@@ -69,7 +69,7 @@ pro tvSwitcher::UpdateButtons
   for i=0,self->MsgListLen()-1 do begin 
      ic=objs[i]->Icon()
      if objs[i]->Status() then begin ;on
-        if size(ic,/N_DIMEN) eq 2 then val=ic else val='*'+ic+'*'
+        if size(ic,/N_DIMEN) eq 2 then val=ic else val='>'+ic+'<'
      endif else begin           ;off
         if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic
      endelse 
@@ -98,7 +98,7 @@ pro tvSwitcher::Start
      if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic   
      (*self.wList)[i]= $
         widget_button(self.sBase[1b-(*self.MsgList)[i].Exclusive], $
-                      /NO_RELEASE,value=val,/DYNAMIC_RESIZE)
+                      /NO_RELEASE,value=val,xsize=70)
   endfor 
 end
 
@@ -129,7 +129,6 @@ function tvSwitcher::Init,parent,oDraw,USECASE=uc,_EXTRA=e
   ;; Get our key object and sign us up.  Important Keywords get Passed On.
   self.Key=obj_new('tvKey',oDraw)
   self.Key->MsgSignup,self,/TVKEY_KEY
-  
   self.UseCase=keyword_set(uc) 
   
   ;; see if a valid base was passed, if so make the buttons bases there
