@@ -51,6 +51,9 @@
 ; MODIFICATION HISTORY:
 ;
 ;    $Log$
+;    Revision 1.5  2002/06/20 01:21:04  devost
+;    Changed the Icon to a label.
+;
 ;    Revision 1.4  2002/06/19 16:33:11  devost
 ;    Changed the icons to context labels. The placing of the buttons and the
 ;    label put there will have to be revisited.
@@ -96,7 +99,7 @@
 
 function tvPixtbl::Icon
 
-return,'PixetTable'
+return,'PixTable'
 
 ;  return, [                               $
 ;                [000B, 000B],                   $
