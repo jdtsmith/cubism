@@ -453,8 +453,16 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                     UVALUE='viewbackground'), $
       widget_button(cube,VALUE='View Background (new viewer)..', $
                     UVALUE='viewbackground-new'), $
-      widget_button(cube,VALUE='Remove Background...', $
+      widget_button(cube,VALUE='Remove Background', $
                     UVALUE='remove-background')]
+  
+  but=widget_button(cube,VALUE='Load Bad Pixels...',UVALUE='loadbadpixels', $
+                    /SEPARATOR)
+  (*self.wInfo).MUST_BPL= $
+     [widget_button(cube,VALUE='Save Bad Pixels...',UVALUE='savebadpixels') , $
+      widget_button(cube,VALUE='Clear Bad Pixel List...', $
+                    UVALUE='clearbadpixels')]
+  
   wMustCube=[wMustCube, $
              ;;-------------
              widget_button(cube,VALUE='View Cube...',UVALUE='viewcube', $
@@ -624,6 +632,7 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
   detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the info
   detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
   detCal=self.cal & self.cal=obj_new() ;or the calibration object
+  detCubeRecs=self.cuberecs & self.cuberecs=ptr_new() ; or the cuberec list
   
   if ptr_valid(self.DR) then begin 
      detRevAccts=(*self.DR).REV_ACCOUNT 
@@ -637,6 +646,7 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
      self.wInfo=detInfo         ;reattach them
      self.MsgList=detMsgList
      self.cal=detCal
+     self.cuberecs=detCubeRecs
      if ptr_valid(self.DR) then (*self.DR).REV_ACCOUNT=detRevAccts
      self.Changed=oldchange     ;reassign our old changed status
      self->Error,['Error Saving to File: ',file]
@@ -647,9 +657,63 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
   self.wInfo=detInfo           
   self.MsgList=detMsgList   
   self.cal=detCal
+  self.cuberecs=detCubeRecs
   if ptr_valid(self.DR) then (*self.DR).REV_ACCOUNT=detRevAccts
   if strlen(self.SaveFile) eq 0 or keyword_set(AS) then self.SaveFile=file
   self->UpdateTitle
+end
+
+
+;=============================================================================
+;  LoadBadPixels - Load bad pixels from file
+;=============================================================================
+pro CubeProj::LoadBadPixels,file,ERROR=err
+  catch, err
+  if err ne 0 then begin 
+     catch,/cancel
+     if n_elements(un) ne 0 then free_lun,un
+     self->Error,['Error loading bad pixel list from '+file,!ERROR_STATE.MSG],$
+                 /RETURN_ONLY
+  endif
+  if size(file,/TYPE) ne 7 then begin 
+     xf,file,/RECENT,FILTERLIST=['*.bpl','*.*','*'],$
+        TITLE='Load Bad Pixels...',/NO_SHOW_ALL,SELECT=0, $
+        /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
+  endif 
+  if size(file,/TYPE) ne 7 then return ;cancelled
+  openr,un,file,/GET_LUN
+  bp=lonarr(file_lines(file),/NOZERO)
+  readf,un,bp
+  free_lun,un
+  self.bad_pixel_list=ptr_new(bp,/NO_COPY)
+end
+
+
+;=============================================================================
+;  SaveBadPixels - Save bad pixels to file
+;=============================================================================
+pro CubeProj::SaveBadPixels,file
+  if ~ptr_valid(self.bad_pixel_list) then return
+  if size(file,/TYPE) ne 7 then begin 
+     start=idl_validname(self->ProjectName(),/CONVERT_ALL)+".bpl"
+     start=strjoin(strsplit(start,/EXTRACT),'_')
+     xf,file,/RECENT,FILTERLIST=['*.bpl','*.*','*'],/SAVEFILE, $
+        TITLE='Save Bad Pixels As...',/NO_SHOW_ALL,SELECT=0, $
+        START=start,PARENT_GROUP=self->TopBase(),/MODAL
+  endif 
+  if size(file,/TYPE) ne 7 then return ;cancelled
+  openw,un,file,/GET_LUN
+  printf,un,*self.bad_pixel_list
+  free_lun,un
+end
+
+
+;=============================================================================
+;  ClearBadPixels - Clear all bad pixels out
+;=============================================================================
+pro CubeProj::ClearBadPixels, file
+  ptr_free,self.bad_pixel_list
+  self->UpdateButtons
 end
 
 ;=============================================================================
@@ -980,6 +1044,10 @@ pro CubeProj::UpdateButtons
      widget_control, ((*self.wInfo).MUST_BACK)[i], $
                      SENSITIVE=ptr_valid(self.BACKGROUND)
   
+  for i=0,n_elements((*self.wInfo).MUST_BPL-1)-1 do $
+     widget_control, ((*self.wInfo).MUST_BPL)[i], $
+                     SENSITIVE=ptr_valid(self.BAD_PIXEL_LIST)
+  
   widget_control, (*self.wInfo).MUST_SAVE_CHANGED,SENSITIVE= $
                   strlen(self.SaveFile) ne 0 AND keyword_set(self.Changed)
 end
@@ -1009,30 +1077,54 @@ end
 ;=============================================================================
 ;  FindViewer - Find a CubeView to which to send messages.  We send
 ;               messages to one and only one viewer, unless NEW_VIEWER
-;               is set, in which case we spawn a new viewer.
+;               is set, in which case we spawn a new viewer.  The
+;               viewer found will be the most recent one on the
+;               managed list which is displaying products from this
+;               cube of the same type (bcd or cube, bcd by default) as
+;               indicated by the CUBE keyword (default to BCD mode)
 ;=============================================================================
-pro CubeProj::FindViewer,NEW_VIEWER=nv
-  forward_function LookupManagedWidget
-  objs=self->GetMsgObjs(CLASS='CubeRec')
-  valid_viewer=obj_valid(objs[0])
-  if XRegistered('CubeView') eq 0 OR keyword_set(nv) then begin 
-     if valid_viewer then self->MsgListRemove,objs ;get rid of old ones
-     cubeview,CUBE=self         ;have them sign themselves up for our messages
-     return
+pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
+  pvcr=ptr_valid(self.cuberecs)
+  ;; clean list
+  if pvcr then begin 
+     wh=where(obj_valid(*self.cuberecs),NCOMPLEMENT=nc,cnt)
+     if cnt eq 0 then begin 
+        ptr_free,self.cuberecs
+        pvcr=0 
+     endif else if nc gt 0 then *self.cuberecs=(*self.cuberecs)[wh]
   endif 
   
-  if obj_valid(objs[0]) then return ;a viewer is already listening
+  ;; Need a new viewer?
+  if keyword_set(new_viewer) || ~pvcr then begin 
+     if pvcr then self->MsgListRemove,*self.cuberecs
+     cubeview,CUBE=self,RECORD=rec ;have them sign up for our messages     
+     if pvcr then *self.cuberecs=[*self.cuberecs,rec] else $
+        self.cuberecs=ptr_new([rec])
+     return
+  endif
   
-  ;; We need to find a cubeview to talk to
-  resolve_routine,'XManager',/COMPILE_FULL_FILE
-  ids=LookupManagedWidget('CubeView')
-  rec=widget_info(ids[0],FIND_BY_UNAME='CubeRec')
-  if widget_info(rec,/VALID_ID) then begin
-     widget_control, rec,GET_UVALUE=rec
-     ;; sign them up for our messages
-     if obj_valid(rec)?obj_isa(rec,'CubeRec'):0 then self->MsgSignup,rec $
-     else cubeview,CUBE=self
-  endif else cubeview,CUBE=self
+  ;; Pick the best existing viewer
+  recs=self->GetMsgObjs(CLASS='CubeRec')
+  talking=obj_valid(recs[0])
+  
+  for r=0,n_elements(*self.cuberecs)-1 do begin 
+     rec=(*self.cuberecs)[r]
+     rec->GetProperty,BCD_MODE=bcd_mode
+     if bcd_mode eq ~keyword_set(cube_mode) then begin 
+        ;; Not already talking to him?
+        if ~talking || rec ne recs[0] then begin 
+           if talking then self->MsgListRemove,recs
+           self->MsgSignup,rec
+        endif 
+        return
+     endif 
+  endfor 
+  
+  ;; Didn't find one with the right mode... just take the first one
+  if recs[0] ne (*self.cuberecs)[0] then begin 
+     self->MsgListRemove,recs
+     self->MsgSignup,(*self.cuberecs)[0]
+  endif 
 end
 
 ;=============================================================================
@@ -1040,7 +1132,7 @@ end
 ;=============================================================================
 pro CubeProj::ViewCube,NEW_VIEWER=new
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to view'
-  self->FindViewer,NEW_VIEWER=new
+  self->FindViewer,/CUBE_MODE,NEW_VIEWER=new
   self->Send,/CUBE
 end
 
@@ -1117,7 +1209,7 @@ pro CubeProj::SetBackgroundFromRecs,recs
   endelse 
   choice=multchoice('Create background from '+strtrim(n,2)+' recs using:', $
                     list,TITLE='Set BCD Background', $
-                    PARENT_GROUP=self->TopBase(),/MODAL,SELECT=n gt 1)
+                    PARENT_GROUP=self->TopBase(),/MODAL,SELECT=n gt 2)
   choice=choice[0]
   
   if choice eq -1 then return
@@ -1188,7 +1280,8 @@ end
 ;  Info - Info on the cube's contents and history
 ;=============================================================================
 function CubeProj::Info,entries, NO_DATA=nd
-  str=['IRS Spectral Cube: '+self->ProjectName()]
+  str=['IRS Spectral Cube: '+self->ProjectName()+ $
+       (self.ACCOUNTS_VALID ne 1b?" (needs rebuilding)":"")]
   str=[str,' Cube Created: '+ $
        (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))]
   str=[str,' ' + (self.MODULE?self.MODULE:"(no module)")+ $
@@ -1201,6 +1294,9 @@ function CubeProj::Info,entries, NO_DATA=nd
        (ptr_valid(self.BACKGROUND)? $
         (strtrim(self.back_cnt,2)+' records, '+jul2date(self.BACK_DATE)): $
         "none")]
+  str=[str,' Bad Pixels: '+(ptr_valid(self.BAD_PIXEL_LIST)? $
+                            strtrim(n_elements(*self.BAD_PIXEL_LIST),2): $
+                            "none")]
   aps=' Apertures:'
   if NOT ptr_valid(self.APERTURE) OR self.MODULE eq '' then begin 
      aps=aps+' (default)' 
@@ -1215,7 +1311,7 @@ function CubeProj::Info,entries, NO_DATA=nd
      endfor 
   endelse 
   str=[str,aps]
-  
+
   str=[str, $
        ' '+string(FORMAT='(I0,"x",I0," steps = ",F7.3," x ",F7.3,' + $
                   '" arcsec"," (",F6.3," arcsec/pixel)")',self.NSTEP, $
@@ -1254,7 +1350,8 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           MODULE=md,ORDER=ord, PR_WIDTH=prw, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
                           APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
-                          PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb
+                          PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
+                          BAD_PIXEL_LIST=bpl
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
         self.PLATE_SCALE=ps
@@ -1322,26 +1419,33 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
   if n_elements(chngd) ne 0 then self.Changed=chngd
   if n_elements(spn) ne 0 then self.Spawned=spn
   if n_elements(fb) ne 0 then self.feedback=fb
+  if n_elements(bpl) ne 0 then begin 
+     ptr_free,self.bad_pixel_list
+     if bpl[0] ne -1 then self.bad_pixel_list=ptr_new(bpl)
+     self.Changed=1b
+  endif 
   self->UpdateAll,/NO_LIST
 end
 
 ;=============================================================================
-;  GetProperty
+;  GetProperty - Get properties, as a pointer to the original data if
+;                POINTER set.
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            CUBE_UNCERTAINTY=err, PR_SIZE=prz, PR_WIDTH=prw, $
                            CALIB=calib, MODULE=module, APERTURE=ap, $
                            PROJECT_NAME=pn,DR=dr, TLB_OFFSET=tboff, $
                            TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
-                           ASTROMETRY=astr,POSITION_ANGLE=pa,BACKGROUND=bg
-  if arg_present(account) then $
-     if ptr_valid(self.ACCOUNT) then account=*self.account
-  if arg_present(wave) then $
-     if ptr_valid(self.WAVELENGTH) then wave=*self.WAVELENGTH
-  if arg_present(cube) then $
-     if ptr_valid(self.CUBE) then cube=*self.CUBE
-  if arg_present(unc) then $
-     if ptr_valid(self.CUBE_UNC) then unc=*self.CUBE_UNC
+                           ASTROMETRY=astr,POSITION_ANGLE=pa,BACKGROUND=bg, $
+                           BAD_PIXEL_LIST=bpl,PMASK=pmask,POINTER=ptr
+  ptr=keyword_set(ptr) 
+  if arg_present(account) && ptr_valid(self.ACCOUNT) then $
+     account=ptr?self.account:*self.account
+  if arg_present(wave) && ptr_valid(self.WAVELENGTH) then $
+     wave=ptr?self.WAVELENGTH:*self.WAVELENGTH
+  if arg_present(cube) && ptr_valid(self.CUBE) then $
+     cube=ptr?self.CUBE:*self.CUBE
+  if arg_present(unc) && ptr_valid(self.CUBE_UNC) then unc=*self.CUBE_UNC
   if arg_present(prz) then prz=self.PR_SIZE
   if arg_present(prw) then prw=self.PR_SIZE[1]
   if arg_present(calib) then begin 
@@ -1351,7 +1455,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   if arg_present(module) then module=self.MODULE
   if arg_present(ap) then begin 
      self->NormalizeApertures
-     ap=*self.APERTURE
+     ap=ptr?self.APERTURE:*self.APERTURE
   endif 
   if arg_present(pn) then pn=self->ProjectName()
   if arg_present(dr) then dr=self.DR
@@ -1381,8 +1485,17 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   if arg_present(version) then version=self.version
   if arg_present(astr) then astr=self->CubeAstrometryRecord()
   if arg_present(pa) then pa=self.PA
-  if arg_present(bg) && ptr_valid(self.BACKGROUND) then bg=*self.BACKGROUND
+  if arg_present(bg) && ptr_valid(self.BACKGROUND) then $
+     bg=ptr?self.BACKGROUND:*self.BACKGROUND
+  if arg_present(bpl) && ptr_valid(self.bad_pixel_list) then $
+     bpl=ptr?self.bad_pixel_list:*self.bad_pixel_list 
+  if arg_present(pmask) then begin 
+     self->LoadCalib
+     self.cal->GetProperty,self.module,PMASK=pmask
+     if ~ptr && ptr_valid(pmask) then pmask=*pmask
+  endif
 end
+
 
 ;=============================================================================
 ;  PRs - Return the WAVSAMP Pseudo-Rectangle Samples currently
@@ -1471,6 +1584,7 @@ pro CubeProj::LoadCalib,SELECT=sel
            calname=filestrip(calname)
            if calname ne self.cal_file then begin 
               self.cal_file=calname
+              self.changed=1b
               self.ACCOUNTS_VALID=0b
            endif 
         endif else return
@@ -1480,12 +1594,12 @@ pro CubeProj::LoadCalib,SELECT=sel
   if self.cal_file eq '' then begin 
      self.cal_file=filestrip(irs_recent_calib()) ;use the most recent
      self.ACCOUNTS_VALID=0b
+     self.changed=1b            ;otherwise, same file, no change.
      self->Info,['Calibration set unspecified, loading most recent: ', $
                  '  '+self.cal_file]
   endif
   obj_destroy,self.cal
   self.cal=irs_restore_calib(self.cal_file)
-  self.changed=1
   self->UpdateButtons & self->UpdateTitle
 end
 
@@ -1997,13 +2111,16 @@ pro CubeProj::Normalize
   self.PLATE_SCALE=ps
     
   ;; Normalize the number of steps and step size (they should all be the same)
-  stepsper=(stepspar=lonarr(n_elements(*self.DR)))
-  stepszper=(stepszpar=dblarr(n_elements(*self.DR)))
-  for i=0,n_elements(*self.DR)-1 do begin 
-     stepsper[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPER')
-     stepspar[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPAR')
-     stepszpar[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPAR')
-     stepszper[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPER')
+  enabled=where((*self.DR).DISABLED eq 0,good_cnt)
+  if good_cnt eq 0 then return
+  
+  stepsper=(stepspar=lonarr(good_cnt))
+  stepszper=(stepszpar=dblarr(good_cnt))
+  for i=0,good_cnt-1 do begin 
+     stepsper[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'STEPSPER')
+     stepspar[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'STEPSPAR')
+     stepszpar[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'SIZEPAR')
+     stepszper[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'SIZEPER')
   endfor 
   
   ;; XXX No longer necessary with pos-based layout
@@ -2163,6 +2280,7 @@ pro CubeProj::LayoutBCDs
            [final_off[1],-pr_half]]-.5 ;nasalib standard: 0,0: center of pix
 
   for i=0,n_elements(*self.DR)-1 do begin 
+     if (*self.DR)[i].DISABLED then continue
      pa_rqst=(*self.DR)[i].PA_RQST
      c_pa=cos((270.0D - pa_rqst)/RADEG) ;WCS uses CROTA = N CCW from +y 
      s_pa=sin((270.0D - pa_rqst)/RADEG)
@@ -2176,7 +2294,7 @@ pro CubeProj::LayoutBCDs
 ;     prs[*,i]=[a_rect,d_rect]
      
      ;; Offset to the correct order: account for building a cube using
-     ;; data pointed at another order.
+     ;; data targeted at another order.
      if (*self.DR)[i].TARGET_ORDER ne self.ORDER AND $
         self.ORDER ne 0 then begin
         self.cal->TransformCoords,self.MODULE,[1.#a_rect,1.#d_rect],pa_rqst, $
@@ -2188,8 +2306,7 @@ pro CubeProj::LayoutBCDs
      ;; Compute corner celestial positions in cube frame
      ad2xy,a_rect,d_rect,cubeastr,x,y ;x,y in 0,0 pixel-centered
      x+=0.5 & y+=0.5            ;back to normal pixel convention (.5-centered)
-;     prs[*,i]=[x,y]
-     
+
      ;; Accumulate pixel bounding rectangle
      if n_elements(x_min) ne 0 then begin 
         x_min=x_min<min(x) & y_min=y_min<min(y)
@@ -2270,6 +2387,13 @@ pro CubeProj::BuildCube
   cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
   
+  ;; Bad pixels
+  if ptr_valid(self.BAD_PIXEL_LIST) then begin 
+     bpmask=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=1b)
+     bpmask[*self.BAD_PIXEL_LIST]=0b
+     use_bpmask=1
+  endif else use_bpmask=0
+  
   for dr=0,n_elements(*self.DR)-1 do begin 
      if (*self.DR)[dr].DISABLED then continue
      acct=*(*self.DR)[dr].ACCOUNT
@@ -2282,8 +2406,14 @@ pro CubeProj::BuildCube
      
      ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
      ;; entering the cube
-     if ptr_valid((*self.DR)[dr].BMASK) then $
-        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) eq 0L else bmask=[1.]
+     if ptr_valid((*self.DR)[dr].BMASK) then begin 
+        use_bmask=1
+        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) eq 0L 
+        if use_bpmask then bmask AND= bpmask
+     endif else if use_bpmask then begin 
+        use_bmask=1
+        bmask=bpmask
+     endif else use_bmask=0
         
      ;; Use the reverse account to populate the cube
      for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
@@ -2293,15 +2423,26 @@ pro CubeProj::BuildCube
         ;;  need all in one place? ... e.g trimmed mean?
         ;if array_equal(finite(bcd[these_accts.BCD_PIX]),0b) then $
         ;   print,rev_acc[rev_acc[i]:rev_acc[i+1]-1],these_accts.BCD_PIX, $
-        ;         bcd[these_accts.BCD_PIX]
-        cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
-                        total(bcd[these_accts.BCD_PIX] * $
-                              these_accts.AREA * $
-                              bmask[[these_accts.BCD_PIX]],/NAN)
-        areas[rev_min+i]=areas[rev_min+i]+ $
-                         total(these_accts.AREA* $
-                               bmask[these_accts.BCD_PIX]* $
-                               finite(bcd[these_accts.BCD_PIX]))
+                                ;         bcd[these_accts.BCD_PIX]
+        
+        ;; Default pixel value is non-finite (NaN)
+        if use_bmask then begin 
+           cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
+                           total(bcd[these_accts.BCD_PIX] * $
+                                 these_accts.AREA * $
+                                 bmask[these_accts.BCD_PIX],/NAN)
+           areas[rev_min+i]=areas[rev_min+i]+ $
+                            total(these_accts.AREA * $
+                                  bmask[these_accts.BCD_PIX] * $
+                                  finite(bcd[these_accts.BCD_PIX]))
+        endif else begin 
+           cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
+                           total(bcd[these_accts.BCD_PIX] * $
+                                 these_accts.AREA,/NAN)
+           areas[rev_min+i]=areas[rev_min+i]+ $
+                            total(these_accts.AREA * $
+                                  finite(bcd[these_accts.BCD_PIX]))
+        endelse 
      endfor
   endfor 
   
@@ -2431,7 +2572,7 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
      if z lt (*self.DR)[i].REV_MIN then continue
      thisz=z-(*self.DR)[i].REV_MIN
      ri=*(*self.DR)[i].REV_ACCOUNT
-     if ri[thisz] eq ri[thisz+1] then continue
+     if ri[thisz] ge ri[thisz+1] then continue
      if show then show_vec[i]=1b
      accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[thisz]:ri[thisz+1]-1]]
      ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,BCD_VAL:0.0, $
@@ -2951,8 +3092,8 @@ pro CubeProj::Cleanup
   heap_free,self.MERGE
   ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC, $
            self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
-           self.wInfo
-  if self.spawned then obj_destroy,self.cal ;noone else will see it.
+           self.cuberecs,self.wInfo
+  ;if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->ObjMsg::Cleanup
 end
 
@@ -2961,7 +3102,7 @@ end
 ;=============================================================================
 function CubeProj::Init, name, _EXTRA=e
   if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up
-  if self->IDLitComponent::Init() ne 1 then return,0
+;  if self->IDLitComponent::Init() ne 1 then return,0
 
   self.Changed=0b               ;coming into existence doesn't count
   if n_elements(e) ne 0 then self->SetProperty,_EXTRA=e
@@ -2984,7 +3125,7 @@ end
 ;=============================================================================
 pro CubeProj__define
   c={CubeProj, $
-     INHERITS IDLitComponent, $ ;Use Property stuff
+;     INHERITS IDLitComponent, $ ;Use Property stuff
      INHERITS ObjMsg, $         ;make it an object messanger
      INHERITS ObjReport, $      ;for error, etc. reporting
      ProjectName:'', $          ;the name of the current project 
@@ -3008,6 +3149,7 @@ pro CubeProj__define
      SCALED_BACK: ptr_new(), $  ;the scaled background for stacks
      BACK_DATE: 0.0D, $         ;date background created
      BACK_CNT:0, $              ;count of records used to create background
+     BAD_PIXEL_LIST: ptr_new(),$ ;a user list of bad pixels to exclude
      NSTEP:[0L,0L], $           ;parallel (col), perpendicular (row) steps
      STEP_SIZE: [0.0D,0.0D], $  ;parallel, perpendicular slit step sizes (deg)
      PLATE_SCALE:0.0D, $        ;the plate scale (degrees/pixel)
@@ -3028,6 +3170,7 @@ pro CubeProj__define
      SaveFile:'', $             ;the file it was saved to
      sort:0b, $                 ;our sorting order
      version:'', $              ;the Cubism version of this cube
+     cuberecs:ptr_new(), $      ;a list of cubeview records's we've spawned
      wInfo:ptr_new()}           ;the widget info struct.... a diconnectable ptr
   
   
@@ -3089,7 +3232,8 @@ pro CubeProj__define
          MUST_PROJ:0L, $        ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
-         MUST_BACK:lonarr(3)}   ;background record must be set
+         MUST_BACK:lonarr(3), $ ;background record must be set
+         MUST_BPL:lonarr(2)}    ;must have a list of bad pixels
 
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
