@@ -116,7 +116,8 @@ end
 ;  UpdateWAVSAMP - Get the new cube's WAVSAMP list (all orders) for the BCD
 ;=============================================================================
 pro cvLine::UpdateWAVSAMP,MODULE=md
-  if ptr_valid(self.PRs) then heap_free,self.PRs
+  if ptr_valid(self.PRs) then $
+     ptr_free,(*self.PRs).PRs,(*self.PRs).RANGE,self.PRs
   if obj_valid(self.cube) then $
      prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords) $
   else if obj_valid(self.calib) then begin 
@@ -202,8 +203,9 @@ end
 ;  Cleanup
 ;=============================================================================
 pro cvLine::Cleanup
-  heap_free,self.PRs
-  ptr_free,self.astrometry
+  if ptr_valid(self.PRs) then $
+     ptr_free,(*self.PRs).PRs,(*self.PRs).RANGE,self.PRs
+  ptr_free,self.astrometry,self.mask
   self->tvPlug_lite::Cleanup
 end
 
