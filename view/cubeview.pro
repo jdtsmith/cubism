@@ -103,12 +103,12 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
             {Obj:stats,      keys:'s',Exclusive:1b}, $
             {Obj:phot,       keys:'p',Exclusive:1b}, $
             {Obj:cuberec,    keys:'x',Exclusive:1b}, $
-            {Obj:cubeback,   keys:'', Exclusive:1b}, $
+            {Obj:cubeback,   keys:'t', Exclusive:1b}, $
             {Obj:cubebadpix, keys:'b',Exclusive:1b}, $
             {Obj:aper,       keys:'', Exclusive:1b}]
   
   ;; Toggle-able, non-exclusive list, to the right in toolbar
-  tog_list=[{Obj:pixtbl,     keys:'t',Exclusive:0b}]
+  tog_list=[{Obj:pixtbl,     keys:'',Exclusive:0b}]
 
   ;; a switcher for switching among the tools using icons or keypresses
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
@@ -117,7 +117,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   ;; Various other buttons
   resize=obj_new('tvResize',oDraw,SIZE_MENU=option_menu)
   
-  bquit=widget_button(file_menu,value="Quit",UVALUE='quit') 
+  bquit=widget_button(file_menu,value="Quit",UVALUE='quit',/SEPARATOR) 
   
   ;; put the tvD into the uvalue, to destroy on cleanup.
   widget_control,base,SET_UVALUE=oDraw,/REALIZE
