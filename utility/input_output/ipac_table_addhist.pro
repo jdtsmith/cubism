@@ -72,7 +72,7 @@ pro ipac_table_addhist,value,hdr,COMMENT=comm,BLANK=blank
      message,'Invalid IPAC TABLE header: must be string or string array.'
   
   add=(keyword_set(comm)?'\COMMENT ': $
-       (keyword_set(blank)?'':'\HISTORY ')) + value
+       (keyword_set(blank)?'\':'\HISTORY ')) + value
   
   ;; Add comment before history, and history at end of History
   wh=where(strpos(hdr,'\HISTORY') eq 0,cnt)
