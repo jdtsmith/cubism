@@ -134,9 +134,9 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
   if self.mode eq 2 then begin  ;bcd mode
      self->Reset,/DISABLE       ;no need for our extraction tool.
      self.oAper->On
-  endif else begin 
+  endif else begin              ; A cube mode
      if NOT self->Enabled() then self->Enable
-     self.oAper->Off
+     self.oAper->Off,/RESET
   endelse 
 
   ;;Switch the base showing
