@@ -30,7 +30,7 @@
 ; EXAMPLE:
 ;
 ;    plot_wavsamp, $
-;       cal->GetWAVSAMP('LL',1,{IRS_APERTURE,[.2,.5],[.7,.4]}), $
+;       cal->GetWAVSAMP('LL',1,APER=irs_aperture([.2,.5],[.7,.4])), $
 ;       COLOR=!D.TABLE_SIZE-4,/NOERASE
 ;
 ; MODIFICATION HISTORY:
@@ -44,7 +44,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 J.D. Smith
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -63,12 +63,13 @@
 ;
 ;##############################################################################
 
-pro plot_wavsamp, ws_list, _EXTRA=e
+pro plot_wavsamp, ws_list, ANIMATE=anm,_EXTRA=e
   plot,[0],[0],XRANGE=[0,128],YRANGE=[0,128],XSTYLE=5,YSTYLE=5,/NODATA, $
        POSITION=[0,0,1,1],_EXTRA=e
   for i=0,n_elements(ws_list)-1 do begin 
      x=ws_list[i].X
      y=ws_list[i].Y
      oplot,[x,x[0]],[y,y[0]],_EXTRA=e
+     if keyword_set(anm) then wait,.15
   endfor 
 end
