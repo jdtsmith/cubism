@@ -10,7 +10,7 @@
 ;    
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
+;    IRS Spectral Reduction, Analysis and Processing.
 ;    File I/O
 ;    	
 ; CALLING SEQUENCE:
