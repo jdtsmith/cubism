@@ -14,7 +14,7 @@
 ;
 ; CALLING SEQUENCE:
 ;
-;    plist=polyclip(i,j,x,y,[AREAS=])
+;    polyclip,i,j,x,y
 ;
 ; INPUTS:
 ;
@@ -22,30 +22,32 @@
 ;
 ;    x,y: The vectors containing the x and y subscripts of the
 ;       polygon.  May be in fractional units; pixel centers for pixel
-;       (i,j) is at (x,y)=(i+.5,j+.5).
+;       (i,j) is at (x,y)=(i+.5,j+.5).  Modified on output
 ;
 ; OUTPUTS:
 ;
-;    plist: A new 2xn polygon list, with adjacent columns giving the X
-;       and Y coordinates of the clipped polygon vertices.  If a pixel
-;       is fully outside the specified polygon, -1 is returned.
+;    x,y: X and Y coordinates of the clipped polygon vertices,
+;       modified on output.  If a pixel is fully outside the specified
+;       polygon, x=-1 is returned.
 ;
 ; EXAMPLE:
 ;
-;    p=polyclip(5,4,[1.2,3,5.3,3.2],[1.3,6.4,4.3,2.2])
+;    x=[1.2,3,5.3,3.2] & y=[1.3,6.4,4.3,2.2]
+;    polyclip,5,4,x,y
 ;
 ; MODIFICATION HISTORY:
 ;
-;       2002-08-27 (J.D. Smith): Migrated from SMART codebase
-;       2001-09-26 (J.D. Smith): Written and documented
 ;
+;       2002-08-27 (J.D. Smith): Migrated from SMART codebase
+;       2002-07-28 (J.D. Smith): Optimized, inlining clip_*
+;       2001-09-26 (J.D. Smith): Written and documented
 ;-
 ;    $Id$
 ;##############################################################################
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 J.D. Smith
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -64,50 +66,61 @@
 ;
 ;##############################################################################
 
-;; Compute whether a given point is "inside" the specified edge.
-function clip_inside,i,j,p,t
-  case t of
-     0b: return, p[0] gt i    ;left
-     1b: return, p[0] lt i+1  ;right
-     2b: return, p[1] lt j+1  ;top
-     3b: return, p[1] gt j    ;bottom
-  endcase 
-end
-
-;; Compute the intersection of a given polygon side and the specified
-;; unit pixel edge
-function clip_intersection,i,j,s,p,t
-  case t of
-     0b: return,[i,s[1]+(p[1]-s[1])/(p[0]-s[0])*(i-s[0])] ;left
-     1b: return,[i+1,s[1]+(p[1]-s[1])/(p[0]-s[0])*(i+1-s[0])] ; right
-     2b: return,[s[0]+(p[0]-s[0])/(p[1]-s[1])*(j+1-s[1]),j+1] ; top
-     3b: return,[s[0]+(p[0]-s[0])/(p[1]-s[1])*(j-s[1]),j] ; bottom
-  endcase
-end
-
-function polyclip,i,j,px,py
+pro polyclip,i,j,pol_x,pol_y
   ;; Sutherland-Hodgman's polygon-clipping algorithm for a square unit pixel
-  ;;       A polygon side looks like:
+  ;;       A polygon edge looks like:
   ;;                 s-------->p
-  plist=[transpose(px),transpose(py)] ;the vertex list
+  np=n_elements(pol_x) 
+  py_out=(px_out=fltarr(2*(np>4),/nozero));room for full clipped polygon
+  clip_vals=[i,i+1,j+1,j]
+  
   for ctype=0b,3b do begin      ;clip left, right, top, bottom
-     np=(size(plist,/DIMENSIONS))[1]
-     ;; start with the final->first vertex segment
-     s=plist[*,np-1] & in_s=clip_inside(i,j,s,ctype) 
+     case ctype of              ;which points are inside this clipping line?
+        0b: in=pol_x gt i       ;  left
+        1b: in=pol_x lt i+1     ;  right
+        2b: in=pol_y lt j+1     ;  top
+        3b: in=pol_y gt j       ;  bottom
+     endcase 
+     
+     ;; entirely inside..... no change to polygon
+     if array_equal(in,1b) then continue
+     
+     cv=clip_vals[ctype]
+     
+     ;; does the segment cross the clipping line?
+     crosses=shift(in,1) XOR in
+     pind=0                     ;the index into the vectors
      for k=0,np-1 do begin
-        p=plist[*,k] & in_p=clip_inside(i,j,p,ctype)
-        if in_s XOR in_p then begin ; in->out or out->in, add intersection
-           ci=clip_intersection(i,j,s,p,ctype)
-           if size(pnew,/N_DIMENSIONS) eq 0 then $
-              pnew=[ci] else pnew=[[pnew],[ci]]
+        px=pol_x[k] & py=pol_y[k]
+        if crosses[k] then begin ; in->out or out->in, add intersection
+           ;; Put the intersection point on the list
+           ind=k eq 0?np-1:k-1
+           sx=pol_x[ind] & sy=pol_y[ind]
+           switch ctype of
+              0b:               ;left
+              1b: begin         ;or right
+                 px_out[pind]=cv
+                 py_out[pind]=sy+(py-sy)/(px-sx)*(cv-sx)
+                 break
+              end
+              2b:               ;top
+              3b: begin         ;or bottom
+                 px_out[pind]=sx+(px-sx)/(py-sy)*(cv-sy)
+                 py_out[pind]=cv
+                 break
+              end
+           endswitch
+           pind=pind+1
         endif
-        if in_p then $          ; out->in or in->in, add 2nd point
-           if size(pnew,/N_DIMENSIONS) eq 0 then $
-           pnew=[p] else pnew=[[pnew],[p]]
-        s=p & in_s=in_p         ; rotate
-     endfor
-     if size(pnew,/N_DIMENSIONS) eq 0 then return,-1 ; entirely outside
-     plist=pnew & pnew=0
+        if in[k] then begin ; out->in or in->in, add 2nd point
+           px_out[pind]=px & py_out[pind]=py
+           pind=pind+1
+        endif 
+     endfor 
+     if pind eq 0 then begin   ; polygon is entirely outside this line
+        pol_x=-1
+        return 
+     endif 
+     np=pind & pol_x=px_out[0:np-1] & pol_y=py_out[0:np-1] ;swap
   endfor
-  return,plist
 end
