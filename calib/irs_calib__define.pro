@@ -319,11 +319,15 @@
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
                             PLATE_SCALE=ps,PMASK=pmask,FLUXCON=fluxcon, $
-                            KEY_WAV=fluxcon_kw,TUNE=tune
+                            KEY_WAV=fluxcon_kw,TUNE=tune,SLCF=slcf
   if arg_present(pmask) then begin 
      m=irs_module(module)
      pmask=self.PMASK[m]
-  endif 
+  endif
+  if arg_present(slcf) then begin 
+     m=irs_module(module)
+     slcf=self.SLCF[m]
+  endif
   if arg_present(name) then name=self.name
   if n_elements(module) ne 0 then $
      rec=self->GetRecord(module,order,/MUST_EXIST)
@@ -390,6 +394,8 @@ function IRS_Calib::Info, modules, orders, SHORT=short
      if pmf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'PMASK',pmf)]
      fcf=self.FLUXCON_FILE[md]
      if fcf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'FLUXCON',fcf)]
+     slcff=self.SLCF_FILE[md]
+     if slcff ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'SLCF',slcff)]
      
      str=[str,'']
      for j=0,no-1 do begin 
@@ -483,10 +489,8 @@ function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
                                  FULL=full, RECORD=rec, $
                                  WAVELENGTH_SCALED=wvscld,ALL=all
   rec=self->GetRecord(module,order,/MUST_EXIST)
-  if ~ptr_valid(rec.WAVSAMPS) then begin 
-     nsamp=0
-     return,-1
-  endif 
+  nsamp=0
+  if ~ptr_valid(rec.WAVSAMPS) then return,-1
   
   if ~keyword_set(all) then begin 
      if n_elements(pb) eq 0 then pb=0b ;default to non-pb
@@ -608,6 +612,10 @@ pro IRS_Calib::FreeWAVSAMP, module, order,RECORD=rec,INDEX=inds, _EXTRA=e
   if NOT ptr_valid(rec.WAVSAMPS) then return
   
   if n_elements(inds) eq 0 then begin 
+     if n_elements(module) eq 0 then begin 
+        module=rec.module
+        order=rec.order
+     endif 
      inds=self->FindWAVSAMP(module,order,COUNT=nsamp,_EXTRA=e)
      if nsamp eq 0 then return
   endif 
@@ -1034,30 +1042,34 @@ end
 pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                          LINETILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
                          PLATESCALE_VERSION=psv,PMASK_VERSION=pmv, $
-                         FLUXCON_VERSION=fcv,ONLY=only, $
+                         FLUXCON_VERSION=fcv,SLCF_VERSION=slcfv,ONLY=only, $
                          RECOVER_FROM_WAVSAMP=rcvfws
-  cals=replicate({name:'', group:'', type:''},7)
+  cals=replicate({name:'', group:'', type:''},8)
   cals.name=['WAVSAMP','ORDFIND','PMASK','LINETILT','FLUXCON', $
-             'FRAMETABLE','PLATESCALE']
+             'SLCF',   'FRAMETABLE','PLATESCALE']
   cals.group=['single' ,'single' ,'single','single','single', $
-              'all',       'all']
+              'single','all',       'all']
   cals.type= ['tbl'    ,'tbl'    ,'fits'  ,'tbl'   ,'tbl', $
-              'tbl',       'tbl']
+              'tbl',   'tbl',       'tbl']
 
   version=[n_elements(wv)  gt 0?fix(wv)>0:0,  $
            n_elements(orv) gt 0?fix(orv)>0:0, $
            n_elements(pmv) gt 0?fix(pmv)>0:0, $
            n_elements(tv)  gt 0?fix(tv)>0:0,  $
            n_elements(fcv) gt 0?fix(fcv)>0:0, $
+           n_elements(slcfv) gt 0?fix(slcfv)>0:0, $ 
            n_elements(fv)  gt 0?fix(fv)>0:0,  $
            n_elements(psv) gt 0?fix(psv)>0:0]
   
   if keyword_set(only) then begin 
-     which=where([n_elements(wv)  , $
-                  n_elements(orv) , $
-                  n_elements(tv)  , $
-                  n_elements(fv)  , $
-                  n_elements(psv)] ne 0 ,cnt)
+     which=where([n_elements(wv), $
+                  n_elements(orv), $
+                  n_elements(pmv), $
+                  n_elements(tv), $
+                  n_elements(fcv), $
+                  n_elements(slcfv), $
+                  n_elements(fv), $
+                  n_elements(psv) ] ne 0 ,cnt)
      if cnt eq 0 then return
      cals=cals[which]           ;only these cals are to be used
      version=version[which]
@@ -1070,7 +1082,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
      for j=0,scnt-1 do begin 
-        ;; Skip ORDFIND and LINETILT if we are recovering from WS
+        ;; Skip ORDFIND and LINETILT if we are recovering them from WS
         if keyword_set(rcvfws) then $
            if cals[singles[j]].name eq 'ORDFIND' || $
               cals[singles[j]].name eq 'LINETILT' then continue
@@ -1334,6 +1346,16 @@ pro IRS_Calib::ParsePMASK,file,module
   self.PMASK_FILE[m]=file
 end
 
+;=============================================================================
+;  ParseSLCF
+;=============================================================================
+pro IRS_Calib::ParseSLCF,file,module
+  m=irs_module(module)
+  data=read_ipac_table(file)
+  self.SLCF[m]=ptr_new(transpose([[data.wavelength],[data.slcf]]))
+  self.SLCF_FILE[m]=file
+end
+
 
 ;=============================================================================
 ;  ParseFluxcon - Read and parse the specified FLUXCON file, saving
@@ -1470,7 +1492,9 @@ pro IRS_Calib__define
          ORDER_FILE:strarr(5),$ ;the name of the ORDFIND file (a's & b's)
          FLUXCON_FILE:strarr(5),$ ;the name of the FLUXCON coefficient file
          PMASK_FILE:strarr(5),$ ;the name of the pmask files   
-         PMASK:ptrarr(5), $     ;the pmask, one for each order   
+         SLCF_FILE:strarr(5), $ ;name of the SLCF files
+         PMASK:ptrarr(5), $     ;the pmask, one for each module
+         SLCF: ptrarr(5), $     ;SLCF for each module (at most)
          cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
                                 ;for each module: 0:LH, 1:LL, 2:SH, 3:SL 4:MSED
   
