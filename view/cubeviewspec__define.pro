@@ -758,6 +758,7 @@ pro CubeViewSpec::HighlightPeak
   if NOT ptr_valid(self.reg[1]) then return
   for i=0,n_elements(*self.reg[1])/2-1 do begin 
      reg=(*self.reg[1])[*,i]
+     if NOT array_equal(reg ge 0,1b) then return
      oplot,(*self.lam)[reg[0]:reg[1]],(*self.sp)[reg[0]:reg[1]], $
            COLOR=self.colors_base+3
   endfor 
