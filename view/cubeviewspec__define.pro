@@ -276,7 +276,7 @@ pro CubeViewSpec::Send
      lams=(*self.lam)[*self.reg[1]]
      msg.info=string(FORMAT='(%"Stack: %5.2fum - %5.2fum")', $
                      min(lams),max(lams))
-     if ptr_valid(self.reg[0]) then msg.info=msg.info+' (BG'
+     if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
      msg.foreground=self.reg[1]
      ;; Send either the fit, or the background regions themselves.
      if n_elements(*self.fit) gt 0 AND self.medlam ne 0. then begin 
@@ -763,6 +763,7 @@ end
 pro CubeViewSpec::Cleanup
   wdelete,self.pixwin
   ptr_free,self.lam,self.sp,self.fit,self.reg
+  self->ObjMsg::Cleanup
 end
 
 ;; Renorm is power to renormalize data by (e.g. to make 1e-18 -> 1 use
