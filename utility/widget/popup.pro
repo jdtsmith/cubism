@@ -16,11 +16,11 @@ function popup, text, list, TITLE=ttl, PARENT_GROUP=parent, MODAL=md, $
    
    if keyword_set(parent) then begin 
       base=widget_base(/COLUMN,MODAL=md,GROUP_LEADER=parent,_EXTRA=e, $
-                       /BASE_ALIGN_CENTER,SPACE=1)
+                       /BASE_ALIGN_CENTER,TITLE=ttl,SPACE=1)
    endif else begin 
       sc=get_screen_size()
       base=widget_base(/COLUMN,_EXTRA=e,/BASE_ALIGN_CENTER,  $
-                       XOFFSET=sc[0]/2-20, YOFFSET=sc[1]/2-20)
+                       XOFFSET=sc[0]/2-20, YOFFSET=sc[1]/2-20, TITLE=ttl)
    endelse 
 
    b1=widget_base(base,/ROW)
