@@ -43,11 +43,11 @@ end
 ;       Toggle - Turn object on or off, depending on status and type,
 ;                and set button.
 ;=============================================================================
-
 pro tvSwitcher::Toggle, hit
-  
-  if(*self.MsgList)[hit].Exclusive then begin
-     wh=where((*self.MsgList).Exclusive eq 1,cnt)
+  ;; Toggle On/Off, depending on type.
+  if self->MsgListLen() eq 0 then return
+  if (*self.MsgList)[hit].Exclusive then begin
+     wh=where((*self.MsgList).Exclusive,cnt)
      for i=0,cnt-1 do begin
         obj=self->GetObj((*self.MsgList)[wh[i]])
         if wh[i] eq  hit then obj->On else if obj->Status() then obj->Off
@@ -57,28 +57,8 @@ pro tvSwitcher::Toggle, hit
      if obj->Status() then obj->Off else obj->On
   endelse
   self->UpdateButtons
-
 end
 
-
-
-pro tvSwitcher::ToggleOld,hit
-  ;; Toggle On/Off, depending on type.
-  no=self->MsgListLen()
-  for i=0,no-1 do begin 
-     obj=self->GetObj((*self.MsgList)[i])
-     if (*self.MsgList)[i].Exclusive then begin 
-        if i eq hit then begin  ; Hit it -- turn "on"
-           obj->On              ; just let them decide what On will do
-        endif else begin ;; An exclusive which wasn't the one hit.
-           if obj->Status() then obj->Off
-        endelse 
-     endif else begin           ;just a regular toggler
-        if obj->Status() then obj->Off else obj->On
-     endelse 
-  endfor 
-  self->UpdateButtons
-end
 
 ;=============================================================================
 ;       UpdateButtons - Update the buttons' states
