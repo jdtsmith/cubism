@@ -1564,6 +1564,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
   self->UpdateAll,/NO_LIST
 end
 
+
 ;=============================================================================
 ;  GetProperty - Get properties, as a pointer to the original data if
 ;                POINTER set.
@@ -2674,10 +2675,15 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      fcnt=lonarr(self.CUBE_SIZE[0:1])
      bcnt=0
      for i=0,nfr-1 do begin 
-        stack=stack+ $
+        if foreranges[0,i] eq foreranges[1,i] then begin 
+           stack+=(*self.CUBE)[*,*,foreranges[0,i]]
+           fcnt+=long(finite((*self.CUBE)[*,*,foreranges[0,i]]))
+        endif else begin 
+           stack+= $
               total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],/NAN,3)
-        fcnt+=long(total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
-                                             foreranges[1,i]]),3))
+           fcnt+=long(total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
+                                                foreranges[1,i]]),3))
+        endelse 
         bcnt+=foreranges[1,i]-foreranges[0,i]+1
      endfor
      if nfr gt 0 then stack/=(fcnt>1L)
@@ -2697,10 +2703,15 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   bcnt=lonarr(self.CUBE_SIZE[0:1])
   background=fltarr(self.CUBE_SIZE[0:1])
   for i=0,nbr-1 do begin 
-     background+=total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]], $
-                       /NAN,3)
-     bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
-                                          backranges[1,i]]),3))
+     if backranges[0,i] eq backranges[1,i] then begin 
+        background+=(*self.CUBE)[*,*,backranges[0,i]]
+        bcnt+=long(finite((*self.CUBE)[*,*,backranges[0,i]]))
+     endif else begin 
+        background+=total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]], $
+                          /NAN,3)
+        bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
+                                             backranges[1,i]]),3))
+     endelse 
   endfor 
   background/=(bcnt>1L)
   stack-=background
