@@ -68,7 +68,7 @@ pro tvHist::PlotHist,im
   plots,x,h,THICK=1.5,COLOR=self.color,/DEVICE
   
   ;; show the maximum histogram value
-  xyouts,2,bs[1]-!D.Y_CH_SIZE,strtrim(m,2),COLOR=self.color,/DEVICE
+  xyouts,4,bs[1]-!D.Y_CH_SIZE,strtrim(m,2),COLOR=self.color,/DEVICE
   
   wset,oldwin
 end
