@@ -295,8 +295,7 @@ pro CubeProj::ShowEvent, ev
      
      'about': self->Info,TITLE='About Cube Project', $
                          ['*********************************', $
-                          '       Cube Project v0.2         ', $
-                          '          CUBISM v0.1            ', $
+                          '       CUBISM v0.4, May 2003     ', $
                           '                                 ', $
                           '       JD Smith -- 2002,2003     ', $
                           '  http://sings.stsci.edu/cubism  ', $
