@@ -4,49 +4,14 @@
 ;	Message. Only exclusive and box messages.
 ;=============================================================================
 pro tvHist::Message, msg
-  ;; check for changes in active state -- Update override controls box
   self->tvPlug::Message,msg,TYPE=type
-  if type eq 'BOX' then begin   ; a message from our box
-     self->Histo
-     return
-  endif 
-  if type eq 'TVDRAW_REDRAW' then begin 
-     if (msg.type and 2b) ne 0 then begin ; if original image redrawn
-        ;; if we have a box, redo scaling (and hist plot)
-        if self.Box->IsDrawn() then self->Histo
-     endif 
-     self.Box->Message,msg      ;now alert our box
-  endif 
+  case type of
+     'BOX': self.oDraw->Draw    ;they moved the box!
+     'TVDRAW_PREDRAW':  self->Histo,msg.im
+     'TVDRAW_POSTDRAW': self->PlotHist,msg.im
+     else:
+  endcase 
 end 
-
-;=============================================================================
-;	Update.  Update tvDraw recipient status... turn off and on box if
-;	our active status has just changed... called automatically from
-;	tvPlug::Message to catch TVDRAW_EXCLUSIVE messages with parameter
-;	ac (see tvPlug).
-;=============================================================================
-pro tvHist::Update, ac
-  if n_elements(ac) ne 0 then begin
-     case ac of
-        0b: begin               
-           self.box->Off
-        end
-        
-        1b: begin
-           self.box->On
-        end
-        
-        2b: begin               ;if turned on *again* .. means turn *off*!
-           self.box->Off
-           self.active=0b   
-           self->Reset          ;reset box and resume original scaling
-        end
-     endcase 
-     self->tvPlug::Update,ac    ;chain up, sending change status 
-     return
-  endif 
-  self->tvPlug::Update
-end
 
 function tvHist::Icon
   return,[[  0b,  0b],[  0b,  0b],[  0b,  1b],[  0b,  1b], $
@@ -60,34 +25,26 @@ end
 ;=============================================================================
 ;	Histo.  Actually scale the display to data contained in box.
 ;=============================================================================
-pro tvHist::Histo
+pro tvHist::Histo,im
   if NOT self.Box->IsDrawn() then return
   
   self.Box->Getlrtb,l,r,t,b     ;get box sides
-  ;; Get the Pointers to the images
-  self.oDraw->GetProperty,imorig=io, image=i
   if NOT ((l lt r) and (b lt t)) then return
-  take=(*io)[l:r,b:t]
+  
+  take=(*im)[l:r,b:t]
   s=take(sort(take))
-  n=n_elements(take) 
-  self.max=s[n-3]               ;cut out 4 extreme outliers
+  self.max=s[n_elements(take)-3] ;cut out 4 extreme outliers
   self.min=s[2]
   
   ;; truncate the display image below min, above max for redraw.
-  if self.max gt self.min then *i=(self.min>(*io)<self.max) 
-  
-  self.oDraw->Draw,1            ;draw and send the redraw message
-  self->PlotHist                ;plot the histogram in colorbar if available.
+  if self.max gt self.min then *im=(self.min>(*im)<self.max) 
 end
 
-pro tvHist::PlotHist
+pro tvHist::PlotHist,im
   if NOT self.Box->IsDrawn() then return
   
-  self.oDraw->GetProperty, image=image
-  if NOT ptr_valid(image) then return
   self.colobj->DrawCbar, WIN=win
-  
-  self.colobj->GetProperty, BSIZE=bs
+  self.colobj->GetProperty, BSIZE=bs,TOP=top,BOTTOM=bottom
   oldwin=!D.Window
   wset,win
   
@@ -99,32 +56,19 @@ pro tvHist::PlotHist
      return
   endif 
   
-  if self.div ne 1 then begin
-     ;; divide out the granularity
-     min=min/self.div & max=max/self.div
-     h=histogram(*image/self.div,MIN=min,MAX=max, $
-                 BINSIZE=(max-min)/self.nbins) 
-  endif else begin
-     h=histogram(*image,MIN=min,MAX=max,BINSIZE=(max-min)/self.nbins) 
-  endelse 
+  h=histogram(*im,MIN=bottom,MAX=top,BINSIZE=float(top-bottom)/self.nbins>1) 
   nh=n_elements(h) 
-  h=h[1:nh-2]                   ;lop off the scaled to regions
   
-  ;; renormalize histogram to height of bar
-  m=max(h)
+  ;; renormalize histogram (excluding endpoints) to height of bar
+  m=max(h[1:nh-2])
   h=h*float(bs[1]-1)/m
   
   ;;scale x to width of bar
-  x=findgen(nh-2)/(nh-3)*(bs[0]-1)
-
-                                ;self.colobj->GetProperty,Top=t,Bottom=b, NRESERVE=nr
-                                ;col=t-nr-1
-  col=self.Colobj->GetColor('Green')
-  plots,x,h,THICK=1.5,COLOR=col,/DEVICE
-
+  x=findgen(nh)/(nh-1)*(bs[0]-1)
+  plots,x,h,THICK=1.5,COLOR=self.color,/DEVICE
   
   ;; show the maximum histogram value
-  xyouts,2,bs[1]-!D.Y_CH_SIZE,strtrim(m,2),COLOR=col,/DEVICE
+  xyouts,2,bs[1]-!D.Y_CH_SIZE,strtrim(m,2),COLOR=self.color,/DEVICE
   
   wset,oldwin
 end
@@ -134,24 +78,42 @@ end
 ;=============================================================================
 pro tvHist::Reset
   self.Box->Reset               ;reset to no box drawn
-  self.oDraw->GetProperty,image=i,imorig=io
-  *i=*io
+  self->Off
   self.oDraw->Draw
-  return
 end
 
 ;=============================================================================
-;	Cleanup.  Clean self up
+;	On:  Get all our messages.
 ;=============================================================================
-pro tvHist::Cleanup
-  self->tvPlug::Cleanup
-  return
+pro tvHist::On
+  if self.active then begin     ;if turned on *again* .. means Reset
+     self->Reset            ;reset to no box drawn
+     return
+  end
+  self->tvPlug::On
+  self.box->On
+  self->Update,/EXCLUSIVE,/PREDRAW,/POSTDRAW
+end
+
+;=============================================================================
+;       Off: If we have a box drawn, keep processing.
+;=============================================================================
+pro tvHist::Off
+  self->tvPlug::Off
+  self.box->Off
+  ;; If no box ever drawn, sign up for exclusives only, otherwise,
+  ;; keep all the messages coming
+  if self.box->IsDrawn() eq 0 then begin 
+     self.colobj->DrawCbar
+     self->Update,/ALL_OFF,/EXCLUSIVE
+  endif 
 end
 
 ;=============================================================================
 ;	Start:  Post-Initialization
 ;=============================================================================
 pro tvHist::Start
+  self->tvPlug::Start
   if NOT obj_valid(self.colobj) then begin 
      test=self.oDraw->GetMsgObjs(CLASS='tvcolor')
      if NOT obj_valid(test[0]) then begin 
@@ -160,7 +122,8 @@ pro tvHist::Start
      endif 
      self.ColObj=test[0]
   endif 
-  
+  self.Box->GetProperty,COLOR=col
+  self.color=col
   self->Histo
 end
 
@@ -170,21 +133,14 @@ end
 ;	If COLOR is passed, and is a valid tvColor object, a histogram
 ;	curve will be drawn over the top.
 ;=============================================================================
-function tvHist::Init,oDraw,EXCLUSIVE=exc,COLOBJ=col,DIVISOR=div,NBINS=nb, $
+function tvHist::Init,oDraw,EXCLUSIVE=exc,COLOBJ=col,NBINS=nb, $
                       _EXTRA=e
   if (self->tvPlug::Init(oDraw) ne 1) then return,0 ;chain up
-  if n_elements(div) eq 0 then self.div=1 else self.div=div
   if n_elements(nb) eq 0 then self.nbins=200 else self.nbins=nb
-  
   if obj_valid(col) then if obj_isa(col,'tvColor') then self.colobj=col
   
   ;; Get a tvrbox object, signing ourselves up for box messages from it.
-  self.box=obj_new('tvrbox', oDraw, MsgList=[self],/NO_REDRAW, $
-                   ACTIVE=self.recip.ACTIVE,_EXTRA=e)
-
-  ;; Sign up with Draw object for exclusives only (we lead tvrbox)
-  self->Update,EXCLUSIVE=keyword_set(exc),ACTIVE=1b-keyword_set(exc), $
-     /PREDRAW,/POSTDRAW
+  self.box=obj_new('tvrbox', oDraw, MsgList=[self],/NO_REDRAW,_EXTRA=e)
   return,1
 end
 
@@ -194,11 +150,11 @@ end
 pro tvHist__define
   struct={tvHist, $ 
           INHERITS tvPlug, $    ;make it a plug-in
-          div:0, $              ;the divisor for proper histogram plotting
           min:0.0, $            ;the minimum hist value
           max:0.0, $            ;the maximum hist value
           nbins:0, $            ;number of bins, defaults to 100
           colobj:obj_new(), $   ;a tvColor object we might be using
+          color:0, $              ;the color to draw the histogram with
           box:obj_new()}        ;a tvRBox to use.
   return
 end

@@ -7,22 +7,17 @@ pro tvLine::Message,msg
    
    case type of 
       'WIDGET_DRAW': begin 
-         self.oDraw->GetProperty,offset=offset,zoom=zoom,pan=pan, $
-                                 imorig=imorig,dispsize=dispsize
+         self.oDraw->GetProperty,IMORIG=imorig
          if NOT ptr_valid(imorig) then return
-         X=FLOOR(Float(msg.X-pan[0])/ zoom)
-         Y=FLOOR(Float(msg.Y-pan[1])/ zoom)
-         if X lt 0 or X ge dispsize[0] or Y lt 0 or Y ge  $
-          dispsize[1] then begin 
+         pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
+         if pt[0] eq -1 then begin 
             widget_control, self.wLine,set_value=' '
             self.savpoint=[-1,-1] ;ensure rentry works
             return
          endif 
-         X=X+offset[0] & Y=Y+offset[1]
-         if X eq self.savpoint[0] and Y eq self.savpoint[1] then return
-         str=string(FORMAT=self.form,X,Y,(*imorig)[X,Y])
-         widget_control, self.wLine,set_value=str
-         self.savpoint=[X,Y]
+         if total(pt eq self.savpoint) eq 2 then return
+         widget_control, self.wLine,set_value=self->String(imorig,pt)
+         self.savpoint=pt
       end
       
       'WIDGET_TRACKING': begin 
@@ -32,16 +27,22 @@ pro tvLine::Message,msg
          endif 
       end
       
-      'TVDRAW_REDRAW': begin 
-         if self.savpoint[0] eq -1 then return
+      'TVDRAW_POSTDRAW': begin 
+         if self.savpoint[0] eq -1 then return ;not on a point
          self.oDraw->GetProperty,IMORIG=imorig
-         str=string(FORMAT=self.form,self.savpoint[0],self.savpoint[1], $
+         str=string(FORMAT=self.form,self.savpoint, $
                     (*imorig)[self.savpoint[0],self.savpoint[1]])
          widget_control, self.wLine,set_value=str
       end
    endcase 
 end 
 
+;=============================================================================
+;	String - The string value associate with point X,Y
+;=============================================================================
+function tvLine::String, im,point
+  return,string(FORMAT=self.form,point,(*im)[point[0],point[1]])
+end
 
 ;=============================================================================
 ;	Cleanup.  Clean self up
@@ -57,13 +58,11 @@ function tvLine::Init,parent,oDraw,FORMAT=form,_EXTRA=e
    if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
    ;; set up the format for printing x,y, value
    if n_elements(form) eq 0 then self.form='("(",I3,",",I3,") ",G14.8)' else $
-    self.form=form
+      self.form=form
    self.wLine=widget_label(parent,value=' ',/dynamic_resize)
-   ;; specify motion & tracking events ... not exclusive
-   self.recip.MOTION=1b &  self.recip.TRACKING=1b
-   self.recip.ACTIVE=1b         ;non-exclusive -- turn self on by default
-   self.recip.REDRAW=1b
-   self->Update                 ;sign up with the draw widget
+   
+   ;; specify motion, tracking and postdraw events... we're always on
+   self->Update,/MOTION,/TRACKING,/POSTDRAW
    return,1
 end 
 
@@ -78,14 +77,3 @@ pro tvLine__define
            wLine:0L}            ;widget id of text line
    return
 end
-
-
-
-
-
-
-
-
-
-
-

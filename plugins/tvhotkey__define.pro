@@ -9,18 +9,13 @@
 ;	Expecting only TVKEY messages.
 ;=============================================================================
 pro tvHotKey::Message, msg
-   if NOT self.UseCase then char=strlowcase(msg.KEY) else char=msg.KEY
-   for i=0,self->MsgListLen()-1 do begin
-      if strpos((*self.MsgList)[i].keys,char) ne -1 then begin 
-         ;; Let's co-opt a TVDRAW message and have our TvDraw send it!
-         mymsg={TVDRAW_EXCLUSIVE,OBJ:(*self.MsgList)[i].Obj}
-         ;; send out our EXCLUSIVE message to all interested parties
-         self.oDraw->MsgSend,mymsg                   
-         self.cur=i             ;this is now the current one
-         self->Button,self->GetObj((*self.MsgList)[i])
-         return
-      endif
-   endfor
+  if NOT self.UseCase then char=strlowcase(msg.KEY) else char=msg.KEY
+  wh=where((*self.MsgList).keys eq char,cnt)
+  if cnt eq 0 then return
+  self.cur=wh[0]                ;this is now the current one
+  obj=self->GetObj((*self.MsgList)[self.cur])
+  self.oDraw->MsgSend,EXCLUSIVE=obj
+  self->Button,obj
 end
 
 function tvHotKey::GetObj, ml
@@ -48,8 +43,7 @@ pro tvHotKey::Event, ev
 
    ;; send out the exclusive message for all to hear.
    obj=self->GetObj((*self.MsgList)[wh])
-   msg={TVDRAW_EXCLUSIVE,OBJ:obj}
-   self.oDraw->MsgSend,msg
+   self.oDraw->MsgSend,EXCLUSIVE=obj
    
    self.cur=wh
    self->Button,obj
@@ -141,11 +135,8 @@ function tvHotKey::Init,oDraw, USECASE=uc, SELECT_BASE=sb, _EXTRA=e
    endif 
    
    if self->MsgListLen() ne 0 and NOT self.UseCase then  $
-    (*self.MsgList).keys=strlowcase((*self.MsgList).keys)
+      (*self.MsgList).keys=strlowcase((*self.MsgList).keys)
    
-   ;; Activate ourselves
-   self.recip.ACTIVE=1b
-   self->Update               
    return,1
 end
 
@@ -162,4 +153,3 @@ pro tvHotKey__define
            pix:ptr_new()}       ;a list of bitmaps on the buttons
    return
 end
-
