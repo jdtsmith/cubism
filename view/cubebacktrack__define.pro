@@ -39,7 +39,7 @@ pro CubeBackTrack::Message, msg
      
      'CUBEREC_UPDATE': begin 
         if msg.FULL_MODE then begin ; Full cube mode
-           if self.cube ne msg.CUBE then begin 
+           if self.cube ne msg.CUBE && obj_valid(msg.CUBE) then begin 
               self.cube=msg.CUBE
               self.cube->GetProperty,BCD_SIZE=bcdsz,PROJECT_NAME=pn, $
                                      WAVELENGTH=wave
@@ -221,7 +221,7 @@ end
 ;  EnsureCube - Make sure the cube we have is still valid
 ;=============================================================================
 pro CubeBackTrack::EnsureCube
-  if NOT obj_valid(self.cube) then begin 
+  if ~obj_valid(self.cube) then begin 
      self->Off
      self->Error,'Cube no longer valid.'
   endif 
