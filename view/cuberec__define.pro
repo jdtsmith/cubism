@@ -1,4 +1,7 @@
- ;;**************************OverRiding methods********************************
+;; A class which handles extractions on the cube, and also serves as a
+;; concentrator for all messages to the viewer-related objects.
+
+;;**************************OverRiding methods********************************
 ;=============================================================================
 ;  Message - Let's hear about new Stacks, Switch to Full, Records, or cubes 
 ;=============================================================================
@@ -11,8 +14,10 @@ pro CubeRec::Message, msg
         return
      end 
      'CUBEVIEWSPEC_SAVE': begin 
-        if msg.export then self->Extract,/EXPORT else $
-           self->Extract,/SAVE,ASCII=msg.ascii
+        method=self.region_file?"ExtractFileRegion":"Extract"
+        if msg.export then call_method,method,self,/EXPORT, $
+                                       FILE=self.region_file else $
+           call_method,method,self,/SAVE,ASCII=msg.ascii,FILE=self.region_file
         return
      end
      ;; Send updates for these
@@ -32,13 +37,15 @@ pro CubeRec::Message, msg
            if ptr_valid(msg.background) then begin
               type=size(*msg.background,/TYPE)
               if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
-                 self.stack=ptr_new(self.cube->Stack(*msg.foreground, $
-                                                     BG_VALS=*msg.background))
+                 self.stack=ptr_new(self.cube-> $
+                                    Stack(*msg.foreground, $
+                                          BG_VALS=*msg.background))
               endif else $      ;background index ranges
                  self.STACK=ptr_new(self.cube-> $
                                     Stack(*msg.foreground,$
                                           BACKRANGES=*msg.background)) 
-           endif else self.STACK=ptr_new(self.cube->Stack(*msg.foreground))
+           endif else self.STACK=ptr_new(self.cube-> $
+                                         Stack(*msg.foreground))
         endelse 
         self->SwitchMode,/STACK
      end
@@ -69,7 +76,7 @@ pro CubeRec::Message, msg
         ;; we don't want BCD mode, but either cube mode will do
         self->SwitchMode,BCD=0
      end
-     'CUBEPROJ_UPDATE':         ;just fall through to update message
+     'CUBEPROJ_UPDATE': if msg.new_cube && self.mode ge 2 then return
   endcase
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
                  self.cur_wav, self.cube,self.MODULE,self.bcd,self.bcd_BMASK}
@@ -95,10 +102,12 @@ end
 pro CubeRec::Off,_EXTRA=e
   self->tvPlug::Off,_EXTRA=e
   self.Box->Off
+  self.Region->Off
 end
 
 pro CubeRec::Reset,_EXTRA=e
   self.Box->Reset
+  self.Region->Reset
   self->Off,_EXTRA=e
 end
 
@@ -178,9 +187,12 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
      if widget_info(self.wCompass,/BUTTON_SET) then self.oRose->On
   endelse 
   
-  ;; The menu button
+  ;; The menu buttons
   if widget_info(self.wMapSaveBut,/VALID_ID) then begin 
      widget_control, self.wMapSaveBut,SENSITIVE=self.mode eq 1
+  endif 
+  if widget_info(self.wExtractRegionBut,/VALID_ID) then begin 
+     widget_control, self.wExtractRegionBut,SENSITIVE=self.mode ne 2
   endif 
   
   ;;Switch the base showing
@@ -224,11 +236,11 @@ pro CubeRec::Export
         widget_control, self.wLambda,SET_COMBOBOX_SELECT=self.cur_wav
         im=self.cube->Cube(self.cur_wav)
      end
-     1: begin                   ;show the stack
+     1: begin                   ;export the stack
         if ~ptr_valid(self.STACK) then return
         im=*self.STACK
      end
-     2: begin                   ;show the record
+     2: begin                   ; the record
         if ~ptr_valid(self.BCD) then return
         im=*self.BCD
         if (widget_info(self.wBGSub,/BUTTON_SET)) && $
@@ -242,7 +254,7 @@ end
 ;  EnsureCube - Make sure the cube we have is still valid
 ;=============================================================================
 pro CubeRec::EnsureCube
-  if NOT obj_valid(self.cube) then begin 
+  if ~obj_valid(self.cube) then begin 
      widget_control, self.wBase[self.mode],SENSITIVE=0
      self->Error,'Cube no longer valid.'
   endif 
@@ -320,15 +332,11 @@ pro CubeRec::SaveMapEvent,ev
   self.cube->SaveMap,*self.STACK
 end
 
+
 ;=============================================================================
-;  Extract -  Extract a spectrum from box
+;  SetupViewSpec -  Get a spectrum viewer if necessary
 ;=============================================================================
-pro CubeRec::Extract,_EXTRA=e
-  self->CheckCube
-  self.Box->Getlrtb,l,r,t,b
-  spec=self.cube->Extract([l,b],[r,t],_EXTRA=e)
-  info=string(FORMAT='(%"Extracted from %s, [%d,%d]->[%d,%d]")', $
-              self.cube->ProjectName(),l,b,r,t)
+pro CubeRec::SetupViewSpec
   if obj_valid(self.oView) eq 0 then begin 
      self.oView=obj_new('CubeViewSpec',PARENT_GROUP=self.wBase[0])
      ;; Set up messages between us
@@ -339,6 +347,42 @@ pro CubeRec::Extract,_EXTRA=e
         self->MsgSend, $
            {CUBEREC_FULL,self.cur_wav,(*self.wavelength)[self.cur_wav]}
   endif 
+end
+
+;=============================================================================
+;  ExtractFileRegion -  Extract a region from a file
+;=============================================================================
+pro CubeRec::ExtractFileRegion,FILE=rff,_EXTRA=e
+  if ~self->On() then self->On
+  self->CheckCube
+
+  if n_elements(rff) eq 0 then rff=1 ;select and return the file
+  spec=self.cube->Extract(FROM_FILE=rff,OUTPUT_POLY=op,_EXTRA=e)
+  if spec[0] eq -1 then return
+  self.region_file=rff     
+  self->SetupViewSpec
+  
+  spec=ptr_new(spec,/NO_COPY)
+  info=string(FORMAT='(%"Region from %s")',file_basename(self.region_file))
+  self.Box->Reset & self.Box->Off
+  self.region->SetProperty,REGION=op
+  if ~self.region->On() then self.region->On
+  self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,spec}
+  ptr_free,spec
+end
+
+
+;=============================================================================
+;  Extract -  Extract a spectrum from box
+;=============================================================================
+pro CubeRec::Extract,_EXTRA=e
+  self->CheckCube
+  self.Box->Getlrtb,l,r,t,b
+  self.region_file=''           ;no longer extracting by region
+  spec=self.cube->Extract([l,b],[r,t],_EXTRA=e)
+  info=string(FORMAT='(%"Extracted from %s, [%d,%d]->[%d,%d]")', $
+              self.cube->ProjectName(),l,b,r,t)
+  self->SetupViewSpec
   sp=ptr_new(spec,/NO_COPY)
   self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,sp}
   ptr_free,sp
@@ -368,16 +412,16 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
                        _EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
 
-  if n_elements(color) eq 0 then color=!D.TABLE_SIZE-1
-
   self->MsgSetup,['CUBEREC_SPEC','CUBEREC_FULL','CUBEREC_UPDATE']
   
-  ;; Get an extractor tvrbox object, signing ourselves up for box messages
-  self.Box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,COLOR=color,_EXTRA=e)
+  ;; Get an extraction tvrbox object, signing ourselves up for box messages
+  self.Box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
   
+  self.Region=obj_new('tvFixedRegion',oDraw,_EXTRA=e)
+  
   ;; listen for this cube's messages
-  if obj_valid(cube) then cube->MsgSignup,self 
+  if obj_valid(cube) then cube->MsgSignup,self,/ALL
 
   ;; set up the different bases
   b=widget_base(parent,/COLUMN,/FRAME,/BASE_ALIGN_LEFT,SPACE=1, $
@@ -438,6 +482,12 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
                        SENSITIVE=~LMGR(/VM,/RUNTIME), $
                        EVENT_PRO='cuberec_event', $
                        UVALUE={self:self,method:'Export',event:0})
+     self.wExtractRegionBut=widget_button(menu, $
+                                          value='Extract Region From File...',$
+                                          EVENT_PRO='cuberec_event', $
+                                          UVALUE={self:self, $
+                                                  method:'ExtractFileRegion', $
+                                                  event:0},/SEPARATOR)
   endif
   return,1
 end
@@ -456,6 +506,8 @@ pro CubeRec__define
       delay:0.0, $              ;the play speed delay
       spec:obj_new(), $         ;our CubeSpec tool
       box:obj_new(), $          ;our extraction box object
+      region:obj_new(), $       ;fixed region object
+      region_file:'', $         ;file from which region recovered
       oAper: obj_new(), $       ;our aperture viewing/editing tool
       oView: obj_new(), $       ;our ViewSpec tool
       oRose: obj_new(), $       ;our compass rose drawing tool
@@ -477,7 +529,8 @@ pro CubeRec__define
       wBGSub:0L, $              ;background subtract button
       wStackInfo:0L, $          ;The stack information
       wFull:0L,$                ;The "Switch to Full mode" button
-      wMapSaveBut:0L}           ;The Save Map as FITS button
+      wMapSaveBut:0L, $         ;The Save Map as FITS button
+      wExtractRegionBut:0L}     ;Extract Region from File button
   
   ;; The messages we send
   
