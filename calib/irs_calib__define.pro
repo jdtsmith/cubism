@@ -533,7 +533,6 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
   endif 
   
   self->SetRecord,rec
-  
   ;; Return the list of pseudo-rects
   return,*ws.PR
 end
@@ -678,6 +677,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   ws.PR_WIDTH=width
   ws.Aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
   ws.PR=ptr_new(prs,/NO_COPY)
+  
   ws.FULL=1b
   
   if ptr_valid(rec.WAVSAMPS) then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] else $
@@ -690,6 +690,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
 end
 
 function IRS_Calib::IsFullAperture,aps
+  if n_elements(aps) eq 0 then return,0
   return,total(aps.low eq 0. AND aps.high eq 1.,1) eq 2.
 end
 
