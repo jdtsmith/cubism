@@ -22,7 +22,7 @@ foreach (@keywords) {$keywords{pack("A8",$_)}++;};
        52=>'SH_cen ', 56=>'LH_a   ', 57=>'LH_b   ', 58=>'LH_cen ');
 
 find(sub{
-       return unless -f and /\.bcd_fp\.fits$/;
+       return unless -f and /(\.bcd_fp|_bcd)\.fits$/;
        parsefile($File::Find::dir, $_);
      }, '.');
 
