@@ -100,13 +100,15 @@ function read_ipac_table,file, HEADERS=hdr
         firstchar = strmid(line,0,1)
         case firstchar of
            '\': begin 
-              parts=strtrim(stregex(line,'^\\([a-z ]+=?)(.*)$', $
+              parts=strtrim(stregex(line,'^\\([a-zA-Z0-9_ ]+)=(.*)$', $
                                     /SUBEXPR,/EXTRACT),2)
+              if strlen(parts[0]) eq 0 then break
               if n_elements(hdr) eq 0 then begin 
                  hdr=create_struct(parts[1],parts[2]) 
               endif else hdr=create_struct(hdr,parts[1],parts[2])
            end
            '|': begin
+              sep_pos=[strsplit(line,'|'),strlen(line)-1]
               tok=strtrim(strsplit(line,'|',/EXTRACT),2) 
               if got_tags eq 0 then begin 
                  tags=tok
@@ -116,15 +118,44 @@ function read_ipac_table,file, HEADERS=hdr
               if got_type then break ; skip anything beyond the type field
               for i=0,n_elements(tok)-1 do begin 
                  case 1 of 
-                    strmatch(tok[i],'r*'): val=0.0
-                    strmatch(tok[i],'i*'): val=0L
-                    strmatch(tok[i],'d*'): val=0.0D
-                    strmatch(tok[i],'c*'): val=''
+                    strmatch(tok[i],'r*'): begin 
+                       val=0.0
+                       if n_elements(format) eq 0 then format=['F0'] else $
+                          format=[format,'F0']
+                    end 
+                    strmatch(tok[i],'i*'): begin 
+                       val=0L
+                       if n_elements(format) eq 0 then format=['I0'] else $
+                          format=[format,'I0']
+                    end 
+                    strmatch(tok[i],'d*'): begin 
+                       val=0.0D
+                       if n_elements(format) eq 0 then format=['D0'] else $
+                          format=[format,'D0']
+                     end
+                     strmatch(tok[i],'c*'): begin 
+                        val=''
+                        aform=['T'+strtrim(sep_pos[i],2), $
+                               'A'+strtrim(sep_pos[i+1]-sep_pos[i]-1,2)]
+                        if n_elements(format) eq 0 then format=[aform] else $
+                           format=[format,aform]
+                     end
                     1: begin 
                        print,'warning, unkown type '+tok[i]
                        break
                     end 
                  endcase 
+                 
+                 ;; Remove disallowed characters from the tag
+                 unclean_tag=tags[i]
+                 tags[i]=''
+                 while ((pos=stregex(unclean_tag,'[^0-9 _$A-Za-z]'))) $
+                    ne -1 do begin 
+                    tags[i]=tags[i]+strmid(unclean_tag,0,pos)+'_'
+                    unclean_tag=strmid(unclean_tag,pos+1)
+                 endwhile 
+                 tags[i]=tags[i]+unclean_tag
+                 
                  if n_elements(data_elem) eq 0 then $
                     data_elem=create_struct(tags[i],val) $
                  else data_elem=create_struct(data_elem,tags[i],val) 
@@ -136,7 +167,7 @@ function read_ipac_table,file, HEADERS=hdr
         if at_data eq 0 then continue
      endif 
      ;; reading data
-     reads,line,data_elem
+     reads,line,data_elem,FORMAT='('+strjoin(format,",")+')'
      if n_elements(ret) eq 0 then ret=data_elem else ret=[ret,data_elem]
   endwhile
   free_lun,un
