@@ -6,9 +6,9 @@ function sm_get_fonts, BOLD=b,SIZE=sz,ITALIC=i
   switch !VERSION.OS_FAMILY of
      'unix': $
         begin
-        device,get_fontnames=df,font='*cour*'+b+'-'+i+'-normal*--'+ $
+        dispfont='*cour*'+b+'-'+i+'-normal*--'+ $
                strtrim(sz,2)+'*'
-        dispfont=df[0] 
+;        dispfont=df[0] 
         break
      end
 
