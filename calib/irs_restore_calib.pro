@@ -63,8 +63,10 @@
 ;##############################################################################
 function irs_restore_calib, cfile
   @irs_dir
-  file=filepath(ROOT=irs_calib_dir,SUBDIR=["data","sets"],cfile)
-  if file_test(file,/READ,/REGULAR) eq 0 then $
-     message,'No such calibration object file: '+cfile
+  if file_test(cfile,/READ,/REGULAR) then file=cfile else begin 
+     file=filepath(ROOT=irs_calib_dir,SUBDIR="sets",cfile)
+     if file_test(file,/READ,/REGULAR) eq 0 then $
+        message,'No such calibration object file: '+cfile
+  endelse 
   return,restore_object(file,'IRS_Calib')
 end
