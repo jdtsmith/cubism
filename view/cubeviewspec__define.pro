@@ -200,9 +200,11 @@ pro CubeViewSpec::Event,ev
                           r=[r[0]<r[1],r[1]>r[0]]
                           if NOT array_equal(r ne -1,1b) then return
                           ;; append the new region
-                          if ptr_valid(self.reg[sel]) then begin 
-                             *self.reg[sel]=[[*self.reg[sel]],[r]]
-                          endif else self.reg[sel]=ptr_new(reform(r,2,1))
+                          if ptr_valid(self.reg[sel]) then $
+                             *self.reg[sel]=[[*self.reg[sel]],[r]] $
+                          else $
+                             self.reg[sel]=ptr_new(reform(r,2,1))
+                          
                           self.selected=n_elements(*self.reg[sel])/2-1
                           self.seltype=sel
                           self->MergeRegs
@@ -211,6 +213,7 @@ pro CubeViewSpec::Event,ev
                           for i=0,n_elements(*self.wMapSets)-1 do $
                                 widget_control, (*self.wMapSets)[i], $
                                                 SET_BUTTON=0
+                          self->UpdateButtons
                        end
                        
                        0:  begin ;XClip
@@ -298,6 +301,12 @@ pro CubeViewSpec::Event,ev
            widget_control, self.wRType, SENSITIVE=1
      end
      
+     self.wWavWeight: begin 
+        self.weight_cont=widget_info(ev.value,/BUTTON_SET)
+        if self.mode eq 0 then return ; nothing to update for full mode
+        self->Send
+     end 
+     
      self.wMode: self->SwitchMode,ev.value
      else: return               ; Just ignore any others
   endcase
@@ -328,6 +337,7 @@ pro CubeViewSpec::MapEvent,ev
         self.weights=ptr_new(weights,/NO_COPY)
      self.selected=-1
      self->Plot
+     self->UpdateButtons
      self->Send,MAP_NAME=name
      return
   endif 
@@ -413,6 +423,7 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
         if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
         msg.foreground=self.reg[1]
         msg.weights=self.weights
+        msg.weight_cont=self.weight_cont
         ;; Send either the fit, or the background regions themselves.
         if ptr_valid(self.reg[0]) && n_elements(*self.fit) gt 0 && $
            self.medlam ne 0. then begin 
@@ -420,9 +431,13 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
                           (*self.lam)[self->RegionIndices(*self.reg[1])], $
                           *self.fit)*10.^self.renorm)
            msg.info=msg.info+' -- Fit'
-        endif else msg.background=self.reg[0]
+        endif else begin 
+           if self.weight_cont && ptr_valid(self.reg[0]) then $
+              msg.info+=' -- Lambda-Weighted'
+           msg.background=self.reg[0]
+        endelse 
         ;;if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
-        if ptr_valid(self.reg[0]) then msg.info=msg.info+')'
+        if ptr_valid(self.reg[0]) then msg.info+=')'
      endelse 
   endelse 
   self->MsgSend,msg
@@ -443,11 +458,21 @@ pro CubeViewSpec::SwitchMode,mode,FULL=full,MAP=map
      self.mode=mode
   endif else self.mode=1-self.mode
   widget_control, self.wMode,SET_VALUE=self.mode ;de-sen in full mode
+  self->UpdateButtons
+  self->Plot
+  self->Send
+end
+
+
+;=============================================================================
+;  UpdateButtons - Update all buttons to reflect current modes
+;=============================================================================
+pro CubeViewSpec::UpdateButtons
   for i=0,n_elements(self.wGray)-1  do $
      widget_control, self.wGray[i],SENSITIVE=self.mode
   widget_control, self.wReg_or_Wav,set_value=(['Lambda','Region:'])[self.mode]
-  self->Plot
-  self->Send
+  widget_control, self.wWavWeight, SENSITIVE=n_elements(*self.fit) eq 0 && $
+     ptr_valid(self.reg[0]) && ptr_valid(self.reg[1])
 end
 
 ;=============================================================================
@@ -564,6 +589,7 @@ pro CubeViewSpec::Fit
   end
   
   ;; Show it under continuum and peak, along with width, if calculated
+  self->UpdateButtons
   self->Plot
   self->Send
 end
@@ -663,6 +689,7 @@ pro CubeViewSpec::Delete
      ptr_free,self.reg[self.seltype]
      self.selected=-1
   endelse 
+  self->UpdateButtons
   self->Plot
   self->Send
 end
@@ -682,6 +709,7 @@ pro CubeViewSpec::Reset,KEEP=k
   self.medlam=0                 ;This signals no fit.
   self->ResetFit
   self->UpdateParams
+  self->UpdateButtons
   self->Plot
   self->Send
 end
@@ -691,6 +719,7 @@ end
 ;=============================================================================
 pro CubeViewSpec::ResetFit
   ptr_free,self.fit & self.fit=ptr_new(/ALLOCATE_HEAP)
+  self->UpdateButtons
 end
 
 ; pro CubeViewSpec::Load, lam, sp
@@ -999,12 +1028,6 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   self.wBase=widget_base(/COLUMN,/TRACKING_EVENTS,SPACE=1, $
                          TITLE='CubeSpec: Extracted Spectrum',MBAR=mbar) 
   
-  rowbase=widget_base(self.wBase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_BOTTOM) 
-  colbase=widget_base(rowbase,/COLUMN) 
-  
-  subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER,SPACE=1) 
-  self.wMode=cw_bgroup(subrowbase,/EXCLUSIVE,/ROW,['Full Cube','Map'], $
-                       SET_VALUE=0,/NO_RELEASE)
   
   file=widget_button(mbar,value='File',/MENU)
   self.wSaveBut=widget_button(file,value='Save Spectrum As...')
@@ -1015,43 +1038,67 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   but=widget_button(maps, value='Save Current Map...', $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='save')
   self.wGray[0]=but
-  
-  
+
   but=widget_button(maps, value='Load Maps...', $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='load')
   but=widget_button(maps,value='Reset to Default Maps', $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='reset')
 
  ;;sets=widget_button(maps,value='Map Sets',/MENU)
-  
   self->BuildMapMenu,maps
   
-  subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER,/FRAME)
-  pbase=widget_base(subrowbase)
-  self.wDo=cw_bgroup(pbase,/EXCLUSIVE,/ROW,SET_VALUE=2,/NO_RELEASE,$
+  
+  ;; Button layout
+  controlbase=widget_base(self.wBase,/ROW,/ALIGN_LEFT, $
+                          /BASE_ALIGN_BOTTOM)
+  col1base=widget_base(controlbase,/COLUMN) 
+  
+  col1row1base=widget_base(col1base,/ROW,/ALIGN_LEFT, $
+                           /BASE_ALIGN_TOP,SPACE=1) 
+  
+  self.wMode=cw_bgroup(col1row1base,/EXCLUSIVE,/COLUMN,['Full Cube','Map'], $
+                       SET_VALUE=0,/NO_RELEASE,/FRAME)
+  
+
+  mousecolbase=widget_base(col1row1base,/COLUMN,SPACE=1,/FRAME)
+  mousebaserow1=widget_base(mousecolbase,/ROW,SPACE=1)
+  but=widget_label(mousebaserow1,VALUE='Mouse:')
+  self.wDo=cw_bgroup(mousebaserow1,/EXCLUSIVE,/ROW,SET_VALUE=2,/NO_RELEASE,$
                      ['XZoom','YZoom','Lambda'],IDS=ids) ;
   self.wReg_or_Wav=ids[2]
-  self.wRType=widget_droplist(subrowbase,VALUE=['Continuum','Peak'])
+  
+  mousebaserow2=widget_base(mousecolbase,/ROW,SPACE=1)
+  
+  but=cw_bgroup(mousebaserow2,/NONEXCLUSIVE,SET_VALUE=[0], $
+                ['Lambda-Weighted'],IDS=ids,/RETURN_ID)
+  widget_control, but,SENSITIVE=0
+  self.wWavWeight=but
+                            
+  self.wRType=widget_droplist(mousebaserow2,VALUE=['Continuum','Peak'])
   self.wGray[1]=self.wRType
   
-  subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER, $
-                         SPACE=1,XPAD=0,/FRAME) 
-  self.wOrder=widget_droplist(subrowbase,TITLE='Fit Order:', $
-                              VALUE=string(FORMAT='(I0)',indgen(5)+1))
-  self.wGray[2]=self.wOrder
+  
+  col1row2base=widget_base(col1base,/ROW,/ALIGN_LEFT, $
+                           /BASE_ALIGN_CENTER,SPACE=1,/FRAME) 
+  
   if NOT keyword_set(rn) then buttons=['Auto Renorm','Value line'] $
   else buttons=['Value line']
   
-  self.wToggles=cw_bgroup(subrowbase,buttons,/NONEXCLUSIVE,/ROW,$
+  self.wToggles=cw_bgroup(col1row2base,buttons,/NONEXCLUSIVE,/ROW,$
                           SET_VALUE=replicate(1,n_elements(buttons)))
   
-  self.wFit=cw_bgroup(rowbase,IDS=ids,/COLUMN, $
+  self.wOrder=widget_droplist(col1row2base,TITLE='Fit Order:', $
+                              VALUE=string(FORMAT='(I0)',indgen(5)+1))
+  self.wGray[2]=self.wOrder
+
+  
+  self.wFit=cw_bgroup(controlbase,IDS=ids,/COLUMN, $
                       ['Reset Plot','Remove Fit','Fit'],/NO_RELEASE)
   self.wGray[3:4]=ids[1:2]
   for i=0,n_elements(self.wGray)-1  do $
      widget_control, self.wGray[i],SENSITIVE=0
 
-  colbase=widget_base(rowbase,/COLUMN)
+  colbase=widget_base(controlbase,/COLUMN)
   self.wParams=widget_label(colbase,/FRAME,/ALIGN_LEFT,VALUE= $
                             string(FORMAT='(6A)', $
                                    replicate(string(replicate(32b,24)),6)+ $
@@ -1130,6 +1177,7 @@ pro CubeViewSpec__define
       wav_ind:0, $              ;the index of the current wavelength
       wavelength:0.0, $         ;the current wavelength (if full mode)
       upgoing:0b, $             ;whether the wavelength is increasing or not
+      weight_cont:0b, $         ;fit continuum lambda-weighted
       ;; Widget/Window/ColorMap ID's
       wBase:0L, $               ;the window base
       wMapSets:ptr_new(), $     ;point to map set buttons
@@ -1139,6 +1187,7 @@ pro CubeViewSpec__define
       wReg_or_Wav:0L, $         ;button with either Regions: or Wave
       wMode:0L, $               ;The Mode selector
       wGray:lonarr(5), $        ;things to de-sensitize
+      wWavWeight: 0L, $         ;wavelength weighting button
       wRType:0L, $              ;peak or continuum being selected
       wDraw:0L, $               ;drawing canvas
       wLine: 0L, $              ;the status line id
@@ -1159,8 +1208,9 @@ pro CubeViewSpec__define
        foreground:ptr_new(), $  ;a 2xn list of foreground wavelength index
                                 ; ranges over which to average
        weights:ptr_new(), $     ;a 2xn list of weights
-       background:ptr_new()}    ;a 2xn list of continuum wavelength ranges to
+       background:ptr_new(),$   ;a 2xn list of continuum wavelength ranges to
                                 ; average, or a list of background values
+       weight_cont: 0b}         ;whether the continuum is to be weighted
 
                                 ; background over wavelength.
   msg={CUBEVIEWSPEC_FULL, $     ;switch to full mode
