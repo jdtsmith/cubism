@@ -366,12 +366,13 @@ function IRS_Calib::Info, modules, orders
      md=irs_module(modules[i])
      module=irs_module(md,/TO_NAME)
      no=ptr_valid(self.cal[md])?n_elements(*self.cal[md]):0
+     real_orders=no gt 0?n_elements(self->Orders(md)):no
      str=[str,string(FORMAT='(%"\n ==> Module %s: %s")',module, $
-                     (no gt 0?strtrim(n_elements(*self.cal[md]),2)+ $
+                     (no gt 0?strtrim(real_orders,2)+ $
                       " orders.":" not loaded."))]
      if no eq 0 then continue
      if n_elements(orders) eq 0 then ords=indgen(no) else $
-        ords=where_array((*self.cal[md]).order,[orders],no,/SWITCHAB)
+        ords=where_array((*self.cal[md]).ORDER,[orders],no,/SWITCHAB)
      if no eq 0 then continue
      str=[str,'']
      wsf=self.WAVSAMP_FILE[md]
@@ -383,13 +384,15 @@ function IRS_Calib::Info, modules, orders
      str=[str,'']
      for j=0,no-1 do begin 
         rec=(*self.cal[md])[ords[j]]
-        str=[str,string(FORMAT='(%"    ==> Order %2s%d  (%s): ")', $
-                        module,rec.order, $
-                        rec.Date eq 0.0D?"--":jul2date(rec.Date))]
+        if rec.order eq 0 then str=[str,"    ==> Target "+module+" center"] $
+        else str=[str,string(FORMAT='(%"    ==> Order %2s%d  (%s): ")', $
+                             module,rec.order, $
+                             rec.Date eq 0.0D?"--":jul2date(rec.Date))]
         nw=ptr_valid(rec.WAVSAMPS)?n_elements(*rec.WAVSAMPS):0
         str=[str, $
              string(FORMAT='("         Position: Z: ",F8.3," Y:",' + $
                     'F8.3," Angle:",F8.3)',rec.TPF_Z,rec.TPF_Y,REC.TPF_ANGLE)]
+        if rec.order eq 0 then continue ;just a stub order
         str=[str, $
              "          A:"+strjoin(string(FORMAT='(G10.3)',rec.A)), $
              "          B:"+strjoin(string(FORMAT='(G10.3)',rec.B)), $
@@ -439,7 +442,9 @@ end
 function IRS_Calib::Orders,module
   m=irs_module(module)
   if NOT ptr_valid(self.cal[m]) then return,-1
-  return,(*self.cal[m]).ORDER
+  ords=(*self.cal[m]).ORDER
+  wh=where(ords ne 0,cnt)
+  if cnt gt 0 then return,ords[wh] else return,-1
 end
 
 ;=============================================================================
@@ -908,22 +913,24 @@ end
 ;              omitted, the first order for the matching module is
 ;              returned.
 ;=============================================================================
-function IRS_Calib::GetRecord, module, order, MUST_EXIST=me
+function IRS_Calib::GetRecord, module, order, MUST_EXIST=me, EXISTS=exi
   m=irs_module(module)
+  exi=1
   if ptr_valid(self.cal[m]) then begin 
      if n_elements(order) eq 0 then begin 
         cnt=1 & wh=0            ; default to using the first order on the list
-     endif else wh=where((*self.cal[m]).Order eq order,cnt)
+     endif else wh=where((*self.cal[m]).ORDER eq order,cnt)
      if cnt gt 0 then return,(*self.cal[m])[wh[0]]
   endif 
+  exi=0
   if keyword_set(me) then begin 
      message,'No such record exists: '+ $
              irs_module(module,/TO_NAME)+' Order '+strtrim(order,2)
      return,-1
   endif 
   st={IRS_CalibRec}           ; None found, just create a new one
-  st.Module=m
-  st.Order=order
+  st.MODULE=m
+  st.ORDER=order
   return,st
 end
 
@@ -937,7 +944,7 @@ pro IRS_Calib::SetRecord, record
      message,'Wrong record type: '+tag_names(record,/STRUCTURE_NAME)
   record.Date=systime(/JULIAN) ; The date set
   if ptr_valid(self.cal[record.module]) then begin 
-     wh=where((*self.cal[record.module]).Order eq record.order,cnt)
+     wh=where((*self.cal[record.module]).ORDER eq record.ORDER,cnt)
      if cnt ne 0 then begin     ; overwrite that list item
         cal=(*self.cal[record.module])[wh[0]]
         ;; If it's a new WAVSAMPS pointer, free the old one.
@@ -1044,10 +1051,10 @@ end
 pro IRS_Calib::ParseWAVSAMP,file,module
   m=irs_module(module)
   data=read_ipac_table(file)
-  orders=(data.order)[uniq(data.order)]
+  orders=data[uniq(data.ORDER)].ORDER
   for ord=0,n_elements(orders)-1 do begin 
      rec=self->GetRecord(m,orders[ord])
-     wh=where(data.order eq orders[ord],cnt)
+     wh=where(data.ORDER eq orders[ord],cnt)
      if cnt eq 0 then continue  ;no data for this order
      ;; Collect the data and create the WAVSAMP structure list
      pr=replicate({IRS_WAVSAMP_PSEUDORECT},cnt)
@@ -1085,8 +1092,8 @@ end
 pro IRS_Calib::ParseOrdFind,file,module
   m=irs_module(module)
   data=read_ipac_table(file)
-  for i=0,n_elements(data.order)-1 do begin 
-     rec=self->GetRecord(m,data[i].order)
+  for i=0,n_elements(data.ORDER)-1 do begin 
+     rec=self->GetRecord(m,data[i].ORDER)
      rec.a=[data[i].a0,data[i].a1,data[i].a2,data[i].a3,data[i].a4,data[i].a5]
      rec.b=[data[i].b0,data[i].b1,data[i].b2,data[i].b3,data[i].b4,data[i].b5]
      rec.WAV_CENTER=data[i].wavelength_center
@@ -1114,8 +1121,8 @@ pro IRS_Calib::ParseLineTilt,file,module
         (*self.cal[m])[i].c=[data[0].c0,data[0].c1,data[0].c2,data[0].c3]
      endfor 
   endif else begin
-     for i=0,n_elements(data.order)-1 do begin
-        rec=self->GetRecord(module,(data.order)[i])
+     for i=0,n_elements(data.ORDER)-1 do begin
+        rec=self->GetRecord(module,(data.ORDER)[i])
         rec.c=[data[i].c0,data[i].c1,data[i].c2,data[i].c3]
         self->SetRecord,rec
      endfor
@@ -1130,19 +1137,32 @@ end
 pro IRS_Calib::ParseFrameTable,file
   data=read_ipac_table(file)
   names=strupcase(strtrim(data.fov_name,2))
-  for i=0,4 do begin 
-     if ptr_valid(self.cal[i]) eq 0 then continue
-     for j=0,n_elements(*self.cal[i])-1 do begin 
+  for md=0,4 do begin 
+     if ptr_valid(self.cal[md]) eq 0 then continue
+     for j=0,n_elements(*self.cal[md])-1 do begin 
         mname=irs_fov(/LOOKUP_MODULE, /RETURN_NAME, $
-                      MODULE=irs_module(/TO_NAME,(*self.cal[i])[j].MODULE), $
-                      ORDER=(*self.cal[i])[j].ORDER, $
+                      MODULE=(*self.cal[md])[j].MODULE, $
+                      ORDER=(*self.cal[md])[j].ORDER, $
                       POSITION=0)
         wh=where(names eq strupcase(mname),cnt)
         if cnt eq 0 then message,'No frame table entry found for: '+mname
-        (*self.cal[i])[j].TPF_Z= data[wh[0]].brown_theta_Y/60.D
-        (*self.cal[i])[j].TPF_Y=-data[wh[0]].brown_theta_Z/60.D
-        (*self.cal[i])[j].TPF_ANGLE=data[wh[0]].angle
+        (*self.cal[md])[j].TPF_Z= data[wh[0]].brown_theta_Y/60.D
+        (*self.cal[md])[j].TPF_Y=-data[wh[0]].brown_theta_Z/60.D
+        (*self.cal[md])[j].TPF_ANGLE=data[wh[0]].angle
      endfor 
+     ;; Add order-0 (slit center) reference if necessary, purely for
+     ;; frametable offsetting
+     mname=irs_fov(/LOOKUP_MODULE,/RETURN_NAME,MODULE=md,ORDER=0,POSITION=0)
+     wh=where(names eq strupcase(mname),cnt)
+     if cnt gt 0 then begin 
+        rec=self->GetRecord(md,0,EXISTS=exists) ;create a new order "0" record
+        if ~exists then begin 
+           rec.TPF_Z= data[wh[0]].brown_theta_Y/60.D
+           rec.TPF_Y=-data[wh[0]].brown_theta_Z/60.D
+           rec.TPF_ANGLE=data[wh[0]].angle
+           self->SetRecord,rec
+        endif 
+     endif 
   endfor 
   self.FRAMETABLE_FILE=file
 end
