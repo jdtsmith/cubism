@@ -82,29 +82,27 @@ pro ipac_table_addpar,hdr,name,value,BEFORE=before,AFTER=after,FORMAT=format
   if n_elements(format) eq 0 then format=f
   
   if n_elements(hdr) gt 0 && hdr[0] then begin 
-     wh=where(strpos(hdr,'\'+tname+' '+name+' =') eq 0,cnt)
+     wh=where(strpos(hdr,'\'+name+' *=') eq 0,cnt)
      if cnt gt 0 then repl=wh[0] else begin 
         if keyword_set(before) then begin 
-           wh=where(stregex(hdr,'^\\(char|int|real) '+before, $
-                            /FOLD_CASE,/BOOLEAN), cnt)
+           wh=where(stregex(hdr,'^\\'+before+' *=',/BOOLEAN), cnt)
            if cnt gt 0 then insert_at=wh[0]
         endif 
         
         if keyword_set(after) then begin 
-           wh=where(stregex(hdr,'^\\(char|int|real) '+after, $
-                            /FOLD_CASE,/BOOLEAN),cnt)
+           wh=where(stregex(hdr,'^\\'+after+' *=',/BOOLEAN),cnt)
            if cnt gt 0 then insert_at=wh[0]+1
         endif 
         
         if n_elements(insert_at) eq 0 then begin ;before comment/history
-           wh=where(stregex(hdr,'^\\(COMMENT|HISTORY)',/BOOLEAN),cnt)
+           wh=where(stregex(hdr,'^\\ (COMMENT|HISTORY)',/BOOLEAN),cnt)
            if cnt gt 0 then insert_at=wh[0]
         endif 
      endelse 
   endif  
   
   if size(value,/TYPE) eq 7 then value="'"+value+"'"
-  record=string(FORMAT='("\",A," ",A," = ",'+format+')',tname,name,value)
+  record=string(FORMAT='("\",A,"= ",'+format+')',name,value)
   
   if n_elements(hdr) gt 0 && hdr[0] then begin 
      if n_elements(repl) gt 0 then hdr[repl]=record else begin 
