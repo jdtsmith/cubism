@@ -1,3 +1,6 @@
+;-----------------------------------------------------------------------
+;        MESSAGE FUNCTION
+;-----------------------------------------------------------------------
 ;; We're only getting key messages
 pro tvPSelect::Message,msg
   up=msg.key eq self.switch_key[0] & down=msg.key eq self.switch_key[1]
@@ -11,6 +14,17 @@ pro tvPSelect::Message,msg
   self->Event,{index:pl}
 end
 
+
+;-----------------------------------------------------------------------
+;        PROPERTY  FUNCTION
+;-----------------------------------------------------------------------
+
+pro tvPSelect::GetProperty, PLANES=planes, IMAGE=image
+  if arg_present(planes) then planes=self.Planes
+  if arg_present(image) then image =self.Image
+end 
+
+
 pro tvPSelect::SetProperty, PLANES=pl
   if keyword_set(pl) then begin
      ptr_free,self.Planes
@@ -19,20 +33,35 @@ pro tvPSelect::SetProperty, PLANES=pl
   endif 
 end
 
+;-----------------------------------------------------------------------
+;        EVENT FUNCTION
+;-----------------------------------------------------------------------
+
 pro tvPSelect_Event,ev
   widget_control, ev.handler, get_uvalue=self
   self->Event,ev
 end
+
 
 pro tvPSelect::Event, ev
   ;; Set the next image, without changing zoom etc (same sized image)
   self.oDraw->SetProperty, IMORIG=(*self.Image)[*,*,ev.index],/NO_RESIZE
 end
 
+
+;-----------------------------------------------------------------------
+;        CLEANUP FUNCTION
+;-----------------------------------------------------------------------
 pro tvPSelect::Cleanup
   ptr_free,self.Image,self.Planes
   self->tvPlug::Cleanup
 end
+
+
+;-----------------------------------------------------------------------
+;        START FUNCTION
+;-----------------------------------------------------------------------
+
 
 pro tvPSelect::Start
   self->tvPlug::Start
@@ -40,6 +69,11 @@ pro tvPSelect::Start
   oKey=(self.oDraw->GetMsgObjs(CLASS='tvKEY'))[0]
   if obj_valid(oKey) then oKey->MsgSignup,self,/TVKEY_KEY
 end
+
+;-----------------------------------------------------------------------
+;        INIT FUNCTION
+;-----------------------------------------------------------------------
+
 
 function tvPSelect::Init, parent, oDraw, im,COLUMN=col,NOLABEL=nl, $
                           START=strt,PLANES=pl,SWITCH_KEYs=sk,_EXTRA=e
@@ -67,7 +101,9 @@ function tvPSelect::Init, parent, oDraw, im,COLUMN=col,NOLABEL=nl, $
   if strt ne 0 then widget_control, self.wList, set_droplist_select=strt
   return,1
 end
-
+;-----------------------------------------------------------------------
+;        STRUCTURE DEFINITION 
+;-----------------------------------------------------------------------
 pro tvPSelect__define
   struct={tvPSelect, $
           Inherits tvPlug, $
