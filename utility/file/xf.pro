@@ -46,7 +46,7 @@ pro xf,file, _EXTRA=e, TITLE=t, PARENT_GROUP=xfp,GROUP=group, $
                           yoffset=yoff,GROUP_LEADER=xfp,/FLOATING, $
                           MODAL=md)
       endif else md=0           ;no topbase? can't be modal
-   endif 
+   endif else md=0
    if n_elements(base) eq 0 then $
     base=widget_base(TITLE = t,/COLUMN,uvalue=fileptr,xoffset=xoff, $
                      yoffset=yoff,MODAL=md)
