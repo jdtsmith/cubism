@@ -54,9 +54,10 @@ pro CubeBadPix::Message, msg
            self.cube->GetProperty,BAD_PIXEL_LIST=bpl
            ptr_free,self.bp_list
            if n_elements(bpl) gt 0 then self.bp_list=ptr_new(bpl,/NO_COPY)
-           if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
+           ;;if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
            self->Enable
-        endif else self->Reset,/DISABLE ;cube mode
+        endif else self->Reset,/DISABLE,/NO_REDRAW ;cube mode
+        ;; Cuberec will redraw for us.
      end
   endcase
 end
@@ -64,9 +65,9 @@ end
 ;=============================================================================
 ;  Reset - Take away the drawn glyphs
 ;=============================================================================
-pro CubeBadPix::Reset,_EXTRA=e
+pro CubeBadPix::Reset,NO_REDRAW=nrd,_EXTRA=e
   self.oDraw->MsgSignup,self,/NONE
-  self.oDraw->ReDraw,/ERASE,/SNAPSHOT
+  if ~keyword_set(nrd) then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
   self->tvPlug::Off,_EXTRA=e
 end
 
@@ -81,7 +82,7 @@ pro CubeBadPix::Off,_EXTRA=e
      self.oDraw->MsgSignup,self,/NONE,/TVDRAW_SNAPSHOT
   endif else was_on=0
   self->tvPlug::Off,_EXTRA=e
-  if was_on then self.oDraw->Redraw,/SNAPSHOT ;to get everything into bg.
+  if was_on then self.oDraw->Redraw,/SNAPSHOT ;to get *everything* into bg.
 end
 
 ;=============================================================================
@@ -229,11 +230,16 @@ pro CubeBadPix::Start
      self.color=!D.TABLE_SIZE-1
      return
   endif 
-  
   self.color=col->GetColor(['cyan','red','blue'])
-  
 end
 
+;=============================================================================
+;  Cleanup
+;=============================================================================
+pro CubeBadPix::Cleanup
+  ptr_free,self.bp_list,self.bmask,self.pmask
+  self->tvPlug::Cleanup
+end
 
 ;=============================================================================
 ;  Init -  Initialize the CubeBadPix object
