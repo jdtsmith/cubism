@@ -11,7 +11,7 @@ pro CubeBadPix::Message, msg
         if pt[0] eq -1 then return
         ;; Non-first button only: cycle through group
         if msg.press eq 4b then begin $
-           self.showing=(self.showing+1) mod (ptr_valid(self.bp_list)?3:2)
+           self.showing=(self.showing+1) mod (ptr_valid(self.bp_list)?4:3)
            self.oDraw->Redraw,/SNAPSHOT
            return
         endif else if msg.press ne 1b then return
@@ -38,7 +38,7 @@ pro CubeBadPix::Message, msg
      'TVDRAW_SNAPSHOT': begin 
         self.oDraw->GetProperty,ZOOM=zm
         self.zoom=zm
-        if self.showing ne 2 then self->MarkStatic,/ALL
+        if self.showing ne 3 then self->MarkStatic,/ALL
         ;; Only put bpl in background when On
         if ~self->On() then self->MarkAll
      end
@@ -52,6 +52,9 @@ pro CubeBadPix::Message, msg
            self.cube->GetProperty,PMASK=pm,/POINTER
            self.pmask=pm
            self.cube->GetProperty,BAD_PIXEL_LIST=bpl
+;           ptr_free,self.non_finite
+;           wh=where(~finite(*msg.bcd),cnt)
+;           if cnt gt 0 then self.non_finite=ptr_new(wh,/NO_COPY)
            ptr_free,self.bp_list
            if n_elements(bpl) gt 0 then self.bp_list=ptr_new(bpl,/NO_COPY)
            ;;if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
@@ -134,8 +137,10 @@ end
 ;  MarkStatic - Mark static (bmask or pmask) pixels
 ;=============================================================================
 pro CubeBadPix::MarkStatic,ind,ALL=all
-  ok_mask=35583U
-  fatal_mask=29696U
+  ;; We leave bit 8 of BMASK off, since it's just all the areas
+  ;; outside the slit
+  fatal_mask=28672U             ;bits 12 13 14
+  ok_mask=36607U                ; all others beside bit 8
   
   if keyword_set(all) then begin 
      if ptr_valid(self.bmask) then begin 
@@ -164,7 +169,7 @@ pro CubeBadPix::MarkStatic,ind,ALL=all
      endif else pcnt=0
   endif else self->Error,'Must pass index, or display All'
 
-  if self.showing ne 1 then begin ; draw non-fatal marks
+  if self.showing eq 0 then begin ; draw non-fatal marks
      for i=0,bcnt-1 do begin 
         pt=self.oDraw->Convert(bind[i],/DEVICE,/SHOWING)
         if pt[0] eq -1 then continue
@@ -172,18 +177,31 @@ pro CubeBadPix::MarkStatic,ind,ALL=all
               SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
      endfor 
   endif 
-  for i=0,fbcnt-1 do begin      ;draw fatal marks
-     pt=self.oDraw->Convert(fbind[i],/DEVICE,/SHOWING)
-     if pt[0] eq -1 then continue
-     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=7, $
-           SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
-  endfor
-  for i=0,pcnt-1 do begin       ;draw permanent marks
-     pt=self.oDraw->Convert(pind[i],/DEVICE,/SHOWING)
-     if pt[0] eq -1 then continue
-     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[2],PSYM=1, $
-           SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
-  endfor 
+  if self.showing le 1 then begin 
+     for i=0,pcnt-1 do begin    ;draw permanent marks
+        pt=self.oDraw->Convert(pind[i],/DEVICE,/SHOWING)
+        if pt[0] eq -1 then continue
+        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[2],PSYM=1, $
+              SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
+     endfor 
+  endif 
+  if self.showing le 2 then begin 
+     for i=0,fbcnt-1 do begin   ;draw fatal marks
+        pt=self.oDraw->Convert(fbind[i],/DEVICE,/SHOWING)
+        if pt[0] eq -1 then continue
+        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=7, $
+              SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
+     endfor
+  endif 
+;   if ptr_valid(self.non_finite) then begin 
+;      nf=*self.non_finite
+;      for i=0,n_elements(nf)-1 do begin ;draw non-finite marks
+;         pt=self.oDraw->Convert(nf[i],/DEVICE,/SHOWING)
+;         if pt[0] eq -1 then continue
+;         plots,pt[0],pt[1],/DEVICE,COLOR=self.color[3],PSYM=6, $
+;               SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
+;      endfor 
+; endif 
 end
 
 ;=============================================================================
@@ -230,14 +248,14 @@ pro CubeBadPix::Start
      self.color=!D.TABLE_SIZE-1
      return
   endif 
-  self.color=col->GetColor(['cyan','red','blue'])
+  self.color=col->GetColor(['cyan','red','blue','magenta'])
 end
 
 ;=============================================================================
 ;  Cleanup
 ;=============================================================================
 pro CubeBadPix::Cleanup
-  ptr_free,self.bp_list,self.bmask,self.pmask
+  ptr_free,self.bp_list;,self.non_finite ;masks are not ours to free
   self->tvPlug::Cleanup
 end
 
@@ -257,12 +275,13 @@ pro CubeBadPix__define
   st={CubeBadPix, $
       INHERITS tvPlug,$         ;it's a full tvDraw plugin
       cube:obj_new(), $         ;the cube project we're servicing
-      color:intarr(3), $       ;the three colors
+      color:intarr(4), $        ;the three colors
       zoom:1.0, $               ;the zoom factor
       bp_list:ptr_new(), $      ;the bad pixel list
       bmask:ptr_new(), $        ;the per-BCD mask plane
       pmask:ptr_new(), $        ;the static mask plane
-      showing:0, $              ;showing 0) all 1) no non-fatal 2) only user
+;      non_finite:ptr_new(), $   ;where it's non-finite
+      showing:0, $              ;showing 0)all 1) all but non-fatal
+                                ;        2)only fatal 3) only user
       parent:0L}
-
 end
