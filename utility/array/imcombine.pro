@@ -7,9 +7,9 @@ function imcombine,array,AVERAGE=avg,MEDIAN=med,REJECT_MINMAX=rmm
         message,'3-D with at least 3 planes required'
      if keyword_set(avg) then begin 
         ;; Average excluding min/max
-        m=max(array,DIMENSION=3,max_list,MIN=m,SUBSCRIPT_MIN=min_list)
+        m=max(array,DIMENSION=3,max_list,MIN=m,SUBSCRIPT_MIN=min_list,/NAN)
         array[max_list]=0.0 & array[min_list]=0.0
-        return,total(array,3)/float(dims[2]-2)
+        return,total(array,3,/NAN)/((total(finite(array),3)-2)>1)
      endif else if keyword_set(med) then $
         return,median(array,DIMENSION=3) ;median sans min/max is the same
   end else begin 
