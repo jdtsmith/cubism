@@ -441,9 +441,9 @@ function tvDraw::Convert, coord, DEVICE=dev, FRACTIONAL=frd,SHOWING=sh, $
      if keyword_set(di) then return,self.zoom*coord ;really a distance
      if keyword_set(sh) then begin 
         ;; Report only on pixels which are now diplayed.
-        if array_equal(co ge self.offset AND $
-                       co lt (self.offset+self.dispsize),1b) eq 0 then $
-           return,-1
+        if ~array_equal(co ge self.offset AND $
+                        co lt (self.offset+self.dispsize),1b) $
+        then return,-1    
      endif 
      inc=keyword_set(frd)?0.:.5 ;fractional pixels, not to center
      pix=floor(self.pan+self.zoom*(co+inc-self.offset))
