@@ -1,7 +1,15 @@
+
+- Visualizer with per-order low-res vis options (dotted line for the
+  other sub-slit).  Selected files are highlit via line-weight.
+  Option for loading MIPS/IRAC image?  Clicking on a spot selects
+  bcd's at that spot and hilights?
+
 - Account for the fact that LH has +w == -x.
 
-- Configurable build plate scales for cube, e.g. .5-2 x natural plate
-  scale.
+- Configurable build plate scales for cube, e.g. .5-2 x "natural" plate
+  scale... put in a propertysheet.
+
+- Use PA_SLT and aggregate WCS posn's.
 
 - Re-factor clipping to process larger chunks at a time in a single
   CALL_EXTERNAL.  Move bounding-box compu inside polyclip.c, and clip
@@ -16,9 +24,6 @@
   data structure.  {pixel: 0L, poly:ptr_new(), area:0.0} Too much
   trouble?
 
-- WCS stuff, for maps and cubes (and refined cube positions), with
-  Line record showing wavelength/WCS.
-
 
 
 Long Term:
@@ -27,6 +32,11 @@ Re-do xf as object.
 Trap errors via ObjReport.  Add all popups/choices/etc. in there too.  
 
 OLD:
+- WCS stuff, for maps and cubes (and refined cube positions), with
+  Line record showing wavelength/WCS.
+
+- Build e.g. SL1 with SL2 pointings... requires offsetting from
+  POS_RQST to the other slit.
 
 - SAV-file for IDLVM --- auto-compilation?  Pull in AstroLib stuff?  C
   code?  PATH finding no longer possible: need to fix polyfillaa's
