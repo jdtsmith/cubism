@@ -15,16 +15,22 @@
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    st=read_ipac_table(file, HEADERS=)
+;    st=read_ipac_table(file, [hdr], [HEADERS=,UNITS=])
 ;
 ; INPUT PARAMETERS:
 ;
 ;    file: The IPAC table file.  
 ;			
-; INPUT KEYWORD PARAMETERS:
+; OPTIONAL OUTPUT PARAMETERS:
+;
+;    hdr: The headers as string array.
+;    
+; OPTIONAL OUTPUT KEYWORD PARAMETERS:
 ;
 ;    HEADERS: If used, return the header variables set at the
 ;       beginning of the table (\type key=value) as a structure.
+;
+;    UNITS: The units for each data column, if available
 ;			
 ; OUTPUTS:
 ;
@@ -36,11 +42,6 @@
 ;    Only reads float, double, integer, and string column types.
 ;    Blanks in header names are changed to underscores in structure
 ;    field names.
-;
-; PROCEDURES:
-;
-;    Notable routines or classes (*not* parent classes -- see next entry)
-;    it relies on.
 ;
 ; NOTES:
 ;  
@@ -54,6 +55,7 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2005-02-25 (J.D. Smith): Pre-allocate return for speedup.
 ;    2003-11-24 (J.D. Smith): Better header keyword value treatment.
 ;    2002-08-27 (J.D. Smith): Initial migration from SMART codebase.
 ;    2001-12-02 (J.D. Smith): Written, based very loosely on routine
@@ -61,11 +63,12 @@
 ;        
 ;-
 ;    $Id$
+;
 ;##############################################################################
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002,2004 J.D. Smith
+;  Copyright (C) 2001,2002,2004,2005 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -84,17 +87,22 @@
 ;
 ;##############################################################################
 
-function read_ipac_table,file, HEADERS=hdr_in
+function read_ipac_table,file, hdr,HEADERS=st_hdrs,UNITS=units
   openr,un,file,/get_lun
   line=''
-  at_data=(got_tags=(got_type=0))
+  line_cnt=0
+  nlines=file_lines(file)
+  at_data=(chead=0)
   while NOT eof(un) do begin 
      readf,un,line
      if stregex(line,'^ *$',/BOOLEAN) then continue ; Skip blank lines
      if at_data eq 0 then begin 
+        line_cnt++
         firstchar = strmid(line,0,1)
         case firstchar of
            '\': begin 
+              if ~arg_present(hdr) then break
+              if n_elements(hdr) eq 0 then hdr=[line] else hdr=[hdr,line]
               parts=strtrim( $
                     stregex(line, $
                             '^\\(REAL|CHAR|INT) +([a-zA-Z0-9_ ]+)=(.*)$', $
@@ -108,76 +116,84 @@ function read_ipac_table,file, HEADERS=hdr_in
                  else: skip=1
               endcase
               if skip then break
-              if n_elements(hdr) eq 0 then begin 
-                 hdr=create_struct(parts[2],val) 
-              endif else hdr=create_struct(hdr,parts[2],val)
+              if n_elements(st_hdrs) eq 0 then begin 
+                 st_hdrs=create_struct(parts[2],val) 
+              endif else st_hdrs=create_struct(st_hdrs,parts[2],val)
            end
            '|': begin
               line=strtrim(line) ;no trailing blanks, please
               sep_pos=[strsplit(line,'|'),strlen(line)-1]
               tok=strtrim(strsplit(line,'|',/EXTRACT),2) 
-              if got_tags eq 0 then begin 
-                 tags=tok
-                 got_tags=1
-                 break
-              endif 
-              ;; skip any other headers beyond the type field
-              if got_type then break 
-              for i=0,n_elements(tok)-1 do begin 
-                 case 1 of 
-                    strmatch(tok[i],'r*'): begin 
-                       val=0.0
-                       if n_elements(format) eq 0 then format=['F0'] else $
-                          format=[format,'F0']
-                    end 
-                    strmatch(tok[i],'i*'): begin 
-                       val=0L
-                       if n_elements(format) eq 0 then format=['I0'] else $
-                          format=[format,'I0']
-                    end 
-                    strmatch(tok[i],'d*'): begin 
-                       val=0.0D
-                       if n_elements(format) eq 0 then format=['D0'] else $
-                          format=[format,'D0']
-                     end
-                     strmatch(tok[i],'c*'): begin 
-                        val=''
-                        aform=['T'+strtrim(sep_pos[i],2), $
-                               'A'+strtrim(sep_pos[i+1]-sep_pos[i]-1,2)]
-                        if n_elements(format) eq 0 then format=[aform] else $
-                           format=[format,aform]
-                     end
-                    1: begin 
-                       print,'warning, unkown type '+tok[i]
-                       break
-                    end 
-                 endcase 
+              case chead++ of 
+                 0: begin       ;column names
+                    tags=strarr(n_elements(tok))
+                    ;; Remove disallowed characters from the tag
+                    for i=0,n_elements(tok)-1 do $
+                       tags[i]=idl_validname(tok[i],/CONVERT_ALL)
+                 end
+                 1: begin       ;format flags
+                    got=bytarr(n_elements(tags))
+                    for i=0,n_elements(tok)-1 do begin 
+                       case 1 of 
+                          strmatch(tok[i],'r*'): begin 
+                             val=0.0
+                             if n_elements(format) eq 0 then $
+                                format=['F0'] else format=[format,'F0']
+                          end 
+                          strmatch(tok[i],'i*'): begin 
+                             val=0L
+                             got[i]=2b ;indicate integer
+                             if n_elements(format) eq 0 then $
+                                format=['I0'] else format=[format,'I0']
+                          end 
+                          strmatch(tok[i],'d*'): begin 
+                             val=0.0D
+                             if n_elements(format) eq 0 then $
+                                format=['D0'] else format=[format,'D0']
+                          end
+                          strmatch(tok[i],'c*'): begin 
+                             got[i]=1b ;indicate string
+                             val=''
+                             aform=['T'+strtrim(sep_pos[i],2), $
+                                    'A'+strtrim(sep_pos[i+1]-sep_pos[i]+1,2)]
+                             if n_elements(format) eq 0 then $
+                                format=[aform] else format=[format,aform]
+                          end
+                          1: begin 
+                             print,'warning, unkown type '+tok[i]
+                             break
+                          end 
+                       endcase 
                  
-                 ;; Remove disallowed characters from the tag
-                 unclean_tag=tags[i]
-                 tags[i]=''
-                 while ((pos=stregex(unclean_tag,'[^0-9 _$A-Za-z]'))) $
-                    ne -1 do begin 
-                    tags[i]=tags[i]+strmid(unclean_tag,0,pos)+'_'
-                    unclean_tag=strmid(unclean_tag,pos+1)
-                 endwhile 
-                 tags[i]=tags[i]+unclean_tag
-                 
-                 if n_elements(data_elem) eq 0 then $
-                    data_elem=create_struct(tags[i],val) $
-                 else data_elem=create_struct(data_elem,tags[i],val) 
-              endfor
-              got_type=1
-           end
-           else: at_data=1
+                       ;; Create/extend data structure
+                       if n_elements(data_elem) eq 0 then $
+                          data_elem=create_struct(tags[i],val) $
+                       else data_elem=create_struct(data_elem,tags[i],val) 
+                    endfor
+                 end
+                 2: begin       ;units
+                    units=tok
+                 end 
+              endcase 
+           end 
+           else: begin 
+              at_data=1
+              ret=replicate(data_elem,nlines-line_cnt+1)
+              line_cnt=0
+           end 
         endcase
         if at_data eq 0 then continue
      endif 
      ;; reading data
      reads,line,data_elem,FORMAT='('+strjoin(format,",")+')'
-     if n_elements(ret) eq 0 then ret=data_elem else ret=[ret,data_elem]
+     ret[line_cnt++]=data_elem
   endwhile
-  if arg_present(hdr_in) then hdr_in=hdr
+  
+  if n_elements(got_string) ne 0 then begin 
+     wh=where(got_string eq 1b,cnt)
+     for i=0,cnt-1 do ret.(wh[i])=strtrim(ret.(wh[i]),2)
+  endif 
+  if arg_present(units) && chead lt 2 then units=replicate('',n_tags(ret))
   free_lun,un
   return,ret
 end
