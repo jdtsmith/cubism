@@ -1074,7 +1074,7 @@ function CubeProj::Info,entries, NO_DATA=nd
   str=[str,aps]
   
   str=[str, $
-       ' '+string(FORMAT='(I0,"x",I0," steps = ",F6.3," x ",F6.3,' + $
+       ' '+string(FORMAT='(I0,"x",I0," steps = ",F7.3," x ",F7.3,' + $
                   '" arcsec"," (",F6.3," arcsec/pixel)")',self.NSTEP, $
                   self.STEP_SIZE*3600*self.NSTEP,self.PLATE_SCALE*3600)]
   str=[str,' '+string(FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")',$
@@ -1591,7 +1591,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      device,GET_SCREEN_SIZE=ss
      window,XSIZE=xsize,YSIZE=ysize, $
             XPOS=tboff[0]+tbsize[0], YPOS=ss[1]-tboff[1]-ysize, $
-            TITLE=string(FORMAT='(%"%s %s  (%s)  [%dx%d ; %4.1f\"x%4.1f\"]")',$
+            TITLE=string(FORMAT='(%"%s %s  (%s)  [%dx%d ; %5.1f\"x%5.1f\"]")',$
                          'Building Cube: ', $
                          self->ProjectName(), $
                          (self.MODULE?self.MODULE:"(no module)")+ $
