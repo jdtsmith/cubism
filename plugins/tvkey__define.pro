@@ -54,7 +54,6 @@ end
 ;       Cleanup
 ;=============================================================================
 pro tvKey::Cleanup
-  self->OMArray::Cleanup        ;clean up our parents
   self->tvPlug::Cleanup
 end
 
@@ -99,7 +98,6 @@ end
 ;=============================================================================
 pro tvKey__define
   struct={tvKey, $ 
-          INHERITS OMArray, $   ;For simple signup
           INHERITS tvPlug, $    ;make it a tvDraw plug-in
           base_pos:0, $         ;which character is centered
           wHid: 0L}             ;the widget id of the hidden text widget
