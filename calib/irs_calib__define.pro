@@ -296,6 +296,7 @@ end
 ;=============================================================================
 pro SMART_Calib::Print, modules
   if n_elements(modules) eq 0 then modules=indgen(4)
+  print,' == SMART Calibration Object: '+self.Name+' =='
   for i=0,n_elements(modules)-1 do begin 
      md=smart_module(modules[i])
      no=ptr_valid(self.cal[md])?n_elements(*self.cal[md]):0
