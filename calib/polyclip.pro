@@ -41,7 +41,7 @@
 ;		Written and documented.
 ;
 ;-
-
+;    $Id$
 ;; Compute whether a given point is "inside" the specified edge.
 function clip_inside,i,j,p,t
   case t of

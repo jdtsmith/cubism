@@ -48,7 +48,8 @@
 ;
 ;		Written.  Initial documentation.
 ;-
- 
+;   $Id$
+
 function polyfillaa, x,y,sx,sy, AREAS=areas
   ;; Clip to the nearest enclosing region
   left=floor(min(x,max=maxx))>0
