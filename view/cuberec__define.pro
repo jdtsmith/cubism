@@ -59,7 +59,8 @@ pro CubeRec::Message, msg
      end
   endcase
   self->UpdateView
-  self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.cube,self.MODULE}
+  self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
+                 self.cur_wav, self.cube,self.MODULE}
 end
 
 ;=============================================================================
@@ -220,7 +221,7 @@ pro CubeRec::FullEvent,ev
      end
   endcase 
   self->UpdateView
-  self->MsgSend,{CUBEREC_FULL,(*self.wavelength)[self.cur_wav]}
+  self->MsgSend,{CUBEREC_FULL,self.cur_wav,(*self.wavelength)[self.cur_wav]}
 end
 
 ;=============================================================================
@@ -246,11 +247,13 @@ pro CubeRec::Extract
               self.cube->ProjectName(),l,b,r,t)
   if XRegistered("CubeViewSpec") eq 0 then begin 
      o=obj_new('CubeViewSpec',PARENT_GROUP=self.wBase[0])
+     ;; Set up messages between us
      self->MsgSignup,o,/CUBEREC_SPEC,/CUBEREC_FULL
      o->MsgSignup,self,/CUBEVIEWSPEC_STACK
      o->MsgSignup,self,/CUBEVIEWSPEC_FULL
      if self.mode eq 0 then $
-        self->MsgSend,{CUBEREC_FULL,(*self.wavelength)[self.cur_wav]}
+        self->MsgSend, $
+           {CUBEREC_FULL,self.cur_wav,(*self.wavelength)[self.cur_wav]}
   endif 
   sp=ptr_new(spec,/NO_COPY)
   self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,sp}
@@ -346,11 +349,17 @@ pro CubeRec__define
       wFull:0L}                 ;The "Switch to Full mode" button
   
   ;; The messages we send
-  msg={CUBEREC_SPEC,Info:'',wavelength:ptr_new(),spec:ptr_new()}
-  ;;  spec is 2xn or 3xn, info is a text message describing the extraction.
   
-  msg={CUBEREC_FULL,wavelength:0.0} ;s
-  msg={CUBEREC_UPDATE,BCD_MODE:0,CUBE:obj_new(),MODULE:''} ;XXX WCS!
+  ;; Extracted Spectra: spec is 2xn or 3xn, info is a text message
+  ;; describing the extraction.
+  msg={CUBEREC_SPEC,Info:'',wavelength:ptr_new(),spec:ptr_new()}
+  
+  ;; Special purpose: full Cube being viewed.
+  msg={CUBEREC_FULL,plane:0L,wavelength:0.0}
+  
+  ;; General update
+  msg={CUBEREC_UPDATE,BCD_MODE:0,FULL_MODE:0,PLANE:0L, $
+       CUBE:obj_new(),MODULE:''} 
   
   ;;What about backtrack in full cube mode: showing which
   ;;BCD's/pixels contributed to a given cube pixel.  How?  Maybe
