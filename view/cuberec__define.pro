@@ -9,9 +9,9 @@ pro CubeRec::Message, msg
         self->Extract
         return
      end 
-
      'CUBEVIEWSPEC_SAVE': begin 
         self->Extract,/SAVE,ASCII=msg.ascii
+        return
      end
      'CUBEVIEWSPEC_FULL': begin 
         self.cur_wav=value_locate(*self.wavelength,msg.wavelength)>0

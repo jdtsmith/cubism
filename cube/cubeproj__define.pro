@@ -1936,7 +1936,7 @@ end
 ;     XXXX: Switch from position to wavelength based ????        
 ;=============================================================================
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
-                         BG_VALS=bg_vals,MAP_NAME=mname, SAVE=sf
+                         BG_VALS=bg_vals,MAP_NAME=mname, SAVE=save
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
@@ -1998,7 +1998,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      stack=stack-background
   endif
   
-  if keyword_set(sf) then self->SaveMap,stack,sf
+  if keyword_set(save) then self->SaveMap,stack,save
   return,stack
 end
 
