@@ -19,7 +19,10 @@ pro CubeViewSpec::Message, msg
      *self.sp=*msg.spec
      widget_control, self.wToggles,GET_VALUE=ren
      if n_elements(ren) eq 2 then begin ; if auto-renorm'ing
-        if ren[0] then self.renorm=round(alog10(median(*self.sp)))
+        if ren[0] then begin 
+           med=median(*self.sp)
+           self.renorm=med gt 0.?round(alog10(med)):0
+        endif 
      endif
      if self.renorm ne 0. then *self.sp=*self.sp/10.0D^self.renorm
      widget_control, self.wDraw,/DRAW_BUTTON_EVENTS, /DRAW_MOTION_EVENTS
