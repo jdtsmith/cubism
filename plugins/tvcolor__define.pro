@@ -194,6 +194,12 @@
 pro tvColor::Message,msg
   self->tvPlug::Message,msg,TYPE=type
   case type of
+     'TVDRAW_RESIZE': begin 
+        self.bSize[0]=msg.x
+        widget_control, self.wBar,SCR_XSIZE=msg.x
+        self->DrawCbar
+     end 
+     
      'DRAW_MOTION': begin 
         bright=float(msg.X)/self.winsize[0]
         contrast=float(msg.Y)/self.winsize[1]
@@ -239,7 +245,7 @@ pro tvColor::Message,msg
         endcase 
      end 
      
-     'WIDGET_TRACKING':  begin 
+     'TLB_WIDGET_TRACKING':  begin 
         if msg.enter then begin 
            self.oDraw->SetWin 
            self->SetColors,/NO_REDRAW
@@ -254,8 +260,8 @@ end
 ;=============================================================================
 pro tvColor::On
   self->tvPlug::On
-  self.oDraw->MsgSignup,self,WIDGET_TRACKING=self.protect, $
-     DRAW_BUTTON=self.mouse_mode
+  self.oDraw->MsgSignup,self,TLB_WIDGET_TRACKING=self.protect, $
+                        DRAW_BUTTON=self.mouse_mode,/TVDRAW_RESIZE
 end
 
 ;=============================================================================
@@ -263,7 +269,8 @@ end
 ;=============================================================================
 pro tvColor::Off
   self->tvPlug::Off
-  self.oDraw->MsgSignup,self,/NONE,WIDGET_TRACKING=self.protect
+  self.oDraw->MsgSignup,self,/NONE,TLB_WIDGET_TRACKING=self.protect, $
+                        /TVDRAW_RESIZE
 end
 
 function tvColor::Icon
@@ -446,6 +453,9 @@ end
 ;=============================================================================
 pro tvColor::Start
   self->tvPlug::Start
+  self.oDraw->GetProperty,WINSIZE=ws
+  self.bSize[0]=ws[0]
+  widget_control, self.wBar, XSIZE=ws[0]
   self->DrawCbar
   device,GET_VISUAL_NAME=vn     ;Should DirectColor redraw?
   if vn ne 'PseudoColor' then self.need_redraw=1
