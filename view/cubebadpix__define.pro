@@ -31,7 +31,7 @@ pro CubeBadPix::Message, msg
                                *self.bp_list:-1
      end
      
-     'TVDRAW_REDRAW': begin 
+     'TVDRAW_SNAPSHOT': begin 
         self.oDraw->GetProperty,ZOOM=zm
         self.zoom=zm
         self->MarkStatic,/ALL
@@ -48,7 +48,7 @@ pro CubeBadPix::Message, msg
               ptr_free,self.bp_list
               if n_elements(bpl) gt 0 then self.bp_list=ptr_new(bpl,/NO_COPY)
               self.pmask=pm
-              self.oDraw->ReDraw,/ERASE,/SNAPSHOT
+              if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
            endif 
            self->Enable
         endif else self->Off,/DISABLE
@@ -57,11 +57,21 @@ pro CubeBadPix::Message, msg
 end
 
 ;=============================================================================
+;  Reset - Take away the drawn glyphs
+;=============================================================================
+pro CubeBadPix::Reset,_EXTRA=e
+  self.oDraw->MsgSignup,self,/NONE
+  self.oDraw->ReDraw,/ERASE,/SNAPSHOT
+  self->tvPlug::Off,_EXTRA=e
+end
+
+
+;=============================================================================
 ;  Off - No more events needed
 ;=============================================================================
 pro CubeBadPix::Off,_EXTRA=e
-  self.oDraw->MsgSignup,self,/NONE
-  if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
+  ;; Nothing but snapshot
+  if self->On() then self.oDraw->MsgSignup,self,/NONE,/TVDRAW_SNAPSHOT
   self->tvPlug::Off,_EXTRA=e
 end
 
@@ -69,13 +79,13 @@ end
 ;  On - Signup for all our messages.
 ;=============================================================================
 pro CubeBadPix::On
+  self->EnsureCube
   if self->On() then begin 
-     self->Off
+     self->Reset
      return
   endif 
-  self->EnsureCube
   self->tvPlug::On
-  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_REDRAW
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_SNAPSHOT
   self.oDraw->Redraw,/SNAPSHOT
 end
 
