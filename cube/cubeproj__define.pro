@@ -176,8 +176,13 @@ pro CubeProj::ShowEvent, ev
         widget_control, ev.id, SET_BUTTON=(self.SaveMethod AND 2b) ne 0b
      end 
      
-     'add-droop-aor': self->AddAOR,/DROOPRES
-     'add-flatap-aor': self->AddAOR,/FLATAP
+     'add-droop-aor':     self->AddGroup,/DROOPRES
+     'add-flatap-aor':    self->AddGroup,/FLATAP
+     'add-module':        self->AddGroup,/MODULE_ONLY
+     'add-droop-module':  self->AddGroup,/DROOPRES,/MODULE_ONLY
+     'add-flatap-module': self->AddGroup,/FLATAP,/MODULE_ONLY
+     
+     
      
      'setorder': begin 
         self->GetProperty,CALIB=cal
@@ -199,6 +204,19 @@ pro CubeProj::ShowEvent, ev
         widget_control, (*self.wInfo).SList,SET_LIST_TOP=top
         self->UpdateButtons
      end
+     
+     'select-by-filename': begin 
+        pat=getinp('File Matching (regex):',(*self.DR)[0].FILE, $
+                   TITLE='Select by File', $
+                   PARENT_GROUP=self->TopBase(),/MODAL,XSIZE=40)
+        if pat then begin 
+           wh=where(stregex((*self.DR).FILE,pat,/BOOLEAN),cnt)
+           if cnt eq 0 then self->Error,'No files matched'
+           widget_control, (*self.wInfo).SList, SET_LIST_SELECT=wh
+           self->UpdateButtons
+        endif 
+     end 
+
      
      'replace-string': $
         begin 
@@ -433,17 +451,25 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Edit menu
   edit=widget_button(mbar,VALUE='Edit',/MENU)
-  b1=widget_button(edit,VALUE='Select All',uvalue='select-all')
+  (*self.wInfo).MUST_PROJ[0]=widget_button(edit,VALUE='Select All', $
+                                           UVALUE='select-all')
+  (*self.wInfo).MUST_PROJ[1]=widget_button(edit,VALUE='Select By Filename',$
+                                           UVALUE='select-by-filename')
   wMustSel=widget_button(edit,VALUE='Replace File Substring...', $
                          UVALUE='replace-string') 
   
   ;;*** Data Record menu
   rec=widget_button(mbar,VALUE='Record',/MENU)
   b1=widget_button(rec,VALUE='Add Data...',UVALUE='adddata')
-  b2=widget_button(rec,VALUE='Import Data from AOR',/MENU)
-  tmp=widget_button(b2,VALUE='BCD...',UVALUE='addaor')
+  b2=widget_button(rec,VALUE='Import Data from Mapping AOR',/MENU)
+  tmp=widget_button(b2,VALUE='BCD...',UVALUE='addgroup')
   tmp=widget_button(b2,VALUE='DroopRes...',UVALUE='add-droop-aor')
   tmp=widget_button(b2,VALUE='FlatAp...',UVALUE='add-flatap-aor')
+  b3=widget_button(rec,VALUE='Import Data by Module',/MENU)
+  tmp=widget_button(b3,VALUE='BCD...',UVALUE='add-module')
+  tmp=widget_button(b3,VALUE='DroopRes...',UVALUE='add-droop-module')
+  tmp=widget_button(b3,VALUE='FlatAp...',UVALUE='add-flatap-module')
+  
   
   (*self.wInfo).MUST_UNRESTORED=widget_button(rec, UVALUE='restoreall',$
                                               VALUE='Restore All Record Data')
@@ -466,7 +492,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Cube menu  
   cube=widget_button(mbar,VALUE='Cube',/MENU)
-  (*self.wInfo).MUST_PROJ= $
+  (*self.wInfo).MUST_PROJ[2]= $
      widget_button(cube,VALUE='Build Cube',UVALUE='buildcube') 
   (*self.wInfo).MUST_ACCT= $
      widget_button(cube,VALUE='Reset Accounts',UVALUE='resetaccounts')
@@ -549,7 +575,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                  'View Record','View Cube','Import AOR','Save','Close'],$
                 BUTTON_UVALUE= $
                 ['enablerecord','disablerecord','delete','headers', $
-                 'viewrecord','viewcube','addaor','save','exit'])
+                 'viewrecord','viewcube','addgroup','save','exit'])
   ;; list of buttons that require a selection to be meaningful
   (*self.wInfo).MUST_SELECT=[wMustSel,ids[0:4]]
   (*self.wInfo).view_ids[2]=ids[4]
@@ -752,8 +778,8 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt
      
      ;; Optional BMASK, UNCERTAINTY
      ptr_free,(*self.DR)[which].BMASK,(*self.DR)[which].UNC
-     unc_file=self->FileBCD(file,/UNCERTAINTY)
-     bmask_file=self->FileBCD(file,/BMASK)
+     unc_file=irs_associated_file(file,/UNCERTAINTY)
+     bmask_file=irs_associated_file(file,/BMASK)
      
      if size(bmask_file,/TYPE) eq 7 && file_test(bmask_file) then $
         (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
@@ -1325,6 +1351,7 @@ end
 pro CubeProj::SetBackgroundFromRecs,recs
   self->RecOrSelect,recs
   if recs[0] eq -1 then return
+  self->RestoreData,recs
   n=n_elements(recs) 
   if n ge 3 then begin 
      list=["Average","Average + Min/Max Trim"]
@@ -1473,23 +1500,6 @@ function CubeProj::Info,entries, NO_DATA=nd
   return,str
 end
 
-;=============================================================================
-;  FileBCD - Find the BCD version of any given fits file
-;=============================================================================
-function CubeProj::FileBCD,file,BMASK=bm,UNCERTAINTY=unc
-  if keyword_set(bm) then reg='bmask\.fits$' else $
-     if keyword_set(unc) then reg='func\.fits$' else $
-        reg='bcd(_fp)?\.fits$'
-  if stregex(file,reg,/BOOLEAN) then return,file
-  parts=stregex(file,'^(.*[0-9][._])[^.]+\.fits$',/EXTRACT,/SUBEXPR)
-  base=parts[1]
-  if strlen(base) eq 0 then return,-1
-  if keyword_set(bm) then filt='bmask' else $
-     if keyword_set(unc) then filt='func' else filt='bcd*'
-  f=file_search(base+filt+'.fits',COUNT=cnt)
-  if cnt eq 0 then return,-1
-  return,f[0]
-end
 
 ;=============================================================================
 ;  SetProperty - Set various cube properties.  Most of these should be
@@ -2618,7 +2628,7 @@ pro CubeProj::BuildCube
      ;; entering the cube
      if ptr_valid((*self.DR)[dr].BMASK) then begin 
         use_bmask=1
-        bmask=(*(*self.DR)[dr].BMASK AND 29952UL) eq 0L 
+        bmask=(*(*self.DR)[dr].BMASK AND 29952U) eq 0L 
         if use_bpmask then bmask AND= bpmask
      endif else if use_bpmask then begin 
         use_bmask=1
@@ -3147,10 +3157,11 @@ pro CubeProj::ShowAperture
 end
      
 ;=============================================================================
-;  AddAOR - Add an entire AOR from a full AOR directory, with choice
-;           of module(s) and observations.
+;  AddGroup - Add a group of data files from a directory, with choice
+;             of module(s) and observations, and grouping by spectral
+;             map (=object+aor+fovid, default) or module only.
 ;=============================================================================
-pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr,FLATAP=fl
+pro CubeProj::AddGroup,DIR=dir,MODULE_ONLY=md,COADD=cd,DROOPRES=dr,FLATAP=fl
   if n_elements(dir) eq 0 then begin 
      type=keyword_set(cd)?"Coadd":(keyword_set(dr)? $
           "Droopres":(keyword_set(fl)?"FlatAp":"BCD"))
@@ -3160,7 +3171,7 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr,FLATAP=fl
   if size(dir,/TYPE) ne 7 then return
   
   if ~file_test(dir,/DIRECTORY) then $
-     self->Error,'Must select directory containing AORs'
+     self->Error,'Must select directory.'
   if keyword_set(cd) then begin 
      type='Coadd' & filt='*coa*2d.fits' 
   endif else if keyword_set(dr) then begin 
@@ -3174,7 +3185,7 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr,FLATAP=fl
   widget_control, /HOURGLASS
   files=file_search(dir,filt,/TEST_REGULAR,COUNT=cnt)
   if cnt eq 0 then $
-     self->Error,['No data found in:',dir],TITLE='AOR Import Error'
+     self->Error,['No data found in:',dir],TITLE='Data Import Error'
   if cnt gt 500 then begin 
      ans=dialog_message(["Selected directory contains "+strtrim(cnt,2)+ $
                          " data files. Continue?",dir],$
@@ -3182,60 +3193,16 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr,FLATAP=fl
                         DIALOG_PARENT=self->TopBase())
      if ans ne 'Yes' then return
   endif 
-
-  for i=0,n_elements(files)-1 do begin 
-     file=self->FileBCD(files[i]) ;get the bcd header...
-     hdr=headfits(file)
-     rec={FILE:files[i],OBJECT:strtrim(sxpar(hdr,'OBJECT'),2), $
-          FOV:long(sxpar(hdr,'FOVID')), $
-          NCYCLES:long(sxpar(hdr,'NCYCLES')), $
-          TIME:float(sxpar(hdr,'EXPTOT_T')), $
-          STEPS:long([sxpar(hdr,'STEPSPAR'),sxpar(hdr,'STEPSPER')])}
-     if n_elements(all) eq 0 then all=[rec] else all=[all,rec]
-  endfor 
   
-  uniq_objs=uniq(all.OBJECT,sort(all.OBJECT))
-  for i=0,n_elements(uniq_objs)-1 do begin 
-     object=all[uniq_objs[i]].OBJECT
-     wh=where(all.OBJECT eq object,cnt)
-     uniq_fovs=uniq(all[wh].FOV,sort(all[wh].FOV))
-     nfovs=n_elements(uniq_fovs) 
-     for j=0,nfovs-1 do begin 
-        this=all[wh[uniq_fovs[j]]]
-        these=all[wh[where(all[wh].FOV eq this.fov)]]
-        fovname=irs_fov(this.fov,/SHORT_NAME,MODULE=md,ORDER=ord)
-        ;; A file we don't recognize
-        if size(fovname,/TYPE) ne 7 then continue
-        pos=strpos(fovname,'_cen')
-        if pos ne -1 then fovname=strmid(fovname,0,pos)
-        ;; Assume same FOV and same OBJECT == one map
-        rec={CNT:n_elements(these),FOVNAME:fovname, OBJECT:this.OBJECT,$
-             FILES:ptr_new(these.file),STEPS:this.STEPS, $
-             TIME:this.TIME, NCYCLES:this.NCYCLES,MERGE:0b}
-        if n_elements(choices) eq 0 then choices=rec else begin 
-           choices=[choices,rec]
-           ;; The separate low-res slits are compatible with each other
-;            if ord gt 0 and (md eq 'SL' or md eq 'LL') then begin
-;               other=md+strtrim(ord eq 2?1:2,2)
-;               whfov=where(choices.FOVNAME eq other,cnt)
-;               if cnt gt 0 then begin 
-;                  ;; both are present
-;                  rec.FOVNAME=other+'+'+fovname
-;                  rec.FILES=ptr_new([*rec.FILES,*choices[whfov[0]].FILES])
-;                  rec.cnt+=choices[whfov[0]].CNT
-;                  rec.MERGE=1b
-;                  choices=[choices,rec]
-;               endif 
-;            endif 
-        endelse 
-     endfor 
-  endfor 
+  md=keyword_set(md) 
+  choices=irs_file_filter(files,COUNT=cnt,MODULE_ONLY=md)
+  if cnt eq 0 then return
   
-  list=strarr(n_elements(choices))
+  list=strarr(cnt)
   for i=0,n_elements(choices)-1 do begin 
-     if choices[i].MERGE then begin 
+     if md then begin 
         list[i]=string(FORMAT='(%"%s %s (%d files)")', $
-                       choices[i].OBJECT,choices[i].FOVNAME,choices[i].CNT)
+                       choices[i].OBJECT,choices[i].MODULE,choices[i].CNT)
      endif else begin 
         list[i]=string(FORMAT='(%"%s %s (%d files) %dx%d@%d (%ss)")', $
                        choices[i].OBJECT,choices[i].FOVNAME,choices[i].CNT, $
@@ -3244,7 +3211,7 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr,FLATAP=fl
      endelse 
   endfor 
   
-  ch=multchoice('Choose '+type+' Data:',list,TITLE='Load AOR', $
+  ch=multchoice('Choose '+type+' Data:',list,TITLE='Load Group', $
                 PARENT_GROUP=self->TopBase(),/MODAL,/NONEXCLUSIVE)
   
   widget_control, /HOURGLASS
@@ -3273,11 +3240,11 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
   for i=0,n_elements(files)-1 do begin 
      data=readfits(files[i],header,/SILENT)
      if ~stregex(files[i],'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
-        bcdfile=self->FileBCD(files[i])
+        bcdfile=irs_associated_file(files[i])
         if size(bcdfile,/TYPE) eq 7 then header=headfits(bcdfile)
      endif 
      
-     bfile=self->FileBCD(files[i],/BMASK)
+     bfile=irs_associated_file(files[i],/BMASK)
      if size(bfile,/TYPE) eq 7 && file_test(bfile,/READ) then $
         bmask=readfits(bfile,/SILENT) else bmask=0
      
@@ -3630,7 +3597,7 @@ pro CubeProj__define
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
          MUST_SELECT:lonarr(16),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
-         MUST_PROJ:0L, $        ;SW button which requires a valid project
+         MUST_PROJ:lonarr(3), $ ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(3), $ ;background record must be set
