@@ -51,6 +51,9 @@
 ; MODIFICATION HISTORY:
 ;
 ;    $Log$
+;    Revision 1.3  2002/01/30 03:34:21  nidhi
+;    The table is now "all that it can be" given IDL's limited implementation of the table widget. There is that annoying space on the bottom and left sides, but there is no known fix to that problem. Its either that or have scroll bars there for effect, just to fill in the space. Right now, I've left out the scrollers.
+;
 ;    Revision 1.2  2002/01/26 21:57:14  nidhi
 ;    This is the "All Purpose" box for use with general plugins that just need a selection tool. Also, I dont know how to word wrap this. sorry.
 ;
@@ -80,8 +83,6 @@
 ;  02111-1307, USA.
 ;
 ;##############################################################################
-
-
 
 
 ;=============================================================================
@@ -121,12 +122,6 @@ pro tvPixtbl::Off
 
 end
 
-;pro tvPixtbl_killed, wid
-;  event = {id:wid}
-;  self->Off
-;end
-
-
 
 pro tvPixtbl::On
 
@@ -138,8 +133,8 @@ pro tvPixtbl::On
                         GROUP_LEADER=self.parent);, $
                         ;uvalue=self, kill_notify='tvPixtbl_killed')
 
-  self.wTable = widget_table(self.wBase, value=*self.tblptr,/SCROLL, $
-                            scr_xsize=425, scr_ysize=150)
+  self.wTable = widget_table(self.wBase, value=*self.tblptr, $
+                            xsize=5, ysize=5)
 
   widget_control, self.wBase, /REALIZE
   
@@ -223,47 +218,6 @@ function tvPixtbl::MakeTable, im,point
 
 end
 
-;=============================================================================
-;	Event - Turn the widget on and off
-;=============================================================================
-pro tvpixtbl_event, ev
-  widget_control, ev.handler, get_uvalue=self
-  self->Event,ev
-end
-
-
-pro tvPixtbl::Event,ev
-  widget_control, ev.handler, get_value=tmp
-
-  if tmp eq 'PT  On' then begin
-     widget_control, self.wBtn, set_value="PT Off"
-
-     tmptbl = intarr(self.tblsize(0), self.tblsize(1))
-     self.tblptr = ptr_new(tmptbl) ;a new empty table
-     self.wBase=widget_base(/COLUMN, SPACE=1, /FLOATING, $
-                            GROUP_LEADER=self.parent ,$
-                            event_pro="tvpixtbl_event")
-
-     self.wTable = widget_table(self.wBase, value=*self.tblptr,/SCROLL, $
-                               scr_xsize=425, scr_ysize=150)
-
-     widget_control, self.wBase, /REALIZE
-  
-     ;specify draw_motion events. always on
-     self.oDraw->MsgSignup,self,/DRAW_MOTION
-     
-  endif else if tmp eq 'PT Off' then begin
-     widget_control, self.wBtn, set_value="PT  On"
-     self->wDestroy
-     self.oDraw->MsgSignup,self,/NONE
-
-  endif else begin
-     print, "ERROR: Unknown value returned from tvpixtbl_wBtn"
-  endelse
-
-
-  
-end
 ;=============================================================================
 ;	wDestroy - Destroy the Widget
 ;=============================================================================
