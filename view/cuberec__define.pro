@@ -224,6 +224,8 @@ pro CubeRec::Export
      2: begin                   ;show the record
         if ~ptr_valid(self.BCD) then return
         im=*self.BCD
+        if (widget_info(self.wBGSub,/BUTTON_SET)) && $
+            ptr_valid(self.BCD_BACKGROUND) then im-=*self.BCD_BACKGROUND
      end
   endcase
   self.cube->ExportToMain,MAP=im,TYPE=self.mode eq 2?"_im":void
