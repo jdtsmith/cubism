@@ -46,8 +46,8 @@
 ;  02111-1307, USA.
 ;
 ;##############################################################################
-pro cubism_vm
+pro cubism_vm,pname
   @cubism_dir                   ; to freeze the relative cubism directory
-  device,DECOMPOSED=0,RETAIN=2
-  cubism,MODAL=0
+  device,DECOMPOSED=0,RETAIN=2,TRUE=24
+  cubism,pname,MODAL=0
 end
