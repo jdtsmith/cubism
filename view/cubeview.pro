@@ -78,7 +78,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   ;;**********************************************************************
   exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},8)
   exc_list.Obj= [zoomer,hist,stretcher,slicer,stats,phot,cuberec,aper] 
-  exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'r'    ,'']
+  exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'x'    ,'']
 
   tog_list=replicate({Obj:obj_new(), keys:'',Exclusive:0b},1)
   tog_list.Obj= [pxtbl]
