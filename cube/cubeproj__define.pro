@@ -904,7 +904,7 @@ pro CubeProj::UpdateAll,NO_LIST=nl
 end
 
 ;=============================================================================
-;  FindViewer - Find a CubeView to which to send message.  We send
+;  FindViewer - Find a CubeView to which to send messages.  We send
 ;               messages to one and only one viewer, unless NEW_VIEWER
 ;               is set, in which case we spawn a new viewer.
 ;=============================================================================
@@ -923,10 +923,10 @@ pro CubeProj::FindViewer,NEW_VIEWER=nv
   ;; We need to find a cubeview to talk to
   resolve_routine,'XManager',/COMPILE_FULL_FILE
   ids=LookupManagedWidget('CubeView')
-  rec=widget_info(ids[0],FIND_BY_UNAME='CubeRec') 
-  if widget_info(rec,/VALID_ID) then begin 
+  rec=widget_info(ids[0],FIND_BY_UNAME='CubeRec')
+  if widget_info(rec,/VALID_ID) then begin
      widget_control, rec,GET_UVALUE=rec
-  ;; sign them up for our messages
+     ;; sign them up for our messages
      if obj_valid(rec)?obj_isa(rec,'CubeRec'):0 then self->MsgSignup,rec $
      else cubeview,CUBE=self
   endif else cubeview,CUBE=self
@@ -1208,7 +1208,7 @@ end
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            ERROR=err, PR_SIZE=prz, CALIB=calib,MODULE=module, $
                            APERTURE=ap,PROJECT_NAME=pn,DR=dr,TLB_OFFSET=tboff,$
-                           TLB_SIZE=tbsize
+                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -1247,6 +1247,11 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
         if widget_info((*self.wInfo).Base,/VALID_ID) then $
         widget_control, (*self.wInfo).Base,TLB_GET_SIZE=tbsize else tbsize=-1
   endif
+  if arg_present(bcdsz) then begin 
+     if NOT ptr_valid(self.DR) then bcdsz=0 else if $
+        NOT ptr_valid((*self.DR)[0].BCD) then bcdsz=0 else  $
+        bcdsz=size(*(*self.DR)[0].BCD,/DIMENSIONS)
+  endif 
 end
 
 ;=============================================================================
@@ -1753,7 +1758,7 @@ pro CubeProj::BuildRevAcct
      ;; Compute the total reverse index of the full cube index
      ;; histogram for this DR's accounting.  E.g. the account records
      ;; from this BCD pertaining to cube pixel z are:
-     ;; ri[ri[z]:ri[z+1]-1].
+     ;; ri[ri[z-rev_min]:ri[z+1-rev_min]-1].
      h=histogram((*(*self.DR)[i].ACCOUNT).cube_pix+ $
                  (*(*self.DR)[i].ACCOUNT).cube_plane* $
                  self.CUBE_SIZE[0]*self.CUBE_SIZE[1], $
@@ -1768,6 +1773,32 @@ end
 pro CubeProj::ResetAccounts
   self.ACCOUNTS_VALID=0b
   self->UpdateButtons
+end
+
+;=============================================================================
+;  BackTrackPix - Find the BCDs, pixels, and overlap fractions
+;                 influencing the specified full cube pixel.
+;=============================================================================
+function CubeProj::BackTrackPix, pix, plane
+  nrec=self->N_Records()
+  if nrec eq 0 then return,-1
+  if NOT ptr_valid((*self.DR)[0].REV_ACCOUNT) then self->BuildRevAcct
+  if n_elements(pix) eq 2 then pix=pix[0]+pix[1]*self.CUBE_SIZE[0]
+  if n_elements(plane) ne 0 then $
+     z=pix+plane*self.CUBE_SIZE[0]*self.CUBE_SIZE[1] $
+  else z=pix
+  for i=0,nrec-1 do begin 
+     if z lt (*self.DR)[i].REV_MIN then continue
+     thisz=z-(*self.DR)[i].REV_MIN
+     ri=*(*self.DR)[i].REV_ACCOUNT
+     if ri[thisz] eq ri[thisz+1] then continue
+     accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[thisz]:ri[thisz+1]-1]]
+     ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,AREA:0.0}, $
+                   n_elements(accs))
+     ret.BCD_PIX=accs.BCD_PIX & ret.AREA=accs.AREA
+     if n_elements(all) eq 0 then all=[ret] else all=[all,ret]
+  endfor 
+  if n_elements(all) ne 0 then return,all else return,-1
 end
 
 ;=============================================================================
@@ -1838,8 +1869,9 @@ pro CubeProj::ReadMapFile,file,FORERANGES=fr,BACKRANGES=br,WEIGHTS=weights
   openr,lun,file,/GET_LUN
   readf,unit,nf,nb,nw
   
-             
-
+  ;; XXXXX make this robust
+  
+  
   return
 end
 
@@ -2312,7 +2344,6 @@ pro CubeProj__define
                                 ;  0: no, 1:yes, 2:size changed
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      ERR:  ptr_new(),$          ;a pointer to the nxmxl error cube
-;     ITIME: ptr_new(),$         ;nxmxl integration time per pixel
      CUBE_SIZE: [0L,0L,0L],$    ;the size of the cube, (n,m,l)
      CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
      NSTEP:[0L,0L], $           ;parallel (col), perpendicular (row) steps
