@@ -45,6 +45,7 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;       2002-08-27 (J.D. Smith): Migrated from SMART codebase.
 ;       2002-08-02 (J.D. Smith): Updated documentation and changed
 ;          keywords.
 ;       1998-09-09 (J.D. Smith): Written
