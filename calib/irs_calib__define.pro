@@ -159,25 +159,39 @@
 ;	
 ;       CALLING SEQUENCE:
 ;
-;          obj->ReadCalib, module, WAVSAMP_VERSION=,ORDER_VERSION=, $
-;                          TILT_VERSION=
+;          obj->ReadCalib, [module, /ONLY,WAVSAMP_VERSION=,ORDER_VERSION=, $
+;                           TILT_VERSION=]
 ;
 ;	OPTIONAL INPUT PARAMETERS:
 ;
 ;          module: The number (or name) of the module for which to
-;             read calibration data.  Defaults to all four modules.
+;             read calibration data.  Defaults to all four modules, if
+;             omitted.
 ;
 ;       INPUT KEYWORD PARAMETERS:
 ;
+;          ONLY: If set, only versions explicitly passed with the
+;             _VERSION keywords described below will be read, as
+;             opposed to the normal case of the *latest* version being
+;             used if none is specified.
+;             
 ;          WAVSAMP_VERSION: The version number of the WAVSAMP file to
-;             use.  Defaults to the latest version.
+;             use.  Defaults to the latest version, unless ONLY is
+;             set, in which case no WAVSAMP data is read or set for
+;             the module(s).  A version of 0 (zero) means use the
+;             latest version.
 ;
 ;          ORDER_VERSION: The version number of the order
 ;             position/wavelength solution file to use.  Defaults to
-;             the latest version.
+;             the latest version, unless ONLY is set, in which case no
+;             ORDER data is read or set for the module(s).  A version
+;             of 0 (zero) means use the latest version.
 ;
-;          WAVSAMP_VERSION: The version number of the tilt solution
-;             file to use.  Defaults to the latest version.
+;          TILT_VERSION: The version number of the tilt solution file
+;             to use.  Defaults to the latest version, unless ONLY is
+;             set, in which case no TILT data is read or set for the
+;             module(s).  A version of 0 (zero) means use the latest
+;             version.
 ;            
 ;    SetRecord:
 ;    
@@ -242,9 +256,16 @@
 ;     SMART_Calib
 ;
 ; EXAMPLE:
+; 
+;     Populate a new cal object with all the latest calibration data:
+;     
+;    cal=obj_new('SMART_Calib','2002-04-01: Pre-Launch')
+;    cal->ReadCalib
 ;
-;    a=obj_new('SMART_Calib','2002-04-01: Pre-Launch')
-;    a->ReadCalib
+;     Update the WAVSAMP to the latest version for long-low only:
+;     
+;    cal=sm_restore_calib('sm_2001_12_14.cal') 
+;    a->ReadCalib,'LL',WAVSAMP_VERSION=0,/ONLY
 ;
 ; MODIFICATION HISTORY:
 ;
@@ -299,23 +320,35 @@ pro SMART_Calib::Print, modules
   print,' == SMART Calibration Object: '+self.Name+' =='
   for i=0,n_elements(modules)-1 do begin 
      md=smart_module(modules[i])
+     module=smart_module(md,/TO_NAME)
      no=ptr_valid(self.cal[md])?n_elements(*self.cal[md]):0
-     print,FORMAT='(%"\n **Module %s: %s")',smart_module(md,/TO_NAME), $
+     print,FORMAT='(%"\n ==> Module %s: %s")',module, $
            (no gt 0?strtrim(n_elements(*self.cal[md]),2)+ $
             " orders.":" not loaded.")
+     if no eq 0 then continue
+     print,''
+     wsf=self.WAVSAMP_FILE[md]
+     if wsf ne '' then print,FORMAT='(A12,": ",A)', 'WAVSAMP',wsf
+     orf=self.ORDER_FILE[md]
+     if orf ne '' then print,FORMAT='(A12,": ",A)', 'ORDER',orf
+     tif=self.TILT_FILE[md]
+     if tif ne '' then print,FORMAT='(A12,": ",A)', 'TILT',tif
+     print,''
      for j=0,no-1 do begin 
         rec=(*self.cal[md])[j]
-        print,FORMAT='(%"   ==Order %02d  (%s): ")',rec.order, $
-              rec.Date eq 0.0D?"--":jul2date(rec.Date)
+        npr=n_elements(*(*rec.WAVSAMPS)[0].PR)
+
+        print,FORMAT='(%"    ==> Order %2s%d  (%s) -- %03d samples: ")', $
+              module,rec.order,rec.Date eq 0.0D?"--":jul2date(rec.Date),npr
         nw=n_elements(*rec.WAVSAMPS) 
         
-        print,"        A:"+strjoin(string(FORMAT='(G10.3)',rec.A))
-        print,"        B:"+strjoin(string(FORMAT='(G10.3)',rec.B))
-        print,"        C:"+strjoin(string(FORMAT='(G10.3)',rec.C))
-        print, "       Apertures:"
+        print,"         A:"+strjoin(string(FORMAT='(G10.3)',rec.A))
+        print,"         B:"+strjoin(string(FORMAT='(G10.3)',rec.B))
+        print,"         C:"+strjoin(string(FORMAT='(G10.3)',rec.C))
+        print,"         Apertures:"
         for k=0,nw-1 do begin 
            ws=(*rec.WAVSAMPS)[k]
-           print, FORMAT='(%"         %4.2f->%4.2f : %4.2f->%4.2f")', $
+           print, FORMAT='(%"           %4.2f->%4.2f : %4.2f->%4.2f")', $
                   ws.Aperture.low,ws.Aperture.high
         endfor 
         print,""
@@ -391,15 +424,15 @@ function SMART_Calib::Clip, module, order, aper,FULL=clip_full
   full=(*rec.WAVSAMPS)[wh[0]]
   
   new=full
-  if keyword_set(clip_full) eq 0 then begin 
-     new.PR=ptr_new(*full.PR)
+  if keyword_set(clip_full) eq 0 then begin
+     new.PR=ptr_new(*full.PR)   ; Copy the psuedo-rects
      newap=new.Aperture
      struct_assign,aper,newap
      new.Aperture=newap
-  endif 
-  npr=n_elements(*new.PR) 
-  for i=0,npr-1 do begin 
-     if keyword_set(clip_full) eq 0 then begin 
+  endif
+  npr=n_elements(*new.PR)
+  for i=0,npr-1 do begin
+     if keyword_set(clip_full) eq 0 then begin
         ;; Start with the full slit pseudo-rect positions
         x=(*new.PR)[i].x
         y=(*new.PR)[i].y
@@ -425,11 +458,17 @@ function SMART_Calib::Clip, module, order, aper,FULL=clip_full
         (*new.PR)[i].y=y
      endif
      
-     ;; Overwrite the pixel/area pointers with new ones
-     (*new.PR)[i].PIXELS=ptr_new(polyfillaa((*new.PR)[i].x,(*new.PR)[i].y, $
-                                            128,128,AREAS=ar))
-     (*new.PR)[i].AREAS =ptr_new(ar,/NO_COPY)
+     pixels=polyfillaa((*new.PR)[i].x,(*new.PR)[i].y,128,128,AREAS=ar)
+     
+     if pixels[0] ne -1 then begin 
+        ;; Overwrite the pixel and area pointers with new ones
+        (*new.PR)[i].PIXELS=ptr_new(pixels,/NO_COPY)
+        (*new.PR)[i].AREAS =ptr_new(ar,/NO_COPY)
+     endif 
   endfor 
+  good=where(ptr_valid((*new.PR).PIXELS),goodcnt)
+  if goodcnt eq 0 then message,'No WAVSAMP pseudo-rects on array'
+  if goodcnt lt npr then *new.PR=(*new.PR)[good]
   return,new
 end
 
@@ -477,20 +516,30 @@ pro SMART_Calib::SetRecord, record
 end
 
 ;=============================================================================
-;       ReadCalib - Read all three calibration files for a given
-;                   module or modules, and record in the object.
+;       ReadCalib - Read (up to) all three calibration files for a
+;                   given module or modules, and record in the object.
 ;=============================================================================
 pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
-                           TILT_VERSION=tv
+                           TILT_VERSION=tv,ONLY=only
   @smart_dir                    ;get smart_calib_dir
+  
   cals=['WAVSAMP','ORDFIND','LINETILT']
-
   version=[n_elements(wv)  gt 0?fix(wv)>0:0, $
            n_elements(orv) gt 0?fix(orv)>0:0, $
            n_elements(tv)  gt 0?fix(tv)>0:0]
   
+  if keyword_set(only) then begin 
+     which=where([n_elements(wv) ne 0, $
+                  n_elements(orv) ne 0, $
+                  n_elements(tv) ne 0],cnt)
+     if cnt eq 0 then return
+     cals=cals[which]
+     version=version[which]
+  endif 
+
   if n_elements(module) ne 0 then modules=[smart_module(module)] $
   else modules=indgen(4)        ;do them all, by default
+  
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
      for j=0,n_elements(cals)-1 do begin 
@@ -565,6 +614,7 @@ pro SMART_Calib::ParseWAVSAMP,file,module
      rec.WAVSAMPS=ptr_new(ws,/NO_COPY)
      ;; Put the record back
      self->SetRecord,rec
+     
      ;; Clip the full slit as a starting point.
      c=self->Clip(m,orders[ord],/FULL)
   endfor
