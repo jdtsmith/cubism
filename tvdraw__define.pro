@@ -576,7 +576,7 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
             TOP=self.top-self.bottom,/NAN,MIN=self.scale_min?self.min:void, $
             MAX=self.scale_max?self.max:void)
   
-  self.scale_min=(self.scale_max=0)
+  ;self.scale_min=(self.scale_max=0)
   
   ;; Resize it
   self.zoom=min(float(self.winsize)/self.dispsize)
