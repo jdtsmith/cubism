@@ -136,7 +136,7 @@ pro tvSlice::PlotEvent,ev
   self->ResetScale
   c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
   c[0]=round((0>c[0])<(n_elements(*self.plotvec)-1))
-  if self.plotpt[0] eq c[0] then return
+  if self.plotpt[0] eq c[0] || c[0] ge n_elements(*self.plotvec) then return
   c[1]=(*io)[(*self.plotvec)[c[0]]] ;the data value there
   if self.plotpt[0] ne -1 then self->EraseIndicator ;Erase old one
   self.plotpt=c
