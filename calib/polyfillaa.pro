@@ -108,9 +108,8 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
            'Failed compiling DLM clipper -- reverting to internal version.'
         polyclip_compiled=0
      endif else begin 
-        resolve_routine,'polyclip'
-        path=(routine_info('polyclip',/SOURCE)).PATH
-        path=strmid(path,0,strpos(path,path_sep(),/REVERSE_SEARCH))
+        @cubism_dir
+        path=filepath(ROOT=cubism_dir,'calib')
         make_dll,'polyclip',['polyclip_test','polyclip'],INPUT_DIRECTORY=path,$
                  DLL_PATH=polyclip_path,/REUSE_EXISTING
         ;; Test for a correctly compiled library
