@@ -68,33 +68,42 @@ end
 ;           BACKRANGES, if any (-1 otherwise).  If WAVELENGTH_CONVERT
 ;           is set, convert ranges and weights from lambda to
 ;           index-based using the passed wavelength, checking to make
-;           sure the regions fall in the given wavelength domain.
+;           sure the regions fall in the given wavelength domain.  If
+;           REDSHIFT is passed, use this value (in km/s) to shift the
+;           ranges of the map.
 ;=============================================================================
 pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
-                      WAVELENGTH_CONVERT=wc,NO_WEIGHT_CONVERT=nwc
+                      WAVELENGTH_CONVERT=wc,NO_WEIGHT_CONVERT=nwc, $
+                      REDSHIFT=redshift
   weights=(fr=(br=-1))
   if NOT ptr_valid(self.map_sets) then return
   wh=where(strlowcase((*self.map_sets).name) eq strlowcase(name[0]),cnt)
   if cnt eq 0 then return
   map=(*self.map_sets)[wh[0]]
+  
   if ptr_valid(map.weights) then begin 
      weights=*map.weights
      if n_elements(wc) ne 0 and keyword_set(nwc) eq 0 then begin 
-        minlam=min(weights[0,*],MAX=maxlam)
-        weights=interpol(weights[1,*],weights[0,*],wc)>0.
+        wlam=weights[0,*]
+        if n_elements(redshift) ne 0 then wlam*=1.+redshift/299792.458
+        
+        minlam=min(wlam,MAX=maxlam)
+                
+        weights=interpol(weights[1,*],wlam,wc)>0.
         wh=where(wc gt maxlam OR wc lt minlam,NCOMPLEMENT=good,cnt)
         if good eq 0 then $
            self->Error,map.name+': No overlap with current wavelengths.'
-        if cnt gt 0 then weights[wh]=0.0 ;no extrapolation, please
+        if cnt gt 0 then weights[wh]=0.0 ;no extrapolation, just zero
      endif
   endif 
   
   if ptr_valid(map.foreranges) then begin 
      fr=*map.foreranges
+     if n_elements(redshift) ne 0 then fr*=1.+redshift/299792.458
      if n_elements(wc) ne 0 then begin 
         foreranges=make_array(/LONG,size(fr,/DIMENSIONS))
         for i=0,n_elements(fr)/2-1 do begin 
-           void=min(abs(wc-fr[0,i]),low)
+           void=min(abs(wc-fr[0,i]),low) ;nearest wavelength
            void=min(abs(wc-fr[1,i]),high)
            foreranges[0,i]=[low,high]
         endfor
@@ -106,17 +115,17 @@ pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
      
   if ptr_valid(map.backranges) then begin
      br=*map.backranges
+     if n_elements(redshift) ne 0 then br*=1.+redshift/299792.458
      if n_elements(wc) ne 0 then begin 
         backranges=make_array(/LONG,size(br,/DIMENSIONS))
         for i=0,n_elements(br)/2-1 do begin 
-           void=min(abs(wc-br[0,i]),low)
+           void=min(abs(wc-br[0,i]),low) ;nearest wavelength
            void=min(abs(wc-br[1,i]),high)
            backranges[0,i]=[low,high]
         endfor
         br=backranges
      endif
   endif
-
 end
 
 ;=============================================================================
