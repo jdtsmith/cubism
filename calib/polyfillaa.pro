@@ -104,13 +104,19 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   if n_elements(polyclip_compiled) eq 0 OR keyword_set(rc) then begin 
      catch, err
      if err ne 0 then begin   ; any failure in compiling, just use the IDL vers
+        message, /CONTINUE, $
+           'Failed compiling clip function... reverting to internal version.'
         polyclip_compiled=0
      endif else begin 
         resolve_routine,'polyclip'
         path=(routine_info('polyclip',/SOURCE)).PATH
         path=strmid(path,0,strpos(path,path_sep(),/REVERSE_SEARCH))
         make_dll,'polyclip','polyclip',INPUT_DIRECTORY=path, $
-                 DLL_PATH=polyclip_path ;,/REUSE_EXISTING
+                 DLL_PATH=polyclip_path,/REUSE_EXISTING
+        ;; Test for a correctly compiled library
+        tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE,/UNLOAD)
+        print,'Got: ',tmp
+        if tmp[0] ne 42b then message,'Testing DLM: Incorrect value returned.'
         polyclip_compiled=1
      endelse 
      catch,/cancel
