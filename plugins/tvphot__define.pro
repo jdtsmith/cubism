@@ -49,7 +49,6 @@ pro tvPhot::Erase
 end
 
 pro tvPhot::Draw
-  self.Box->drawbox
   if self.cntrd[0] ne -1. then begin 
      ;; draw a small circle on the centroid center.
      cendev=round(self.oDraw->Convert(self.cntrd,/FRAC,/DEVICE,ZOOM=zm))
@@ -208,7 +207,7 @@ pro tvPhot::On
   self->tvPlug::On
   self.box->On
   self->Update,/EXCLUSIVE,/POSTDRAW,/REDRAW
-  if self.Box->IsDrawn() then self->wShow
+  if widget_info(self.wSlab,/VALID_ID) eq 0 then self->wShow
 end
 
 ;=============================================================================
@@ -217,7 +216,9 @@ end
 pro tvPhot::Off
   self->tvPlug::Off
   self.box->Off
+  self->Erase
   self->Update,/ALL_OFF, /EXCLUSIVE
+  self.oDraw->SendRedraw
 end
 
 ;=============================================================================
