@@ -15,6 +15,7 @@ pro CubeRec::Message, msg
         return
      end
      'CUBEVIEWSPEC_FULL': begin 
+        if ~ptr_valid(self.wavelength) then return
         self.cur_wav=value_locate(*self.wavelength,msg.wavelength)>0
         self->SwitchMode,/FULL
      end
@@ -43,7 +44,8 @@ pro CubeRec::Message, msg
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
         self.cube=msg.CUBE
         self.bcd=msg.BCD
-        self.bcd_err=msg.ERROR
+        self.bcd_UNC=msg.UNC
+        self.bcd_BMASK=msg.BMASK
         self.module=msg.MODULE
         self->SwitchMode,/BCD
      end
@@ -66,7 +68,7 @@ pro CubeRec::Message, msg
   endcase
   self->UpdateView
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
-                 self.cur_wav, self.cube,self.MODULE}
+                 self.cur_wav, self.cube,self.MODULE,self.bcd_BMASK}
 end
 
 ;=============================================================================
@@ -398,7 +400,8 @@ pro CubeRec__define
       oRose: obj_new(), $       ;our compass rose drawing tool
       STACK:ptr_new(), $        ;the stacked image
       BCD:ptr_new(), $          ;the BCD data
-      BCD_ERR:ptr_new(), $      ;the BCD error
+      BCD_UNC:ptr_new(), $      ;the BCD error
+      BCD_BMASK:ptr_new(), $    ;the BCD mask data
       MODULE:'',$               ;the modules for cube or rec
       cal:obj_new(), $          ;the calibration object
       ;; Widget ID's
@@ -424,9 +427,5 @@ pro CubeRec__define
   
   ;; General update
   msg={CUBEREC_UPDATE,BCD_MODE:0,FULL_MODE:0,PLANE:0L, $
-       CUBE:obj_new(),MODULE:''} 
-  
-  ;;What about backtrack in full cube mode: showing which
-  ;;BCD's/pixels contributed to a given cube pixel.  How?  Maybe
-  ;;pop up a list with BCD/pixel
+       CUBE:obj_new(),MODULE:'',BMASK:ptr_new()}
 end
