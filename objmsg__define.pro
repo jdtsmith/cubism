@@ -6,7 +6,7 @@
 ; CONTACT:
 ;
 ;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://sirtf.caltech.edu/SMART
+;       http://sirtf.caltech.edu/SMART 
 ;
 ; DESCRIPTION:
 ;    
@@ -255,6 +255,9 @@
 ;
 ; MODIFICATION HISTORY:
 ;    $Log$
+;    Revision 1.2  2001/07/30 19:38:09  jdsmith
+;    	Reworked documentation.
+;
 ;    Revision 1.1  2001/07/30 18:53:39  jdsmith
 ;    	Initial import from SCORE sources.
 ;
