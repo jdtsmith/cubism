@@ -1,0 +1,17 @@
+\ WAVECUT: wavelength cutoffs
+\ Test LH order trimming for S11
+\ JDS 2005-03-29  Created from the hand-tuned LH cutoffs of Lee Armus
+\channelID = 3
+| order | wavecut_low | wavecut_high | 
+| int   | real        | real         |
+|       | um          | um           |
+   11     33.8600       37.1661
+   12     30.9923       34.1615
+   13     28.8867       31.5048
+   14     26.8212       29.4695
+   15     25.2761       27.5066
+   16     23.5029       25.7079
+   17     22.1688       24.0708
+   18     20.8956       22.7549
+   19     19.7517       21.3961
+   20     19.1095       20.2365

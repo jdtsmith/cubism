@@ -1,0 +1,11 @@
+\ WAVECUT: wavelength cutoffs
+\ Test SL order trimming for S11
+\ JDS 2005-03-29  Created by hand-examination of BCD products and extractions
+\channelID = 0
+| order | wavecut_low | wavecut_high | 
+| int   | real        | real         |
+|       | um          | um           |
+   3      7.34          8.7
+   2      5.24          7.6
+   1      7.51          14.78
+
