@@ -799,7 +799,8 @@ pro CubeProj::SaveBadPixels,file
   endif 
   if size(file,/TYPE) ne 7 then return ;cancelled
   openw,un,file,/GET_LUN
-  printf,un,*self.bad_pixel_list
+  printf,un,1#(*self.bad_pixel_list)
+  self->UpdateButtons
   free_lun,un
 end
 
