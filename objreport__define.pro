@@ -33,8 +33,10 @@
 ;	DESCRIPTION:
 ;
 ;          Writes an message to the command line or as a GUI popup,
-;          and (for Error) stops execution if command-line or throws
-;          an error/returns to the $MAIN$ level when using a widget.
+;          and (for Error) stops execution if command-line or, for a
+;          GUI, throws an error (blocking widget)/returns to the
+;          $MAIN$ level (non-blocking widgets).  Can be used in both
+;          command-line and GUI modes.
 ;	
 ;       CALLING SEQUENCE:
 ;
@@ -48,22 +50,22 @@
 ;
 ;          PARENT: If set to a valid widget, use this as the popup's
 ;             parent, instead of the test widget returned by
-;             TestWidget().
+;             ReportWidget().
 ;
 ;          TITLE: The optional title to give the widget (if it's a
 ;             widget).
 ;
 ;    Methods to Override:
 ;
-;       TestWidget: Returns a widget ID to test for validity in order
-;          to decide how to report errors. Defaults to
+;       ReportWidget: Returns a widget ID to test for validity in
+;          order to decide how to report errors. Defaults to
 ;          (*self.wInfo).Base.
 ;
 ;       IsWidget: Returns a boolean which determines whether to use
 ;          the widget popup or not.  Can be overridden to default to a
 ;          fixed behaviour, but normally this isn't necessary, as long
-;          as TestWidget() returns a widget ID which can be tested for
-;          validity.  May also be useful directly in your method
+;          as ReportWidget() returns a widget ID which can be tested
+;          for validity.  May also be useful directly in your method
 ;          classes for testing whether a widget is running or not.
 ;
 ; NOTES:
@@ -90,7 +92,7 @@
 ;    message,/INFO in non-widget programs.
 ;
 ;    The same program can be used in both widget and non-widget modes.
-;    The function method TestWidget returns the main widget, over
+;    The function method ReportWidget returns the main widget, over
 ;    which the error will be situated, and whose existence and
 ;    validity serves to discriminate between widget mode and
 ;    non-widget (command-line) mode.  If this widget id is not
@@ -193,12 +195,12 @@ end
 pro ObjReport::Error,msg,RETURN_ONLY=ro,_EXTRA=e
   on_error,2
   if self->IsWidget() then begin 
-     self->PopupReport,msg,/Error,PARENT=parent,_EXTRA=e
+     self->orPopupReport,msg,/Error,PARENT=parent,_EXTRA=e
      if self->IsBlocking() then begin
         ;; Send a message to be caught by the established OBJREPORT catch
         message,'OBJREPORT-ERROR',/NOPRINT
      endif else if keyword_set(ro) then return else retall 
-  endif else self->CommandLineReport,msg
+  endif else self->orCommandLineReport,msg
 end
 
 ;=============================================================================
@@ -206,8 +208,8 @@ end
 ;=============================================================================
 pro ObjReport::Warning,msg,PARENT=parent,_EXTRA=e
   if self->IsWidget() then $
-     self->PopupReport,msg,/WARNING,PARENT=parent,_EXTRA=e $
-  else self->CommandLineReport,msg,/WARNING,_EXTRA=e
+     self->orPopupReport,msg,/WARNING,PARENT=parent,_EXTRA=e $
+  else self->orCommandLineReport,msg,/WARNING,_EXTRA=e
 end 
 
 ;=============================================================================
@@ -215,16 +217,16 @@ end
 ;=============================================================================
 pro ObjReport::Info,msg,PARENT=parent,_EXTRA=e
   if self->IsWidget() then $
-     self->PopupReport,msg,/INFO,PARENT=parent,_EXTRA=e $
-  else self->CommandLineReport,msg,/INFO,_EXTRA=e
+     self->orPopupReport,msg,/INFO,PARENT=parent,_EXTRA=e $
+  else self->orCommandLineReport,msg,/INFO,_EXTRA=e
 end 
 
 ;=============================================================================
-;  Popup - Create a blocking or non-blocking popup with the associated
-;          msg
+;  orPopupReport - Create a blocking or non-blocking popup with the
+;                  associated msg
 ;=============================================================================
-pro ObjReport::PopupReport,msg,INFO=info,WARNING=warning,ERROR=error, $
-                           PARENT=parent,TITLE=title,SCROLL=scroll,_EXTRA=e
+pro ObjReport::orPopupReport,msg,INFO=info,WARNING=warning,ERROR=error, $
+                             PARENT=parent,TITLE=title,SCROLL=scroll,_EXTRA=e
   title_type=keyword_set(error)?"error":keyword_set(warning)?"warning": $
              keyword_set(info)?"info":"error"
   if strlen(self.or_title_base) eq 0 then $
@@ -245,10 +247,10 @@ pro ObjReport::PopupReport,msg,INFO=info,WARNING=warning,ERROR=error, $
 end
 
 ;=============================================================================
-;  CommandLineReport - Print messages to the command line
+;  orCommandLineReport - Print messages to the command line
 ;=============================================================================
-pro ObjReport::CommandLineReport,msg,INFO=info,WARNING=warning, $
-                                 ERROR=error,TITLE=title
+pro ObjReport::orCommandLineReport,msg,INFO=info,WARNING=warning, $
+                                   ERROR=error,TITLE=title
   on_error,2
   title_type=keyword_set(error)?"error":keyword_set(warning)?"warning": $
              keyword_set(info)?"info":"error"
@@ -268,18 +270,18 @@ pro ObjReport::CommandLineReport,msg,INFO=info,WARNING=warning, $
 end
 
 ;=============================================================================
-;  TestWidget - Return the widget to test the validity of to decide
-;               between graphical and text-based errors/warnings.
-;               Should be overridden.  By default, looks for a class
-;               tag "wInfo" which is a ptr to an info structure with a
-;               "Base" tag.
+;  ReportWidget - Return the widget to test the validity of to decide
+;                 between graphical and text-based errors/warnings.
+;                 Should be overridden.  By default, looks for a class
+;                 tag "wInfo" which is a ptr to an info structure with
+;                 a "Base" tag.
 ;=============================================================================
-function ObjReport::TestWidget
+function ObjReport::ReportWidget
   catch, err
   if err ne 0 then begin 
      catch,/cancel
      message, "No class tag pointer `wInfo' with tag `Base' found.  " + $
-              "Change/Override TestWidget Method?"
+              "Override the ReportWidget Method?"
   endif
   if ptr_valid(self.wInfo) then return,((*self.wInfo).Base)
   return,-1L
@@ -296,7 +298,7 @@ end
 ;  isWidget - Do we use a widget for popup messages?
 ;=============================================================================
 function ObjReport::IsWidget
-  self.or_widget=self->TestWidget() ;re-get the widget, it could be changing
+  self.or_widget=self->ReportWidget() ;re-get the widget, it could be changing
   return,widget_info(self.or_widget,/VALID_ID)
 end
 
