@@ -1207,7 +1207,8 @@ end
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            ERROR=err, PR_SIZE=prz, CALIB=calib,MODULE=module, $
-                           APERTURE=ap,PROJECT_NAME=pn,DR=dr
+                           APERTURE=ap,PROJECT_NAME=pn,DR=dr,TLB_OFFSET=tboff,$
+                           TLB_SIZE=tbsize
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -1228,6 +1229,24 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   endif 
   if arg_present(pn) then pn=self->ProjectName()
   if arg_present(dr) then dr=self.DR
+  if arg_present(tboff) OR arg_present(tbsize) then begin 
+     if NOT ptr_valid(self.wInfo) then begin 
+        tboff=(tbsize=-1)
+     endif else begin 
+        if widget_info((*self.wInfo).Base,/VALID_ID) then begin 
+           geom=widget_info((*self.wInfo).Base,/GEOMETRY) 
+           tboff=[geom.xoffset,geom.yoffset]
+           tbsize=[geom.xsize,geom.ysize]
+        endif else begin 
+           tboff=(tbsize=-1)
+        endelse 
+     endelse 
+  endif
+  if arg_present(tbsize) then begin 
+     if NOT ptr_valid(self.wInfo) then tbsize=-1 else $
+        if widget_info((*self.wInfo).Base,/VALID_ID) then $
+        widget_control, (*self.wInfo).Base,TLB_GET_SIZE=tbsize else tbsize=-1
+  endif
 end
 
 ;=============================================================================
@@ -1338,7 +1357,7 @@ pro CubeProj::MergeSetup,ORDS=ords
   ptr_free,self.WAVELENGTH
   heap_free,self.MERGE
   wave1=(self.cal->GetWAVSAMP(self.MODULE,ords[0],/PIXEL_BASED, $
-                              PR_WIDTH=self.PR_SIZE[1], $
+                              PR_WIDTH=self.PR_SIZE[1], /SAVE_POLYGONS, $
                               APERTURE=(*self.APERTURE)[0])).lambda
   if self.ORDER gt 0 then begin ;single order, nothing to do
      self.WAVELENGTH=ptr_new(wave1)
@@ -1568,7 +1587,18 @@ pro CubeProj::BuildAccount,_EXTRA=e
      
      tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b],!D.TABLE_SIZE-5
      save_win=!D.WINDOW
-     window,XSIZE=xsize,YSIZE=ysize,TITLE='Building Cube: '+self->ProjectName()
+     self->GetProperty,TLB_OFFSET=tboff,TLB_SIZE=tbsize
+     print,'got: ',tboff
+     device,GET_SCREEN_SIZE=ss
+     window,XSIZE=xsize,YSIZE=ysize, $
+            XPOS=tboff[0]+tbsize[0], YPOS=ss[1]-tboff[1]-ysize, $
+            TITLE=string(FORMAT='(%"%s %s  (%s)  [%dx%d ; %4.1f\"x%4.1f\"]")',$
+                         'Building Cube: ', $
+                         self->ProjectName(), $
+                         (self.MODULE?self.MODULE:"(no module)")+ $
+                         (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
+                          ' all orders'), $
+                         self.NSTEP,self.STEP_SIZE*3600*self.NSTEP)
      plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
           POSITION=[15,15,xsize-15,ysize-4],/DEVICE, $
           yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
@@ -1781,29 +1811,67 @@ pro CubeProj::BuildCube
   self->UpdateButtons & self->UpdateList
 end
 
+
+;=============================================================================
+;  ReadMapFile - Read in a map file from cubism/map_sets, or
+;                elsewhere, if a full path is specified.  Map set
+;                files have the format:
+;
+;                    NFore NBack NWeight Fit Order
+;                    fore_lam_1_low fore_lam_1_high
+;                    ...
+;                    fore_lam_NFore_low fore_lam_NFore_high
+;                    back_lam_1_low back_lam_1_high
+;                    ...
+;                    back_lam_NBack_low back_lam_NBack_high;
+;                    weight_lam_1 weight_1
+;                    ...
+;                    weight_lam_NWeight weight_NWeight
+;=============================================================================
+pro CubeProj::ReadMapFile,file,FORERANGES=fr,BACKRANGES=br,WEIGHTS=weights
+  if NOT file_test(file,/READ) then begin 
+     cdir=(routine_info('CubeProj__define',/SOURCE)).PATH
+     cdir=strmid(cdir,0,strpos(cdir,path_sep(),/REVERSE_SEARCH))
+     file=filepath(ROOT_DIR=cdir,SUBDIR='map_sets',file)
+  endif 
+  if NOT file_test(file,/READ) then self->Error,"No such file found: ",file
+  nf=(nb=(nw=0))
+  openr,lun,file,/GET_LUN
+  readf,unit,nf,nb,nw
+  
+             
+
+  return
+end
+
 ;=============================================================================
 ;  Stack - Build a stacked image from the cube between any number of
 ;          sets of wavelength intervals, optionally weighting the
 ;          individual planes with WEIGHTS.
 ;
-;             FORERANGES: A 2xn list of foreground wavelength ranges
-;                         over which to stack.
+;             FORERANGES: A 2xn list of foreground ranges over which
+;                         to stack.
+;
 ;             BACKRANGES: A 2xn list of background wavelength ranges
 ;                         over which to stack.
-
-;             BG_VALS: A list of background values, one for each
-;                      foreground plane, in the order present in
-;                      FOREREANGES, to subtract.  If passed,
-;                      BACKRANGES is ignored.
-
-;             WEIGHTS: A list of n pointers to weight vectors [0-1]
-;                      spanning the same number of elements as the
-;                      foreground range.
+;
+;             BG_fit: A list of two or more parameters which
+;                     constitute a polynomial fit with wavelength of
+;                     the continuum to subtract off.  If passed, any
+;                     BACKRANGES given is ignored.
+;
+;             WEIGHTS: A list of pointers to 2xn weight vectors of
+;                      lambda vs. weight [0-1] with which to weight
+;                      the foreground region.  Will be
+;                      interpolated. Pointers are not freed here.
+;
+;             MAP_FILE: The name of a map set file
+;
+;     XXXX: Switch from position to wavelength based ????        
 ;=============================================================================
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
-                         BG_VALS=bg_vals
+                         BG_VALS=bg_vals,MAP_FILE=mf
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to stack'
-  
   sf=size(foreranges,/DIMENSIONS)
   if n_elements(sf) eq 2 then nfr=sf[1] else nfr=1
   
@@ -1828,7 +1896,6 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      if nbgv ne fcnt then $
         self->Error,'Wrong number of background values passed'
      stack=stack-total(bg_vals)/fcnt ;average(fi-bgvi)
-     print,'stacking with: ',bg_vals
      return,stack
   endif 
   
