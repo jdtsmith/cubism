@@ -3056,7 +3056,9 @@ pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii,COORDS=coords
                radecstring(dec[2],PRECISION=3), $
                radecstring(ra[3],/RA,PRECISION=3), $
                radecstring(dec[3],PRECISION=3)
-        printf,un,'#      LAM (um)          FLUX (e/s/pixel)'
+        printf,un,self.fluxcon?$
+               '#      LAM (um)       FLUX (Jy/pixel)': $
+               '#      LAM (um)       FLUX (e/s/pixel)'
      endif 
      printf,un,FORMAT='(2G18.10)',transpose([[*self.WAVELENGTH],[sp]])
      free_lun,un
