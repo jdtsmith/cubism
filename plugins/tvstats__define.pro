@@ -89,7 +89,15 @@ pro tvStats::Stats
   med=median(take)
   avg=total(take,/NAN)/n
   std=sqrt(total((take-avg)^2,/NAN)/(n-1))
-  str=string(FORMAT=self.form,l,b,r-l+1,t-b+1,max,min,avg,med,std)
+  
+  keep=where(abs(take-avg) le 3.*std,nclip)
+  if nclip gt 1 then begin 
+     clipped_avg=total(take[keep],/NAN)/nclip
+     clipped_std=sqrt(total((take[keep]-clipped_avg)^2,/NAN)/(nclip-1))
+  endif else nclip=0
+  
+  str=string(FORMAT=self.form,l,b,r-l+1,t-b+1,max,min,avg,med,std, $
+             nclip, clipped_avg, clipped_std)
   widget_control, self.wSlab, set_value=str
   self.min=min & self.max=max & self.med=med & self.avg=avg & self.std=std
 end
@@ -106,7 +114,7 @@ pro tvStats::wShow
   ln=widget_base(self.wBase,FRAME=2,ysize=0,xsize=ws[0]-5)
   title=widget_label(self.wBase,value='Box Statistics', $
                      FONT=cu_get_fonts(/BOLD,SIZE=14))
-  self.wSlab=widget_text(self.wBase,value=' ',xsize=54,ysize=2,_EXTRA=e)
+  self.wSlab=widget_text(self.wBase,value=' ',xsize=54,ysize=3,_EXTRA=e)
   widget_control, self.parent,UPDATE=1
 end
 
@@ -126,7 +134,8 @@ function tvStats::Init,parent,oDraw,FORMAT=form, _EXTRA=e
   self.parent=parent
   if n_elements(form) eq 0 then $
      self.form='("[",I3,",",I3,"]","(",I3," x",I3,")"," MAX:",G11.5,' + $
-     '"  MIN:",G11.5,/,"AVG:",G11.5,"  MEDIAN:",G11.5, "  STDEV:",G10.5)'  $
+        '"  MIN:",G11.5,/,"AVG:",G11.5,"  MEDIAN:",G11.5, "  STDEV:",G10.5,' +$
+        '/,"3SIG CLIPPED  CNT:",I5," AVG:",G11.5,"  STDEV:",G11.5)'  $
   else self.form=form
   
   ;; Get a tvrbox object, signing *ourself* up for box messages.
