@@ -447,8 +447,9 @@ function tvDraw::Convert, coord, DEVICE=dev, FRACTIONAL=frd,SHOWING=sh, $
   if keyword_set(si) then return,pix[0]+pix[1]*self.size[0] else return,pix
 end
 
-pro tvDraw::SetWin, OLD=old
-  if keyword_set(old) then dw=self.oldwin else dw=self.drawwin
+pro tvDraw::SetWin, OLD=old,DOUBLE=dbl
+  if keyword_set(old) then dw=self.oldwin else $
+     if keyword_set(dbl) then dw=self.dbwin else dw=self.drawwin
   wset,dw
 end
 
@@ -481,16 +482,30 @@ end
 ;end
   
 ;=============================================================================
-;  Erase - Erase a section of the screen by copying over the pixmap
+;  Erase - Erase a section of the screen by copying over the pixmap.
+;          If FULL is set, erase the entire screen.  If DOUBLE is set,
+;          erase to the Double-Buffer window (for later updating using
+;          DBRefresh).
 ;=============================================================================
-pro tvDraw::Erase,ll,dist,FULL=full
-  oldwin=!D.WINDOW
-  self->SetWin
+pro tvDraw::Erase,ll,dist,FULL=full,DOUBLE=dbl
+  ;oldwin=!D.WINDOW
+  self->SetWin,DOUBLE=dbl
   if keyword_set(full) then begin 
      ll=[0,0] & dist=self.winsize
   endif
   device,copy=[ll,dist,ll,self.pixwin]
-  wset,oldwin
+  ;wset,oldwin
+end
+
+;=============================================================================
+;  DBRefresh - Put the contents of the Double Buffer into the Win
+;=============================================================================
+pro tvDraw::DBRefresh,ll,dist,FULL=full
+  self->SetWin
+  if keyword_set(full) then begin 
+     ll=[0,0] & dist=self.winsize
+  endif
+  device,copy=[ll,dist,ll,self.dbwin]
 end
 
 ;=============================================================================
@@ -605,11 +620,14 @@ end
 ;                pre or post-draw) to the interested recipients.
 ;=============================================================================
 pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,SNAPSHOT=snap
+  if size(msg,/TYPE) eq 8 then begin 
+     self->ObjMsg::MsgSend,msg
+     return
+  endif 
   if keyword_set(pre) then self->ObjMsg::MsgSend,{TVDRAW_PREDRAW,self.immod}  
   if keyword_set(post) then self->ObjMsg::MsgSend,{TVDRAW_POSTDRAW,self.imscl}
   if keyword_set(redr) then self->ObjMsg::MsgSend,{TVDRAW_REDRAW,self.imscl}
   if keyword_set(snap) then self->ObjMsg::MsgSend,{TVDRAW_SNAPSHOT,self.imscl}
-  if size(msg,/TYPE) eq 8 then self->ObjMsg::MsgSend,msg
 end
 
 ;=============================================================================
