@@ -16,7 +16,7 @@
 ;
 ;    inds=polyfillaa(x,y,sx,sy,[AREAS=])
 ;
-; INPUTS:
+; INPUT PARAMETERS:
 ;
 ;    x,y: The vectors containing the x and y subscripts of the
 ;       polygon.  May be in fractional units.
@@ -34,7 +34,7 @@
 ;    inds: The indices of all pixels at least partially inside the
 ;       polygon.
 ;
-; PROCEDURE:
+; PROCEDURES:
 ;
 ;    polyclip
 ;
@@ -46,7 +46,7 @@
 ;
 ;       Wed Sep 26 12:27:55 2001, JD Smith <jdsmith@astro.cornell.edu>
 ;
-;		Initial documentation.
+;		Written.  Initial documentation.
 ;-
  
 function polyfillaa, x,y,sx,sy, AREAS=areas
