@@ -71,9 +71,9 @@ pro CubeRec::Message, msg
      end
      'CUBEPROJ_UPDATE':         ;just fall through to update message
   endcase
-  self->UpdateView
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
                  self.cur_wav, self.cube,self.MODULE,self.bcd_BMASK}
+  self->UpdateView
 end
 
 ;=============================================================================
@@ -356,7 +356,8 @@ end
 ;  Cleanup
 ;=============================================================================
 pro CubeRec::Cleanup
-  ptr_free,self.stack           ;bcd and error are not ours to destroy
+  ;; bcd,wavelength, and error are not ours to destroy
+  ptr_free,self.STACK           
   self->tvPlug::Cleanup
 end
 
