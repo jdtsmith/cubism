@@ -3,7 +3,7 @@
 ;                 tracking messages
 ;=============================================================================
 pro tvLine::Message,msg
-  self->tvPlug::Message,msg,TYPE=type ;pass it up to tvPlug
+  self->tvPlug_lite::Message,msg,TYPE=type ;pass it up
   case type of 
      'DRAW_MOTION': begin 
         self.oDraw->GetProperty,IMORIG=imorig
@@ -14,7 +14,7 @@ pro tvLine::Message,msg
            self.savpoint=[-1,-1] ;ensure rentry works
            return
         endif 
-        if total(pt eq self.savpoint) eq 2 then return
+        if array_equal(pt,self.savpoint) then return
         widget_control, self.wLine,set_value=self->String(imorig,pt)
         self.savpoint=pt
      end
@@ -29,9 +29,7 @@ pro tvLine::Message,msg
      'TVDRAW_POSTDRAW': begin 
         if self.savpoint[0] eq -1 then return ;not on a point
         self.oDraw->GetProperty,IMORIG=imorig
-        str=string(FORMAT=self.form,self.savpoint, $
-                   (*imorig)[self.savpoint[0],self.savpoint[1]])
-        widget_control, self.wLine,set_value=str
+        widget_control, self.wLine,set_value=self->String(imorig,self.savpoint)
      end
   endcase 
 end 
@@ -47,7 +45,7 @@ end
 ;       Init - Initialize the line.
 ;=============================================================================
 function tvLine::Init,parent,oDraw,FORMAT=form,_EXTRA=e
-  if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
+  if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   ;; set up the format for printing x,y, value
   if n_elements(form) eq 0 then self.form='("(",I3,",",I3,") ",G14.8)' else $
      self.form=form
@@ -63,7 +61,7 @@ end
 ;=============================================================================
 pro tvLine__define
   struct={tvLine, $ 
-          INHERITS tvPlug,$     ;make it a plug-in
+          INHERITS tvPlug_lite,$ ;make it a plug-in
           savpoint: [0,0], $    ;point to save
           form:'', $            ;format of printed text
           wLine:0L}             ;widget id of text line
