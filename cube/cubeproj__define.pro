@@ -527,11 +527,12 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   wMustSel=[wMustSel,$
             widget_button(cube,VALUE='Set Background from Rec(s)...', $
                           UVALUE='setbackgroundfromrecs',/SEPARATOR)]
+  
+  but=widget_button(cube,VALUE='Load Background Rec(s)...', $
+                    UVALUE='loadbackgroundlist')
   (*self.wInfo).MUST_BACK= $
      [widget_button(cube,VALUE='Save Background Rec(s)...', $
                     UVALUE='savebackgroundlist'), $
-      widget_button(cube,VALUE='Load Background Rec(s)...', $
-                    UVALUE='loadbackgroundlist'), $
       widget_button(cube,VALUE='View Background...', $
                     UVALUE='viewbackground'), $
       widget_button(cube,VALUE='View Background (new viewer)..', $
@@ -966,6 +967,7 @@ pro CubeProj::LoadBadPixels,file,ERROR=err
      if n_elements(un) ne 0 then free_lun,un
      self->Error,['Error loading bad pixel list from '+file,!ERROR_STATE.MSG],$
                  /RETURN_ONLY
+     file=-1
   endif
   if size(file,/TYPE) ne 7 then begin 
      xf,file,/RECENT,FILTERLIST=['*.bpl','*.*','*'],$
@@ -1026,6 +1028,7 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err
      self->Error,['Error loading background list from '+ $
                   file,!ERROR_STATE.MSG],$
                  /RETURN_ONLY
+     file=-1
   endif
   if size(file,/TYPE) ne 7 then begin 
      xf,file,/RECENT,FILTERLIST=['*.bgl','*.*','*'],$
@@ -4082,7 +4085,7 @@ pro CubeProj__define
          MUST_PROJ:lonarr(5), $ ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
-         MUST_BACK:lonarr(5), $ ;background record must be set
+         MUST_BACK:lonarr(4), $ ;background record must be set
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
          MUST_UNRESTORED:0L}    ;must have unrestored data
   
