@@ -136,6 +136,13 @@ function CubeBackTrack::Description
 end
 
 ;=============================================================================
+;  MouseHelp
+;=============================================================================
+function CubeBackTrack::MouseHelp
+  return,['Lock/Unlock Pixel','','']
+end
+
+;=============================================================================
 ;  ReportWidget - Where to position our error and other messages
 ;=============================================================================
 function CubeBackTrack::ReportWidget
