@@ -212,39 +212,42 @@
 ;##############################################################################
 
 ;=============================================================================
-;      GetObj - The OMArray MsgList has a fixed format
+;  GetMsgListObj - The OMArray MsgList has a structure format, with
+;                  the "obj" field the recipient object.
 ;=============================================================================
-function OMArray::GetObj,r
+function OMArray::GetMsgListObj,r
   return,r.Obj
 end 
 
 ;=============================================================================
-;      MsgSendWhich - A default selector which just looks at the
-;                     message type, and matches it inside the MsgNames
-;                     list.  Exact matches are then searched for
-;                     selected values in the MsgList, and those
-;                     objects are returned.  
+;  MsgSendWhich - A default selector which just looks at the message
+;                 type, and matches it inside the MsgNames list.
+;                 Exact matches are then searched for selected values
+;                 in the MsgList, and those objects are returned.
 ;=============================================================================
 function OMArray::MsgSendWhich, msg
   if self->MsgListLen() eq 0b or ptr_valid(self.MsgNames) eq 0b then $
      return, -1
   type=tag_names(msg,/STRUCTURE_NAME)
   wh=where(*self.MsgNames eq type,cnt)
-  if cnt eq 0 then return,-1
+  if cnt eq 0 then $
+     message,string('Attempted to send unknown message for ',self,': ',type)
   wh=where((*self.MsgList).recip[wh[0],*],cnt)
   if cnt eq 0 then return,-1 else return,(*self.MsgList)[wh].Obj
 end
 
 ;=============================================================================
-;      MsgSetup - Setup the messages we can provide.
+;  MsgSetup - Setup the messages we can provide.
 ;=============================================================================
 pro OMArray::MsgSetup, msgnames
-  if ptr_valid(self.MsgNames) then *self.msgnames=[msgnames] $
-  else self.MsgNames=ptr_new([msgnames])
+  if ptr_valid(self.MsgNames) then begin
+     *self.msgnames=[*self.msgnames,msgnames]
+     *self.msgnames=(*self.msgnames)[uniq(*self.msgnames,sort(*self.msgnames))]
+  endif else self.MsgNames=ptr_new([msgnames])
 end
 
 ;=============================================================================
-;      IsSet - Query if a specific message is set.
+;  IsSet - Query if a specific message is set.
 ;=============================================================================
 function OMArray::IsSet,msgname
   if ptr_valid(self.MsgNames) eq 0 or self->MsgListClean() eq 0 then return,0
@@ -254,14 +257,13 @@ function OMArray::IsSet,msgname
 end
 
 ;=============================================================================
-;      MsgSignup - Sign an object or objects up for messages specified
-;                  by name as keyword parameters, using the same names
-;                  setup in MsgSetup (which must be called before any
-;                  signup occurs).  If ALL is set, turn on all
-;                  messages.  If NONE is set, turn off all messages.
-;                  These can be combined with specific additional
-;                  message names, e.g.:
-;                     obj->MsgSignup,recip,/NONE,/MSGTYPE1
+;  MsgSignup - Sign an object or objects up for messages specified by
+;              name as keyword parameters, using the same names
+;              specified in MsgSetup (which must be called before any
+;              signup occurs).  If ALL is set, turn on all messages.
+;              If NONE is set, turn off all messages.  These can be
+;              combined with specific additional message names, e.g.:
+;              obj->MsgSignup,recip,/NONE,/MSGTYPE1
 ;=============================================================================
 pro OMArray::MsgSignup, objs, ALL=all_on,NONE=all_off,_EXTRA=set_source
   if n_elements(objs) eq 0 then $
@@ -284,18 +286,13 @@ pro OMArray::MsgSignup, objs, ALL=all_on,NONE=all_off,_EXTRA=set_source
   ;; Construct the message list elements from the keywords passed.
   for i=0,n_elements(objs)-1  do begin
      in_list=0
-     if ptr_valid(self.MsgList) then rec=self->GetRecord(objs[i])
+     if ptr_valid(self.MsgList) then rec=self->GetMsgListRecord(objs[i])
      if size(rec,/TYPE) ne 8 then $ ; No record, make one
         rec={Obj:objs[i],recip:bytarr(n_elements(*self.MsgNames))} $
      else in_list=1
      if all_on then rec.recip=1b else if all_off then rec.recip=0b
      for i=0,nt-1 do $
         if loc[i] ne -1 then rec.recip[loc[i]]=keyword_set(set_source.(i))
-     ;; delete empty recipient lists
-     ;if array_equal(rec.recip,0b) then begin 
-     ;   if in_list then self->MsgRemove,objs[i]
-     ;   continue
-     ;endif
      if n_elements(recs) eq 0 then recs=[rec] else recs=[recs,rec]
   endfor
   if n_elements(recs) eq 0 then return
@@ -303,7 +300,7 @@ pro OMArray::MsgSignup, objs, ALL=all_on,NONE=all_off,_EXTRA=set_source
 end
 
 ;=============================================================================
-;      Cleanup
+;  Cleanup
 ;=============================================================================
 pro OMArray::Cleanup
   ptr_free,self.MsgNames
