@@ -163,7 +163,7 @@ pro tvSwitcher::Start
   endfor 
   
   for i=0,tcnt-1 do begin 
-     desc=objs[exc[i]]->Description()
+     desc=objs[tog[i]]->Description()
      if NOT keyword_set(desc) then continue
      (*self.wTList)[tog[i]]= $
         widget_button(self.toolMenu,value=desc,UVALUE=tog[i], $
