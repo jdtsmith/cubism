@@ -1,29 +1,24 @@
 ;+
 ; NAME:  
 ;
-;    SMART_APERTURE
-;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
+;    IRS_APERTURE
 ;
 ; DESCRIPTION:
 ;    
-;    Defines the SMART_APERTURE structure for specifying extraction apertures.
+;    Defines the IRS_APERTURE structure for specifying extraction apertures.
 ;    
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
+;    IRS IRS Spectral Reduction, Analysis and Processing.
 ;    Extraction apertures.
 ;    	
 ; CALLING SEQUENCE:
 ;
 ;    Not called directly, use:
 ;    
-;      st={SMART_APERTURE}
+;      st={IRS_APERTURE}
 ;
-;    and see class SMART_Calib
+;    and see class IRS_Calib
 ;
 ; NOTES:
 ;  
@@ -65,7 +60,8 @@
 ;    The "low" and "high" apertures should not cross.
 ;
 ; MODIFICATION HISTORY:
-;    
+;
+;    2002-08-27 (J.D. Smith): Initial migration from SMART codebase.
 ;    2001-12-13 (J.D. Smith): Written
 ;-
 ;    $Id$
@@ -73,29 +69,27 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
 
-pro SMART_APERTURE__define
-  st={SMART_APERTURE,$
+pro IRS_APERTURE__define
+  st={IRS_APERTURE,$
       Low: [0.0,0.0], $         ;The "low in the slit" (left) aperture pair.
       High:[0.0,0.0]}           ; & "high in the slit" (right). Normalized.
 end
