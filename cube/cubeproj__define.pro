@@ -811,7 +811,7 @@ pro CubeProj::ExportToMain, SPECTRUM=sp, MAP=mp, TYPE=map_type
   export=spQ?sp:(mpQ?mp:self)
   
    ;; Simple fix -- replace dashes/spaces with underscores
-  def=idl_validname(name,/CONVERT_ALL)
+  def=strlowcase(idl_validname(name,/CONVERT_ALL))
   type=spQ?'spectrum':(mpQ?'map':'Cube object')
   title=spQ?'Spectrum':(mpQ?'Map':'Cube Project')
   var_name=getinp('Name of exported '+type+' var:',def, $
@@ -2700,12 +2700,20 @@ pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii,COORDS=coords
      printf,un,'# Cube: '+self->ProjectName()
      if n_elements(coords) gt 0 then begin 
         delta=coords[*,1]-coords[*,0]+1
-        xy2ad,coords[0,*]+[-.5,.5],coords[1,*]+[-.5,.5], $
-              self->CubeAstrometryRecord(),ra,dec
-        printf,un,FORMAT='("# Extracted ",I0,"x",I0,' + $
-               '" [",A,",",A," to ",A,",",A,"]")', delta, $
+        ll=coords[*,0]-.5
+        lr=[coords[0,1],coords[1,0]]+[.5,-.5]
+        ur=coords[*,1]+.5
+        ul=[coords[0,0],coords[1,1]]+[-.5,.5]
+        all=[ [ll], [lr], [ur], [ul] ]
+        xy2ad,all[0,*],all[1,*],self->CubeAstrometryRecord(),ra,dec
+        printf,un,FORMAT='("# Extracted ",I0,"x",I0)',delta
+        printf,un,FORMAT='("# Box: ",2(A,",",A,:," ; "),"]")', $
                radecstring(ra[0],/RA),radecstring(dec[0]), $
                radecstring(ra[1],/RA),radecstring(dec[1])
+        printf,un,FORMAT='("#      ",2(A,",",A,:," ; "),"]")', $
+               radecstring(ra[2],/RA),radecstring(dec[2]), $
+               radecstring(ra[3],/RA),radecstring(dec[3])
+        printf,un,'#      LAM (um)          FLUX (e/s/pixel)'
      endif 
      printf,un,FORMAT='(2G18.10)',transpose([[*self.WAVELENGTH],[sp]])
      free_lun,un
