@@ -58,7 +58,7 @@ end
 pro WSMask::MaskGen,MODULE=md
   self.cube->GetProperty,BCD_SIZE=sz
   mask=make_array(VALUE=1b,sz)
-  prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords)
+  prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords,WAVECUT=0)
   
   for ord=0,n_elements(ords)-1 do $
      for i=0,n_elements(*prs[ord])-1 do $
