@@ -11,7 +11,8 @@ pro CubeRec::Message, msg
         return
      end 
      'CUBEVIEWSPEC_SAVE': begin 
-        self->Extract,/SAVE,ASCII=msg.ascii
+        if msg.export then self->Extract,/EXPORT else $
+           self->Extract,/SAVE,ASCII=msg.ascii
         return
      end
      'CUBEVIEWSPEC_FULL': begin 
