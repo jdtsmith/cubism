@@ -55,94 +55,106 @@ end
 ;  Event - Handle internal events.
 ;=============================================================================
 pro CubeViewSpec::Event,ev
-  ;; Always refocus to hotkey
-  widget_control,self.wHotKey,SET_TEXT_SELECT=4,SET_VALUE=['**','**','**'], $
-                 /INPUT_FOCUS
   type=tag_names(ev,/STRUCTURE_NAME)
-  if type eq 'WIDGET_TRACKING' then begin 
+  if type eq 'WIDGET_TRACKING' then  begin 
      if ev.enter then begin 
         self->SetColors
         self->SetWin
+        widget_control, self.wDraw,/INPUT_FOCUS
      endif 
      return
-  endif 
-  case ev.id of 
-     self.wHotKey: begin 
-        case type of
-           ;; Key Presses
-           'WIDGET_TEXT_CH': $
-              case strupcase(ev.ch[0]) of 
-              'C': begin
-                 self->SwitchMode,/MAP
-                 widget_control, self.wDo, SET_VALUE=2
-                 widget_control, self.wRType, SET_DROPLIST_SELECT=0,/SENSITIVE
-              end
-              'U': self->SwitchMode,/FULL
-              'P': begin
-                 self->SwitchMode,/MAP
-                 widget_control, self.wDo, SET_VALUE=2
-                 widget_control, self.wRType, SET_DROPLIST_SELECT=1,/SENSITIVE
-              end
-              'R': self->Reset
-              'L': if self.mode eq 0 then widget_control, self.wDo,SET_VALUE=2
-              'D': self->Delete
-              'M': self->SwitchMode,/MAP
-              'F': self->Fit
-              'V': begin        ;value line
-                 widget_control, self.wToggles, GET_VALUE=tog
-                 tog[1]=1-tog[1]
-                 widget_control, self.wToggles, SET_VALUE=tog
-                 self->Plot
-              end
-              'X': begin        ;XZoom
-                 widget_control, self.wDo, SET_VALUE=0
-                 widget_control, self.wRType, SENSITIVE=0
-              end
-              'Y': begin        ;YZoom
-                 widget_control, self.wDo, SET_VALUE=1
-                 widget_control, self.wRType, SENSITIVE=0
-              end
-              'Q': widget_control, ev.top, /DESTROY
-              
-              '	':  begin       ;Tab character, switch outlines...
-                 if self.selected eq -1 then return
-                 if NOT ptr_valid(self.reg[self.seltype]) then return
-                 nreg=n_elements(*self.reg[self.seltype])/2
-                 self.selected=self.selected+1
-                 if self.selected ge nreg then begin 
-                    self.selected=0
-                    if ptr_valid(self.reg[1-self.seltype]) then $
-                       self.seltype=1-self.seltype
-                 endif 
-                 self->Plot
-              end
-              else:             ;print,"Got: *"+strupcase(ev.ch[0])+"*"
-           endcase 
+  end
            
-           ;; Arrow Keys
-           'WIDGET_TEXT_SEL': begin
-              if self.mode eq 0 then begin 
-                 self.wav_ind=0>(self.wav_ind+ $
-                                 ((ev.offset eq 3 OR ev.offset eq 7)?1:-1))< $
+  case ev.id of 
+     self.wDraw: begin          ;press and motion events
+        if ev.type lt 5 then $
+           c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
+        case ev.type of
+           5b: begin ;; ASCII keys
+              if ev.release then return ;just press events
+              if ev.ch eq 8 then begin ; Delete Key
+                 self->Delete 
+                 return
+              endif 
+              case strupcase(ev.ch) of 
+                 'C': begin
+                    self->SwitchMode,/MAP
+                    widget_control, self.wDo, SET_VALUE=2
+                    widget_control, self.wRType, SET_DROPLIST_SELECT=0, $
+                                    /SENSITIVE
+                 end
+                 'U': self->SwitchMode,/FULL
+                 'P': begin
+                    self->SwitchMode,/MAP
+                    widget_control, self.wDo, SET_VALUE=2
+                    widget_control, self.wRType, SET_DROPLIST_SELECT=1, $
+                                    /SENSITIVE
+                 end
+                 'R': self->Reset
+                 'L': if self.mode eq 0 then widget_control, self.wDo, $
+                                                             SET_VALUE=2
+                 'D': self->Delete
+                 'M': self->SwitchMode,/MAP
+                 'F': self->Fit
+                 'V': begin     ;value line
+                    widget_control, self.wToggles, GET_VALUE=tog
+                    tog[1]=1-tog[1]
+                    widget_control, self.wToggles, SET_VALUE=tog
+                    self->Plot
+                 end
+                 'X': begin     ;XZoom
+                    widget_control, self.wDo, SET_VALUE=0
+                    widget_control, self.wRType, SENSITIVE=0
+                 end
+                 'Y': begin     ;YZoom
+                    widget_control, self.wDo, SET_VALUE=1
+                    widget_control, self.wRType, SENSITIVE=0
+                 end
+                 'Q': widget_control, ev.top, /DESTROY
+                 
+                 ' ':  begin    ;Space, switch outlines...
+                    if self.selected eq -1 then return
+                    if NOT ptr_valid(self.reg[self.seltype]) then return
+                    nreg=n_elements(*self.reg[self.seltype])/2
+                    self.selected=self.selected+1
+                    if self.selected ge nreg then begin 
+                       self.selected=0
+                       if ptr_valid(self.reg[1-self.seltype]) then $
+                          self.seltype=1-self.seltype
+                    endif 
+                    self->Plot
+                 end
+                 else:          ;print,"Got: *"+strupcase(ev.ch[0])+"*"
+              endcase 
+           end
+           
+           6b: begin ;; Special keys
+              if ev.release then return ; Just press events
+              if ev.key lt 5 or ev.key gt 8 then return ; Only Arrow Keys
+              del=(ev.modifiers AND 1)?((ev.modifiers AND 2) ne 0?10:5):1
+              if self.mode eq 0 then begin ;; Change wavelengths
+                 self.wav_ind=0>$
+                              (self.wav_ind+ $
+                               (ev.key eq 5 or ev.key eq 7?-del:del))<$
                               (n_elements(*self.lam)-1)
                  self.wavelength=(*self.lam)[self.wav_ind]
                  self->Plot
                  self->Send
                  return
               endif 
+              ;; Moving a selected region
               if self.selected eq -1 then return
               if NOT ptr_valid(self.reg[self.seltype]) then return
               range=(*self.reg[self.seltype])[*,self.selected]
-              case ev.offset of
-                 1: begin       ;up
-                    range[0]=range[0]-1 & range[1]=range[1]+1
+              case ev.key of
+                 7: begin       ;up
+                    range[0]=range[0]-del & range[1]=range[1]+del
                  end
-                 3: range=range+(self.upgoing?-1:1) ;left
-                 5: range=range+(self.upgoing?1:-1) ;right
-                 7: begin       ;down
-                    range[0]=range[0]+1 & range[1]=range[1]-1
+                 5: range=range+(self.upgoing?-del:del) ;left
+                 6: range=range+(self.upgoing?del:-del) ;right
+                 8: begin       ;down
+                    range[0]=range[0]+del & range[1]=range[1]-del
                  end
-                 else:
               endcase
               nl=n_elements(*self.lam) 
               del=range[1]-range[0]
@@ -153,16 +165,8 @@ pro CubeViewSpec::Event,ev
               self->MergeRegs
               self->Plot
               if n_elements(*self.fit) eq 0 then self->Send
-           end
-           
-           ;; Delete key
-           'WIDGET_TEXT_DEL': self->Delete            
-        endcase 
-     end 
-          
-     self.wDraw: begin 
-        c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
-        case ev.type of
+           end 
+              
            0b: case ev.press of ;press events
               1b: begin         ;Left button
                  widget_control, self.wDo, GET_VALUE=doing
@@ -200,7 +204,8 @@ pro CubeViewSpec::Event,ev
                           ;; XXX regs and weights presently incompatible
                           ptr_free,self.weights 
                           for i=0,n_elements(*self.wMapSets)-1 do $
-                             widget_control, (*self.wMapSets)[i], SET_BUTTON=0
+                                widget_control, (*self.wMapSets)[i], $
+                                                SET_BUTTON=0
                        end
                        
                        0:  begin ;XClip
@@ -227,7 +232,7 @@ pro CubeViewSpec::Event,ev
               
               
               4b: begin         ;Right Button - Reset (no nuking regions)
-                 if self.got ge 0 then begin ;if selecting a range, cancel
+                 if self.got ge 0 then begin ;if selecting range, cancel
                     self.got=-1 
                     self->Plot  
                  endif else self->Reset,/KEEP
@@ -258,10 +263,10 @@ pro CubeViewSpec::Event,ev
                  if n_elements(*self.fit) eq 0 then self->Send
                  self->Plot
               endif else if self->ShowingValueLine() then self->Plot
-           end
-           
+           end 
         endcase 
-     end 
+        return
+     end
      
      self.wQuit: widget_control, ev.top,/DESTROY
      
@@ -284,8 +289,8 @@ pro CubeViewSpec::Event,ev
      end
      
      self.wMode: self->SwitchMode,ev.value
-     else:	
   endcase
+  widget_control, self.wDraw,/INPUT_FOCUS
 end
 
 ;=============================================================================
@@ -294,6 +299,7 @@ end
 pro CubeViewSpec::MapEvent,ev
   widget_control, ev.id,get_uvalue=uval
   oMap=IRSMapSet(self)
+  widget_control, self.wDraw,/INPUT_FOCUS
   
   if n_elements(uval) eq 0 then begin 
      ;; A specific map choice selected
@@ -787,7 +793,7 @@ pro CubeViewSpec::ShowRegions
   y=!Y.CRANGE
   ;;full mode, no region -- simply highlight the chosen wavelength
   if self.mode eq 0 AND self.wavelength ne 0.0 then begin 
-     plots,self.wavelength,y,COLOR=self.colors_base,THICK=2
+     plots,self.wavelength,y,COLOR=self.colors_base+3,THICK=2
      return
   endif
   
@@ -1026,12 +1032,9 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   self.wLine=widget_label(colbase,/FRAME,/DYNAMIC_RESIZE,VALUE='***')
   if keyword_set(rn) then self.renorm=round(rn)
   ;; A key catching text widget with a draw widget overlain
-  fakebase=widget_base(self.wBase)
-  self.wDraw=widget_draw(fakebase,XSIZE=600,YSIZE=400)
+  self.wDraw=widget_draw(self.wBase,XSIZE=600,YSIZE=400)
   window,/FREE,/PIXMAP,XSIZE=600,YSIZE=400 ;to cache the image in
   self.pixwin=!D.WINDOW
-  self.wHotKey=widget_text(fakebase,/ALL_EVENTS,FRAME=0,xsize=1,ysize=3, $
-                           value=['**','**','**'])
   
   self.lam=ptr_new(/ALLOCATE_HEAP)
   self.sp=ptr_new(/ALLOCATE_HEAP)
@@ -1050,7 +1053,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
 
   ;if n_elements(lam) ne 0 AND n_elements(sp) ne 0 then self->Load,lam,sp
 
-  widget_control,self.wHotKey,SET_TEXT_SELECT=4,/INPUT_FOCUS
+  widget_control,self.wDraw,/DRAW_KEYBOARD_EVENTS,/INPUT_FOCUS
   self->MsgSetup,['CUBEVIEWSPEC_STACK','CUBEVIEWSPEC_FULL','CUBEVIEWSPEC_SAVE']
   return,1
 end
@@ -1114,7 +1117,6 @@ pro CubeViewSpec__define
       wLine: 0L, $              ;the status line id
       pixwin: 0l, $             ;window id of double-buffer pixmap
       win: 0L, $                ;window id of the real window
-      wHotKey:0L, $             ;hidden key catcher text widget
       wOrder:0L, $              ;the continuum fit order widget
       wToggles:0L, $            ;the renorm/value-line check box  
       wFull:0L, $               ;widget id for selecting full mode
