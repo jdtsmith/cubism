@@ -152,7 +152,8 @@ pro CubeProj::ShowEvent, ev
      'viewrecord-new': self->ViewRecord,/NEW
      'viewbackground-new': self->ViewBackground,/NEW
      'remove-background': begin 
-        ptr_free,self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK
+        ptr_free,self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
+                 self.BACK_EXP_LIST
         self.BACK_CNT=0 & self.BACK_DATE=0.0D
         self.ACCOUNTS_VALID AND=NOT 4b ;bg's no longer valid
         self->UpdateButtons
@@ -527,12 +528,17 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
             widget_button(cube,VALUE='Set Background from Rec(s)...', $
                           UVALUE='setbackgroundfromrecs',/SEPARATOR)]
   (*self.wInfo).MUST_BACK= $
-     [widget_button(cube,VALUE='View Background...', $
+     [widget_button(cube,VALUE='Save Background Rec(s)...', $
+                    UVALUE='savebackgroundlist'), $
+      widget_button(cube,VALUE='Load Background Rec(s)...', $
+                    UVALUE='loadbackgroundlist'), $
+      widget_button(cube,VALUE='View Background...', $
                     UVALUE='viewbackground'), $
       widget_button(cube,VALUE='View Background (new viewer)..', $
                     UVALUE='viewbackground-new'), $
       widget_button(cube,VALUE='Remove Background', $
                     UVALUE='remove-background')]
+  
   
   but=widget_button(cube,VALUE='Load Bad Pixels...',UVALUE='loadbadpixels', $
                     /SEPARATOR)
@@ -541,6 +547,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
       widget_button(cube,VALUE='Clear Bad Pixel List...', $
                     UVALUE='clearbadpixels')]
   
+
   wMustCube=[wMustCube, $
              ;;-------------
              widget_button(cube,VALUE='View Cube...',UVALUE='viewcube', $
@@ -1005,6 +1012,55 @@ pro CubeProj::ClearBadPixels, file
   else self.GLOBAL_BAD_PIXEL_LIST=ptr_new()
   self->UpdateButtons
   self->Send,/UPDATE
+end
+
+
+;=============================================================================
+;  LoadBackGroundList - Load background exposures from file
+;=============================================================================
+pro CubeProj::LoadBackGroundList,file,ERROR=err
+  catch, err
+  if err ne 0 then begin 
+     catch,/cancel
+     if n_elements(un) ne 0 then free_lun,un
+     self->Error,['Error loading background list from '+ $
+                  file,!ERROR_STATE.MSG],$
+                 /RETURN_ONLY
+  endif
+  if size(file,/TYPE) ne 7 then begin 
+     xf,file,/RECENT,FILTERLIST=['*.bgl','*.*','*'],$
+        TITLE='Load Background List',/NO_SHOW_ALL,SELECT=0, $
+        /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
+  endif 
+  if size(file,/TYPE) ne 7 then return ;cancelled
+  openr,un,file,/GET_LUN
+  bg=lonarr(file_lines(file),/NOZERO)
+  readf,un,bg
+  free_lun,un
+       
+  wh=where_array((*self.DR).DCEID,bg,cnt)
+  if cnt lt n_elements(bg) then $
+     self->Warning,strtrim(n_elements(bg)-cnt,2)+ $
+                   ' record(s) not present in project'
+  self->SetBackgroundFromRecs,wh
+end
+
+
+;=============================================================================
+;  SaveBackGroundList - Save list of background records to file
+;=============================================================================
+pro CubeProj::SaveBackGroundList,file
+  if ~ptr_valid(self.BACK_EXP_LIST) then return
+  if size(file,/TYPE) ne 7 then begin 
+     start=self->FileBaseName()+".bgl"
+     xf,file,/RECENT,FILTERLIST=['*.bgl','*.*','*'],/SAVEFILE, $
+        TITLE='Save Background List As...',/NO_SHOW_ALL,SELECT=0, $
+        START=start,PARENT_GROUP=self->TopBase(),/MODAL
+  endif 
+  if size(file,/TYPE) ne 7 then return ;cancelled
+  openw,un,file,/GET_LUN
+  printf,un,1#(*self.BACK_EXP_LIST)
+  free_lun,un
 end
 
 ;=============================================================================
@@ -1582,7 +1638,6 @@ pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm
   bcds=self->BCD(recs)
   back=imcombine(bcds,/AVERAGE,REJECT_MINMAX=choice eq 1)
   self.BACKGROUND=ptr_new(back,/NO_COPY)
-  self.BACK_CNT=n
   self.BACK_DATE=systime(/JULIAN)
   self.Changed=1b
   self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
@@ -1688,7 +1743,9 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
   
   str=[str,' Background: '+ $
        ((this.BACK_DATE ne 0.0d)? $
-        (strtrim(this.BACK_CNT,2)+' records, '+jul2date(this.BACK_DATE)): $
+        (strtrim(ptr_valid(this.BACK_EXP_LIST)? $
+                 n_elements(*this.BACK_EXP_LIST):0,2)+' records, '+ $
+         jul2date(this.BACK_DATE)): $
         "none")]
   
   str=[str,' FLUXCON: '+(this.FLUXCON?"Yes":"No")]
@@ -4025,7 +4082,7 @@ pro CubeProj__define
          MUST_PROJ:lonarr(5), $ ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
-         MUST_BACK:lonarr(3), $ ;background record must be set
+         MUST_BACK:lonarr(5), $ ;background record must be set
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
          MUST_UNRESTORED:0L}    ;must have unrestored data
   
