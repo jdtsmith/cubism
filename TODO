@@ -1,12 +1,38 @@
+- Account for the fact that LH has +w == -x.
 
-- Project interface.
+- Configurable build plate scales for cube, e.g. .5-2 x natural plate
+  scale.
 
-- WCS stuff, for maps and cubes (and refined cube positions).
+- Re-factor clipping to process larger chunks at a time in a single
+  CALL_EXTERNAL.  Move bounding-box compu inside polyclip.c, and clip
+  multiple polygons directly.  
 
-- Positional (instead of logical grid) cube sample placement (for
-  mixed targetting constituent BCDs).
+  Memory overhead: Create and return an IDL variable with the clipped
+  polys/areas directly in a DLM?  Ideally would work with input as a
+  ptrarr to 2xn polys to clip, and put the clipped polys into a ptarr
+  to ptarr to 2xn for each pixel clipped, and associated ptrarr to
+  arrays for assoc'd pixel indices, and areas.  Then the wrapper code
+  could just peel out the pointers and stick them into the relevant
+  data structure.  {pixel: 0L, poly:ptr_new(), area:0.0} Too much
+  trouble?
 
-- Line record showing wavelength/WCS.
+- WCS stuff, for maps and cubes (and refined cube positions), with
+  Line record showing wavelength/WCS.
+
+
+
+Long Term:
+
+Re-do xf as object.  
+Trap errors via ObjReport.  Add all popups/choices/etc. in there too.  
+
+OLD:
+
+- SAV-file for IDLVM --- auto-compilation?  Pull in AstroLib stuff?  C
+  code?  PATH finding no longer possible: need to fix polyfillaa's
+  path finder.  Beware of 'foo.sav' files being restored ahead of
+  foo.pro compiled.  Make a "cubism_vm" just for this purpose?
+  XManager,/NO_BLOCK doesn't -- throughout, or just entry to XManager?
 
 w/ IDLv5.6: Combo-Box lambda.  Context menus for choice plug-ins.
 Tabbed Project views?  Check-boxes in menus.  Replace keypress event
@@ -22,12 +48,6 @@ pointer to the array is returned, along with vector lengths, etc., and
 then passed on to the second function, along with a pre-fabricated
 pile of IDL arrays, which disentangles the C-heap and populates the
 IDL arrays.
-
-Long Term:
-
-Re-do xf as object.  
-Trap errors via ObjReport.  Add all popups/choices/etc. in there too.  
-
 
 ; OLDER NOTES ON CubeProj:
 ;
