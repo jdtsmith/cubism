@@ -1077,7 +1077,7 @@ function CubeProj::List
          if self.reconstructed_pos then pos=(*self.DR).REC_POS else $
             pos=(*self.DR)[i].RQST_POS
          
-         s=string(FORMAT='(" ",A,T23,A10,T34,A12,T48,A3,T59,A,T70,A)', $
+         s=string(FORMAT='(" ",A,T23,A10,T34,A12,T48,A3,T59,A,T67,A)', $
                   (*self.DR)[i].ID, $
                   radecstring(pos[0],/RA),radecstring(pos[1]), $
                   ptr_valid((*self.DR)[i].UNC)?'Yes':'No', $
@@ -1450,7 +1450,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
                           APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
-                          BAD_PIXEL_LIST=bpl
+                          BAD_PIXEL_LIST=bpl,RECONSTRUCTED_POSITIONS=rcp
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
         self.PLATE_SCALE=ps
@@ -1523,6 +1523,10 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      if bpl[0] ne -1 then self.bad_pixel_list=ptr_new(bpl)
      self.Changed=1b
   endif 
+  if n_elements(rcp) eq 0 then begin 
+     self.reconstructed_pos=keyword_set(rcp) 
+     self.ACCOUNTS_VALID=0b & self.Changed=1b
+  endif
   self->UpdateAll,/NO_LIST
 end
 
@@ -2942,8 +2946,8 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
   if size(dir,/TYPE) ne 7 then return
   
   if ~file_test(dir,/DIRECTORY) || $
-     ~stregex(dir,'[0-9]{10}'+path_sep()+'?$',/BOOLEAN) then $
-     self->Error,'Must select AOR directory of form 0123456789'
+     ~stregex(dir,'r?[0-9]{7,10}'+path_sep()+'?$',/BOOLEAN) then $
+     self->Error,'Must select AOR directory of form [r]0123456[789]'
   if keyword_set(cd) then filt='*coa*2d.fits' else filt='*bcd{,_fp}.fits'
   files=file_search(dir,filt,/TEST_REGULAR)
   for i=0,n_elements(files)-1 do begin 
@@ -2966,6 +2970,8 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
         this=all[wh[uniq_fovs[j]]]
         these=all[wh[where(all[wh].FOV eq this.fov)]]
         fovname=irs_fov(this.fov,/SHORT_NAME,MODULE=md,ORDER=ord)
+        ;; A file we don't recognize
+        if size(fovname,/TYPE) ne 7 then continue
         pos=strpos(fovname,'_cen')
         if pos ne -1 then fovname=strmid(fovname,0,pos)
         ;; Assume same FOV and same OBJECT == one map
@@ -3118,9 +3124,9 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
      self.cal->TransformBoreSightCoords,self.module,[0,0], $
                                         rec.PA_RQST,void,new_pa
      rec.PA_RQST=new_pa          ; transform requested PA to the slit
-  endelse 
+  endelse
   
-  ;; RQST is SIRTF-field-centric, not FOV-centric.
+  ;; PA_RQST is SIRTF-field-centric, not FOV-centric.
 
   ;; Achieved (reconstructed) positions/PA
   if n_elements(rpos) eq 3 then rec.REC_POS=rpos else $
