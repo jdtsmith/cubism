@@ -41,9 +41,10 @@
 ;  02111-1307, USA.
 ;
 ;##############################################################################
-pro cubism,_EXTRA=e
+pro cubism,pname,_EXTRA=e
   project=obj_new('CubeProj')
-  project->Open,PROJECT=opened_project,CANCEL_TEXT='Create New Cube Project', $
+  project->Open,pname,PROJECT=opened_project, $
+                CANCEL_TEXT='Create New Cube Project', $
                 _EXTRA=e
   if NOT obj_valid(opened_project) then begin
      project->SetProperty,/SPAWNED 
