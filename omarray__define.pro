@@ -3,11 +3,6 @@
 ;
 ;    OMArray
 ;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
-;
 ; DESCRIPTION:
 ;    
 ;    Provides a specific inter-object messaging framework, as a pure
@@ -188,7 +183,8 @@
 ;    self.oma->MsgSignup,self,/MSG1
 ;
 ; MODIFICATION HISTORY:
-;
+;    
+;    2002-08-27 (J.D. Smith): Migrated from SMART codebase.
 ;    2001-10-01 (J.D. Smith): Written, as initial ObjMsg helper class.
 ;-
 ;    $Id$
@@ -196,27 +192,24 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
-
 
 ;=============================================================================
 ;      GetObj - The OMArray MsgList has a fixed format
@@ -235,7 +228,7 @@ end
 function OMArray::MsgSendWhich, msg
   if self->MsgListLen() eq 0b or ptr_valid(self.MsgNames) eq 0b then $
      return, -1
-  if n_elements(type) eq 0 then type=tag_names(msg,/STRUCTURE_NAME)
+  type=tag_names(msg,/STRUCTURE_NAME)
   wh=where(*self.MsgNames eq type,cnt)
   if cnt eq 0 then return,-1
   wh=where((*self.MsgList).recip[wh[0],*],cnt)
@@ -268,7 +261,7 @@ end
 ;                  messages.  If NONE is set, turn off all messages.
 ;                  These can be combined with specific additional
 ;                  message names, e.g.:
-;;                    obj->MsgSignup,recip,/NONE,/MSGTYPE1
+;                     obj->MsgSignup,recip,/NONE,/MSGTYPE1
 ;=============================================================================
 pro OMArray::MsgSignup, objs, ALL=all_on,NONE=all_off,_EXTRA=set_source
   if n_elements(objs) eq 0 then $

@@ -3,11 +3,6 @@
 ;
 ;    ObjMsg
 ;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
-;
 ; DESCRIPTION:
 ;    
 ;    Superclass providing generic framework for inter-object,
@@ -289,7 +284,6 @@
 ; 
 ;    2001-08-17 (J.D. Smith): Sped up MsgRemove with array
 ;       formulation.  Minor other changes.
-;
 ;    2001-07-30 (J.D. Smith): Migrated directly from SCORE-era source.
 ;
 ;-
@@ -298,24 +292,22 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
 
@@ -338,7 +330,6 @@ pro ObjMsg::MsgSend,msg
 ;       help,/st,msg
 ;       help, /TRACEBAC
 ;  endif 
-  
                                 ;send all the messages
   for i=0,n_elements(sendlist)-1 do sendlist[i]->Message,msg  
 end
@@ -403,7 +394,6 @@ function ObjMsg::MsgListClean
   endif else return,0
   return,1                      ;only get here if a valid list remains.
 end
-
 
 ;=============================================================================
 ;      MsgSignup - Add an ObjMsg inherited object to the message
