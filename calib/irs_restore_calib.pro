@@ -71,7 +71,7 @@
 function irs_restore_calib, cfile,NON_CACHED=nc,RECENT=recent
   common irs_calib_store, irs_calib_store_files, irs_calib_store_objects
   @cubism_dir
-  if keyword_set(recent) || n_elements(cfile) eq then $
+  if keyword_set(recent) || n_elements(cfile) eq 0 then $
      cfile=irs_recent_calib()
   if file_test(cfile,/READ,/REGULAR) then file=cfile else begin 
      file=filepath(ROOT=irs_calib_dir,SUBDIR="sets",cfile)
