@@ -65,7 +65,7 @@ pro CubeAper::Message, msg
            x_size=x_size[1]-x_size[0]
            off=(float(distX)/x_size)*delta_ap
            sign=[1,1]
-           if msg.MODIFIERS AND 1b then begin 
+           if msg.MODIFIERS AND 1b then begin ;Shift
               sides=[0,1] 
               if (msg.MODIFIERS AND 2b) ne 0b then sign=[-1,1]*(self.side?1:-1)
            endif else sides=[self.side]
