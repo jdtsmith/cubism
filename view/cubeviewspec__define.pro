@@ -2,7 +2,8 @@
 ;;**************************OverRiding methods********************************
 
 ;=============================================================================
-;  Message - We'll hear about new spectra from CubeRec
+;  Message - We'll hear about new spectra from CubeRec, and switching
+;            to FULL mode
 ;=============================================================================
 pro CubeViewSpec::Message, msg
   type=tag_names(msg,/STRUCTURE_NAME)
@@ -36,6 +37,9 @@ pro CubeViewSpec_event, ev
   self->Event,ev
 end
 
+;=============================================================================
+;  Event - Handle internal events.
+;=============================================================================
 pro CubeViewSpec::Event,ev
   ;; Always refocus to hotkey
   widget_control,self.wHotKey,SET_TEXT_SELECT=4,SET_VALUE=['**','**','**'], $
@@ -263,7 +267,7 @@ end
 
 ;=============================================================================
 ;  Send - Send the currently selected set of regions as a stack, or
-;         just the wavelength if in full mode
+;         just the wavelength if in full mode.
 ;=============================================================================
 pro CubeViewSpec::Send
   free_back=0
@@ -271,6 +275,7 @@ pro CubeViewSpec::Send
      if self.wavelength eq 0.0 then return
      msg={CUBEVIEWSPEC_FULL,self.wavelength}
   endif else begin 
+     free=1
      if NOT ptr_valid(self.reg[1]) then return ;need a peak region
      msg={CUBEVIEWSPEC_STACK}
      lams=(*self.lam)[*self.reg[1]]
@@ -278,25 +283,21 @@ pro CubeViewSpec::Send
                      min(lams),max(lams))
      if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
      msg.foreground=self.reg[1]
+     msg.background=self.reg[0]
+     msg.weights=self.weights
      ;; Send either the fit, or the background regions themselves.
      if n_elements(*self.fit) gt 0 AND self.medlam ne 0. then begin 
-        for i=0,n_elements(*self.reg[1])/2-1 do begin 
-           from=(*self.reg[1])[0,i]
-           to=(*self.reg[1])[1,i]
-           ind=(from<to)+indgen(abs(to-from)+1)
-           if n_elements(inds) eq 0 then inds=[ind] else inds=[inds,ind]
-        endfor
-        msg.background=ptr_new(poly((*self.lam)[inds], $
-                                    *self.fit*10.^self.renorm)) ;rescale
-        free_back=1
+        msg.bg_fit=ptr_new(*self.fit*10.^self.renorm)
         msg.info=msg.info+' -- Fit'
-     endif else msg.background=self.reg[0]
+        free_back=1
+     endif 
+     if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
      if ptr_valid(self.reg[0]) then msg.info=msg.info+')'
      if self.reg_name then msg.info=msg.info+' <'+self.reg_name+'>'
-     ;; WEIGHTS?
   endelse 
   self->MsgSend,msg
-  if free_back then ptr_free,msg.background ;it's a throwaway
+  
+  if free_back then ptr_free,msg.bg_fit
 end
 
 ;=============================================================================
@@ -316,6 +317,10 @@ pro CubeViewSpec::SwitchMode,mode
   self->Send
 end
 
+;=============================================================================
+;  Fit - Fit the current continuum with a polynomial of specified
+;        order.
+;=============================================================================
 pro CubeViewSpec::Fit
   if self.mode eq 0 then return ;full mode, no fitting
   self->MergeRegs               ;just to make sure
@@ -423,7 +428,7 @@ pro CubeViewSpec::Fit
      wh=where(imaginary(roots) eq 0. and float(roots) ge 0.,cnt)
      no_pos=0
      if cnt eq 0 then begin 
-        message, 'No positive real width found!'
+        self->Warn,'No positive real width found!'
         self.ew=-.999999999999999e6
      endif else if cnt gt 1 then begin 
         ;;find the closest one to our approximation
@@ -439,6 +444,9 @@ pro CubeViewSpec::Fit
   self->Send
 end
 
+;=============================================================================
+;  UpdateParams - Update the line fit parameters displayed.
+;=============================================================================
 pro CubeViewSpec::UpdateParams
   if self.medlam eq 0 then widget_control, self.wParams, SET_VALUE='' $
   else $
@@ -455,7 +463,9 @@ pro CubeViewSpec::UpdateParams
                    "Line Strength",self.strength))
 end
 
-;; draw the beginning of region line
+;=============================================================================
+;  ShowRegionLine - Draw the beginning of region selection line.
+;=============================================================================
 pro CubeViewSpec::ShowRegionLine
   if self.got eq -1 then return ; we aren't defining a region
   val=self.pressloc[self.got eq 1]
@@ -463,7 +473,9 @@ pro CubeViewSpec::ShowRegionLine
   else plots,val,!Y.CRANGE,COLOR=self.colors_base
 end
 
-;; Show the continuum fit
+;=============================================================================
+;  ShowFit - Draw the continuum fit.
+;=============================================================================
 pro CubeViewSpec::ShowFit
   ;; mark the max and median positions
   if self.medlam ne 0 then begin 
@@ -503,7 +515,9 @@ pro CubeViewSpec::ShowFit
 ;   polyfill,fillx,filly,/LINE_FILL
 end
 
-;; Delete the selected region
+;=============================================================================
+;  Delete - Delete the selected region.
+;=============================================================================
 pro CubeViewSpec::Delete
   if self.selected eq -1 then return
   if NOT ptr_valid(self.reg[self.seltype]) then return
@@ -524,7 +538,10 @@ pro CubeViewSpec::Delete
   self->Send
 end
 
-;; Reset the plot, keeping regions if KEEP is set.
+;=============================================================================
+;  Reset - Reset the plot ranges, keeping regions intact if KEEP is
+;          set.
+;=============================================================================
 pro CubeViewSpec::Reset,KEEP=k
   self.xr=self.xr_def
   self.yr=self.yr_def
@@ -584,7 +601,9 @@ end
 ;   free_lun,un
 ;end 
 
-
+;=============================================================================
+;  Plot - Plot everything which needs plotting.
+;=============================================================================
 pro CubeViewSpec::Plot,NOOUTLINE=noo
   if n_elements(*self.lam) eq 0 then return
   wset,self.pixwin              ;Double buffering
@@ -609,6 +628,9 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   device,COPY=[0,0,!D.X_SIZE,!D.Y_SIZE,0,0,self.pixwin]
 end
 
+;=============================================================================
+;  ShowValueLine - Draw the moving current value line.
+;=============================================================================
 pro CubeViewSpec::ShowValueLine
   if self.press or self.movestart eq -1 then return
   widget_control, self.wToggles, GET_VALUE=tog
@@ -618,6 +640,9 @@ pro CubeViewSpec::ShowValueLine
   plots,x,!Y.CRANGE
 end
 
+;=============================================================================
+;  ShowValueLine - Draw the moving current value line.
+;=============================================================================
 pro CubeViewSpec::HighlightPeak
   if NOT ptr_valid(self.reg[1]) then return
   for i=0,n_elements(*self.reg[1])/2-1 do begin 
@@ -627,6 +652,9 @@ pro CubeViewSpec::HighlightPeak
   endfor 
 end
 
+;=============================================================================
+;  ShowRegions - Draw the peak and continuum regions with outlines.
+;=============================================================================
 pro CubeViewSpec::ShowRegions
   y=!Y.CRANGE
   ;;full mode, no region -- simply highlight the chosen wavelength
@@ -654,7 +682,9 @@ pro CubeViewSpec::ShowRegions
   endfor 
 end
 
-;; Highlight the selected region
+;=============================================================================
+;  Outline - Draw outline highlight around the selected region.
+;=============================================================================
 pro CubeViewSpec::Outline
   if self.selected eq -1 then return
   range=(*self.reg[self.seltype])[*,self.selected]
@@ -664,7 +694,9 @@ pro CubeViewSpec::Outline
         COLOR=self.colors_base+3
 end
 
-;; Find regions where peak and continuum overlap
+;=============================================================================
+;  FindOver - Find regions where peak and continuum overlap.
+;=============================================================================
 function CubeViewSpec::FindOver
   if total(ptr_valid(self.reg)) ne 2. then return,-1
   for i=0,n_elements(*self.reg[1])/2-1 do begin 
@@ -680,8 +712,10 @@ function CubeViewSpec::FindOver
   if n_elements(range) eq 0 then return,-1 else return,range
 end
 
-;; Merge overlapping selected regions in continuum/peak locations.
-;; And sort the final regions
+;=============================================================================
+;  MergeRegs - Merge overlapping selected regions in continuum/peak
+;              locations, and sort the final regions.
+;=============================================================================
 pro CubeViewSpec::MergeRegs
   for j=0,1 do begin 
      ptr=self.reg[j]
@@ -724,7 +758,9 @@ pro CubeViewSpec::MergeRegs
   endfor 
 end
 
-;; Find the region we've clicked in, if any
+;=============================================================================
+;  FindReg - Find the region we've clicked in, if any, and outline it
+;=============================================================================
 pro CubeViewSpec::FindReg, xpos,FOUND=found
   for j=0,1 do begin 
      ptr=self.reg[j]
@@ -750,7 +786,9 @@ pro CubeViewSpec::FindReg, xpos,FOUND=found
   self->Outline                 ; let's see it
 end
 
-;; Give us a nice dull to bright red then white.
+;=============================================================================
+;  SetColors - Give us a nice dull to bright red then white.
+;=============================================================================
 pro CubeViewSpec::SetColors
   tvlct,[110b,147b,184b,255b,255b], $
         [0b,  0b,   13b,158b,255b], $
@@ -758,14 +796,18 @@ pro CubeViewSpec::SetColors
         self.colors_base
 end
 
+;=============================================================================
+;  Cleanup
+;=============================================================================
 pro CubeViewSpec::Cleanup
   wdelete,self.pixwin
-  ptr_free,self.lam,self.sp,self.fit,self.reg
+  ptr_free,self.lam,self.sp,self.fit,self.reg,self.weights
   self->ObjMsg::Cleanup
 end
 
-;; Renorm is power to renormalize data by (e.g. to make 1e-18 -> 1 use
-;; Renorm=-18)
+;=============================================================================
+;  Init
+;=============================================================================
 function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
                             SPECTRUM=sp,PARENT_GROUP=grp
   if n_elements(xr) ne 0 then self.xr_def=xr else self.xr_def=[0,0]
@@ -779,7 +821,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   
   rowbase=widget_base(self.wBase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_BOTTOM) 
   colbase=widget_base(rowbase,/COLUMN) 
-  self.wMode=cw_bgroup(colbase,/EXCLUSIVE,/ROW,['Full Cube','Cube Stack'], $
+  self.wMode=cw_bgroup(colbase,/EXCLUSIVE,/ROW,['Full Cube','Map'], $
                        SET_VALUE=0,/NO_RELEASE)
 
   subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER,/FRAME) 
@@ -844,6 +886,9 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   return,1
 end
 
+;=============================================================================
+;  CubeViewSpec
+;=============================================================================
 pro CubeViewSpec__define
   st={CubeViewSpec, $
       INHERITS OMArray, $       ;Helper class for ObjMsg
@@ -853,8 +898,9 @@ pro CubeViewSpec__define
       sp:ptr_new(), $
       fit:ptr_new(), $          ;the continuum fit
       reg_name:'', $            ;Name of the current region set (if any)
-      reg:ptrarr(2),$           ;2 ptrs each to a 2xn array of continuum/peak
-                                ;index ranges
+      reg:ptrarr(2),$           ;2 ptrs each to a 2xn array of
+                                ; continuum([0])/peak([1]) index ranges
+      weights:ptr_new(), $      ;the weights vector for the foreground
       ;; Data of the fit and peak
       renorm:0, $               ;power 10^n to renormalize all data with
       ew: 0.0, $                ;Equivalent Width
@@ -903,13 +949,15 @@ pro CubeViewSpec__define
   
   ;; The messages we send
   msg={CUBEVIEWSPEC_STACK, $    ;send a selected stack set
-       info:'', $               ;the info on this stack
-       foreground:ptr_new(), $  ;a 2xn list of foreground index ranges
-                                ; to average over
+       info:'', $               ;the info on this map stack specification
+       foreground:ptr_new(), $  ;a 2xn list of foreground wavelength index
+                                ; ranges over which to average
        weights:ptr_new(), $     ;a list of n pointers to weight vectors [0-1]
-       background:ptr_new()}    ;a 2xn list of background index ranges to
-                                ; average OR a list of n points in a polynomial
-                                ; fit to the background over wavelength.
+       background:ptr_new(),$   ;a 2xn list of continuum wavelength ranges to
+                                ; average
+       bg_fit:ptr_new()}        ;a list of n parameters in an
+                                ; n-1th order polynomial fit to the
+                                ; background over wavelength.
   msg={CUBEVIEWSPEC_FULL, $     ;switch to full mode
        wavelength:0.0}          ;the wavelength we're at
 end
