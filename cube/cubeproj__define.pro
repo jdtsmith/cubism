@@ -293,13 +293,20 @@ pro CubeProj::ShowEvent, ev
                  DEFAULT=irs_module(self.MODULE),/FREE_POINTERS
      end
      
-     'about': self->Info,TITLE='About Cube Project', $
-                         ['*********************************', $
-                          '       CUBISM v0.4, May 2003     ', $
-                          '                                 ', $
-                          '       JD Smith -- 2002,2003     ', $
-                          '  http://sings.stsci.edu/cubism  ', $
-                          '*********************************']
+     'about': begin 
+        @cubism_version
+        if self.version ne '' AND cubism_version ne self.version then $
+           thiscube=' (Curr. Cube: '+self.version+')' else thiscube=''
+        
+        self->Info,TITLE='About Cube Project', $
+                   ['*********************************', $
+                    '       CUBISM '+cubism_version,     $
+                    thiscube,                            $
+                    '                                 ', $
+                    '       JD Smith -- 2002,2003     ', $
+                    '  http://sings.stsci.edu/cubism  ', $
+                    '*********************************']
+     end
      
      else: call_method,action,self ;all others, just call the named method
   endcase     
@@ -611,7 +618,8 @@ pro CubeProj::WriteFits,file
   if size(file,/TYPE) ne 7 then begin 
      xf,file,/RECENT,FILTERLIST=['*.fits','*.*','*'],/SAVEFILE, $
         TITLE='Save Cube As FITS File...',/NO_SHOW_ALL,SELECT=0, $
-        START=strlowcase(self->ProjectName())+".fits", $
+        START=strlowcase(strjoin(strsplit(self->ProjectName(),/EXTRACT),'_'))+$
+        ".fits", $
         PARENT_GROUP=self->TopBase()
      if size(file,/TYPE) ne 7 then return
   endif
@@ -620,12 +628,21 @@ pro CubeProj::WriteFits,file
   sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
               'This file contains a spectral cube assembled from an IRS', $
               'step & stare spectral mapping dataset.', $
-              'For more information on SINGS see http://sings.sirtf.edu'], $
+              'For more information on SINGS see http://sings.stsci.edu'], $
              hdr,/COMMENT
   
+  fxaddpar,hdr,'CUBE-DT',jul2date(self.CUBE_DATE),' Cube build date'
+  
+  fxaddpar,hdr,'FILENAME',filestrip(file),' Name of this file'
+
   ;;Module/Order
   fxaddpar,hdr,'APERNAME',self.MODULE,' The IRS module'
   fxaddpar,hdr,'ORDER',self.ORDER,' The order: 0 for all orders'
+  
+  ;; Code version & calibration set used to create cube
+  fxaddpar,hdr,'CUBE_VER',self.version,' CUBISM version used'
+  self->LoadCalib
+  fxaddpar,hdr,'CAL_SET',self.cal->Name(),' IRS Calibration set used'
   
   ;; Celestial coordinates
   RADEG = 180.0d/!DPI           ; preserve double
@@ -1051,7 +1068,7 @@ pro CubeProj::Sort,sort
   endif 
 end
 
-pro CubeProj::Print,entries,_EXTRA=e
+pro CubeProj::PrintInfo,entries,_EXTRA=e
   print,transpose(self->Info(entries,_EXTRA=e))
 end
 
@@ -1072,8 +1089,8 @@ function CubeProj::Info,entries, NO_DATA=nd
   if NOT ptr_valid(self.APERTURE) OR self.MODULE eq '' then begin 
      aps=aps+' (default)' 
   endif else begin 
-     ords=self.cal->Orders(self.MODULE)
      nap=n_elements(*self.APERTURE)
+     ords=obj_valid(self.cal)?self.cal->Orders(self.MODULE):intarr(nap)+1
      for i=0,nap-1 do begin 
         ap=(*self.APERTURE)[i]
         aps=[aps,string(FORMAT='(%"  %s  %4.2f->%4.2f : %4.2f->%4.2f")',$
@@ -1218,7 +1235,7 @@ end
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            ERROR=err, PR_SIZE=prz, CALIB=calib,MODULE=module, $
                            APERTURE=ap,PROJECT_NAME=pn,DR=dr,TLB_OFFSET=tboff,$
-                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz
+                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz,VERSION=version
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -1262,6 +1279,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
         NOT ptr_valid((*self.DR)[0].BCD) then bcdsz=0 else  $
         bcdsz=size(*(*self.DR)[0].BCD,/DIMENSIONS)
   endif 
+  if arg_present(version) then version=self.version
 end
 
 ;=============================================================================
@@ -1732,11 +1750,11 @@ pro CubeProj::BuildAccount,_EXTRA=e
               endif
               
               if feedback_only then continue
-              ;; Clip it against the sky (cube) grid
+              ;; Clip the offset polygon against the sky (cube) grid
               cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
                                           self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
                                           AREAS=areas)
-           
+              
               if cube_spatial_pix[0] eq -1 then continue
 ;                  print,FORMAT='("Not hitting cube for pixel: "' + $
 ;                        ',I0,",",I0," -- step [",I0,",",I0,"]")', $
@@ -1840,7 +1858,7 @@ end
 
 ;=============================================================================
 ;  BuildCube - Assemble the Cube from the accounting information, the
-;              BCD data and the uncertainties.
+;              BCD data, the BMASK, and the uncertainties.
 ;=============================================================================
 pro CubeProj::BuildCube
   if NOT ptr_valid(self.DR) then return
@@ -1859,23 +1877,35 @@ pro CubeProj::BuildCube
      bcd=*(*self.DR)[dr].BCD
      use_err=ptr_valid((*self.DR)[dr].ERROR)
      if use_err then err=*(*self.DR)[dr].ERROR
+     
+     ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
+     ;; entering the cube
+     if ptr_valid((*self.DR)[dr].BMASK) then $
+        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) gt 0 else bmask=[1.]
+        
      ;; Use the reverse account to populate the cube
      for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
         if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
         these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
-        ;; XXX Error weighting, other alternatives
+        ;; XXX Error weighting, BMASK, other alternatives
         ;;  need all in one place? ... e.g trimmed mean?
+        
         cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
-           total(bcd[these_accts.BCD_PIX] * these_accts.AREA)
-        areas[rev_min+i]=areas[rev_min+i]+total(these_accts.AREA)
+                        total(bcd[these_accts.BCD_PIX] * $
+                              these_accts.AREA * $
+                              bmask[[these_accts.BCD_PIX]])
+        areas[rev_min+i]=areas[rev_min+i]+ $
+                         total(these_accts.AREA*bmask[[these_accts.BCD_PIX]])
      endfor
   endfor 
   
-  areas=areas>1.e-7
+  areas=areas>1.e-10            ;avoid divide by zero errors
   ptr_free,self.CUBE,self.ERR
-  self.CUBE=ptr_new(cube/areas,/NO_COPY)
+  self.CUBE=ptr_new(cube/areas)
   self.CUBE_DATE=systime(/JULIAN)
   self.Changed=1
+  @cubism_version 
+  self.version=cubism_version
   self->UpdateButtons & self->UpdateList & self->UpdateTitle
 end
 
@@ -1969,17 +1999,75 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   endif
   
   return,stack
-  
-
 end
 
 ;=============================================================================
-;  Extract - Extract a Spectrum from the Cube
+;  Extract - Extract a Spectrum from the Cube, and possibly save it
+;            XXX - Other extractions, including physical coordinates
 ;=============================================================================
-function CubeProj::Extract,low,high
+function CubeProj::Extract,low,high, SAVE=sf, FITS=fits
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to extract'
-  return,total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
-               1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+  sp=total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
+           1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+
+  if keyword_set(sf) then self->SaveSpectrum,sp,sf,FITS=fits
+  return,sp
+end
+
+;=============================================================================
+;  SaveSpectrum - Save a Spectrum to FITS or ASCII
+;=============================================================================
+pro CubeProj::SaveSpectrum,sp,sf,FITS=fits
+  fits=keyword_set(fits) 
+  if size(sf,/TYPE) ne 7 then begin 
+     xf,sf,/SAVEFILE, /RECENT, $
+        FILTERLIST=[(fits?'*.fits':'*.txt'), '*.*', '*'], $
+        TITLE='Save Spectrum As '+(fits?'FITS':'Text')+' File...', $
+        /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(), $
+        START=strlowcase(strjoin(strsplit(self->ProjectName(),/EXTRACT),'_'))+$
+        (fits?".fits":".txt")
+     if size(sf,/TYPE) ne 7 then return
+  endif
+  
+  catch, err
+  if err ne 0 then begin 
+     self->Error,['Error saving spectrum to file '+sf,!ERROR_STATE.MSG]
+  endif 
+  widget_control,/HOURGLASS  
+
+  if fits then begin 
+     fxhmake,hdr,/date,/EXTEND
+     ;; Description
+     sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
+                 'This file contains a 1D spectrum extracted from an IRS', $
+                 'spectral cube, assembled from a step & stare spectral', $
+                 'mapping dataset.', $
+                 'For more information on SINGS see http://sings.stsci.edu'], $
+                hdr,/COMMENT
+     fxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
+     fxaddpar,hdr,'APERNAME',self.MODULE,' The IRS module'
+     fxaddpar,hdr,'CUBE_VER',self.version,' CUBISM version used'
+     self->LoadCalib
+     name=self.cal->Name()
+     if name eq '' then name=self.cal_file
+     fxaddpar,hdr,'CAL_SET',name,' IRS Calibration set used'
+     fxwrite,sf,hdr
+     
+     ;; Make the binary table
+     fxbhmake,hdr,1,'CUBESPEC','CUBISM cube-extracted spectrum'
+     fxbaddcol,wcol,hdr,*self.WAVELENGTH,'WAVELENGTH','Column label field 1', $
+               TUNIT='Microns'
+     fxbaddcol,fcol,hdr,*self.WAVELENGTH,'FLUX','Column label field 2', $
+               TUNIT='count/s'
+     fxbcreate,unit,sf,hdr
+     fxbwrite,unit,*self.WAVELENGTH,wcol,1
+     fxbwrite,unit,sp,fcol,1
+     fxbfinish,unit
+  endif else begin 
+     openw,un,/get_lun,sf
+     printf,un,FORMAT='(2G18.10)',transpose([[*self.WAVELENGTH],[sp]])
+     free_lun,un
+  endelse 
 end
 
 ;=============================================================================
@@ -2139,6 +2227,9 @@ pro CubeProj::NormalizeApertures
   endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
 end
 
+;=============================================================================
+;  ShowAperture
+;=============================================================================
 pro CubeProj::ShowAperture
   if NOT self->IsWidget() then return
   if NOT ptr_valid(self.APERTURE) then begin 
@@ -2384,6 +2475,7 @@ pro CubeProj__define
      feedback:0, $              ;whether to show feedback when building cube
      SaveFile:'', $             ;the file it was saved to
      sort:0b, $                 ;our sorting order
+     version:'', $              ;the Cubism version of this cube
      wInfo:ptr_new()}           ;the widget info struct.... a diconnectable ptr
   
   
@@ -2413,7 +2505,8 @@ pro CubeProj__define
                                 ; module, slit position 1, or slit position 2
        PA: 0.0D, $              ;Position angle of slit E of N
        BCD: ptr_new(), $        ;the BCD
-       ERROR:ptr_new(), $       ;the BCD's error plane
+       ERROR:ptr_new(), $       ;the BCD's error image
+       BMASK:ptr_new(), $       ;the BCD's BMASK image
        EXP: 0L, $               ;the exposure number in the mapping sequence
        CYCLE:0L, $              ;the cycle number at this position
        NCYCLES:0L,$             ;the number of cycles at this position
