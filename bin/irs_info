@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # irs_info -- Summarize info for IRS data in directories at and
-# beneath this one.
+# beneath the current one..
 #
 #  12/27/03 J.D. Smith
 #   5/18/04 (JDS): Added support for staring and fixed cluster data sets.
@@ -9,7 +9,6 @@
 # Copyright (C) 2003,2004 J.D. Smith
 #
 use File::Find;
-use Data::Dumper;
 
 @keywords=qw{AORKEY OBJECT FOVID AIRSCMDN AOT_TYPE OBJTYPE EXPID NCYCLES
              EXPTOT_T RAMPTIME STEPSPAR STEPSPER COLUMN ROW};
@@ -45,9 +44,6 @@ sub parsefile {
   my $obj=$keys{OBJECT};
   my $fov=$fovs{$keys{FOVID}};
   return unless $fov && $aor && $obj;
-
-  #$fov=~s/_.*$//;
-  #$fov=sprintf("%-3s",$fov);
 
   $bcds{$obj}{$aor}{$dir}{$fov}{cnt}++;
   foreach (@keywords[2..$#keywords-2]) {
