@@ -59,7 +59,6 @@ function polyfillaa, x,y,sx,sy, AREAS=areas
   plist=[transpose(x),transpose(y)] ;the vertex list
   for j=bottom,top do begin 
      for i=left,right do begin
-        print,'computing ',i,j
         pc=polyclip(i,j,x,y,BOUNDING_BOX=bb)
         if pc[0] ne -1 then begin
            px=reform(pc[0,*]) & py=reform(pc[1,*])
