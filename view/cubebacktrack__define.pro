@@ -97,15 +97,16 @@ pro CubeBackTrack::On
   self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
   title=string(FORMAT='(%"BackTracking: %s")',pn)
   self.msg_head= $
-     "        BCD             Pix          Val       Back        Frac   "
+     "BCD                      Pix         Frac        Val       Back  " + $
+     "(Val-Back)  Flag"
   msg=self.msg_base+string(10b)+self.msg_head
   self.wBase=widget_base(/COLUMN, SPACE=1,GROUP_LEADER=self.parent, $
                          TITLE=title, /TLB_SIZE_EVENTS,UVALUE=self)
   self.wLabel=widget_label(self.wBase,value=msg,/ALIGN_LEFT, $
                            /DYNAMIC_RESIZE)
   if self.list_size gt 0 then $
-     self.wList=widget_list(self.wBase,XSIZE=54,SCR_YSIZE=self.list_size) $
-  else self.wList=widget_list(self.wBase,XSIZE=54,YSIZE=8) 
+     self.wList=widget_list(self.wBase,XSIZE=87,SCR_YSIZE=self.list_size) $
+  else self.wList=widget_list(self.wBase,XSIZE=87,YSIZE=8) 
   widget_control, self.wBase, SET_UVALUE=self,/REALIZE
   make_widget_adjacent,self.wBase,self.parent
   
@@ -199,10 +200,12 @@ pro CubeBackTrack::UpdateList
   if size(list,/N_DIMENSIONS) eq 0 then str='' else begin 
      str=strarr(n_elements(list))
      for i=0,n_elements(list)-1 do begin 
-        str[i]=string(FORMAT='(" (",I3,",",I3,") ",G9.3,1X,G9.3,1X,G9.3)', $
+        str[i]=string(FORMAT='(" (",I3,",",I3,") ",G9.3,1X,G9.3,1X,' + $
+                      'G9.3,1X,G9.3,2X,A)', $
                       list[i].BCD_PIX mod self.bcd_size[0], $
                       list[i].BCD_PIX/self.bcd_size[0], $
-                      list[i].BCD_VAL, list[i].BACK_VAL, list[i].AREA)
+                      list[i].AREA,list[i].BCD_VAL,list[i].BACK_VAL, $
+                      list[i].BCD_VAL-list[i].BACK_VAL,list[i].FLAGS)
         if list[i].ID eq oldid then begin 
            str[i]=string(FORMAT='(23X,A)',str[i])
         endif else begin 
