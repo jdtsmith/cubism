@@ -6,7 +6,7 @@
 ; CONTACT:
 ;
 ;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://sirtf.caltech.edu/SMART 
+;       http://isc.astro.cornell.edu/smart/download
 ;
 ; DESCRIPTION:
 ;    
@@ -255,6 +255,9 @@
 ;
 ; MODIFICATION HISTORY:
 ;    $Log$
+;    Revision 1.3  2001/07/30 21:26:07  jdsmith
+;    	Changed download and info URL
+;
 ;    Revision 1.2  2001/07/30 19:38:09  jdsmith
 ;    	Reworked documentation.
 ;
