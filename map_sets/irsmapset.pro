@@ -178,7 +178,7 @@ end
 ;=============================================================================
 ;  LoadSets - Load Map Sets from file
 ;=============================================================================
-pro IRSMapSet::LoadSets,files
+pro IRSMapSet::LoadSets,files, NAMES=names
   if n_elements(files) eq 0 then begin 
      xf,files,/RECENT,FILTERLIST=['*.map','*.*','*'],/MULTIPLE, $
         TITLE='Load Map Sets',/NO_SHOW_ALL,SELECT=0, $
@@ -186,11 +186,13 @@ pro IRSMapSet::LoadSets,files
   endif 
   if size(files,/TYPE) ne 7 then return ;cancelled  
   cnt=n_elements(files) 
-
+  
+  names=strarr(cnt)
   for i=0,cnt-1 do begin
      fr=(br=(weights=0))
      self->ReadMapSetFile,files[i],FORERANGES=fr,BACKRANGES=br, $
                           WEIGHTS=weights, NAME=name
+     names[i]=name
      self->AddMap,name,FORERANGES=fr,BACKRANGES=br,WEIGHTS=weights,/FORCE
   endfor
 end
