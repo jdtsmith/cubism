@@ -290,7 +290,7 @@ pro CubeViewSpec::Event,ev
      end
      
      self.wMode: self->SwitchMode,ev.value
-     else:                      ; Just ignore any others
+     else: return               ; Just ignore any others
   endcase
   widget_control, self.wDraw,/INPUT_FOCUS
 end
