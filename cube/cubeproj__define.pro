@@ -161,6 +161,11 @@ pro CubeProj::ShowEvent, ev
         self.feedback=1b-self.feedback
         widget_control, ev.id, SET_BUTTON=self.feedback
      end
+     'fluxcon': begin 
+        self.fluxcon=1b-self.fluxcon
+        widget_control, ev.id, SET_BUTTON=self.fluxcon
+        self.changed=1b
+     end
      'save-with-data': begin 
         self.SaveMethod XOR=1b
         widget_control, ev.id, SET_BUTTON=self.SaveMethod AND 1b
@@ -466,8 +471,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      widget_button(cube,VALUE='Reset Accounts',UVALUE='resetaccounts')
   ;;-------------
   b1=widget_button(cube,VALUE='Use Cube Build Feedback',UVALUE='feedback', $
-                   /SEPARATOR,/CHECKED_MENU) 
+                   /CHECKED_MENU,/SEPARATOR) 
   widget_control, b1, /SET_BUTTON
+  b1=widget_button(cube,VALUE='Build Cube with FLUXCON',UVALUE='fluxcon', $ $
+                   /CHECKED_MENU)
   ;;-------------
   (*self.wInfo).MUST_MODULE= $
      widget_button(cube,value='Set Cube Build Order...',UVALUE='setorder', $
@@ -501,7 +508,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Info menu
   info=widget_button(mbar,VALUE='Info',/MENU)
-  b1=widget_button(info,VALUE='Project History...',UVALUE='phist') 
+  b1=widget_button(info,VALUE='Project History...',UVALUE='phist')
   (*self.wInfo).MUST_CAL= $
      [wMustCal, $
       widget_button(info,VALUE='Calibration Set Details...',UVALUE='calset')]
@@ -623,6 +630,7 @@ end
 ;  Load - Load a Project from file
 ;=============================================================================
 function CubeProj::Load,file,ERROR=err
+  on_error,2
   catch, err
   if err ne 0 then begin 
      catch,/cancel
@@ -1414,6 +1422,7 @@ function CubeProj::Info,entries, NO_DATA=nd
        (ptr_valid(self.BACKGROUND)? $
         (strtrim(self.back_cnt,2)+' records, '+jul2date(self.BACK_DATE)): $
         "none")]
+  str=[str,' FLUXCON: '+(self.fluxcon?"Yes":"No")]
   str=[str,' Bad Pixels: '+(ptr_valid(self.BAD_PIXEL_LIST)? $
                             strtrim(n_elements(*self.BAD_PIXEL_LIST),2): $
                             "none")]
@@ -1749,6 +1758,36 @@ pro CubeProj::LoadCalib,SELECT=sel
   self->UpdateButtons & self->UpdateTitle
 end
 
+
+;=============================================================================
+;  FluxConImage - Make an image to match the BCD which contains, for
+;                 each pixel, the factor to convert it from e/s to Jy
+;                 by division. (fluxed=instrumental/fluxconimage)
+;=============================================================================
+function CubeProj::FluxConImage
+  if ~ptr_valid(self.DR) then return,-1
+  
+  prs=self->PRs(/ALL_ORDERS,ORDERS=ords)
+  fcimage=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=0.)
+  total_areas=make_array(size(fcimage,/DIMENSIONS),VALUE=0.)
+  for i=0,n_elements(ords)-1 do begin 
+     lam=(*prs[i]).lambda
+     self.cal->GetProperty,self.MODULE,ords[i],FLUXCON=fluxcon,TUNE=tune, $
+                           KEY_WAV=key_wav
+     flux_conv=fluxcon*poly(lam-key_wav,tune)
+     for j=0,n_elements(lam)-1 do begin 
+        pix=*(*prs[i])[j].pixels
+        areas=*(*prs[i])[j].areas
+        total_areas[pix]+=areas
+        fcimage[pix]+=flux_conv[j]*areas
+     endfor 
+  endfor 
+  wh=where(total_areas gt 0.,cnt,COMPLEMENT=wh_none,NCOMPLEMENT=cnt_none)
+  if cnt gt 0 then fcimage[wh]/=total_areas[wh]
+  if cnt_none gt 0 then fcimage[wh_none]=1.
+  return,fcimage
+end
+
 ;=============================================================================
 ;  AddMergeRec - Add a merge record for a given order, index and
 ;                wavelength set.
@@ -1924,7 +1963,7 @@ end
 ;                 combine by using the pre-computed interpolated
 ;                 wavelength sampling in the region of overlap, and
 ;                 splitting individual polygon area overlaps between
-;                 planes with linear interpolation.  If they don't
+;                 planes using linear interpolation.  If they don't
 ;                 overlap, just concatenate the accounting cubes.
 ;                 ORDER is the logical order number index in sequence
 ;                 (as opposed to the optical grating order number).
@@ -1951,9 +1990,9 @@ pro CubeProj::MergeAccount,dr,order,account
   to_planes=*mrec.to            ; ... and sent to these cube planes
   fracs=*mrec.frac              ; ... with these fractions
   
-  ;; First group the account records by the cube plane they affect
+  ;; First group the account records by the cube plane(s) they affect
   minp=min(planes,MAX=maxp)
-  h=histogram(account.CUBE_PLANE,MIN=minp,MAX=maxp,REVERSE_INDICES=ri_cube)
+  h=histogram(account.cube_plane,MIN=minp,MAX=maxp,REVERSE_INDICES=ri_cube)
   
   ;; Offset all to the correct cube plane (some we'll change soon)
   account.cube_plane=account.cube_plane+mrec.offset
@@ -1981,7 +2020,7 @@ pro CubeProj::MergeAccount,dr,order,account
   endfor
   if n_elements(new_acc) ne 0 then account=[account,new_acc]
   
-  ;; Append this newly modified account list
+  ;; Append this newly modified account list to the DR's accounts
   if ptr_valid(dr_acct) then *dr_acct=[*dr_acct,account] else $
      (*self.DR)[dr].ACCOUNT=ptr_new(account)     
 end 
@@ -1990,9 +2029,10 @@ end
 ;=============================================================================
 ;  BuildAccount - Build the accounting lists, listing, for each
 ;                 record, and for all pixels in the cube, all
-;                 overlapping data pixels, including the BCD index #,
-;                 the pixel in that BCD which overlapped, and fraction
-;                 which overlapped the corresponding cube pixel.
+;                 overlapping data pixels from that record, including
+;                 the BCD index #, the pixel in that BCD which
+;                 overlapped, and fraction which overlapped the
+;                 corresponding cube pixel.
 ;=============================================================================
 pro CubeProj::BuildAccount,_EXTRA=e
   self->Normalize
@@ -2041,7 +2081,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      for i=0,self.cube_size[0] do plots,i,!Y.CRANGE
      for i=0,self.cube_size[1] do plots,!X.CRANGE,i
      wait,0
-  endif 
+  endif
   ;; End debugging plots
   
   ;; XXX Possible Time saver: If the cube size was changed, we might
@@ -2058,7 +2098,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
   for i=0L,n_elements(*self.DR)-1 do begin 
      ;; skip disabled records unconditionally
      if (*self.DR)[i].DISABLED then continue 
-     feedback_only=0            ;might just show the feedback
+     feedback_only=0            ;might just be showing the feedback
      if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
      color=!D.TABLE_SIZE-5+((*self.DR)[i].EXP-exp_off) mod 4
      
@@ -2090,7 +2130,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
                                   ORDER1=(*self.DR)[i].TARGET_ORDER, $
                                   self.MODULE,ORDER2=self.ORDER,newpos
         pos=newpos
-     endif 
+     endif
 
      ad2xy,pos[0],pos[1],astr,x,y
      offset=[x,y]+.5
@@ -2114,7 +2154,8 @@ pro CubeProj::BuildAccount,_EXTRA=e
            prmin=1L & prmax=1L
         endelse 
         acc_ind=0L
-        for j=prmin,prmax do begin ; iterate over all the PRs
+        ;; iterate over all the adjacent PRs (different cube planes)
+        for j=prmin,prmax do begin 
            ;; Setup the rotation matrix to rotate back to the +x
            ;; direction
            ;;
@@ -2182,7 +2223,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
               ;; Add space to account list, large chunks at a time
               if acc_ind+ncp ge nacc then begin 
                  account=[account,replicate({CUBE_ACCOUNT_LIST},nacc)]
-                 nacc=2*nacc
+                 nacc*=2
               endif
               account[acc_ind:acc_ind+ncp-1].cube_pix=cube_spatial_pix
               account[acc_ind:acc_ind+ncp-1].cube_plane=j ;just this order's
@@ -2190,6 +2231,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
               account[acc_ind:acc_ind+ncp-1].area=areas
               acc_ind=acc_ind+ncp
            endfor
+                 
         endfor
         if feedback_only then continue
         account=account[0:acc_ind-1] ; trim this order's account to size
@@ -2207,10 +2249,10 @@ end
 ;  BuildRevAcct - Build the reverse accounts from the regular accounts.
 ;=============================================================================
 pro CubeProj::BuildRevAcct
-  for i=0L,n_elements(*self.DR)-1 do begin 
+  for i=0L,n_elements(*self.DR)-1 do begin
      if self.ACCOUNTS_VALID eq 1b AND ptr_valid((*self.DR)[i].REV_ACCOUNT) $
         then continue else ptr_free,(*self.DR)[i].REV_ACCOUNT
-     if (*self.DR)[i].DISABLED then continue 
+     if (*self.DR)[i].DISABLED then continue
      
      ;; Compute the total reverse index of the full cube index
      ;; histogram for this DR's accounting.  E.g. the account records
@@ -2527,7 +2569,8 @@ end
 
 ;=============================================================================
 ;  BuildCube - Assemble the Cube from the accounting information, the
-;              BCD data, the BMASK, and the uncertainties.
+;              BCD data, the BMASK, and the uncertainties (along with
+;              fluxing information if appropriate)
 ;=============================================================================
 pro CubeProj::BuildCube
   if NOT ptr_valid(self.DR) then return
@@ -2551,16 +2594,22 @@ pro CubeProj::BuildCube
      csz=self.cube_size[0]*self.cube_size[1]
      ctarg=self.cube_size[2]/2
   endif 
-
+  
+  if self.fluxcon then fluxcon=self->FluxConImage()
+  
   for dr=0,n_elements(*self.DR)-1 do begin 
      if (*self.DR)[dr].DISABLED then continue
      acct=*(*self.DR)[dr].ACCOUNT
      rev_acc=*(*self.DR)[dr].REV_ACCOUNT
      rev_min=(*self.DR)[dr].REV_MIN
      bcd=*(*self.DR)[dr].BCD
+     if self.fluxcon then bcd/=fluxcon
      if ptr_valid(self.BACKGROUND) then bcd-=*self.BACKGROUND
      use_unc=ptr_valid((*self.DR)[dr].UNC)
-     if use_unc then unc=*(*self.DR)[dr].UNC
+     if use_unc then begin 
+        unc=*(*self.DR)[dr].UNC
+        if self.fluxcon then unc/=fluxcon
+     endif
      
      ;; Exclude BCD pix with any of BMASK bits 8,10,12,13,& 14 set from
      ;; entering the cube
@@ -2593,14 +2642,14 @@ pro CubeProj::BuildCube
            areas[pix]+=total(these_accts.AREA * $
                              bmask[these_accts.BCD_PIX] * $
                              finite(bcd[these_accts.BCD_PIX]))
-        endif else begin 
+        endif else begin
            cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
                      total(bcd[these_accts.BCD_PIX] * $
                            these_accts.AREA,/NAN)
            areas[pix]+=total(these_accts.AREA * $
                              finite(bcd[these_accts.BCD_PIX]))
         endelse 
-        if self.feedback then begin 
+        if self.feedback then begin ;highlight completed pixels
            if pix/csz eq ctarg then begin 
               pix=pix mod csz
               x=pix mod self.cube_size[0]
@@ -2609,7 +2658,7 @@ pro CubeProj::BuildCube
            endif 
         endif 
      endfor
-  endfor 
+  endfor
   
   areas=areas>1.e-10            ;avoid divide by zero errors
   ptr_free,self.CUBE,self.CUBE_UNC
@@ -3408,9 +3457,11 @@ pro CubeProj__define
      cal:obj_new(), $           ;the irs_calib object.
      cal_file:'', $             ;the calibration file used (if not a full
                                 ; directory, in the "calib/" subdir)
+     fluxed:0b, $               ; whether the cube is fluxed
      Changed:0b, $              ;if the project is changed since last saved.
      Spawned:0b, $              ;whether we were opened by another instance
      feedback:0b, $             ;whether to show feedback when building cube
+     fluxcon:0b, $              ;whether to build with FLUXCON fluxes
      reconstructed_pos:0b, $    ;whether to build with reconstructed positions
      SaveFile:'', $             ;the file it was saved to
      SaveMethod:0b, $           ;bit 1: data, bit 2: accounts
