@@ -1,0 +1,27 @@
+\order flux
+\comment Identifier = b2_psf_fov.tbl
+\comment Slit field of view (frame) and fiducial PSF information.
+\comment Version 0.1 03/18/03 PM,JB  Defined this file.  Initial PSF estimates by HT.
+\comment Version 1.0 12/20/03 PM Modified pixel aperture widths for extraction, 
+\comment                       changed platescale from 4.8 to 5.1.
+\comment Version 1.1 01/14/04 PM Reversed relative positions of LL nods based on focal 
+\comment                         plane mapping in IOC.
+\comment         2.0 08/02/04 PM Updated W_ref for 1st and bonus orders and module center.
+\comment History 
+\character channelID = 2
+\character platescale = 5.1
+| FOV |  order |               FOVNAME                        |  DFRAC  | lambda_ref |  W_ref  |
+| int |  int   |               char                           |  real   | real       |  real   |
+|     |        |                                              |         | microns    |  pixels |
+  38      1       IRS_Long-Lo_1st_Order_1st_Position             0.667    27.000       7.172 
+  39      1       IRS_Long-Lo_1st_Order_2nd_Position             0.333    27.000       7.172
+  40      1       IRS_Long-Lo_1st_Order_Center_Position          0.500    27.000       7.172
+  41      1       IRS_Long-Lo_Module_Center                      0.500    27.000       7.172
+  41      2       IRS_Long-Lo_Module_Center                      0.500    16.000       4.250
+  41      3       IRS_Long-Lo_Module_Center                      0.500    20.500       5.445
+  44      2       IRS_Long-Lo_2nd_Order_1st_Position             0.667    16.000       4.250
+  45      2       IRS_Long-Lo_2nd_Order_2nd_Position             0.333    16.000       4.250
+  46      2       IRS_Long-Lo_2nd_Order_Center_Position          0.500    16.000       4.250
+  44      3       IRS_Long-Lo_2nd_Order_Bonus_1st_Position       0.667    20.500       5.445
+  45      3       IRS_Long-Lo_2nd_Order_Bonus_2nd_Position       0.333    20.500       5.445
+  46      3       IRS_Long-Lo_2nd_Order_Bonus_Center_Position    0.500    20.500       5.445
