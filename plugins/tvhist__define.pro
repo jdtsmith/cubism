@@ -200,6 +200,7 @@ pro tvHist::Histo,im
         h=histogram(*im,BINSIZE=bs,MIN=mn,MAX=mx,/NAN)
         h[0]=0.                 ;don't elevate the background
         h=total(temporary(h),/CUMULATIVE,/DOUBLE)
+        self.oDraw->SetDrawMinMax,MIN=0,MAX=max(h)
         (*im)[*self.finite]=h[((mn>(*im)[*self.finite]<mx)-mn)/bs]
         break
      end
