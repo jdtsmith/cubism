@@ -68,21 +68,25 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
 
   ;; a Cube record tool for extracting and stacking cubes
   cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube,APER_OBJECT=aper, $
-                  COLOR=stretcher->GetColor('Magenta'))
+                  COLOR=stretcher->GetColor('Magenta'),_EXTRA=e)
   ;; make sure the display line gets updates
   cuberec->MsgSignup,line,/CUBEREC_UPDATE
   
   ;; a pixel table tool (non-exclusive)
-  pxtbl=obj_new('tvPixTbl',base,odraw,_EXTRA=e)
-
+  pxtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
+  
+  ;; A cube backtrack tool (non-exclusive), with updates from cuberec
+  cubeback=obj_new('CubeBackTrack',base,oDraw,_EXTRA=e)
+  cuberec->MsgSignup,cubeback,/CUBEREC_UPDATE,/CUBEREC_FULL
+  
   ;;**********************************************************************
   exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},8)
   exc_list.Obj= [zoomer,hist,stretcher,slicer,stats,phot,cuberec,aper] 
   exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'x'    ,'']
 
-  tog_list=replicate({Obj:obj_new(), keys:'',Exclusive:0b},1)
-  tog_list.Obj= [pxtbl]
-  tog_list.keys=['t']
+  tog_list=replicate({Obj:obj_new(), keys:'',Exclusive:0b},2)
+  tog_list.Obj= [cubeback,pxtbl]
+  tog_list.keys=['','t']
 
   ;; a switcher for switching among the tools using icons or keypresses
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
