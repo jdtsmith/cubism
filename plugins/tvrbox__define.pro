@@ -85,7 +85,7 @@ pro tvRBox::Message, msg
      'TVDRAW_POSTDRAW': begin
         ;;  a change of original image, or zoom, etc. occurred
         if self.boxflag eq -1 then return ; only if a box is here
-        self->SetUpDisplay
+        if NOT self.corners then self->SetUpDisplay
      end 
      
      'TVKEY_ARROW': begin 
@@ -116,7 +116,10 @@ pro tvRBox::Message, msg
      end
      
      'TVDRAW_SNAPSHOT': begin 
-        if self.corners then self->DrawCorners
+        if self.corners then begin 
+           self->SetUpDisplay
+           self->DrawCorners
+        endif 
      end
   endcase 
 end
