@@ -23,6 +23,11 @@
 ;    message types by name.  The helper class OMArray is most useful
 ;    for objects which send multiple messages, and whose recipients
 ;    either want the message, or not (a boolean question).
+;
+;    The primary beneficial feature provided by OMArray is easy,
+;    keyword-driven message signup/removal ala:
+;    
+;               object->MsgSignup,self,/THEMESSAGE
 ;    
 ; CATEGORY:
 ;
