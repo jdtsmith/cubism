@@ -67,7 +67,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
                /HIDE,_EXTRA=e)
 
   ;; a Cube record tool for extracting and stacking cubes
-  cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube, $
+  cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube,APER_OBJECT=aper, $
                   COLOR=stretcher->GetColor('Magenta'))
   ;; make sure the display line gets updates
   cuberec->MsgSignup,line,/CUBEREC_UPDATE
@@ -76,9 +76,9 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   pxtbl=obj_new('tvPixTbl',base,odraw,_EXTRA=e)
 
   ;;**********************************************************************
-  exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},7)
-  exc_list.Obj= [zoomer,hist,stretcher,slicer,stats,phot,cuberec] 
-  exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'r'    ]
+  exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},8)
+  exc_list.Obj= [zoomer,hist,stretcher,slicer,stats,phot,cuberec,aper] 
+  exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'r'    ,'']
 
   tog_list=replicate({Obj:obj_new(), keys:'',Exclusive:0b},1)
   tog_list.Obj= [pxtbl]
