@@ -27,7 +27,7 @@ pro cvLine::Message,msg
         endif
         if self.bcd_mode then begin ;bcd mode
            pr=self->FindPR(pt[0],pt[1],ORDER=order)
-           if array_equal(pt,self.savpoint) then begin 
+           if array_equal(floor(pt),self.savpoint) then begin 
               if size(pr,/TYPE) ne 8 then return
               if pr.lambda eq self.savlambda AND order eq self.savorder then $
                  return         ;nothing to see here, move along
@@ -37,7 +37,8 @@ pro cvLine::Message,msg
            endif else lambda=pr.lambda
            widget_control, self.wLine,SET_VALUE= $
                            self->String(imorig,pt,LAMBDA=lambda,ORDER=order)
-           self.savlambda=lambda & self.savorder=order & self.savpoint=pt
+           self.savlambda=lambda & self.savorder=order 
+           self.savpoint=floor(pt)
         endif else begin        ; cube wcs mode
            if ptr_valid(self.astrometry) then begin 
               ;; ra/dec always get updated.
@@ -98,8 +99,10 @@ function cvLine::FindPR,x,y,ORDER=ord
         xp=thispr.x & yp=thispr.y
         yp2=shift(yp,1) & xp2=shift(xp,1)
         ;; Check for odd number of crossings (remember odd numbers are true!)
+        ;; based on Randolph Franklin's page:
+        ;; http://www.ecse.rpi.edu/Homepages/wrf/research/geom/pnpoly.html
         if fix(total(((yp le y AND y lt yp2) OR (yp2 le y AND y lt yp)) AND $
-                     (x lt ((xp2 - xp)*(y - yp)/((yp2 - yp)>1) + xp)))) $
+                     (x lt ((xp2 - xp)*(y - yp)/(yp2 - yp) + xp)))) $
            then begin 
            ord=(*self.PRs)[wh[i]].ORDER
            return,thispr
