@@ -8,6 +8,7 @@
 pro CubeRec::Message, msg
   if widget_info(self.wBase[0],/VALID_ID) eq 0 then return
   self->tvPlug::Message,msg,TYPE=type
+  cal_update=0b
   case type of
      'BOX': begin 
         self->Extract
@@ -85,10 +86,11 @@ pro CubeRec::Message, msg
         self.cube->GetProperty,WAVELENGTH=wl,/POINTER
         if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
      end 
+     'CUBEPROJ_CALIB_UPDATE': cal_update=1b
   endcase
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
                  self.cur_wav, self.cube,self.MODULE,self.bcd,self.bcd_BMASK, $
-                 self.rec_set}
+                 self.rec_set,cal_update}
   self->UpdateView
 end
 
@@ -554,5 +556,5 @@ pro CubeRec__define
   ;; General update
   msg={CUBEREC_UPDATE,BCD_MODE:0,FULL_MODE:0,PLANE:0L, $
        CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new(), $
-       RECORD_SET: ptr_new()}
+       RECORD_SET: ptr_new(), CALIB_UPDATE:0b}
 end
