@@ -982,6 +982,7 @@ pro CubeViewSpec::Cleanup
   self.mode=0 & self->Send,/JUST_SEND ;make sure everybody is in Full mode
   wdelete,self.pixwin
   ptr_free,self.lam,self.sp,self.fit,self.reg,self.weights,self.wMapSets
+  self->OMArray::Cleanup
   self->ObjMsg::Cleanup
 end
 
