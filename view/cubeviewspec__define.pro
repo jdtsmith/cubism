@@ -400,8 +400,9 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
      endif else begin 
         if NOT ptr_valid(self.reg[1]) then return ;need a peak region
         lams=(*self.lam)[*self.reg[1]]
-        msg.info=string(FORMAT='(%"Stack: %5.2fum - %5.2fum")', $
-                        min(lams),max(lams))
+        s=sort(lams[0,*]) & lams=lams[*,s]
+        if lams[0,0] gt lams[1,0] then lams=lams[[1,0],*]
+        msg.info="Stack: "+strjoin(string(FORMAT='(F5.2,"-",F5.2)',lams),", ")
         if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
         msg.foreground=self.reg[1]
         msg.background=self.reg[0]
