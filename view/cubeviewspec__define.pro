@@ -23,6 +23,7 @@ pro CubeViewSpec::Message, msg
      endif
      if self.renorm ne 0. then *self.sp=*self.sp/10.0D^self.renorm
      widget_control, self.wDraw,/DRAW_BUTTON_EVENTS, /DRAW_MOTION_EVENTS
+     self.movestart=-1
      self->Plot
   endelse
 end 
