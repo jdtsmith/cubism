@@ -97,8 +97,8 @@ void polyclip(int argc, void *argv[]) {
   ri_out=(int *)argv[9];
 
   /* Temporary storage, at most 4 additional points for convex polys */
-  px_in=(float *)malloc((np+4)*sizeof(float));
-  py_in=(float *)malloc((np+4)*sizeof(float));
+  px_in=(float *)malloc((np_in+4)*sizeof(float));
+  py_in=(float *)malloc((np_in+4)*sizeof(float));
   
   ri_out[0]=0;
   
