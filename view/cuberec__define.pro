@@ -72,7 +72,7 @@ pro CubeRec::Message, msg
      'CUBEPROJ_UPDATE':         ;just fall through to update message
   endcase
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
-                 self.cur_wav, self.cube,self.MODULE,self.bcd_BMASK}
+                 self.cur_wav, self.cube,self.MODULE,self.bcd,self.bcd_BMASK}
   self->UpdateView
 end
 
@@ -490,5 +490,5 @@ pro CubeRec__define
   
   ;; General update
   msg={CUBEREC_UPDATE,BCD_MODE:0,FULL_MODE:0,PLANE:0L, $
-       CUBE:obj_new(),MODULE:'',BMASK:ptr_new()}
+       CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new()}
 end
