@@ -236,7 +236,8 @@ pro ObjReport::orPopupReport,msg,INFO=info,WARNING=warning,ERROR=error, $
      if NOT widget_info(parent,/VALID_ID) then parent=self.or_widget
   if keyword_set(scroll) then begin 
      xdisplayfile,'',TEXT=msg,/MODAL,GROUP=parent,TITLE=title, $
-                  DONE_BUTTON='  OK  ',_EXTRA=e
+                  DONE_BUTTON='  OK  ',WIDTH=max(strlen(msg)), $
+                  HEIGHT=n_elements(msg)<10, _EXTRA=e
   endif else begin 
      if keyword_set(info) or keyword_set(error) then $
         void=dialog_message(msg,DIALOG_PARENT=parent, $
