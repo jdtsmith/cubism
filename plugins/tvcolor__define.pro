@@ -1,7 +1,7 @@
 ;+
 ; NAME:  
 ;
-;    TVColor
+;    tvColor
 ;
 ; CONTACT:
 ;
@@ -10,152 +10,161 @@
 ;
 ; DESCRIPTION:
 ;    
-;    XXX WRITE THE DOCUMENTATION
+;    An all-purpose color manipulation plug-in, which supports
+;    colormap selection from either a menu or droplist, optional
+;    widget sliders for low, high and gamma modifications of the
+;    colormap, and an optional mouse mode, emulating SAOImage with
+;    mouse-based color stretching.
 ;    
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
-;    Ectoplasmitronication, Frobnicating Thingamajigies.
+;    Color Manipulation, Colormaps
 ;    	
-; CALLING SEQUENCE:
-;
-;    smart_pro, req_arg1, req_arg2, ..., output_arg1, 
-;       [opt_arg1,optoutput_arg1,...,
-;       /BOOLEAN_KEYWORD,KEYWORD=,OUTKEYWORD=]
-;                  or
-;    sm=smart_func(req_arg1, req_arg2, ..., output_arg1, 
-;       [opt_arg1,optoutput_arg1,...,
-;       /BOOLEAN_KEYWORD,KEYWORD=,OUTKEYWORD=])
-;
-; INPUT PARAMETERS:
-;
-;    req_arg1: Describe the inputs.  Don't forget to [M-q] to clean up
-;       the description text.  Follow the indenting (emacs will do it
-;       for you if you help).  Notice all subsequent lines of a body
-;       of text which serves as a single item are indented 3 spaces.
-;			
-; OPTIONAL INPUT PARAMETERS:
-;
-;    opt_arg1: Describe the optional inputs.  Don't forget to [M-q] to
-;       clean up the description text.  May be unnecessary.
-;
-;    opt_arg2: Leave a blank line between entries, as so.  Follow the 
-;       indentation.
-;			
-; INPUT KEYWORD PARAMETERS:
-;
-;    KEYWORD: Describe the input keywords.  Notice how keywords are
-;       capitalized. Don't forget to [M-q] to clean up the description
-;       text. May be unnecessary.
-;
-;    BOOLEAN_KEYWORD: Aside from the leading `/' in the calling
-;       sequence, boolean keywords are described in the same way.
-;			
-; OUTPUT KEYWORD PARAMETERS:
-;
-;    OUTKEYWORD: Describe the output keywords.  Don't forget to [M-q]
-;       to clean up the description text. May be unnecessary.
-;			
-; OUTPUTS:
-;
-;    output_arg1: Describe the outputs, labelling argument outputs
-;       with the argument name.  Don't forget to [M-q] to clean up the
-;       description text.  Function outputs don't need a label.  May
-;       be unnecessary.
-;
-; OPTIONAL OUTPUTS:
-;
-;    optoutput_arg1: Describe the optional output.  May be
-;       unnecessary.
-;
-; COMMON BLOCKS:
-;
-;    COMMON_BLOCK1: I hope you have a good reason for using a common
-;       block.  Omit otherwise
-;
 ; SIDE EFFECTS:
 ;
-;    Especially for procedures with no return values.  May be unnecessary.
+;    Sets a system variable !ctabl:
+;    {!ctabl,cmap:0,low:0.,high:1.,gamma:1.0} which keeps track of the
+;    given colormap and stretch parameters.
 ;
 ; RESTRICTIONS:
 ;
-;    Any restrictions?
+;    On TrueColor display devices, color table changes are not
+;    reflected in the graphics subsystem, but in an internal IDL
+;    translation table.
 ;
 ; METHODS:
 ;
-;    N.B. The `METHODS' section is used in class definition files only
-;    (like class__define.pro) which contain all the methods of that
-;    class.  In it, only the PUBLIC methods should be documented in
-;    this header.  Methods which are internal to the class, and not
-;    for general consumption, should be informally documented in the
-;    body of the code.  Within each individual METHOD section, the
-;    subsections DESCRIPTION, and INPUT PARAMETERS through
-;    RESTRICTIONS above (which should be omitted) can be included for
-;    each method, as appropriate, and at an increased indentation.
-;    See those sections above for style guidelines.
-;
-;    INIT:  (alway start with the INIT method function)
+;    Init:  
 ;
 ;       CALLING SEQUENCE:
 ;
-;          obj=obj_new('Class',req_arg1, req_arg2, ..., 
-;             [opt_arg1,...,/BIN_KEYWORD,KEYWORD=])
-;
+;          obj=obj_new('tvColor',parent,oDraw,[/PROTECT,/MOUSE_MODE=,
+;          	       /SLIDERS,START=,LOW=,HIGH=,WIDTH=,BOTTOM=,TOP=, $
+;          	       RESERVE=,COL_TABLE_PARENT=,COL_TABLE_MENU=,CBARID=, $
+;                      USE_COLORMAPS=])
+;                
 ;       INPUT PARAMETERS:
 ;
-;          req_arg1:
-;
+;          parent:  The widget id of the object widget's parent.
+;          
+;	   oDraw: The tvDraw object.
+;          
 ;       INPUT KEYWORD PARAMETERS:
 ;
-;          KEYWORD:
-;       ...
+;          PROTECT: If set, reinstate the colormap upon re-entry to
+;             the widget.
+;             
+;          MOUSE_MODE: If set, enable the tvColor as an exclusive
+;             object, with SAOImage-style mouse-driven color-map
+;             adjustment.  The icon looks like 3 crayons.
+;             
+;          SLIDERS: If set, draw the three widget sliders.
 ;
-;    METHOD1:
+;          START: The initial starting values of the three widget
+;             sliders (bottom and top chop, and gamma).  Defaults to
+;             values saved into structure !ctabl.
+;
+;	   MIN:	The lower limit (3 element vec) for bottom,
+;	      top, and gamma, as shown on the slider.  Defaults to
+;	      [0,0,1]. (Gamma=gamslider/100.)
+;       
+;          MAX: The upper limit (3 element vec) for bottom, top, and
+;             gamma, as shown on the slider.  Defaults to
+;             [100,100,500].
+;       
+;	   WIDTH: The width in pixels of the widget.  
+;	   
+;	   COL_TABLE_PARENT: The widget id of the parent into which to place
+;             a colormap selection droplist, or any non_zero value to
+;             use the same parent as the slider base. If zero or
+;             ommitted, no colortable selector is created or used.
+;	           
+;          COL_TABLE_MENU: If set to a menu button widget or MBAR
+;             base, the colormap selector is created as a menu, rather
+;             than a droplist.
+;             
+;	   CBARID: The widget id of a colorbar draw widget to draw a color
+;             bar into (with appropriate top and bottom colors).  The
+;             colorbar is drawn with method DrawCbar, which must be
+;             called *after* the colorbar widget is realized.
+;	      
+;          PROTECT: If this keyword is set, colors will be ;
+;            reinstated on entering the draw widget.
+;	     
+;	   RESERVE: Load reserve colors in the colormap.  One of:
+;
+;             *  1: Load standard set of colors
+;                (charcoal,red,green,blue, yellow) into the reserve
+;                space at the top of the colormap.
+;
+;             *  A vector of structures of the form:
+;                {color:'colname',r:0b,g:0b,b:0b} where colname is the
+;                name of the color, and the r,g,b byte values are
+;                [0-255].  These colors are loaded as reserve, and are
+;                available by name via the method GetColor.
+;	      
+;	   BOTTOM: The bottom of the colormap to fill from, defaulting to 0.
+;	      
+;          TOP: The top of the colormap to fill to, including space
+;             for reserve colors.  Defaults to
+;             !D.TABLE_SIZE-1-nreserve
+;                  
+;          USE_COLORMAPS: A vector of indices into the RSI default
+;             colormaps (try "loadct") to include in the selection.
+;             
+;    GetColor:
 ;  
 ;	DESCRIPTION:
 ;
-;	   This method makes possible short duration levitation.
+;	   Get reserve color indices by name.
 ;	
 ;       CALLING SEQUENCE:
 ;
-;          obj->Method1, req_arg1, req_arg2, ..., 
-;             [opt_arg1,...,/BIN_KEYWORD,KEYWORD=]
-;
+;          color=obj->GetColor(color)
+;          
 ;       INPUT PARAMETERS:
 ;
-;          req_arg1:
-;       ...
-;    ...
+;          color:  The name of the color to be retrieved.  Case is ignored.
 ;
-; PROCEDURE:
+;       OUTPUTS:
 ;
-;    Notable routines or classes (*not* parent classes -- see next entry)
-;    it relies on.
+;          colind: An index into the loaded color table where the
+;             requested color resides, or -1 if no color is found.
 ;
-; NOTES:
+;    GetProperty:
 ;  
-;    Additional description and other information which doesn't fit elsewhere.
+;	DESCRIPTION:
+;
+;	   Retrieve several useful properties.
+;	
+;       CALLING SEQUENCE:
+;
+;          obj->GetProperty,BAR=,NRESERVE=,MIN=,MAX=,BSIZE=,TOP=,BOTTOM=
+;          
+;       OUTPUT KEYWORD PARAMETERS:
+;
+;          BAR:  The widget ID of the drawn colorbar.
+;          
+;          BSIZE: The [x,y] size of the colorbar widget.
+;
+;          All others as documented above for Init.
 ;
 ; INHERITANCE TREE:
 ;
-;    GrandParent1--+
-;                   \
-;     GrandParent2--Parent1--ThisClass  (where appropriate... usually linear)
-;                            /
-;    GrandParent3--Parent2--+ 
+;    ObjMsg-->tvPlug-->tvColor
 ;
 ; EXAMPLE:
 ;
-;    a=some_init()
-;    SMART_ROUTINE,a,b,KEYWORD=foo
-;    print,foo
-;
+;    cobj=obj_new('tvColor',parent,oDraw,/MOUSE_MODE,/RESERVE,$
+;                 USE_COLORMAP=[1,2,3])
+;    
 ; MODIFICATION HISTORY:
-;    $Log$
-;    Revision 1.5  2001/09/26 21:48:26  jdsmith
-;    	Minor color table fixup. !D.TABLE_SIZE!=!D.N_COLORS
-;    	Added documentation.
+; 
+;    2001-09-26 (J.D. Smith): Fixed color table issue for better
+;       TrueColor operation.
 ;
+;    2001-08-07 (J.D. Smith): Initial import from SCORE-era viewer
+;       component collection.
 ;-
 ;    $Id$
 ;##############################################################################
@@ -183,146 +192,82 @@
 ;
 ;##############################################################################
 
-
-
-;+
-; NAME: tvColor
-;
-; PURPOSE: An object for manipulating color.
-;
-; CATEGORY: Object-Based Widget
-;
-; CALLING SEQUENCE:
-; 	td=obj_new('tvColor',parent,START=strt,LOW=low,HIGH=high, $
-;                Width=wd, TOP=top, BOTTOM=bot, RESERVE=resrv)
-;	  Create a new tvColor object with parent a widget id to be
-;	  the parent of the draw widget created.
-;	  KEYWORDS:
-;	  	Start:	The starting values of bottom and top chop, and gamma
-;		Min:	The lower limit (3 element vec) for bottom,
-;			top, and gamma, as shown on the slider.  Defaults to
-;			[0,0,1]. (Gamma=gamslider/100.)
-;		Max:	The upper limit (3 element vec) for bottom,
-;			top, and gamma, as shown on the slider.
-;			Defaults to [100,100,500].
-;		Width:	The width in pixels of the widget representing
-;		COL_TABLE_PARENT:
-;			The widget id of the parent to place a colortable
-;			selector into, or any non_zero value to use the same
-;			parent as the slider base. If COL_TABLE_PARENT is
-;			zero or ommitted, no colortable selector is created
-;			or used.
-;	  	CBARID: The widget id of a colorbar draw widget to draw a color
-;	  		bar into (with appropriate top and bottom colors).
-;	  		The colorbar is drawn with method DrawCbar, which
-;	  		must be called *after* the colorbar widget is realized.
-;	  	PROTECT:If this keyword is set, colors will be
-;	  		reinstated on entering the draw widget.
-;		Reserve:EITHER:
-;			1: A scalar such that if equal to 1 a standard set
-;			of colors (charcoal,red, green,blue, yellow) will
-;			be set into the reserve space (top-nres+1:top).
-;			2. An nres length vector of structures of the form:
-;			{color:'colname',r:0b,g:0b,b:0b} where colname is the
-;			name of the color, and the r,g,b values are as in
-;			tvlct.  These colors are loaded as reserve, and are
-;			available by name via the method GetColor.
-;			If absent, no colors are reserved.  Reserve colors
-;			can be retrieved with the method tvColor::GetReserve.
-;               Top:    The top of the colormap to fill to, including
-;                       space for reserve colors.  Defaults to
-;                       !D.TABLE_SIZE-1-nreserve
-;		Bottom:	The bottom of the colormap to fill from, defaulting to
-;			0.
-; INPUTS:	parent:	The widget id of the object widget's parent
-;
-
-; METHODS:
-; 		GetColor(colname): get the color index of the 'colorname'
-; 			reserve color (only works if defined, -1 returned
-; 			otherwise). e.g.
-; 				plots,x,y,color=oCol->GetColor('yellow')
-; 		DrawCbar: Draw the colorbar (only *after* the colorbar widget
-; 			is realized).
-; 		SetColors: Load the internally maintained colors into the
-; 			colormap (useful, e.g. on reentry of widget).  Called
-; 			automatically on reentry if PROTECT is set.
-; INTERNAL METHODS:
-; 		Stretch:  Use the bottom,top,gamma slider values to stretch
-; 			the colormap (internall
-;		Cleanup: Auto cleanup the object.
-;		Init: See for arguments/keywords.
-;		
-;
-; SIDE EFFECTS:
-;
-;
-;
-; RESTRICTIONS:
-;
-; INHERITANCE TREE: tvPlug -> tvColor
-;
-;
-; EXAMPLE:
-;
-;
-;
-; MODIFICATION HISTORY:
-;
-;-
-
-
 ;;**************************OverRiding methods********************************
 ;=============================================================================
-;	Message.  Override the tvPlug Message to display vals.  We have
-;	signed up for tracking messages from the tvDraw object.
+;       Message - Override and chain to tvPlug::Message to display
 ;=============================================================================
 pro tvColor::Message,msg
   self->tvPlug::Message,msg,TYPE=type
-  
   case type of
-     'WIDGET_DRAW': case msg.type of
-        2: begin                ;motion event
-           bright=float(msg.X)/self.winsize[0]
-           contrast=float(msg.Y)/self.winsize[1]
-           range=(self.max[1]-self.min[0])*contrast > 1
-           center=fix(bright*(self.max-self.min)+self.min)
-           low=center[0]-fix(range/2) > self.min[0]
-           high=center[1]+fix(range/2) < self.max[1]
-           newhigh=(float(high)-self.min[1])/(self.max[1]-self.min[1])
-           newlow=(float(low)-self.min[0])/(self.max[0]-self.min[0])
-           if self.high eq newhigh AND self.low eq newlow then return
-           self.high=newhigh
-           self.low=newlow
-           if widget_info(self.wLow,/VALID_ID) then begin
-              widget_control, self.wLow,SET_VALUE=low
-              widget_control, self.wHigh,SET_VALUE=high
-           endif
-           self->Stretch
-        end
-        0: begin 
-           if (msg.press AND 4b) ne 0 then begin 
-              self.high=1.
-              self.low=0.
-              self.gamma=1.
-              if widget_info(self.wLow,/VALID_ID) then begin
-                 widget_control, self.wLow,SET_VALUE=self.min[0]
-                 widget_control, self.wHigh,SET_VALUE=self.max[1]
-                 widget_control, self.wGamma,SET_VALUE=100
-              endif
-              self->Stretch
-           endif else begin 
-              self.oDraw->GetProperty,WINSIZE=ws
-              self.winsize=ws
-              self->Update,/MOTION
-           endelse
-        end
-        1: self->Update,MOTION=0
-     endcase
-     'WIDGET_TRACKING':  if msg.enter eq 1 then self.oDraw->SetWin 
+     'DRAW_MOTION': begin 
+        bright=float(msg.X)/self.winsize[0]
+        contrast=float(msg.Y)/self.winsize[1]
+        range=(self.max[1]-self.min[0])*contrast > 1
+        center=fix(bright*(self.max-self.min)+self.min)
+        low=center[0]-fix(range/2) > self.min[0]
+        high=center[1]+fix(range/2) < self.max[1]
+        newhigh=(float(high)-self.min[1])/(self.max[1]-self.min[1])
+        newlow=(float(low)-self.min[0])/(self.max[0]-self.min[0])
+        if self.high eq newhigh AND self.low eq newlow then return
+        self.high=newhigh
+        self.low=newlow
+        if widget_info(self.wLow,/VALID_ID) then begin
+           widget_control, self.wLow,SET_VALUE=low
+           widget_control, self.wHigh,SET_VALUE=high
+        endif
+        self->Stretch
+     end 
+     
+     'DRAW_BUTTON': begin 
+        case msg.type of 
+           0: begin            ;button press
+              if (msg.press AND 4b) ne 0 then begin ;reset them
+                 self.high=1.
+                 self.low=0.
+                 self.gamma=1.
+                 if widget_info(self.wLow,/VALID_ID) then begin
+                    widget_control, self.wLow,SET_VALUE=self.min[0]
+                    widget_control, self.wHigh,SET_VALUE=self.max[1]
+                    widget_control, self.wGamma,SET_VALUE=100
+                 endif
+                 self->Stretch
+              endif else begin 
+                 self.oDraw->GetProperty,WINSIZE=ws
+                 self.winsize=ws
+                 self.oDraw->MsgSignup,self,/DRAW_MOTION
+              endelse
+           end
+           1: self.oDraw->MsgSignup,self,DRAW_MOTION=0
+        endcase 
+     end 
+     
+     'WIDGET_TRACKING':  if msg.enter eq 1 then begin 
+        self.oDraw->SetWin 
+        self->SetColors
+     endif
      else:
   endcase
-end 
+end
+
+;=============================================================================
+;	On:  Get all our messages.
+;=============================================================================
+pro tvColor::On
+  self->tvPlug::On
+  if self.mouse_mode then begin 
+     self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE, $
+        WIDGET_TRACKING=self.protect, /DRAW_BUTTON 
+  endif else self.oDraw->MsgSignup,WIDGET_TRACKING=self.protect
+end
+
+;=============================================================================
+;       Off: Possibly keep getting exclusive and tracking messages.
+;=============================================================================
+pro tvColor::Off
+  self->tvPlug::Off
+  self.oDraw->MsgSignup,self,/NONE,TVDRAW_EXCLUSIVE=self.mouse_mode, $
+     TRACKING=self.protect
+end
 
 function tvColor::Icon
   return,  [[140B, 049B],[140B, 049B],[222B, 123B],[222B, 123B], $
@@ -331,10 +276,10 @@ function tvColor::Icon
             [222B, 075B],[082B, 106B],[214B, 107B],[222B, 123B]]
 end
 
+;;*************************End OverRiding methods******************************
+
 ;=============================================================================
-;	tvColor_DrawCbar.  For drawing the colorbar, call *after* the 
-;	draw widget for the colorbar is realized.  Draws colorbar only
-;	for given range (bottom:top) in colormap.
+;	GetColor - Get colors by name.
 ;=============================================================================
 function tvColor::GetColor, colname
   if NOT ptr_valid(self.colnames) then return,-1
@@ -343,6 +288,9 @@ function tvColor::GetColor, colname
   else return,(self.bottom+self.topval-self.nreserve)
 end
 
+;=============================================================================
+;       GetProperty
+;=============================================================================
 pro tvColor::GetProperty, BAR=bar, NRESERVE=nres, MIN=min, MAX=max, BSIZE=bs, $
                           TOP=top, BOTTOM=bot
   if arg_present(nres) then nres=self.nreserve
@@ -355,39 +303,39 @@ pro tvColor::GetProperty, BAR=bar, NRESERVE=nres, MIN=min, MAX=max, BSIZE=bs, $
 end
 
 ;=============================================================================
-;	tvColor_DrawCbar.  For drawing the colorbar, call *after* the 
-;	draw widget for the colorbar is realized.  Draws colorbar only
-;	for given range (bottom:top) in colormap.
+;       DrawCbar - For drawing the colorbar, call *after* the draw
+;                  widget for the colorbar is realized.  Draws
+;                  colorbar only for given range (bottom:top) in
+;                  colormap.
 ;=============================================================================
 pro tvColor::DrawCbar, WIN=win
   if self.wBar eq 0L then return
-  oldwin=!D.Window
   widget_control, self.wBar, get_value=win
   wset,win
   tv,self.bottom+bytscl(lindgen(self.bSize[0],self.bSize[1])  $
                         mod self.bSize[0],  $
                         TOP=self.topval-self.bottom-self.nreserve)
-  wset,oldwin
-  return
+  self.oDraw->SetWin
 end
 
 ;=============================================================================
-;	tvColor_SetColors.  Reset the colors to their appropriate values.
-;	useful upon reentry of the widget, in case others have damaged the map.
+;       SetColors - Reset the colors to their appropriate values.
+;                   Useful upon re-entry of the widget, in case others
+;                   have damaged the map.
 ;=============================================================================
 pro tvColor::SetColors
   tvlct,*self.r,*self.g,*self.b,self.bottom
 end
 
 ;=============================================================================
-;	Stretch.  Stretch the colors
+;       Stretch - Stretch the colors according to the internal values.
 ;=============================================================================
 pro tvColor::Stretch
   ;;total colors in our used range
   ncolors=(self.topval-self.bottom-self.nreserve+1)
   
   ;; at low want 0, at high want 1.
-  ;; i.e indxnew[low]=m*indxold[low]+b=0.;
+  ;; i.e. indxnew[low]=m*indxold[low]+b=0.;
   ;; indxnew[high]=m*indxold[high]+b=1.
   ;; --> m=1./(indxold[high]-indxold[low])
   ;; --> b=-m*indxold[low]
@@ -405,43 +353,14 @@ pro tvColor::Stretch
   self->SetColors               ;set them in.
 end
 
-;=============================================================================
-;	TlbEvent.  Handle the tlb events...
-;=============================================================================
-;pro tvColor::TlbEvent,ev
-;   widget_control, ev.handler, get_uvalue=self
-;   type=tag_names(ev,/STRUCTURE_NAME)
-;   if type eq 'WIDGET_TRACKING' then begin 
-;      if ev.enter eq 1 then begin 
-;         ;;reinstate colors
-;         self->SetColors
-;      endif 
-;   endif 
-;   return
-;end
-
-
-
-;=============================================================================
-;	tvColor_tlb_Event.  Hand off tlb events...
-;=============================================================================
-;pro tvColor_tlb_Event, ev
-;   widget_control, ev.handler, get_uvalue=self
-;   self->TlbEvent, ev
-;   return   
-;end
-
-
-;=============================================================================
-;	tvColor_ctabl_Event.  Hand off ctabl events...
-;=============================================================================
 pro tvColor_ctabl_Event, ev
   widget_control, ev.handler,get_uvalue=self
   self->CtablEvent,ev
 end 
 
 ;=============================================================================
-;	CtablEvent.  Handle the color selector table events
+;       CtablEvent - Handle the color selector table events, droplist
+;                    or menu items.
 ;=============================================================================
 pro tvColor::CtablEvent, ev
   ;; load the color table into range
@@ -449,7 +368,7 @@ pro tvColor::CtablEvent, ev
   else widget_control, ev.id,get_uvalue=ind
   sm_loadct,(*self.col_list)[ind],/silent,BOTTOM=self.bottom, $
             NCOLORS=self.topval-self.bottom-self.nreserve+1
-  ;; chop the colors
+  ;; chop the colors appropriately
   tvlct,r,g,b,/GET
   (*self.rorig)=r[self.bottom:self.topval]
   (*self.gorig)=g[self.bottom:self.topval]
@@ -482,28 +401,9 @@ end
 pro tvColor::Cleanup
   ;; set system variable for later use.
   !ctabl.low=self.low & !ctabl.high=self.high & !ctabl.gamma=self.gamma
-  ptr_free,self.r
-  ptr_free,self.g
-  ptr_free,self.b
-  ptr_free,self.colnames
-end
-
-;=============================================================================
-;	On:  Get all our messages.
-;=============================================================================
-pro tvColor::On
-  self->tvPlug::On
-  if self.mouse_mode then $
-     self->Update,/EXCLUSIVE,TRACKING=self.protect,/BUTTON $
-  else self->Update,TRACKING=self.protect
-end
-
-;=============================================================================
-;       Off: Possibly keep getting exclusive and tracking messages.
-;=============================================================================
-pro tvColor::Off
-  self->tvPlug::Off
-  self->Update,/ALL_OFF,EXCLUSIVE=self.mouse_mode,TRACKING=self.protect
+  ptr_free,self.r,self.g,self.b,self.rorig,self.gorig,self.borig, $
+           self.colnames,self.col_list
+  self->tvPlug::Cleanup
 end
 
 ;=============================================================================
@@ -517,23 +417,21 @@ end
 ;=============================================================================
 ;	Init.  Initialize the tvColor object
 ;=============================================================================
-
 function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
-                       USE_COLORS=uc,START=strt,MIN=min, PROTECT=prt,MAX=max, $
-                       Width=sz,TOP=top,BOTTOM=bot,RESERVE=rsrv,CBARID=cbarid,$
-                       MOUSE_MODE=mm,SLIDERS=sld
+                       USE_COLORMAPS=uc,START=strt,MIN=min,MAX=max, $
+                       WIDTH=sz,TOP=top,BOTTOM=bot,RESERVE=rsrv,CBARID=cbarid,$
+                       MOUSE_MODE=mm,SLIDERS=sld,PROTECT=prt,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   
-  if n_elements(top) eq 0 then top=!D.TABLE_SIZE-1 
+  if n_elements(top) eq 0 then top=(!D.TABLE_SIZE-1)
   if n_elements(bot) eq 0 then bot=0
   
   ;; load up the reserve colors, if asked.
-  s=size(rsrv)
-  type=s[s[0]+1]
+  type=size(rsrv,/TYPE)
   if type ne 0 then begin       ;*something* there
      if type eq 8 then begin    ;structs
         self.colnames=ptr_new(rsrv.color)
-        tvlct, rsrv.red, rsrv.green, rsrv.blue, (top-s[s[0]]+1) > 0
+        tvlct, rsrv.red, rsrv.green, rsrv.blue, (top-n_elements(rsrv)+1) > 0
      endif else begin           ;anything else ...  make our own color table,
         ;; construct standards
         self.colnames= $
@@ -588,12 +486,17 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
      self.col_list=ptr_new(uc,/NO_COPY)
   endif
   
+  if self.topval-self.bottom lt (self.nreserve+5) then begin 
+     wmessage,'tvColor: Not enough colors, aborting.',_EXTRA=e
+     return,0
+  endif 
+  
   sm_loadct,/SILENT,/NO_RESET,BOTTOM=self.bottom, $
             NCOLORS=self.topval-self.bottom-self.nreserve+1
   if n_elements(min) eq 0 then min=[0,0,4]
   if n_elements(max) eq 0 then max=[100,100,500]
   if n_elements(strt) ne 3 then begin ;get starting params from system var
-     sm_ctdef                    ; Ensure our color table sysvar is defined
+     sm_ctdef                   ; Ensure our color table sysvar is defined
      strt=fltarr(3)
      strt[0]=min[0]> min[0]+(!ctabl.low)*(max[0]-min[0]) < max[0]
      strt[1]=min[1]>min[0]+(!ctabl.high)*(max[1]-min[1]) < max[1]
@@ -638,6 +541,7 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
   
   self->Stretch
   self.protect=keyword_set(prt)
+  self->Off
   return,1
 end 
 
