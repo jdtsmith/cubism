@@ -68,12 +68,13 @@
 ;    print,foo
 ;
 ; MODIFICATION HISTORY:
-;    
-;    Add here only important modifications which the end user might be
-;    interested in seeing.  Fine level history should be reserved for
-;    the CVS logs.  Use this format:
 ;
-;    2001-08-10 (J.D. Smith): Initially written.
+;    2002-12-06 (J.D. Smith): Communication with CubeView, per-BCD
+;      accounting for speed and flexibility, enable/disable BCD
+;      records without re-clipping the accounts, list-based pixel
+;      accounting and reverse indexing.
+;
+;    2002-09-04 (J.D. Smith): Initially written, based on SCOREProj.
 ;-
 ;    $Id$
 ;##############################################################################
@@ -138,10 +139,10 @@ pro CubeProj::ShowEvent, ev
      'save-as': self->Save,/AS
      
      'viewrecord-new': self->ViewRecord,/NEW
+     'viewrecord-stack': self->ViewRecord,/STACK
      'loadcalib': self->LoadCalib,/SELECT
      'feedback': begin 
         self.feedback=1-self.feedback
-        print,self.feedback
         widget_control, ev.id, set_value=(self.feedback?"*":" ")+ $
                         'Use Cube Build Feedback' ;XXX checkbox
      end
@@ -156,33 +157,8 @@ pro CubeProj::ShowEvent, ev
         if ord eq 'All' then self.ORDER=0 else self.ORDER=ord
      end
      
-     'setaperture': begin 
-        if ptr_valid(self.APERTURE) then begin 
-           ap=(*self.APERTURE)[0]
-           if ap.low[0] eq ap.low[1] AND ap.high[0] eq ap.high[1] then $
-              ap_now=string(FORMAT='(F4.2,:," ")', ap.low[0],ap.high[0]) $ 
-           else ap_now=string(FORMAT='(F4.2,:," ")', ap.low,ap.high)
-        endif else ap_now='0.0 1.0'
-        ap=getinp("Aperture (Low High):",ap_now, $
-                  TITLE='Set Aperture',PARENT_GROUP=self->TopBase(),/MODAL)
-        if ap eq '' then return
-        ap=float(strsplit(ap,/EXTRACT))
-        if n_elements(ap) eq 0 then self->Error,'Not enough aperture elements'
-        if min(ap) lt 0. or max(ap) gt 1. then $
-           self->Error,'Aperture out of range [0-1]'
-        if n_elements(ap) eq 2 then ap=[ap[0],ap[0],ap[1],ap[1]]
-        if ptr_valid(self.APERTURE) then $
-           if array_equal([(*self.APERTURE)[0].low,(*self.APERTURE)[0].high], $
-                          ap) then return
-        ptr_free,self.APERTURE
-        self.APERTURE=ptr_new({IRS_APERTURE,ap[0:1],ap[2:3]})
-        self.ACCOUNTS_VALID=0 
-        self->UpdateList
-     end
-        
-        
      'viewcube-new': self->ViewCube,/NEW
-     
+          
      'select-all': begin        ;select all records
         top=widget_info((*self.wInfo).SList,/LIST_TOP)
         widget_control, (*self.wInfo).SList, $
@@ -411,6 +387,9 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
             widget_button(rec,value='View',uvalue='viewrecord',/SEPARATOR), $
             widget_button(rec,value='View (new viewer)', $
                           uvalue='viewrecord-new'), $
+            ((*self.wInfo).MUST_MULTISELECT= $
+             widget_button(rec,value='View Record Stack', $
+                           uvalue='viewrecord-stack')), $
             widget_button(rec,value='Show Header...',uvalue='headers'),$
             widget_button(rec,value='Show Keyword Value(s)...', $
                           uvalue='header-keyword')]
@@ -419,6 +398,8 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
   cube=widget_button(mbar,value='Cube',/MENU)
   (*self.wInfo).MUST_PROJ= $
      widget_button(cube,value='Build Cube',UVALUE='buildcube') 
+  (*self.wInfo).MUST_ACCT= $
+     widget_button(cube,value='Reset Accounts',UVALUE='resetaccounts')
   ;;-------------
   b1=widget_button(cube,value=(self.feedback?'*':' ')+ $
                    'Use Cube Build Feedback',UVALUE='feedback', $
@@ -427,7 +408,7 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
   (*self.wInfo).MUST_MODULE= $
      widget_button(cube,value='Set Cube Build Order...',UVALUE='setorder', $
                    /SEPARATOR)
-  wMustCal=widget_button(cube,value='Set Aperture(s)...',UVALUE='setaperture')
+  wMustCal=widget_button(cube,value='Aperture(s)...',UVALUE='showaperture')
   wMustCube=[wMustCube, $
              ;;-------------
              widget_button(cube,value='View Cube...',UVALUE='viewcube', $
@@ -801,11 +782,13 @@ end
 ;  UpdateTitle - Update the Show GUI Title
 ;=============================================================================
 pro CubeProj::UpdateTitle
-  if self->IsWidget() then $
-     widget_control, (*self.wInfo).Base,  $
-                     TLB_SET_TITLE='CUBISM Project: '+self->ProjectName()+ $
-                     "  <"+(self.SaveFile?filestrip(self.SaveFile): $
-                            "(unsaved)")+">"
+  if NOT self->IsWidget() then return
+  pn=self->ProjectName()
+  if self.Changed then pn='*'+pn+'*'
+  widget_control, (*self.wInfo).Base,  $
+                  TLB_SET_TITLE='CUBISM Project: '+ pn + $
+                  "  <"+(self.SaveFile?filestrip(self.SaveFile): $
+                         "(unsaved)")+">"
 end
 
 ;=============================================================================
@@ -878,11 +861,17 @@ pro CubeProj::UpdateButtons
      widget_control,((*self.wInfo).MUST_SELECT)[i],  $
                     SENSITIVE=ptr_valid(self.DR) AND sel[0] ne -1
   
+  widget_control,(*self.wInfo).MUST_MULTISELECT,SENSITIVE=n_elements(sel) gt 1
+
   for i=0,n_elements((*self.wInfo).MUST_CAL)-1  do  $
      widget_control,((*self.wInfo).MUST_CAL)[i],  $
                     SENSITIVE=obj_valid(self.cal)
   
-  widget_control, (*self.wInfo).MUST_PROJ, SENSITIVE=ptr_valid(self.DR)
+  for i=0,n_elements((*self.wInfo).MUST_PROJ)-1  do  $
+     widget_control, (*self.wInfo).MUST_PROJ[i], SENSITIVE=ptr_valid(self.DR)
+  
+  widget_control, (*self.wInfo).MUST_ACCT, SENSITIVE=self.ACCOUNTS_VALID
+  
   widget_control, (*self.wInfo).MUST_MODULE,SENSITIVE=self.MODULE ne ''
   
   for i=0,n_elements((*self.wInfo).MUST_CUBE)-1 do $
@@ -894,7 +883,7 @@ pro CubeProj::UpdateButtons
 end
 
 ;=============================================================================
-;  UpdateColumnHeads - Update the sort selected button
+;  UpdateColumnHeads - Update the sort selected button (carry to page 2).
 ;=============================================================================
 pro CubeProj::UpdateColumnHeads
   if NOT self->IsWidget() then return
@@ -905,15 +894,20 @@ pro CubeProj::UpdateColumnHeads
   widget_control, (*self.wInfo).wHead[(*self.wInfo).which_list],SET_VALUE=flags
 end
 
+;=============================================================================
+;  UpdateAll
+;=============================================================================
 pro CubeProj::UpdateAll
   self->UpdateButtons
   self->UpdateColumnHeads
   self->UpdateList
+  self->UpdateTitle
 end
 
 ;=============================================================================
 ;  FindViewer - Find a CubeView to which to send message.  We send
-;               messages to one and only one viewer.
+;               messages to one and only one viewer, unless NEW_VIEWER
+;               is set, in which case we spawn a new viewer.
 ;=============================================================================
 pro CubeProj::FindViewer,NEW_VIEWER=nv
   objs=self->GetMsgObjs(CLASS='CubeRec')
@@ -950,11 +944,12 @@ end
 ;=============================================================================
 ;  ViewRecord - View the record in an existing or new viewer
 ;=============================================================================
-pro CubeProj::ViewRecord,rec,NEW_VIEWER=new
+pro CubeProj::ViewRecord,rec,NEW_VIEWER=new,STACK=vs
   self->RecOrSelect,rec
   self->FindViewer,NEW_VIEWER=new
-  widget_control, (*self.wInfo).SList,SET_LIST_SELECT=[rec[0]]
-  self->Send,RECORD=rec[0]
+  if NOT keyword_set(vs) then $
+     widget_control, (*self.wInfo).SList,SET_LIST_SELECT=[rec[0]]
+  self->Send,RECORD=keyword_set(vs)?rec:rec[0]
 end
 
 ;=============================================================================
@@ -1227,30 +1222,40 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      calib=self.cal
   endif 
   if arg_present(module) then module=self.MODULE
-  if arg_present(ap) then if ptr_valid(self.APERTURE) then ap=*self.APERTURE
+  if arg_present(ap) then begin 
+     self->NormalizeApertures
+     ap=*self.APERTURE
+  endif 
   if arg_present(pn) then pn=self->ProjectName()
   if arg_present(dr) then dr=self.DR
 end
 
 ;=============================================================================
-;  PRs - Return the WAVSAMP Pseudo-Rectangle Sample currently
-;        set. ORDERS is input/output.  If passed, return PRs for the
-;        specified orders.  Otherwise, use the orders setup for
-;        building the cube, or the FULL set of orders..
+;  PRs - Return the WAVSAMP Pseudo-Rectangle Samples currently
+;        set. ORDERS is input/output.  If passed in, return PRs for
+;        the specified orders.  Otherwise, use the orders setup for
+;        building the cube, or the full set of orders with ALL_ORDERS,
+;        and return through ORDERS.  The array of pointers returned
+;        must be freed by the caller (but their contents must be left
+;        alone).
 ;=============================================================================
-function CubeProj::PRs,ORDERS=ords,FULL=full
-  if n_elements(ords) eq 0 or keyword_set(full) then begin 
-     if self.ORDER eq 0 OR keyword_set(full) then $
+function CubeProj::PRs,ORDERS=ords,ALL_ORDERS=all,FULL=full
+  self->LoadCalib               ;ensure we have a loaded calibration object
+  self->NormalizeApertures
+  if n_elements(ords) eq 0 or keyword_set(all) then begin 
+     if self.ORDER eq 0 OR keyword_set(all) then $
         ords=self.cal->Orders(self.MODULE) else ords=self.ORDER
   endif
-  nap=n_elements(self.APERTURE) 
-  for i=0,n_elements(ords) do begin 
-     pr=self.cal->GetWAVSAMP(self.MODULE,self.ORDER,/PIXEL_BASED, $
-                             APERTURE=nap eq 1?(*self.APERTURE)[0]: $
-                             (*self.APERTURE)[ord])
-     if n_elements(prs) eq 0 then prs=pr else prs=[prs,pr]
+  nap=n_elements(*self.APERTURE) 
+  nords=n_elements(ords) 
+  prs=ptrarr(nords)
+  for i=0,nords-1 do begin
+     ap=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[i]
+     prs[i]=ptr_new(self.cal->GetWAVSAMP(self.MODULE,ords[i],/PIXEL_BASED,$
+                                         FULL=full,APERTURE=ap, $
+                                         PR_WIDTH=self.PR_SIZE[1]))
   endfor 
-  return,wvs
+  return,prs
 end
 
 ;=============================================================================
@@ -1293,9 +1298,10 @@ pro CubeProj::LoadCalib,SELECT=sel
   endif else if obj_isa(self.cal,'IRS_Calib') then return
 
   if self.cal_file eq '' then begin 
-     self.cal_file=filestrip(irs_recent_calib())
+     self.cal_file=filestrip(irs_recent_calib()) ;use the most recent
      self.ACCOUNTS_VALID=0b
-     self->Info,['Loading most recent calibration set: ','  '+self.cal_file]
+     self->Info,['Calibration set unspecified, loading most recent: ', $
+                 '  '+self.cal_file]
   endif
   obj_destroy,self.cal
   self.cal=irs_restore_calib(self.cal_file)
@@ -1538,7 +1544,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
   self->MergeSetup
   self.CUBE_SIZE[2]=n_elements(*self.WAVELENGTH) 
   
-  stepsz=self.STEP_SIZE/self.PLATE_SCALE ; slit step size, in pixels
+  stepsz=float(self.STEP_SIZE/self.PLATE_SCALE) ; slit step size, in pixels
   
   ;; Are we treating one order, or all of them?
   if self.ORDER eq 0 then ords=self.cal->Orders(self.MODULE) else $
@@ -1647,20 +1653,15 @@ pro CubeProj::BuildAccount,_EXTRA=e
            ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
               bcdpixel=(*prs[j].PIXELS)[k] 
-              
               ;; associated polygon (2xn list) this pixel got clipped to
               ;; by the PR on the detector grid
               poly=*(*prs[j].POLYGONS)[k]
-           
               ;; Offset to poly's center
               poly=poly-rebin(prs[j].cen,size(poly,/DIMENSIONS))
-           
               ;; Rotate this polygon to the cube sky grid, if necessary
               if angle ne 0.0 then poly=rot#poly
-
               ;; Offset the polygon correctly into the sky grid
               poly=poly+rebin(offset,size(poly,/DIMENSIONS))
-              
               if self.feedback AND j eq 1L then begin
                  plots,[reform(poly[0,*]),poly[0,0]], $
                        [reform(poly[1,*]),poly[1,0]], $
@@ -1670,8 +1671,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
               endif
               
               if feedback_only then continue
-              
-              ;; Clip it against the sky grid
+              ;; Clip it against the sky (cube) grid
               cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
                                           self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
                                           AREAS=areas)
@@ -1733,6 +1733,11 @@ pro CubeProj::BuildRevAcct
      (*self.DR)[i].REV_CNT=n_elements(h) 
      (*self.DR)[i].REV_MIN=om
   endfor
+  self->UpdateButtons
+end
+
+pro CubeProj::ResetAccounts
+  self.ACCOUNTS_VALID=0b
   self->UpdateButtons
 end
 
@@ -1906,7 +1911,7 @@ pro CubeProj::CheckModules,id,ERROR=err
      self->Error,["Data from only one module is permitted: ", $
                   "   "+strjoin(modules[u],",")],/RETURN_ONLY
   self.module=modules[u[0]]
-  if array_equal(orders,orders[0]) then self.ORDER=orders[0]
+  ;;if array_equal(orders,orders[0]) then self.ORDER=orders[0]
 end
 
 ;=============================================================================
@@ -1922,10 +1927,10 @@ pro CubeProj::Normalize
   self->CheckModules
   
   ;; For low-res use the target order as the order, if they're all the same.
-  if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
-     self.ORDER eq 0 AND $
-     (self.module eq 'SL' OR self.module eq 'SH') $
-     then self.ORDER=(*self.DR)[0].TARGET_ORDER
+;   if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
+;      self.ORDER eq 0 AND $
+;      (self.module eq 'SL' OR self.module eq 'SH') $
+;      then self.ORDER=(*self.DR)[0].TARGET_ORDER
   
   ;; Normalize the plate scale... they should all be the same!
   ps=dblarr(2*n_elements(*self.DR))
@@ -1989,16 +1994,9 @@ pro CubeProj::Normalize
   endif 
   
   ;; Normalize the build aperture(s)
-  if ptr_valid(self.APERTURE) then begin 
-     for i=0,n_elements(*self.APERTURE)-1 do begin 
-        ap=(*self.APERTURE)[i]
-        ;; default to the full aperture
-        if array_equal(ap.low,0.) AND array_equal(ap.high,0.) then $
-           (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
-     endfor 
-  endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
+  self->NormalizeApertures
   
-  ;; Find the average position angle over the course of the map
+  ;; Find the average position angle over the entire map
   pa=mean((*self.DR).PA)
   
   ;; Establish the dimensions of the cube in the slit coordinate system
@@ -2010,6 +2008,49 @@ pro CubeProj::Normalize
   endif
 end
 
+;=============================================================================
+;  NormalizeApertures - Make sure the apertures are all something useful
+;=============================================================================
+pro CubeProj::NormalizeApertures
+  ;; Normalize the build aperture(s)
+  if ptr_valid(self.APERTURE) then begin 
+     for i=0,n_elements(*self.APERTURE)-1 do begin 
+        ap=(*self.APERTURE)[i]
+        ;; default to the full aperture
+        if array_equal(ap.low,0.) AND array_equal(ap.high,0.) then $
+           (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
+     endfor 
+  endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
+end
+
+pro CubeProj::ShowAperture
+  if NOT self->IsWidget() then return
+  if NOT ptr_valid(self.APERTURE) then begin 
+     self->Info,'No apertures defined'
+     return
+  endif 
+  
+  nap=n_elements(*self.APERTURE)
+  ords=self.cal->Orders(self.module)
+  ap_str=strarr(nap)
+  for i=0,nap-1 do begin 
+     if self.ORDER eq 0 then begin 
+        if nap eq 1 then ap_pref="All: " else $
+           ap_pref=string(FORMAT='("Ord ",I2,":")',ords[i])
+     endif else ap_pref=string(FORMAT='("Ord ",I2,":")',self.ORDER)
+     
+     ap=(*self.APERTURE)[i]
+     if ap.low[0] eq ap.low[1] AND ap.high[0] eq ap.high[1] then $
+        ap_str[i]=string(FORMAT='(%"%4.2f->%4.2f")', ap.low[0],ap.high[0]) $
+     else ap_str[i]=string(FORMAT='(%"%4.2f->%4.2f : %4.2f->%4.2f")', $
+                           ap.low,ap.high)
+     ap_str[i]=ap_pref+ap_str[i]
+  endfor 
+  
+  self->Info,['Apertures: ','',ap_str],TITLE=self->ProjectName()+' Apertures'
+end
+     
+     
 ;=============================================================================
 ;  AddData - Add one or more BCD data files to the cube.
 ;=============================================================================
@@ -2043,7 +2084,8 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
   if n_elements(s) eq 3 then begin 
      if s[2] eq 2 then begin 
         rec.BCD=ptr_new(bcd[*,*,0]) & rec.ERROR=ptr_new(bcd[*,*,1])
-     endif else self->Error,'Incorrect BCD dimensions'
+     endif else self->Error,'Incorrect BCD dimensions: '+ $
+                            strjoin(strtrim(size(bcd,/DIMENSIONS),2),",")
   endif else if n_elements(s) eq 2 then begin 
      rec.BCD=ptr_new(bcd)
   endif
@@ -2122,15 +2164,31 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
                            self.NSTEP,jul2date(self.CUBE_DATE)), $
                     self.MODULE,self.WAVELENGTH}
   endif
-  if n_elements(record) ne 0 then begin 
+  nrec=n_elements(record) 
+  if nrec ne 0 then begin 
+     stackQ=nrec gt 1
      rec=(*self.DR)[record]
+     if stackQ then begin 
+        bcd=*rec[0].BCD
+        err=*rec[0].BCD
+        for i=1,nrec-1 do begin 
+           bcd=bcd+*rec[i].BCD
+           err=err+*rec[i].BCD
+        endfor 
+        bcd_p=(self.STACK=ptr_new(bcd,/NO_COPY))
+        err_p=(self.STACK_ERR=ptr_new(err,/NO_COPY))
+        str=string(FORMAT='(%"%s <Stack of %d recs>")', $
+                   self->ProjectName(),nrec)
+     endif else begin 
+        bcd_p=rec.BCD
+        err_p=rec.ERROR
+        str=string(FORMAT='(%"%s <%s> %s")', $
+                   self->ProjectName(),rec.ID, $
+                   irs_fov(rec.FOVID,/SHORT_NAME))
+     endelse 
      self->MsgSend,{CUBEPROJ_RECORD, $
-                    self,$
-                    string(FORMAT='(%"%s <%s> %s")', $
-                           self->ProjectName(),rec.ID, $
-                           irs_fov(rec.FOVID,/SHORT_NAME)), $
-                    self.MODULE,self.ORDER,self.CAL,rec.BCD,rec.ERROR}
-  endif   
+                    self,str,self.MODULE,self.ORDER,self.CAL,bcd_p,err_p}
+  endif
 end
 
 ;=============================================================================
@@ -2148,6 +2206,7 @@ pro CubeProj::Cleanup
   heap_free,self.MERGE
   ptr_free,self.APERTURE,self.CUBE,self.ERR,self.wInfo
   if self.spawned then obj_destroy,self.cal ;noone else will see it.
+  self->ObjMsg::Cleanup
 end
 
 ;=============================================================================
@@ -2178,6 +2237,8 @@ pro CubeProj__define
                                 ; for each order
      DR: ptr_new(), $           ;All the BCD's: pointer to list of
                                 ; data record structures of type CUBE_DR
+     STACK:ptr_new(),$          ;A summed BCD stack
+     STACK_ERR:ptr_new(),$      ;A summed BCD Error stack
      ACCOUNTS_VALID: 0b,$       ; are the account records valid?
                                 ;  0: no, 1:yes, 2:size changed
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
@@ -2254,9 +2315,11 @@ pro CubeProj__define
          lines:0, $             ;number of list lines last set
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
-         MUST_SELECT:lonarr(14),$ ;the SW buttons which require any selected
+         MUST_SELECT:lonarr(15),$ ;the SW buttons which require any selected
+         MUST_MULTISELECT:0L,$  ;must have more than one selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
          MUST_PROJ:0L, $        ;SW button which requires a valid project
+         MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4)}   ;SW button requires valid cube created.
 
   ;; XXX WCS STUFF SHOULD GO TOO
