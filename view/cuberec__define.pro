@@ -33,20 +33,23 @@ pro CubeRec::Message, msg
         widget_control, self.wStackInfo,SET_VALUE=msg.info
         ptr_free,self.stack
         if msg.name then $      ; A named map
-           self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name)) $
+           self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name, $
+                                               WAVELENGTH_WEIGHTED= $
+                                               msg.weight_cont)) $
         else begin 
            if ptr_valid(msg.background) then begin
               type=size(*msg.background,/TYPE)
               if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
                  self.stack=ptr_new(self.cube-> $
                                     Stack(*msg.foreground, $
+                                          WAVELENGTH_WEIGHTED=msg.weight_cont,$
                                           BG_VALS=*msg.background))
               endif else $      ;background index ranges
                  self.STACK=ptr_new(self.cube-> $
-                                    Stack(*msg.foreground,$
-                                          BACKRANGES=*msg.background)) 
-           endif else self.STACK=ptr_new(self.cube-> $
-                                         Stack(*msg.foreground))
+                                    Stack(*msg.foreground, $
+                                          WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                          BACKRANGES=*msg.background))
+           endif else self.STACK=ptr_new(self.cube->Stack(*msg.foreground))
         endelse 
         self->SwitchMode,/STACK
      end
@@ -348,6 +351,7 @@ end
 ;  SetupViewSpec -  Get a spectrum viewer if necessary
 ;=============================================================================
 pro CubeRec::SetupViewSpec
+  ;; XXX ensure valid wavelength
   if obj_valid(self.oView) eq 0 then begin 
      self.oView=obj_new('CubeViewSpec',PARENT_GROUP=self.wBase[0])
      ;; Set up messages between us
