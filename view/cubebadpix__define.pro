@@ -133,36 +133,52 @@ end
 ;  MarkStatic - Mark static (bmask or pmask) pixels
 ;=============================================================================
 pro CubeBadPix::MarkStatic,ind,ALL=all
+  ok_mask=35583U
+  fatal_mask=29696U
+  
   if keyword_set(all) then begin 
      if ptr_valid(self.bmask) then begin 
-        ;; don't show off-flat values
-        bind=where((*self.bmask AND 65279) gt 0,bcnt)
-     endif else bcnt=0
+        ;; non-fatal and fatal bmasks
+        bind=where((*self.bmask AND ok_mask) gt 0,bcnt)
+        fbind=where((*self.bmask AND fatal_mask) gt 0,fbcnt)
+     endif else begin 
+        bcnt=0 & fbcnt=0
+     endelse 
      if ptr_valid(self.pmask) then begin 
         pind=where(*self.pmask gt 0,pcnt)
      endif else pcnt=0
-  endif else begin 
+  endif else if n_elements(ind) gt 0 then begin 
      if ptr_valid(self.bmask) then begin 
         ;; don't show off-flat values
-        bind=where((*self.bmask)[ind] AND 65279 gt 0,bcnt)
+        bind=where((*self.bmask)[ind] AND ok_mask gt 0,bcnt)
         if bcnt gt 0 then bind=ind[bind]
-     endif else bcnt=0
+        fbind=where((*self.bmask AND fatal_mask) gt 0,fbcnt)
+        if fbcnt gt 0 then fbind=ind[fbind]        
+     endif else begin 
+        bcnt=0 & fbcnt=0
+     endelse 
      if ptr_valid(self.pmask) then begin 
         pind=where((*self.pmask)[ind] gt 0,pcnt)
         if pcnt gt 0 then pind=ind[pind]
      endif else pcnt=0
-  endelse 
+  endif else self->Error,'Must pass index, or display All'
 
   for i=0,bcnt-1 do begin 
      pt=self.oDraw->Convert(bind[i],/DEVICE,/SHOWING)
      if pt[0] eq -1 then continue
-     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[2],PSYM=4, $
+     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=4, $
            SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
   endfor 
+  for i=0,fbcnt-1 do begin
+     pt=self.oDraw->Convert(fbind[i],/DEVICE,/SHOWING)
+     if pt[0] eq -1 then continue
+     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=7, $
+           SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
+  endfor
   for i=0,pcnt-1 do begin 
      pt=self.oDraw->Convert(pind[i],/DEVICE,/SHOWING)
      if pt[0] eq -1 then continue
-     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=1, $
+     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[2],PSYM=1, $
            SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
   endfor 
 end
