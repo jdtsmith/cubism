@@ -487,7 +487,7 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
   endif
   
   if self.topval-self.bottom lt (self.nreserve+5) then begin 
-     wmessage,'tvColor: Not enough colors, aborting.',_EXTRA=e
+     message,'tvColor: Not enough colors, aborting.'
      return,0
   endif 
   
