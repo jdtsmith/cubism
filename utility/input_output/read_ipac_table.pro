@@ -24,7 +24,7 @@
 ; INPUT KEYWORD PARAMETERS:
 ;
 ;    HEADERS: If used, return the header variables set at the
-;       beginning of the table (\key=value) as a structure.
+;       beginning of the table (\type key=value) as a structure.
 ;			
 ; OUTPUTS:
 ;
@@ -44,7 +44,8 @@
 ;
 ; NOTES:
 ;  
-;    Additional description and other information which doesn't fit elsewhere.
+;    See http://spider.ipac.caltech.edu/staff/tab/ipactables.help for
+;    format description
 ;
 ; EXAMPLE:
 ;
@@ -82,7 +83,7 @@
 ;
 ;##############################################################################
 
-function read_ipac_table,file, HEADERS=hdr
+function read_ipac_table,file, HEADERS=hdr_in
   openr,un,file,/get_lun
   line=''
   at_data=(got_tags=(got_type=0))
@@ -93,12 +94,22 @@ function read_ipac_table,file, HEADERS=hdr
         firstchar = strmid(line,0,1)
         case firstchar of
            '\': begin 
-              parts=strtrim(stregex(line,'^\\([a-zA-Z0-9_ ]+)=(.*)$', $
-                                    /SUBEXPR,/EXTRACT),2)
-              if strlen(parts[0]) eq 0 then break
+              parts=strtrim( $
+                    stregex(line, $
+                            '^\\(REAL|CHAR|INT) +([a-zA-Z0-9_ ]+)=(.*)$', $
+                            /SUBEXPR,/EXTRACT),2)
+              if strlen(parts[0]) eq 0 then break ;probably a comment
+              skip=0
+              case parts[1] of
+                 "REAL": val=double(parts[3])
+                 "CHAR": val=parts[3]
+                 "INT": val=long(parts[3])
+                 else: skip=1
+              endcase
+              if skip then break
               if n_elements(hdr) eq 0 then begin 
-                 hdr=create_struct(parts[1],parts[2]) 
-              endif else hdr=create_struct(hdr,parts[1],parts[2])
+                 hdr=create_struct(parts[2],val) 
+              endif else hdr=create_struct(hdr,parts[2],val)
            end
            '|': begin
               sep_pos=[strsplit(line,'|'),strlen(line)-1]
@@ -152,7 +163,7 @@ function read_ipac_table,file, HEADERS=hdr
                  if n_elements(data_elem) eq 0 then $
                     data_elem=create_struct(tags[i],val) $
                  else data_elem=create_struct(data_elem,tags[i],val) 
-              endfor 
+              endfor
               got_type=1
            end
            else: at_data=1
@@ -163,6 +174,7 @@ function read_ipac_table,file, HEADERS=hdr
      reads,line,data_elem,FORMAT='('+strjoin(format,",")+')'
      if n_elements(ret) eq 0 then ret=data_elem else ret=[ret,data_elem]
   endwhile
+  if arg_present(hdr_in) then hdr_in=hdr
   free_lun,un
   return,ret
 end
