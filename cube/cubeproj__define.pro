@@ -876,6 +876,11 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,_EXTRA=e
      if ~file_test(file,/READ) then $
         self->Error,["Couldn't restore data from file (check filename): ",file]
      (*self.DR)[which].BCD=ptr_new(readfits(file,/SILENT,hdr))
+     
+     if ~stregex(file,'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
+        bcdfile=irs_associated_file(file)
+        if bcdfile && file_test(bcdfile,/READ) then hdr=headfits(bcdfile)
+     endif 
      (*self.DR)[which].HEADER=ptr_new(hdr)
      
      ;; Optional BMASK, UNCERTAINTY
@@ -2852,9 +2857,9 @@ pro CubeProj::Normalize
      for i=0,n_elements(ords)-1 do begin 
         self.cal->GetProperty,self.module,ords[i],SLIT_LENGTH=sl
         slmax=sl>slmax
-     endfor 
+     endfor
      self.PR_SIZE[0]=slmax
-  endelse 
+  endelse
   
   ;; Check to ensure all steps are present and accounted for
   self->CheckSteps
@@ -3599,6 +3604,8 @@ end
 pro CubeProj::CheckSteps
   ;; XXX Account for multiple sub-slit maps or multiple map cycles?
   if NOT ptr_valid(self.DR) then self->Error,'No BCD Data loaded.'
+  if ~array_equal(self.NSTEP gt 0,1b) then $
+     self->Error,'No map coordinates set.'
   got=bytarr(self.NSTEP)
   got[(*self.DR).ROW-1,(*self.DR).COLUMN-1]=1b
   wh=where(got eq 0b, cnt)
@@ -3783,6 +3790,7 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
   self->CheckModules            ;Set default build order, and double check.
   self->UpdateList & self->UpdateButtons
 end
+
 
 ;=============================================================================
 ;  AddBCD - Add a bcd image to the cube, optionally overriding the
