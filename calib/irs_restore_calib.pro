@@ -10,7 +10,7 @@
 ;
 ; DESCRIPTION:
 ;    
-;    Restores saved IRS calibration objects.
+;    Restores saved IRS calibration objects, and caches results.
 ;    
 ; CATEGORY:
 ;
@@ -35,6 +35,7 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2004-02-24 (J.D. Smith): Cache restored objects for effiency.
 ;    2002-08-17 (J.D. Smith): Restored calibration file path query.
 ;    2001-12-14 (J.D. Smith): Written
 ;-
@@ -62,11 +63,36 @@
 ;
 ;##############################################################################
 function irs_restore_calib, cfile
+  common irs_calib_store, irs_calib_store_files, irs_calib_store_objects
   @cubism_dir
   if file_test(cfile,/READ,/REGULAR) then file=cfile else begin 
      file=filepath(ROOT=irs_calib_dir,SUBDIR="sets",cfile)
      if file_test(file,/READ,/REGULAR) eq 0 then $
         message,'No such calibration object file: '+cfile
   endelse 
-  return,restore_object(file,'IRS_Calib')
+  
+  ;; Recover from the stored object cache
+  if n_elements(irs_calib_store_files) ne 0 then begin 
+     keep=where(obj_valid(irs_calib_store_objects),keep_cnt,NCOMPLEMENT=reject)
+     if keep_cnt ne 0 then begin 
+        if reject gt 0 then begin 
+           irs_calib_store_files=irs_calib_store_files[keep]
+           irs_calib_store_objects=irs_calib_store_objects[keep]
+        endif 
+        match=where(irs_calib_store_files eq file,match_cnt)
+        if match_cnt gt 0 then return, irs_calib_store_objects[match[0]]
+     endif 
+  endif else keep_cnt=0
+  
+  cal=restore_object(file,'IRS_Calib')
+  
+  ;; Store to the cache
+  if keep_cnt eq 0 then begin
+     irs_calib_store_files=[file] & irs_calib_store_objects=[cal] 
+  endif else begin 
+     irs_calib_store_files=[irs_calib_store_files,file] 
+     irs_calib_store_objects=[irs_calib_store_objects,cal]
+  endelse 
+                                                            
+  return,cal
 end
