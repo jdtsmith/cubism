@@ -7,7 +7,10 @@ pro tvRBox::Message, msg
         case msg.type of
            2: begin             ;motion event
               ;; draw zoom box
-              if self.buttondwn ne 0b then self->movebox,msg.X,msg.Y
+              if self.buttondwn ne 0b then begin 
+                 self->movebox,msg.X,msg.Y
+                 ;self.oDraw->SendRedraw
+              endif
            end
            
            0: begin             ;button press
@@ -66,9 +69,11 @@ pro tvRBox::Message, msg
               self.oDraw->GetProperty,zoom=zoom,pan=pan,offset=offset
               self.coords=float(self.boxoff-pan)/zoom+offset
               
-              ;; send out a BOX message...
               ;if self.boxflag eq 0b then self->erasebox 
+              ;; send out a BOX message...
               self->MsgSend, {BOX, self.boxflag}
+              ;; A redraw message (box might have erased other things)
+              self.oDraw->SendRedraw
            end 
         endcase 
      end
@@ -86,7 +91,7 @@ pro tvRBox::Message, msg
      end 
      
      'TVDRAW_REDRAW': begin     ; the screen was clobbered
-        if self.boxflag ne -1 then begin ; only if a box here
+        if self->IsDrawn() then begin ; only if a box here
            if self.active then self->DrawBox  $ ;currently on
            else if self.corners then self->drawcorners ;currently not on
         endif 
