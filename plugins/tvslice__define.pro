@@ -241,7 +241,7 @@ pro tvSlice::PlotSlice
   ttl=string(FORMAT='("[",I3,",",I3,"] to [",I3,",",I3,"]")', $
              x[0],y[0],x[n-1],y[n-1])
   plot,indgen(n),(*io)[*self.plotvec],xtitle="Slice Index",ytitle='Value',$
-       TITLE=ttl,xstyle=17,XMINOR=n lt 10?-1:0
+       TITLE=ttl,xstyle=16,XMINOR=n lt 10?-1:0
   self.scale=[!X.S,!Y.S] & self.range=!Y.CRANGE
   wset,self.plotpixwin
   device,copy=[0,0,512,384,0,0,self.plotwin] ;save it for redrawing
