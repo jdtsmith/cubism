@@ -29,6 +29,9 @@
 ;    AREAS: For each pixel index returned, the fractional area of that
 ;       pixel contained inside the polygon, between 0 and 1.
 ;
+;    POLYGONS: A list of pointers to 2xn arrays containing the polygon
+;       vertex information (as columns x,y).
+;
 ; OUTPUTS:
 ;
 ;    inds: The indices of all pixels at least partially inside the
@@ -44,13 +47,33 @@
 ;
 ; MODIFICATION HISTORY:
 ;
-;       Wed Sep 26 12:27:55 2001, JD Smith <jdsmith@astro.cornell.edu>
-;
-;		Written.  Initial documentation.
+;       2001-09-26 (J.D. Smith): Written.  Initial documentation.
 ;-
 ;   $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2001,2002 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;  
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
+;
+;##############################################################################
 
-function polyfillaa, x,y,sx,sy, AREAS=areas
+function polyfillaa, x,y,sx,sy, AREAS=areas, POLYGONS=polys
   ;; Clip to the nearest enclosing region
   left=floor(min(x,max=maxx))>0
   right=ceil(maxx)<(sx-1)
@@ -59,14 +82,16 @@ function polyfillaa, x,y,sx,sy, AREAS=areas
   plist=[transpose(x),transpose(y)] ;the vertex list
   for j=bottom,top do begin 
      for i=left,right do begin
-        pc=polyclip(i,j,x,y)
-        if pc[0] ne -1 then begin
-           px=reform(pc[0,*]) & py=reform(pc[1,*])
+        px=x & py=y
+        polyclip,i,j,px,py
+        if px[0] ne -1 then begin
            a=abs(total(px*shift(py,-1) - py*shift(px,-1))/2.)
            if n_elements(ret) eq 0 then begin 
+              if arg_present(polys) then polys=[ptr_new(pc,/NO_COPY)]
               ret=[i+j*sx] 
               areas=[a]
            endif else begin
+              if arg_present(polys) then polys=[polys,ptr_new(pc,/NO_COPY)]
               ret=[ret,i+j*sx]
               areas=[areas,a]
            endelse
