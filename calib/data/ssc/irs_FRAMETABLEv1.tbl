@@ -1,0 +1,27 @@
+\frametable version 1.9 (Tue Sep  4 12:00:00 PDT 2001)
+\angle of +w instrument axis clockwise from TPF +Z axis.
+\hand-crafted by J.D. Smith from Excel spreadsheet v1.9 (Mon Nov 24 13:19:39 MST 2003)
+|fov_name                              |brown_theta_Y |brown_theta_Z |   angle   |
+| char                                 |  real        |  real        |    real   |
+|                                      | arcmin       | arcmin       |  degrees  |
+Telescope_Boresight                       0.0000          0.0000          0.0000        
+IRS_Short-Lo_1st_Order_1st_Position     -12.1800         -2.5140        275.2800        
+IRS_Short-Lo_1st_Order_2nd_Position     -12.1520         -2.8240        275.2800        
+IRS_Short-Lo_1st_Order_Center_Position  -12.1660         -2.6690        275.2800        
+IRS_Short-Lo_2nd_Order_1st_Position     -11.9320         -3.9203        275.2800        
+IRS_Short-Lo_2nd_Order_2nd_Position     -11.9041         -4.2223        275.2800        
+IRS_Short-Lo_2nd_Order_Center_Position  -11.9181         -4.0713        275.2800        
+IRS_Long-Lo_1st_Order_1st_Position       -4.1640        -13.8990        358.8000        
+IRS_Long-Lo_1st_Order_2nd_Position       -5.0480        -13.8800        358.8000        
+IRS_Long-Lo_1st_Order_Center_Position    -4.6060        -13.8890        358.8000        
+IRS_Long-Lo_2nd_Order_1st_Position       -0.7560        -13.9690        358.8000        
+IRS_Long-Lo_2nd_Order_2nd_Position       -1.6400        -13.9510        358.8000        
+IRS_Long-Lo_2nd_Order_Center_Position    -1.1980        -13.9600        358.8000        
+IRS_Short-Hi_1st_Position               -10.7890         10.1540        318.5300        
+IRS_Short-Hi_2nd_Position               -10.7400         10.1120        318.5300        
+IRS_Short-Hi_Center_Position            -10.7640         10.1330        318.5300        
+IRS_Long-Hi_1st_Position                -10.5890        -10.2010         43.3400        
+IRS_Long-Hi_2nd_Position                -10.4990        -10.1150         43.3400        
+IRS_Long-Hi_Center_Position             -10.5440        -10.1580         43.3400        
+IRS_Red_Peak-Up_FOV_Center              -11.6432          2.0139          1.2453        
+IRS_Blue_Peak-Up_FOV_Center             -13.5168          1.9282          1.2453
