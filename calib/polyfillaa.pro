@@ -1,104 +1,80 @@
-;+
-; NAME:
-;
-;    POLYFILLAA
-;
-; DESCRIPTION:
-;
-;    Finds the fractional area of all pixels at least partially inside
-;    a specified polygon.
-;
-; CATEGORY:
-;
-;    GRAPHICS, REGION OF INTEREST
-;
-; CALLING SEQUENCE:
-;
-;    inds=polyfillaa(x,y,sx,sy,[AREAS=])
-;
-; INPUT PARAMETERS:
-;
-;    x,y: The vectors containing the x and y subscripts of the
-;       polygon.  May be in fractional units.
-;
-;    sx,sy: The size of the pixel grid on which the polygon is
-;       superposed.  
-;
-; OUTPUT KEYWORD PARAMETERS:
-;
-;    AREAS: For each pixel index returned, the fractional area of that
-;       pixel contained inside the polygon, between 0 and 1.
-;
-;    POLYGONS: A list of pointers to 2xn arrays containing the polygon
-;       vertex information (as columns x,y).
-;
-; OUTPUTS:
-;
-;    inds: The indices of all pixels at least partially inside the
-;       polygon.
-;
-; PROCEDURES:
-;
-;    polyclip
-;
-; EXAMPLE:
-;
-;    inds=polyfillaa([1.2,3,5.3,3.2],[1.3,6.4,4.3,2.2],10,10,AREAS=areas)
-;
-; MODIFICATION HISTORY:
-;
-;       2001-09-26 (J.D. Smith): Written.  Initial documentation.
-;-
-;   $Id$
-;##############################################################################
-; 
-; LICENSE
-;
-;  Copyright (C) 2001,2002 J.D. Smith
-;
-;  This file is free software; you can redistribute it and/or modify
-;  it under the terms of the GNU General Public License as published
-;  by the Free Software Foundation; either version 2, or (at your
-;  option) any later version.
-;  
-;  This file is distributed in the hope that it will be useful, but
-;  WITHOUT ANY WARRANTY; without even the implied warranty of
-;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-;  General Public License for more details.
-;  
-;  You should have received a copy of the GNU General Public License
-;  along with this file; see the file COPYING.  If not, write to the
-;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-;  Boston, MA 02111-1307, USA.
-;
-;##############################################################################
 
-function polyfillaa, x,y,sx,sy, AREAS=areas, POLYGONS=polys
-  ;; Clip to the nearest enclosing region
-  left=floor(min(x,max=maxx))>0
-  right=ceil(maxx)<(sx-1)
-  bottom=floor(min(y,max=maxy))>0
-  top=ceil(maxy)<(sy-1)
-  plist=[transpose(x),transpose(y)] ;the vertex list
-  for j=bottom,top do begin 
-     for i=left,right do begin
-        px=x & py=y
-        polyclip,i,j,px,py
-        if px[0] ne -1 then begin
-           a=abs(total(px*shift(py,-1) - py*shift(px,-1))/2.)
-           if n_elements(ret) eq 0 then begin 
-              if arg_present(polys) then $
-                 polys=[ptr_new([transpose(px),transpose(py)])]
-              ret=[i+j*sx] 
-              areas=[a]
-           endif else begin
-              if arg_present(polys) then $
-                 polys=[polys,ptr_new([transpose(px),transpose(py)])]
-              ret=[ret,i+j*sx]
-              areas=[areas,a]
-           endelse
-        endif
+;; Polyfillaa, using either built-in or auto-compiled code.
+
+function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
+                     RECOMPILE=rc
+  common polyfillaa_external,polyclip_compiled,polyclip_path
+  if n_elements(polyclip_compiled) eq 0 OR keyword_set(rc) then begin 
+     catch, err
+     if err ne 0 then begin   ; any failure in compiling, just use the IDL vers
+        polyclip_compiled=0
+     endif else begin 
+        resolve_routine,'polyclip'
+        path=(routine_info('polyclip',/SOURCE)).PATH
+        path=strmid(path,0,strpos(path,path_sep(),/REVERSE_SEARCH))
+        make_dll,'polyclip_new','polyclip',INPUT_DIRECTORY=path, $
+                 DLL_PATH=polyclip_path ;,/REUSE_EXISTING
+        polyclip_compiled=1
+     endelse 
+     catch,/cancel
+  endif
+  
+  ;; Clip grid to the nearest enclosing region
+  left=floor(min(px,max=maxx))>0
+  right=floor(maxx)<(sx-1)
+  bottom=floor(min(py,max=maxy))>0
+  top=floor(maxy)<(sy-1)
+  nx=right-left+1 & ny=top-bottom+1
+  npol=long(n_elements(px)) & npix=long(nx*ny)
+  if npix eq 0L then return,-1
+  ret=lonarr(npix,/NOZERO)
+  apa=arg_present(areas)
+  areas=fltarr(npix,/NOZERO)
+  app=arg_present(polys)
+  if app then polys=ptrarr(npix,/NOZERO)
+  ind=0L
+  
+  if keyword_set(nc) OR polyclip_compiled eq 0 then begin ; IDL version
+     for j=bottom,top do begin 
+        for i=left,right do begin
+           px_out=px & py_out=py
+           polyclip,i,j,px_out,py_out
+           if px_out[0] eq -1 then continue
+           ret[ind]=i+j*sx
+           if apa then $
+              areas[ind]=abs(total(double(px_out)*shift(double(py_out),-1) - $
+                                   double(py_out)*shift(double(px_out),-1))/2.)
+           if app then $
+              polys[ind]=ptr_new([transpose(px_out),transpose(py_out)])
+           ind=ind+1L
+        endfor
      endfor
-  endfor
-  if n_elements(ret) eq 0 then return,-1 else return,ret
+  endif else begin        ; Compiled code, use call_external and the shared lib
+     inds=reform(rebin(lindgen(nx),nx,ny)+left+ $
+                 (rebin(transpose(lindgen(ny)),nx,ny)+bottom)*sx, npix)
+     vi=inds mod sx & vj=inds/sx
+     px_out=fltarr((npol+4)*npix,/NOZERO)
+     py_out=fltarr((npol+4)*npix,/NOZERO)
+     ri_out=lonarr(npix+1)
+
+     tmp=call_external(polyclip_path,'polyclip',$
+                       VALUE= $
+                       [0b,0b,1b,   0b,0b,1b,    0b,    0b,    0b,   0b], $
+                       vi,vj,npix,  px,py,npol,  px_out,py_out,areas,ri_out)
+
+     for i=0,npix-1 do begin 
+        if ri_out[i] ge ri_out[i+1] then continue ;no overlap for this one
+        px_new=px_out[ri_out[i]:ri_out[i+1]-1] 
+        py_new=py_out[ri_out[i]:ri_out[i+1]-1]
+;         ;;oplot,[px_new,px_new[0]],[py_new,py_new[0]],COLOR=!D.TABLE_SIZE/2
+        ret[ind]=vi[i]+vj[i]*sx
+        areas[ind]=areas[i]
+        if app then polys[ind]=ptr_new([transpose(px_new),transpose(py_new)])
+        ind=ind+1L
+     endfor 
+  endelse 
+  if ind eq 0L then return,-1
+  if apa then areas=areas[0L:ind-1L]
+  if app then polys=polys[0L:ind-1L]
+  return,ret[0L:ind-1L]
 end
