@@ -150,6 +150,12 @@ pro CubeProj::ShowEvent, ev
      'save-as': self->Save,/AS
      
      'viewrecord-new': self->ViewRecord,/NEW
+     'viewbackground-new': self->ViewBackground,/NEW
+     'remove-background': begin 
+        ptr_free,self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK
+        self.BACK_CNT=0 & self.BACK_DATE=0.0D
+        self->UpdateButtons
+     end 
      'loadcalib': self->LoadCalib,/SELECT
      'feedback': begin 
         self.feedback=1b-self.feedback
@@ -422,6 +428,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
             widget_button(rec,VALUE='Show Keyword Value(s)...', $
                           UVALUE='header-keyword')]
   
+  ;;*** Cube menu  
   cube=widget_button(mbar,VALUE='Cube',/MENU)
   (*self.wInfo).MUST_PROJ= $
      widget_button(cube,VALUE='Build Cube',UVALUE='buildcube') 
@@ -436,6 +443,17 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      widget_button(cube,value='Set Cube Build Order...',UVALUE='setorder', $
                    /SEPARATOR)
   wMustCal=widget_button(cube,VALUE='Aperture(s)...',UVALUE='showaperture')
+  ;;-------------
+  wMustSel=[wMustSel,$
+            widget_button(cube,VALUE='Set Background from Rec(s)...', $
+                          UVALUE='setbackgroundfromrecs',/SEPARATOR)]
+  (*self.wInfo).MUST_BACK= $
+     [widget_button(cube,VALUE='View Background...', $
+                    UVALUE='viewbackground'), $
+      widget_button(cube,VALUE='View Background (new viewer)..', $
+                    UVALUE='viewbackground-new'), $
+      widget_button(cube,VALUE='Remove Background...', $
+                    UVALUE='remove-background')]
   wMustCube=[wMustCube, $
              ;;-------------
              widget_button(cube,VALUE='View Cube...',UVALUE='viewcube', $
@@ -503,7 +521,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   if keyword_set(spn) then $
      self->SetProjectName,TITLE='New Project Name'
   self->UpdateAll
-  XManager,'CubeProj_Show:'+self.ProjectName, base,/NO_BLOCK, $
+  XManager,'CubeProj_Show:'+self.ProjectName+self.savefile, base,/NO_BLOCK, $
            EVENT_HANDLER='CubeProj_show_event',CLEANUP='CubeProj_show_kill'
 end
 
@@ -546,10 +564,12 @@ end
 ;=============================================================================
 ;  Open - Open a Project and show it
 ;=============================================================================
-pro CubeProj::Open,PROJECT=proj,_EXTRA=e
-  xf,pname,/RECENT,FILTERLIST=['*.cpj','*.*','*'],$
-     TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0, $
-     /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
+pro CubeProj::Open,pname,PROJECT=proj,_EXTRA=e
+  if size(pname,/TYPE) ne 7 then begin 
+     xf,pname,/RECENT,FILTERLIST=['*.cpj','*.*','*'],$
+        TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0, $
+        /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
+  endif 
   if size(pname,/TYPE) ne 7 then return ;cancelled
   proj=self->Load(pname)
   if NOT obj_valid(proj) then return
@@ -950,6 +970,10 @@ pro CubeProj::UpdateButtons
      widget_control, ((*self.wInfo).MUST_CUBE)[i], $
                      SENSITIVE=ptr_valid(self.CUBE)
   
+  for i=0,n_elements((*self.wInfo).MUST_BACK)-1 do $ 
+     widget_control, ((*self.wInfo).MUST_BACK)[i], $
+                     SENSITIVE=ptr_valid(self.BACKGROUND)
+  
   widget_control, (*self.wInfo).MUST_SAVE_CHANGED,SENSITIVE= $
                   strlen(self.SaveFile) ne 0 AND keyword_set(self.Changed)
 end
@@ -1015,6 +1039,15 @@ pro CubeProj::ViewCube,NEW_VIEWER=new
 end
 
 ;=============================================================================
+;  ViewBackground - View the background in an existing or new viewer
+;=============================================================================
+pro CubeProj::ViewBackground,NEW_VIEWER=new
+  if NOT ptr_valid(self.BACKGROUND) then self->Error,'No background to view'
+  self->FindViewer,NEW_VIEWER=new
+  self->Send,/BACKGROUND
+end
+
+;=============================================================================
 ;  ViewRecord - View the record(s) in an existing or new viewer
 ;=============================================================================
 pro CubeProj::ViewRecord,rec,NEW_VIEWER=new
@@ -1044,7 +1077,7 @@ pro CubeProj::DisableRecord,recs,DISABLE=dis
 end
 
 ;=============================================================================
-;  EnableRecord - Remove the records disable flag.
+;  RenameRecord - Rename a record
 ;=============================================================================
 pro CubeProj::RenameRecord,rec,name
   self->RecOrSelect,rec
@@ -1059,6 +1092,35 @@ pro CubeProj::RenameRecord,rec,name
   (*self.DR)[rec[0]].ID=name
   self.Changed=1b
   self->UpdateAll
+end
+
+
+;=============================================================================
+;  SetBackgroundFromRecs - Set the BCD background from selected recs.
+;=============================================================================
+pro CubeProj::SetBackgroundFromRecs,recs
+  self->RecOrSelect,recs
+  if recs[0] eq -1 then return
+  n=n_elements(recs) 
+  if n ge 3 then begin 
+     list=["Average","Average + Min/Max Trim"]
+     sel=1 
+  endif else begin 
+     list=["Average"]
+     sel=0
+  endelse 
+  choice=multchoice('Create background from '+strtrim(n,2)+' recs using:', $
+                    list,TITLE='Set BCD Background', $
+                    PARENT_GROUP=self->TopBase(),/MODAL,SELECT=n gt 1)
+  choice=choice[0]
+  
+  if choice eq -1 then return
+  bcds=self->BCD(recs)
+  back=imcombine(bcds,/AVERAGE,REJECT_MINMAX=choice eq 1)
+  self.BACKGROUND=ptr_new(back,/NO_COPY)
+  self.BACK_CNT=n
+  self.BACK_DATE=systime(/JULIAN)
+  self->UpdateButtons
 end
 
 ;=============================================================================
@@ -1129,7 +1191,10 @@ function CubeProj::Info,entries, NO_DATA=nd
        (' -- '+strtrim(self->N_Records(),2)+' BCDs '):"")]
   str=[str,' Using IRS Calib object '+(self.cal_file?self.cal_file:"(none)")+ $
        " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
-  
+  str=[str,' Background: '+ $
+       (ptr_valid(self.BACKGROUND)? $
+        (strtrim(self.back_cnt,2)+' records, '+jul2date(self.BACK_DATE)): $
+        "none")]
   aps=' Apertures:'
   if NOT ptr_valid(self.APERTURE) OR self.MODULE eq '' then begin 
      aps=aps+' (default)' 
@@ -1262,7 +1327,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            CALIB=calib, MODULE=module, APERTURE=ap, $
                            PROJECT_NAME=pn,DR=dr, TLB_OFFSET=tboff, $
                            TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
-                           ASTROMETRY=astr,POSITION_ANGLE=pa
+                           ASTROMETRY=astr,POSITION_ANGLE=pa,BACKGROUND=bg
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -1310,6 +1375,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   if arg_present(version) then version=self.version
   if arg_present(astr) then astr=self->CubeAstrometryRecord()
   if arg_present(pa) then pa=self.PA
+  if arg_present(bg) && ptr_valid(self.BACKGROUND) then bg=*self.BACKGROUND
 end
 
 ;=============================================================================
@@ -1354,11 +1420,34 @@ end
 ;  BCD
 ;=============================================================================
 function CubeProj::BCD, which,UNCERTAINTY=unc,BMASK=bmask
-  if which lt 0 or which ge self->N_Records() then $
-     self->Error,"Invalid record number: "+strtrim(which,2)
-  return,*(*self.DR)[which].BCD
-  if arg_present(unc) then unc=*(*self.DR)[which].UNC
-  if arg_present(bmask) then bmask=*(*self.DR)[which].BMASK
+  if ~array_equal(which lt 0 or which ge self->N_Records(),0b) then $
+     self->Error,"Invalid record number: "+strjoin(strtrim(which,2),",")
+  nw=n_elements(which) 
+  if nw eq 1 then begin 
+     if arg_present(unc) && ptr_valid((*self.DR)[which].UNC) then $
+        unc=*(*self.DR)[which].UNC
+     if arg_present(bmask) && ptr_valid((*self.DR)[which].BMASK) then $
+        bmask=*(*self.DR)[which].BMASK
+     return,*(*self.DR)[which].BCD
+  endif else begin 
+     bcds=(*self.DR)[which].BCD
+     s=size(*bcds[0],/DIMENSIONS)
+     s=[s,nw]
+     ret=make_array(/FLOAT,/NOZERO,s)
+     for i=0,nw-1 do ret[0,0,i]=*bcds[i]
+     if arg_present(unc) && array_equal(ptr_valid((*self.DR)[which].UNC),1b) $
+     then begin 
+        unc=make_array(/FLOAT,s)
+        for i=0,nw-1 do unc[0,0,i]=*(*self.DR)[which[i]].UNC
+     endif 
+     if arg_present(bmask) && $
+        array_equal(ptr_valid((*self.DR)[which].BMASK),1b) $
+     then begin 
+        bmask=make_array(/INTEGER,s)
+        for i=0,nw-1 do bmask[0,0,i]=*(*self.DR)[which[i]].BMASK
+     endif 
+     return,ret
+  endelse 
 end
 
 ;=============================================================================
@@ -2181,6 +2270,7 @@ pro CubeProj::BuildCube
      rev_acc=*(*self.DR)[dr].REV_ACCOUNT
      rev_min=(*self.DR)[dr].REV_MIN
      bcd=*(*self.DR)[dr].BCD
+     if ptr_valid(self.BACKGROUND) then bcd-=*self.BACKGROUND
      use_unc=ptr_valid((*self.DR)[dr].UNC)
      if use_unc then unc=*(*self.DR)[dr].UNC
      
@@ -2768,7 +2858,7 @@ end
 ;=============================================================================
 ;  Send - Send One of our messages
 ;=============================================================================
-pro CubeProj::Send,RECORD=record,CUBE=cube
+pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back
   if keyword_set(cube) then begin 
      self->MsgSend,{CUBEPROJ_CUBE, $
                     self,$
@@ -2777,6 +2867,14 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
                     self.MODULE,self.WAVELENGTH}
      return
   endif
+  if keyword_set(back) then begin 
+     self->MsgSend,{CUBEPROJ_RECORD, $
+                    self,self->ProjectName()+' Background',self.MODULE, $
+                    self.ORDER,self.CAL,self.BACKGROUND,self.BACKGROUND_UNC, $
+                    ptr_new(),ptr_new()}
+     return
+  endif
+  
   nrec=n_elements(record) 
   if nrec eq 0 then return
   
@@ -2800,6 +2898,10 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
      mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
      str=string(FORMAT='(%"%s <Stack of %d recs>")', $
                 self->ProjectName(),nrec)
+     if ptr_valid(self.BACKGROUND) then begin 
+        ptr_free,self.SCALED_BACK
+        self.SCALED_BACK=ptr_new(nrec * *self.BACKGROUND)
+     endif
   endif else begin 
      bcd_p=rec.BCD
      unc_p=rec.UNC
@@ -2810,7 +2912,8 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
   endelse 
   self->MsgSend,{CUBEPROJ_RECORD, $
                  self,str,self.MODULE,self.ORDER,self.CAL, $
-                 bcd_p,unc_p,mask_p}
+                 bcd_p,unc_p,mask_p, $
+                 stackQ?self.SCALED_BACK:self.BACKGROUND}
 end
 
 ;=============================================================================
@@ -2834,7 +2937,9 @@ end
 pro CubeProj::Cleanup
   heap_free,self.DR
   heap_free,self.MERGE
-  ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC,self.wInfo
+  ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC, $
+           self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
+           self.wInfo
   if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->ObjMsg::Cleanup
 end
@@ -2886,6 +2991,11 @@ pro CubeProj__define
      CUBE_UNC:  ptr_new(),$     ;a pointer to the nxmxl uncertainty cube
      CUBE_SIZE: [0L,0L,0L],$    ;the size of the cube, (n,m,l)
      CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
+     BACKGROUND: ptr_new(),$    ;the background image (if any) to subtract
+     BACKGROUND_UNC:ptr_new(),$ ;the uncertainty in the background
+     SCALED_BACK: ptr_new(), $  ;the scaled background for stacks
+     BACK_DATE: 0.0D, $         ;date background created
+     BACK_CNT:0, $              ;count of records used to create background
      NSTEP:[0L,0L], $           ;parallel (col), perpendicular (row) steps
      STEP_SIZE: [0.0D,0.0D], $  ;parallel, perpendicular slit step sizes (deg)
      PLATE_SCALE:0.0D, $        ;the plate scale (degrees/pixel)
@@ -2961,15 +3071,17 @@ pro CubeProj__define
          nsel_sav: 0, $          ;save number of selected records
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
-         MUST_SELECT:lonarr(15),$ ;the SW buttons which require any selected
+         MUST_SELECT:lonarr(16),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
          MUST_PROJ:0L, $        ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
-         MUST_CUBE:lonarr(4)}   ;SW button requires valid cube created.
+         MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
+         MUST_BACK:lonarr(3)}   ;background record must be set
 
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
-       CAL:obj_new(),BCD:ptr_new(),UNC:ptr_new(),BMASK:ptr_new()}
+       CAL:obj_new(),BCD:ptr_new(),UNC:ptr_new(),BMASK:ptr_new(), $
+       BACKGROUND:ptr_new()}    ;XXX UNC
 end
 
 
