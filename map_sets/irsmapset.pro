@@ -200,10 +200,10 @@ end
 ;                    array of {IRS_MAPSET} structures is stored.
 ;=============================================================================
 pro IRSMapSet::LoadDefaultSets
+  @cubism_dir
   if ptr_valid(self.map_sets) then heap_free,self.map_sets
-  cdir=(routine_info('irsmapset',/SOURCE,/FUNCTIONS)).PATH
-  cdir=strmid(cdir,0,strpos(cdir,path_sep(),/REVERSE_SEARCH))
-  files=file_search(filepath(ROOT=cdir,'*.map'),/TEST_READ,COUNT=cnt)
+  files=file_search(filepath(ROOT=cubism_dir,SUBDIRECTORY='map_sets','*.map'),$
+                    /TEST_READ,COUNT=cnt)
   if cnt eq 0 then return
   self->LoadSets,files
 end
@@ -249,7 +249,7 @@ pro IRSMapSet::ReadMapSetFile,file,NAME=name,FORERANGES=fr,BACKRANGES=br, $
      weights=fltarr(2,nw,/NOZERO)
      readf,unit,weights
   endif 
-  close,unit
+  free_lun,unit
 end
 
 pro IRSMapSets::Cleanup
