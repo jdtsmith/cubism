@@ -220,6 +220,7 @@ pro CubeRec::FullEvent,ev
      self.wCompass: begin
         sel=widget_info(self.wCompass,/BUTTON_SET)
         if sel then self.oRose->On else self.oRose->Off
+        return
      end
      
      self.wBrowse: begin 
