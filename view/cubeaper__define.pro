@@ -151,7 +151,7 @@ end
 ;  On - Editing on
 ;============================================================================
 pro CubeAper::On
-  if (self.mode AND 1b) eq 0b then return
+  if (self.mode AND 1b) eq 0b then return ;not display
   self->tvPlug::On
   self.oDraw->MsgSignup,self,/TVDRAW_SNAPSHOT,/DRAW_BUTTON
   self.oDraw->ReDraw,/SNAPSHOT     
@@ -160,7 +160,7 @@ end
 ;=============================================================================
 ;  Off - Editing off
 ;============================================================================
-pro CubeAper::Off,RESET=reset
+pro CubeAper::Off,RESET=reset,NO_REDRAW=nrd
   self.working_on=-1
   if keyword_set(reset) then self.mode=0b else $
      self.mode=self.mode AND NOT 2b ;remove editing bit
@@ -171,7 +171,7 @@ pro CubeAper::Off,RESET=reset
   widget_control, self.wWSButs[2],SENSITIVE=0 ;lock non-sensitive
   self.oDraw->MsgSignup,self,DRAW_BUTTON=0,DRAW_MOTION=0, $
      TVDRAW_SNAPSHOT=self.mode AND 1b
-  if self->On() then self.oDraw->ReDraw,/SNAPSHOT
+  if self->On() AND ~keyword_set(nrd) then self.oDraw->ReDraw,/SNAPSHOT
   self->tvPlug::Off
 end
 ;;*************************End OverRiding methods******************************
