@@ -1,4 +1,191 @@
 ;+
+; NAME:  
+;
+;    TVColor
+;
+; CONTACT:
+;
+;    UPDATED VERSIONs of SMART and more information can be found at:
+;       http://isc.astro.cornell.edu/smart/download
+;
+; DESCRIPTION:
+;    
+;    XXX WRITE THE DOCUMENTATION
+;    
+; CATEGORY:
+;
+;    SMART IRS Spectral Reduction, Analysis and Processing.
+;    Ectoplasmitronication, Frobnicating Thingamajigies.
+;    	
+; CALLING SEQUENCE:
+;
+;    smart_pro, req_arg1, req_arg2, ..., output_arg1, 
+;       [opt_arg1,optoutput_arg1,...,
+;       /BOOLEAN_KEYWORD,KEYWORD=,OUTKEYWORD=]
+;                  or
+;    sm=smart_func(req_arg1, req_arg2, ..., output_arg1, 
+;       [opt_arg1,optoutput_arg1,...,
+;       /BOOLEAN_KEYWORD,KEYWORD=,OUTKEYWORD=])
+;
+; INPUT PARAMETERS:
+;
+;    req_arg1: Describe the inputs.  Don't forget to [M-q] to clean up
+;       the description text.  Follow the indenting (emacs will do it
+;       for you if you help).  Notice all subsequent lines of a body
+;       of text which serves as a single item are indented 3 spaces.
+;			
+; OPTIONAL INPUT PARAMETERS:
+;
+;    opt_arg1: Describe the optional inputs.  Don't forget to [M-q] to
+;       clean up the description text.  May be unnecessary.
+;
+;    opt_arg2: Leave a blank line between entries, as so.  Follow the 
+;       indentation.
+;			
+; INPUT KEYWORD PARAMETERS:
+;
+;    KEYWORD: Describe the input keywords.  Notice how keywords are
+;       capitalized. Don't forget to [M-q] to clean up the description
+;       text. May be unnecessary.
+;
+;    BOOLEAN_KEYWORD: Aside from the leading `/' in the calling
+;       sequence, boolean keywords are described in the same way.
+;			
+; OUTPUT KEYWORD PARAMETERS:
+;
+;    OUTKEYWORD: Describe the output keywords.  Don't forget to [M-q]
+;       to clean up the description text. May be unnecessary.
+;			
+; OUTPUTS:
+;
+;    output_arg1: Describe the outputs, labelling argument outputs
+;       with the argument name.  Don't forget to [M-q] to clean up the
+;       description text.  Function outputs don't need a label.  May
+;       be unnecessary.
+;
+; OPTIONAL OUTPUTS:
+;
+;    optoutput_arg1: Describe the optional output.  May be
+;       unnecessary.
+;
+; COMMON BLOCKS:
+;
+;    COMMON_BLOCK1: I hope you have a good reason for using a common
+;       block.  Omit otherwise
+;
+; SIDE EFFECTS:
+;
+;    Especially for procedures with no return values.  May be unnecessary.
+;
+; RESTRICTIONS:
+;
+;    Any restrictions?
+;
+; METHODS:
+;
+;    N.B. The `METHODS' section is used in class definition files only
+;    (like class__define.pro) which contain all the methods of that
+;    class.  In it, only the PUBLIC methods should be documented in
+;    this header.  Methods which are internal to the class, and not
+;    for general consumption, should be informally documented in the
+;    body of the code.  Within each individual METHOD section, the
+;    subsections DESCRIPTION, and INPUT PARAMETERS through
+;    RESTRICTIONS above (which should be omitted) can be included for
+;    each method, as appropriate, and at an increased indentation.
+;    See those sections above for style guidelines.
+;
+;    INIT:  (alway start with the INIT method function)
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('Class',req_arg1, req_arg2, ..., 
+;             [opt_arg1,...,/BIN_KEYWORD,KEYWORD=])
+;
+;       INPUT PARAMETERS:
+;
+;          req_arg1:
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          KEYWORD:
+;       ...
+;
+;    METHOD1:
+;  
+;	DESCRIPTION:
+;
+;	   This method makes possible short duration levitation.
+;	
+;       CALLING SEQUENCE:
+;
+;          obj->Method1, req_arg1, req_arg2, ..., 
+;             [opt_arg1,...,/BIN_KEYWORD,KEYWORD=]
+;
+;       INPUT PARAMETERS:
+;
+;          req_arg1:
+;       ...
+;    ...
+;
+; PROCEDURE:
+;
+;    Notable routines or classes (*not* parent classes -- see next entry)
+;    it relies on.
+;
+; NOTES:
+;  
+;    Additional description and other information which doesn't fit elsewhere.
+;
+; INHERITANCE TREE:
+;
+;    GrandParent1--+
+;                   \
+;     GrandParent2--Parent1--ThisClass  (where appropriate... usually linear)
+;                            /
+;    GrandParent3--Parent2--+ 
+;
+; EXAMPLE:
+;
+;    a=some_init()
+;    SMART_ROUTINE,a,b,KEYWORD=foo
+;    print,foo
+;
+; MODIFICATION HISTORY:
+;    $Log$
+;    Revision 1.5  2001/09/26 21:48:26  jdsmith
+;    	Minor color table fixup. !D.TABLE_SIZE!=!D.N_COLORS
+;    	Added documentation.
+;
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2001 Cornell University
+;
+;  This file is part of SMART.
+;
+;  SMART is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  SMART is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with SMART; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+;  02111-1307, USA.
+;
+;##############################################################################
+
+
+
+;+
 ; NAME: tvColor
 ;
 ; PURPOSE: An object for manipulating color.
@@ -42,8 +229,9 @@
 ;			available by name via the method GetColor.
 ;			If absent, no colors are reserved.  Reserve colors
 ;			can be retrieved with the method tvColor::GetReserve.
-;		Top:	The top of the colormap to fill to, including space
-;			for reserve colors.  Defaults to !D.N_COLORS-1-nreserve
+;               Top:    The top of the colormap to fill to, including
+;                       space for reserve colors.  Defaults to
+;                       !D.TABLE_SIZE-1-nreserve
 ;		Bottom:	The bottom of the colormap to fill from, defaulting to
 ;			0.
 ; INPUTS:	parent:	The widget id of the object widget's parent
@@ -336,7 +524,7 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
                        MOUSE_MODE=mm,SLIDERS=sld
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   
-  if n_elements(top) eq 0 then top=!D.N_COLORS-1 
+  if n_elements(top) eq 0 then top=!D.TABLE_SIZE-1 
   if n_elements(bot) eq 0 then bot=0
   
   ;; load up the reserve colors, if asked.
