@@ -516,7 +516,7 @@ end
 ;=============================================================================
 ;  ReDraw - Quickly redraw the already computed draw image.
 ;=============================================================================
-pro tvDraw::ReDraw,SNAPSHOT=snap
+pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era
 ;   if keyword_set(snap) then begin 
 ;      print,'redrawing with snap'
 ;      help,/traceback
@@ -524,7 +524,7 @@ pro tvDraw::ReDraw,SNAPSHOT=snap
   snap=keyword_set(snap) 
   if snap then begin 
      self->SetWin
-;     erase
+     if keyword_set(era) then erase
   endif 
   tv, *self.imdisp, self.pan[0], self.pan[1] 
   if snap then self->Snapshot
@@ -575,6 +575,7 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
                           self.offset[1]:self.offset[1]+self.dispsize[1]-1], $
             TOP=self.top-self.bottom,/NAN,MIN=self.scale_min?self.min:void, $
             MAX=self.scale_max?self.max:void)
+  
   self.scale_min=(self.scale_max=0)
   
   ;; Resize it
