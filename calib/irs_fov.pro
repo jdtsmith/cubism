@@ -114,7 +114,7 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos, $
         n_elements(pos) eq 0 then $
         message,'Must specify Module,Order and Position'
      
-     if ord eq 3 and strmid(strupcase(md),1) eq 'L' then ord=1
+     if ord eq 3 and strmid(strupcase(md),1) eq 'L' then ord=2
      wh=where(f.module eq strupcase(md) AND $
               (f.order eq long(ord) OR $
                (strmid(f.module,1) eq 'H' AND f.order eq 0)) AND $
