@@ -1,29 +1,24 @@
 ;+
 ; NAME:  
 ;
-;    SMART_Calib
-;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
+;    IRS_Calib
 ;
 ; DESCRIPTION:
 ;    
-;    A class defining SMART calibration objects, each of which hold a
+;    A class defining IRS calibration objects, each of which hold a
 ;    specific set of WAVSAMP, order, wavelength, and tilt solution
 ;    calibration data for all orders of all modules.
 ;    
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
-;    Extraction and Calibration
+;    IRS Spectral Reduction, Analysis and Processing.
+;    Calibration
 ;    	
 ; COMMON BLOCKS:
 ;
-;    SMART_DIR: Included through file smart_dir.pro.  Defines the path
-;       location of the SMART calibration directory.  This path,
-;       smart_calib_dir, is auto-defined if it doesn't yet exist, and
+;    IRS_DIR: Included through file irs_dir.pro.  Defines the path
+;       location of the IRS calibration directory.  This path,
+;       irs_calib_dir, is auto-defined if it doesn't yet exist, and
 ;       is taken from the !PATH.
 ;
 ; METHODS:
@@ -32,7 +27,7 @@
 ;
 ;       CALLING SEQUENCE:
 ;
-;          obj=obj_new('SMART_Calib',name)
+;          obj=obj_new('IRS_Calib',name)
 ;
 ;       OPTIONAL INPUT PARAMETERS:
 ;
@@ -81,7 +76,7 @@
 ;
 ;	OUTPUTS:
 ;
-;          record: The SMART_CalibRec record structure for the given
+;          record: The IRS_CalibRec record structure for the given
 ;             module and order.
 ;
 ;    Orders:
@@ -107,16 +102,17 @@
 ;    
 ;	DESCRIPTION:
 ;
-;          Return a list of SMART_WAVSAMP_PSEUDORECT structures for
+;          Return a list of IRS_WAVSAMP_PSEUDORECT structures for
 ;          the given module, order and aperture.  If, for a given
-;          module and order, no clipped SMART_WAVSAMP exists, create
+;          module and order, no clipped IRS_WAVSAMP exists, create
 ;          one, append it to the list, and return.  WAVSAMP clipping
 ;          is very expensive.  This serves to cache commonly used
 ;          apertures for quicker access to extraction boundaries.
 ;          	
 ;       CALLING SEQUENCE:
 ;
-;          wavsamp=obj->GetWAVSAMP(module,order, [aperture, /FULL])
+;          wavsamp=obj->GetWAVSAMP(module,order, [aperture, /FULL,
+;                                  /NO_CACHE,/PIXEL_BASED,SLIT_WIDTH=])
 ;          
 ;	INPUT PARAMETERS:
 ;
@@ -128,26 +124,41 @@
 ;            both SL and LL.z
 ;
 ;	OPTIONAL INPUT PARAMETERS:
-;
+;	
 ;          aperture: A structure of the form:
 ;          
-;               {SMART_APERTURE, $
+;               {IRS_APERTURE, $
 ;                  Low: [low_top,low_bottom], $
 ;                  High:[high_top,high_bottom]}
 ;             
 ;             specifying the normalized coordinates along the slit for
 ;             low and high aperture boundaries.  See
-;             SMART_Aperture__define for more information.  If
+;             IRS_Aperture__define for more information.  If
 ;             omitted, the full slit aperture is used.
 ;             
 ;       INPUT KEYWORD PARAMETERS:
 ;
 ;          FULL: If set, the full slit aperture is used, and any
 ;             passed aperture argument is ignored.
+;
+;          NO_CACHE: If set, any WAVSAMP created will not be cached.
+;             This helps save memory.
 ;             
+;          PIXEL_BASED: If set, a pixel-based WAVSAMP is returned.  If
+;             no full, pixel-based WAVSAMP yet exists from which to
+;             generate this WAVSAMP, it is created.
+;
+;          SLIT_WIDTH: If PIXEL_BASE is set, the width of the PR in
+;             pixels.  Defaults to 1.  
+;
+;          SAVE_POLYGONS: If set, the polygons created by clipping to
+;             the detector grid are saved.  These polygons are
+;             required for building spectral cubes from step and stare
+;             maps.
+;
 ;	OUTPUTS:
 ;
-;          wavsamp: The SMART_WAVSAMP structure for the given module,
+;          wavsamp: The IRS_WAVSAMP structure for the given module,
 ;             order and aperture.  See definition at end of file.
 ;            
 ;    ReadCalib:
@@ -155,7 +166,7 @@
 ;	DESCRIPTION:
 ;
 ;          Read and parse calibration data from files and populate the
-;          SMART_Calib object.
+;          IRS_Calib object.
 ;	
 ;       CALLING SEQUENCE:
 ;
@@ -171,27 +182,28 @@
 ;       INPUT KEYWORD PARAMETERS:
 ;
 ;          ONLY: If set, only versions explicitly passed with the
-;             _VERSION keywords described below will be read, as
+;             *_VERSION keywords described below will be read, as
 ;             opposed to the normal case of the *latest* version being
 ;             used if none is specified.
 ;             
 ;          WAVSAMP_VERSION: The version number of the WAVSAMP file to
 ;             use.  Defaults to the latest version, unless ONLY is
 ;             set, in which case no WAVSAMP data is read or set for
-;             the module(s).  A version of 0 (zero) means use the
-;             latest version.
+;             the module(s) unless specified here.  A version of 0
+;             (zero) means use the latest version.
 ;
 ;          ORDER_VERSION: The version number of the order
 ;             position/wavelength solution file to use.  Defaults to
 ;             the latest version, unless ONLY is set, in which case no
-;             ORDER data is read or set for the module(s).  A version
-;             of 0 (zero) means use the latest version.
+;             ORDER data is read or set for the module(s) unless
+;             specified here.  A version of 0 (zero) means use the
+;             latest version.
 ;
 ;          TILT_VERSION: The version number of the tilt solution file
 ;             to use.  Defaults to the latest version, unless ONLY is
 ;             set, in which case no TILT data is read or set for the
-;             module(s).  A version of 0 (zero) means use the latest
-;             version.
+;             module(s) unless specified here.  A version of 0 (zero)
+;             means use the latest version.
 ;            
 ;    SetRecord:
 ;    
@@ -206,7 +218,7 @@
 ;
 ;	INPUT PARAMETERS:
 ;
-;          record: The SMART_CalibRec record structure to be recorded
+;          record: The IRS_CalibRec record structure to be recorded
 ;            in the object.
 ;            
 ;          
@@ -216,7 +228,7 @@
 ;    
 ; NOTES:
 ;    
-;    IRS calibration data is generated at the SSC, and used by SMART
+;    IRS calibration data is generated at the SSC, and used by IRS
 ;    for spectral extractions.  The three important types of
 ;    calibration files, all of which come in the form of an IPAC
 ;    table, are:
@@ -235,31 +247,43 @@
 ;       solutions, i.e. the angle the slit image makes with respect to
 ;       the detector rows.
 ;     
-;    The SMART_Calib class should encapsulate all calibration data
+;    The traditional WAVSAMP is driven by wavelength: a starting
+;    wavelength is picked, and each subsequent wavelength is computed
+;    using a resolution model.  It does not concern itself with the
+;    pixel boundaries, instead computing these as an artifact.
+;    Another WAVSAMP formulation can be computed by demanding fixed
+;    width samples, aligned with the pixel grid as nearly as possible.
+;    This form of WAVSAMP is called pixel-based, and is available here
+;    (look for the PIXEL_BASED keyword).  The pixel-based WAVSAMP
+;    offers some advantages for optimal extraction, and is required
+;    for spectral-mapping data sets.  Both types can be accomodated by
+;    a single IRS_Calib object.
+;
+;    The IRS_Calib class should encapsulate all calibration data
 ;    necessary for full reduction of IRS spectra, and should be
-;    expanded as appropriate.  Each individual SMART_Calib object
+;    expanded as appropriate.  Each individual IRS_Calib object
 ;    represents a particular snapshot of calibration data, which may
 ;    evolve over time, due to updates in the calibration thread, or
 ;    changing instrumental preformance.  This object can be loaded and
-;    saved into a SMART_Proj (either fully, or just by name), in order
+;    saved into a IRS_Proj (either fully, or just by name), in order
 ;    to associate a given extraction with the calibration parameters
 ;    associated with it.
 ;
 ;    See the document "SSC--ISC: Interface Products and Conventions"
 ;    for further description of these calibration products.
 ;
-;    SMART_Calib object sets can be found in the subdirectory
-;    calib/sets, under the smart installation path.
+;    IRS_Calib object sets can be found in the subdirectory
+;    calib/sets.
 ;
 ; INHERITANCE TREE:
 ;
-;     SMART_Calib
+;     IRS_Calib
 ;
 ; EXAMPLE:
 ; 
 ;     Populate a new cal object with all the latest calibration data:
 ;     
-;    cal=obj_new('SMART_Calib','2002-04-01: Pre-Launch')
+;    cal=obj_new('IRS_Calib','2002-04-01: Pre-Launch')
 ;    cal->ReadCalib
 ;
 ;     Update the WAVSAMP to the latest version for long-low only:
@@ -269,6 +293,8 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;	2002-08-23 (J.D. Smith): Added variable-width pixel-based WAVSAMPs.
+;	2002-04-30 (J.D. Smith): Added pixel-based WAVSAMPs.	
 ;       2001-12-08 (J.D. Smith): Written.
 ; 
 ;-
@@ -277,54 +303,64 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
 
 ;=============================================================================
 ;       GetProperty - Get object properties
 ;=============================================================================
-pro SMART_Calib::GetProperty, NAME=name
+pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
+                              WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
+                              DETSIZE=sz
+  rec=self->GetRecord(module,order,/MUST_EXIST)
+  if size(rec,/TYPE) ne 8 then return
   if arg_present(name) then name=self.name
+  if arg_present(sl) then sl=rec.SLIT_LENGTH
+  if arg_present(wc) then  wc=rec.WAV_CENTER
+  if arg_present(wmn) then  wmn=rec.WAV_MIN
+  if arg_present(wmx) then  wmx=rec.WAV_MAX
+  if arg_present(sz) then sz=self.detsize[*,0>module<5]
 end
 
 ;=============================================================================
 ;       SetProperty - Set object properties
 ;=============================================================================
-pro SMART_Calib::SetProperty,NAME=name
+pro IRS_Calib::SetProperty,NAME=name
   if n_elements(name) eq 0 then self.name=name
 end
 
 ;=============================================================================
 ;       Print - Print a listing of what this cal object contains.
 ;=============================================================================
-pro SMART_Calib::Print, modules
+pro IRS_Calib::Print, modules, orders
   if n_elements(modules) eq 0 then modules=indgen(4)
-  print,' == SMART Calibration Object: '+self.Name+' =='
+  print,' == IRS Calibration Object: '+self.Name+' =='
   for i=0,n_elements(modules)-1 do begin 
-     md=smart_module(modules[i])
-     module=smart_module(md,/TO_NAME)
+     md=irs_module(modules[i])
+     module=irs_module(md,/TO_NAME)
      no=ptr_valid(self.cal[md])?n_elements(*self.cal[md]):0
      print,FORMAT='(%"\n ==> Module %s: %s")',module, $
            (no gt 0?strtrim(n_elements(*self.cal[md]),2)+ $
             " orders.":" not loaded.")
+     if no eq 0 then continue
+     if n_elements(orders) eq 0 then ords=indgen(no) else $
+        ords=where_array((*self.cal[md]).order,[orders],no,/SWITCHAB)
      if no eq 0 then continue
      print,''
      wsf=self.WAVSAMP_FILE[md]
@@ -335,93 +371,356 @@ pro SMART_Calib::Print, modules
      if tif ne '' then print,FORMAT='(A12,": ",A)', 'TILT',tif
      print,''
      for j=0,no-1 do begin 
-        rec=(*self.cal[md])[j]
-        npr=n_elements(*(*rec.WAVSAMPS)[0].PR)
-
-        print,FORMAT='(%"    ==> Order %2s%d  (%s) -- %03d samples: ")', $
-              module,rec.order,rec.Date eq 0.0D?"--":jul2date(rec.Date),npr
-        nw=n_elements(*rec.WAVSAMPS) 
-        
-        print,"         A:"+strjoin(string(FORMAT='(G10.3)',rec.A))
-        print,"         B:"+strjoin(string(FORMAT='(G10.3)',rec.B))
-        print,"         C:"+strjoin(string(FORMAT='(G10.3)',rec.C))
-        print,"         Apertures:"
+        rec=(*self.cal[md])[ords[j]]
+        print,FORMAT='(%"    ==> Order %2s%d  (%s): ")', $
+              module,rec.order,rec.Date eq 0.0D?"--":jul2date(rec.Date)
+        nw=ptr_valid(rec.WAVSAMPS)?n_elements(*rec.WAVSAMPS):0
+        print,"          A:"+strjoin(string(FORMAT='(G10.3)',rec.A))
+        print,"          B:"+strjoin(string(FORMAT='(G10.3)',rec.B))
+        print,"          C:"+strjoin(string(FORMAT='(G10.3)',rec.C))
+        print,"          SLIT_LENGTH:"+string(FORMAT='(G10.3)',rec.SLIT_LENGTH)
+        print,"          WAVELENGTH(min,center,max):"+ $
+              string(FORMAT='(3G10.3)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX)
+        if nw gt 0 then $
+           print,"          Apertures:" else $
+           print,"       No Apertures"
         for k=0,nw-1 do begin 
+           flags=""
            ws=(*rec.WAVSAMPS)[k]
-           print, FORMAT='(%"           %4.2f->%4.2f : %4.2f->%4.2f")', $
-                  ws.Aperture.low,ws.Aperture.high
-        endfor 
+           str=string(FORMAT='(%"            %4.2f->%4.2f : %4.2f->%4.2f' + $
+                      ' -- %03d samples")', $
+                      ws.Aperture.low,ws.Aperture.high, $
+                      n_elements(*(*rec.WAVSAMPS)[k].PR))
+           if ws.PIXEL_BASED ne 0.0 then $
+              flags=[string(FORMAT='("pixel-based, width=",F5.3)', $
+                            ws.SLIT_WIDTH)]
+           if ptr_valid((*ws.PR)[0].POLYGONS) then $
+              if flags[0] eq "" then flags=["with polygons"] else $
+              flags=[flags,"with polygons"]
+           nf=n_elements(flags) 
+           if flags[0] ne "" and nf gt 0 then $
+              str=str+" ("+string(FORMAT='('+strtrim(n_elements(flags),2)+ $
+                                  '(A,:,", "))',flags)+")"
+           print,str
+        endfor
         print,""
-     endfor 
-  endfor 
+     endfor
+  endfor
 end
 
 ;=============================================================================
 ;       Orders - Return the list of orders for a given module
 ;=============================================================================
-function SMART_Calib::Orders,module
-  m=smart_module(module)
+function IRS_Calib::Orders,module
+  m=irs_module(module)
   if NOT ptr_valid(self.cal[m]) then return,-1
   return,(*self.cal[m]).ORDER
 end
 
 ;=============================================================================
-;       GetWAVSAMP - Get the list of SMART_WAVSAMP_PSEUDORECT
-;                    structures for a given module, order, and
-;                    aperture (or the FULL aperture).
+;       FindWAVSAMP - Find and return the indices of WAVSAMPs matching
+;                     the criteria passed. The module and order
+;                     arguments are required, but if aperture is
+;                     omitted, and FULL isn't set, matching WAVSAMPs
+;                     of any aperture in that record will be returned.
+;                     The default is non-pixelbased, or, when
+;                     PIXEL_BASED is set, a SLIT_WIDTH of 1 (unless
+;                     specifically overriden).
 ;=============================================================================
-function SMART_Calib::GetWAVSAMP, module, order, aperture, FULL=full
+function IRS_Calib::FindWAVSAMP, module, order, aperture,COUNT=nsamp, $
+                                   PIXEL_BASED=pb, SLIT_WIDTH=width, $
+                                   FULL=full,RECORD=rec
   rec=self->GetRecord(module,order,/MUST_EXIST)
-  if size(rec,/TYPE) ne 8 then message,'No such record exists: '+ $
-     smart_module(module,/TO_NAME)+' Order: '+strtrim(order,2)
-  if n_elements(aperture) eq 0 or keyword_set(full) then $
-     aperture={low:[0.,0.],high:[1.,1.]}
-  if ptr_valid(rec.WAVSAMPS) then begin 
-     aps=(*rec.WAVSAMPS).Aperture
-     na=n_elements(aps)
-     match=where(total(aps.low eq rebin(aperture.low,2,na) AND $
-                       aps.high eq rebin(aperture.high,2,na),1) eq 2,cnt)
-     if cnt gt 0 then return,*(*rec.WAVSAMPS)[match[0]].PR
-  endif
+  if NOT ptr_valid(rec.WAVSAMPS) then begin 
+     nsamp=0
+     return,-1
+  endif 
   
-  ;; None exists for this aperture, so make a new one
-  ws=self->Clip(module,order,aperture) ;this creates new pointers
+  ;; Default to finding full aperture
+  if keyword_set(full) then begin 
+     aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
+  endif 
   
-  ;; And add it to the cache for rapid recovery.
-  if ptr_valid(rec.WAVSAMPS) then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] else $
-     rec.WAVSAMPS=ptr_new(ws)
+  if n_elements(pb) eq 0 then pb=0b ;default to non-pb
+  if n_elements(width) eq 0 then width=1.0 ;Default to 1xn PRs
   
-  ;; Just give the list of pseudo-rects
+  eps=1.e-5                 ;match tolerance
+  
+  ;; Find WAVSAMPs of the right type (pixel-based or no)
+  wh_pix=where((*rec.WAVSAMPS).PIXEL_BASED eq keyword_set(pb),nsamp)
+  if nsamp eq 0 then return,-1
+  
+  ;; Find WAVSAMP's with the right slit pixel width (if pixel-based)
+  if keyword_set(pb) then begin 
+     wh_width=where(abs((*rec.WAVSAMPS)[wh_pix].SLIT_WIDTH-width) $
+                    le eps, nsamp)
+     if nsamp gt 0 then wh_pix=wh_pix[wh_width] else return,-1
+  endif 
+  
+  ;; Search for one of this type already cached with this aperture
+  if n_elements(aperture) ne 0 then begin 
+     aps=(*rec.WAVSAMPS)[wh_pix].Aperture
+     wh_ap=where(total(abs(aps.low-rebin(aperture.low,2,nsamp)) le eps AND $
+                       abs(aps.high-rebin(aperture.high,2,nsamp)) le eps,1) $
+                 eq 2,nsamp)
+     if nsamp gt 0 then wh_pix=wh_pix[wh_ap] else return,-1
+  endif 
+
+  return,wh_pix
+end
+
+
+;=============================================================================
+;       GetWAVSAMP - Generate a list of IRS_WAVSAMP_PSEUDORECT
+;                    structures for a given module, order, and
+;                    aperture (or the FULL aperture), with the option
+;                    for PIXEL_BASED WAVSAMPs.  If a PIXEL_BASED clip
+;                    is requested, and the FULL PIXEL_BASED WAVSAMP
+;                    does not exist, it is created and cached.  The
+;                    newly created WAVSAMP is cached for fast
+;                    recovery, unless NO_CACHE is set.
+;=============================================================================
+function IRS_Calib::GetWAVSAMP, module, order, aperture, FULL=full, $
+                                  PIXEL_BASED=pb,SLIT_WIDTH=width, $
+                                  NO_CACHE=nc,SAVE_POLYGONS=sp
+  rec=self->GetRecord(module,order,/MUST_EXIST)
+  
+  ;; Default to the full aperture, even if FULL isn't set
+  if n_elements(aperture) eq 0 then begin 
+     aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
+  endif 
+
+  ws=self->FindWAVSAMP(module,order,aperture,COUNT=nsamp,FULL=full, $
+                       PIXEL_BASED=pb, SLIT_WIDTH=width)
+  
+  if keyword_set(sp) eq 0 then begin 
+     ;; return the first match
+     if nsamp gt 0 then return,*(*rec.WAVSAMPS)[ws[0]].PR 
+  endif else begin 
+     for i=0,nsamp-1 do begin 
+        ;; return the first match with saved polygons
+        pr=(*rec.WAVSAMPS)[ws[i]].PR
+        if ptr_valid((*pr)[0].POLYGONS) then return,*(*rec.WAVSAMPS)[ws[i]]
+     endfor 
+     self->FreeWAVSAMP,INDS=ws[0] ; free it, to create again later *with* POLYs
+  endelse
+  
+  ;; No clip is cached for this aperture, so make a new one
+  ws=self->Clip(module,order,aperture,PIXEL_BASED=pb,SLIT_WIDTH=width, $
+                SAVE_POLYGONS=sp,FULL=full,RECORD=rec)
+  
+  if size(ws,/TYPE) ne 8 then message,'Error clipping WAVSAMP.'
+  
+  ;; And add it to the cache for rapid recovery, unless asked not to
+  if keyword_set(nc) eq 0 then begin 
+     if ptr_valid(rec.WAVSAMPS) then begin 
+        ;; Only add it if it's a distinct wavesamp record
+        wh=where((*rec.WAVSAMPS).PR eq ws.PR,cnt)
+        if cnt eq 0 then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] 
+     endif else rec.WAVSAMPS=ptr_new(ws)
+  endif 
+  
+  self->SetRecord,rec
+  
+  ;; Return the list of pseudo-rects
   return,*ws.PR
 end
 
 ;=============================================================================
-;       Clip - Clip a WAVSAMP with specified aperture against the
-;              pixels, and return a pointer to a SMART_WAVSAMP
-;              structure.  Apertures are specified in normalized
-;              coordinates, with 0.0 at the "bottom" of the slit (at
-;              left), and 1.0 at right in the "top" of the slit:
-;
-;                     0.0                       1.0 
-;                      |=========================|
-;             
-;                        <--low                   
-;                      1-------------    high-->  
-;                      |             \-----------0 
-;                      2-------------            |
-;                                    \-----------3
+;       FreeWAVSAMP - Remove one or more WAVSAMPS from a record,
+;                     optionally removing ALL of them, or those
+;                     specified with indices provided by optional
+;                     keyword INDEX.
 ;=============================================================================
-function SMART_Calib::Clip, module, order, aper,FULL=clip_full
+pro IRS_Calib::FreeWAVSAMP, module, order, aperture,RECORD=rec,INDEX=inds, $
+                              ALL=all,_EXTRA=e
+
+  if n_elements(rec) eq 0 then rec=self->GetRecord(module,order,/MUST_EXIST)
+  if size(rec,/TYPE) ne 8 then return ;nothing to delete
+  if NOT ptr_valid(rec.WAVSAMPS) then return
+  
+  ;; Clean all of the records for this module and order
+  if keyword_set(all) then begin 
+     self->CleanWAVSAMP,*rec.WAVSAMPS
+     ptr_free,rec.WAVSAMPS
+     return
+  endif
+  
+  if n_elements(inds) eq 0 then $
+     inds=self->FindWAVSAMP(module,order,aperture,COUNT=nsamp,_EXTRA=e)
+  
+  if nsamp eq 0 then return
+  
+  ;; Normalize the indices
+  mask=bytarr(n_elements(*rec.WAVSAMPS))
+  mask[inds]=1b
+  inds=where(mask,COMPLEMENT=good,NCOMPLEMENT=ngood)
+  self->CleanWAVSAMP,(*rec.WAVSAMPS)[inds]
+  
+  if ngood eq 0 then ptr_free,rec.WAVSAMPS else $
+     *rec.WAVSAMPS=(*rec.WAVSAMPS)[good]
+  
+  self->SetRecord,rec
+end 
+
+;=============================================================================
+;       PixelWAVSAMP - Generate a list of pixel-based
+;                      IRS_WAVSAMP_PSEUDORECT structures for a given
+;                      module and order, for the FULL aperture, and
+;                      the SLIT_WIDTH indicated (defaults to 1).  In
+;                      contrast to the SSC-supplied WAVSAMP, these
+;                      have fixed sample widths, and align as closely
+;                      as possible to the pixel boundaries.  Set this
+;                      new WAVSAMP into the record, and clip the full
+;                      version.
+;=============================================================================
+pro IRS_Calib::PixelWAVSAMP, module, order,SLIT_WIDTH=width, _EXTRA=e
   rec=self->GetRecord(module,order,/MUST_EXIST)
-  if size(rec,/TYPE) ne 8 then return,-1
-  if NOT ptr_valid(rec.WAVSAMPS) then return, -1
-  aps=(*rec.WAVSAMPS).Aperture
+  B=rec.B
+  last=5
+  for last=5,0,-1 do if B[last] ne 0. then break
+  B=B[0:last]
+  
+  if n_elements(width) eq 0 then width=1.
+  
+  y_cen=findgen(128)+0.5        ;Pre-specified PSEUDORECT y pixel centers
+  for i=0,n_elements(y_cen)-1 do begin 
+     ;; Solve for the normalized wavelength roots, in normalized wavelength
+     ;;   y=Sum(i=0,5){ B[i]*lam_norm^i }
+     lam_norm=fz_roots([B[0]-y_cen[i],B[1:*]])
+     ;; only real, non-negative wavelengths, please
+     good=where(imaginary(lam_norm) eq 0.,cnt)
+     if cnt eq 0 then continue
+     lam_norm=lam_norm[good]
+     
+     ;; Convert to real wavlength: lam_norm=(lam-lam_c)/lam_c
+     lam=float(lam_norm)*rec.WAV_CENTER+rec.WAV_CENTER
+     good=where(lam ge 0.,cnt)
+     if cnt eq 0 then continue  ;;this sample is out of range.
+     lam=lam[good[0]] & lam_norm=float(lam_norm[good[0]])
+     if lam gt rec.wav_max or lam lt rec.wav_min then continue
+     x_cen=poly(lam_norm,rec.A)
+     
+     ;; We now have the exact center of the slit... rotate edges about edge
+     ;;   centers. 
+     ;; Use the previous bottom edge pair as the top edge, if available
+;      if n_elements(top_edge) ne 0 then begin 
+;         y=y_cen[i]+0.5
+;         bottom_edge=top_edge 
+;      endif else y=y_cen[i]-0.5
+;      while 1 do begin 
+;         theta=poly(y,rec.C)/!radeg ;angle in radians CCW from +x direction
+;         delX=cos(theta)*rec.SLIT_LENGTH/2.
+;         delY=sin(theta)*rec.SLIT_LENGTH/2.
+;         edge=[{X:x_cen-delX,Y:y-delY}, $ ; 1 ------> 0 or 2 ------> 3
+;               {X:x_cen+delX,Y:y+delY}]
+;         if n_elements(bottom_edge) eq 0 then begin ; first run through
+;            bottom_edge=edge 
+;            y=y_cen[i]+0.5       ;now do bottom edge
+;         endif else begin 
+;            top_edge=edge
+;            break
+;         endelse 
+;     endwhile 
+;     pr.x=[reverse(top_edge.X),bottom_edge.X]
+;     pr.y=[reverse(top_edge.Y),bottom_edge.Y]
+;     pr.angle=poly(y_cen[i],rec.C) ;average angle, in degrees
+     
+     ;; Form relative coordinates and rotate PR about the slit center.
+     y_rel=[1.,1.,-1.,-1.]*width/2.
+     x_rel=[rec.SLIT_LENGTH ,-rec.SLIT_LENGTH, $
+            -rec.SLIT_LENGTH,rec.SLIT_LENGTH]/2
+     theta=poly(y_cen[i],rec.C)
+     if theta ne 0. then begin 
+        ct=cos(theta/!radeg) & st=sin(theta/!radeg)
+        ;; Rotate about the PR center
+        xr=ct*x_rel-st*y_rel
+        yr=st*x_rel+ct*y_rel
+        x_rel=xr & y_rel=yr
+     endif 
+     
+     pr={IRS_WAVSAMP_PSEUDORECT}
+     pr.x=x_rel+x_cen
+     pr.y=y_rel+y_cen[i]
+     pr.lambda=lam
+     pr.angle=theta
+     pr.cen=[x_cen,y_cen[i]]
+     if n_elements(prs) eq 0 then begin 
+        prs=[pr] 
+     endif else begin 
+        if width le 1. then begin 
+           ;; Connect bottom edge to previous top edge so as to smoothly tile.
+           npr=n_elements(prs) 
+           pr.x[2:3]=prs[npr-1].x[[1,0]]
+           pr.y[2:3]=prs[npr-1].y[[1,0]]
+           ;;pr.cen=[total(pr.x),total(pr.y)]/4.
+        endif 
+        prs=[prs,pr]
+     endelse 
+  endfor 
+  
+  ;; Construct the WAVSAMP and set it into the record
+  ws={IRS_WAVSAMP}
+  ws.PIXEL_BASED=1b
+  ws.SLIT_WIDTH=width
+  ws.Aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
+  ws.PR=ptr_new(prs,/NO_COPY)
+  
+  if ptr_valid(rec.WAVSAMPS) then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] else $
+     rec.WAVSAMPS=ptr_new(ws,/NO_COPY)
+  self->SetRecord,rec           ; we may have made a new WAVSAMPS pointer
+  
+  ;; Clip this new, full, pixel-based WAVSAMP we just added, which also
+  ;; takes care of overlapping areas in adjacent PRs.
+  ws=self->Clip(module,order,/FULL,/PIXEL_BASED,_EXTRA=e)
+end
+
+function IRS_Calib::IsFullAperture,aps
+  return,total(aps.low eq 0. AND aps.high eq 1.,1) eq 2.
+end
+
+;=============================================================================
+;       Clip - Clip a WAVSAMP with specified aperture against the
+;              pixels, and add it to the records WAVSAMP list,
+;              returning the new IRS_WAVSAMP struture.
+;
+;              If SAVE_POLYGONS is set, populate the POLYGONS field of
+;              each WAVSAMP with the resultant clipped polygons.
+;
+;              Apertures are specified in normalized coordinates, with
+;              0.0 at the "bottom" of the slit (at left), and 1.0 at
+;              right in the "top" of the slit:
+;
+;                           0.0                       1.0 
+;                            |=========================|
+;                   
+;                              <--low                   
+;                            1-------------    high-->  
+;                            |             \-----------0 
+;                            2-------------            |
+;                                          \-----------3
+;                                          
+;=============================================================================
+function IRS_Calib::Clip, module, order, aper,FULL=clip_full,PIXEL_BASED=pb,$
+                            SLIT_WIDTH=width,SAVE_POLYGONS=sp, RECORD=rec
   
   ;; Find the always-present full slit aperture wavsamp clip, i.e.
   ;;    low: [0.,0.] ; high: [1.,1.]
-  wh=where(total(aps.low eq 0. AND aps.high eq 1.,1) eq 2., cnt)
-  if cnt eq 0 then message,'Must have full slit aperture WAVSAMP.'
-  full=(*rec.WAVSAMPS)[wh[0]]
+  wh_full=self->FindWAVSAMP(module,order,/FULL,PIXEL_BASED=pb, $
+                            SLIT_WIDTH=width, COUNT=cnt,RECORD=rec)
+  if cnt eq 0 then begin 
+     if keyword_set(pb) then begin ; Just make a full wavsamp for them
+        self->PixelWAVSAMP,module,order,SLIT_WIDTH=width
+        wh_full=self->FindWAVSAMP(module,order,/FULL,PIXEL_BASED=pb, $
+                                  SLIT_WIDTH=width, COUNT=cnt,RECORD=rec)
+        if cnt eq 0 then message,'Failed to created PIXEL-BASED full WAVSAMP.'
+        ;; If they're after the full clip, it's just been done
+        if self->IsFullAperture(aper) then return,(*rec.WAVSAMPS)[wh_full[0]]
+     endif else message,'Full slit aperture WAVSAMP not available ' + $
+        '(check for WAVSAMP files).'
+  endif
+  
+  full=(*rec.WAVSAMPS)[wh_full[0]]
   
   new=full
   if keyword_set(clip_full) eq 0 then begin
@@ -429,9 +728,11 @@ function SMART_Calib::Clip, module, order, aper,FULL=clip_full
      newap=new.Aperture
      struct_assign,aper,newap
      new.Aperture=newap
-  endif
+  endif else self->CleanWAVSAMP,new,/PA_ONLY ;just clip "in place"
+  
   npr=n_elements(*new.PR)
   for i=0,npr-1 do begin
+     ;; Unless clipping the full aperture in place, scale the PR's
      if keyword_set(clip_full) eq 0 then begin
         ;; Start with the full slit pseudo-rect positions
         x=(*new.PR)[i].x
@@ -444,46 +745,104 @@ function SMART_Calib::Clip, module, order, aper,FULL=clip_full
         delx=(x[0]-x[1]) & dely=(y[0]-y[1])
         x[0] = x[1]+high*delx
         y[0] = y[1]+high*dely
-        x[1] = x[1]+low* delx
-        y[1] = y[1]+low* dely
+        x[1] = x[1]+low *delx
+        y[1] = y[1]+low *dely
         
         delx=(x[3]-x[2]) & dely=(y[3]-y[2])
         x[3] = x[2]+high*delx
         y[3] = y[2]+high*dely
-        x[2] = x[2]+low* delx
-        y[2] = y[2]+low* dely
+        x[2] = x[2]+low *delx
+        y[2] = y[2]+low *dely
         
         ;; Set in the updated x,y
         (*new.PR)[i].x=x
         (*new.PR)[i].y=y
      endif
      
-     pixels=polyfillaa((*new.PR)[i].x,(*new.PR)[i].y,128,128,AREAS=ar)
+     ;; Actually clip the new PR
+     if keyword_set(sp) then $
+        pixels=polyfillaa((*new.PR)[i].x,(*new.PR)[i].y,128,128,AREAS=ar, $
+                          POLYGONS=polys) $
+     else pixels=polyfillaa((*new.PR)[i].x,(*new.PR)[i].y,128,128,AREAS=ar)
      
      if pixels[0] ne -1 then begin 
         ;; Overwrite the pixel and area pointers with new ones
+        ;;  The old ones were either freed (if FULL), or still valid
+        ;;  somewhere in the original full WAVSAMP (for a copy).
         (*new.PR)[i].PIXELS=ptr_new(pixels,/NO_COPY)
         (*new.PR)[i].AREAS =ptr_new(ar,/NO_COPY)
-     endif 
+        if keyword_set(sp) then $
+           (*new.PR)[i].POLYGONS=ptr_new(polys,/NO_COPY)
+     endif else begin 
+        (*new.PR)[i].PIXELS=ptr_new()
+        (*new.PR)[i].AREAS =ptr_new()
+        if keyword_set(sp) then $
+           (*new.PR)[i].POLYGONS=ptr_new()
+     endelse 
   endfor 
+  ;; Remove the PR's which didn't fall on the array
   good=where(ptr_valid((*new.PR).PIXELS),goodcnt)
-  if goodcnt eq 0 then message,'No WAVSAMP pseudo-rects on array'
-  if goodcnt lt npr then *new.PR=(*new.PR)[good]
+  if goodcnt eq 0 then message,'No WAVSAMP pseudo-rects exist on array'
+  if goodcnt lt npr then (*new.PR)=(*new.PR)[good]
+  
+;  if keyword_set(pb) AND NOT array_equal(prs.angle,0.) then begin 
+;     print,'deoverlapping'
+;     self->DeOverlap,prs
+;  endif 
   return,new
 end
+
+;=============================================================================
+;       DeOverlap - Renormalize fractional areas for any areas of
+;                   overlap between two PRs, given a list of PRs.
+;                   This assumes at most 2 PRs can overlap in any
+;                   given location.  For unit width, unit spaced PRs,
+;                   this is valid up to tilt angles of 60 degrees.
+;=============================================================================
+pro IRS_Calib::DeOverlap, prs
+  thisx=prs[0].X & thisy=prs[0].Y
+  for i=0,n_elements(prs)-2 do begin
+     nextx=prs[i+1].X
+     nexty=prs[i+1].Y
+     ;; Clip the adjacent PR's to find the overlap
+     twopolyclip,thisx,thisy,nextx,nexty
+     if thisx[0] ne -1 then begin
+        print,'Got an overlap: ',thisx,thisy
+        ;; Clip the overlapping area to the grid
+        overlap_pix=polyfillaa(thisx,thisy,128,128,AREAS=overlap_areas)
+        if overlap_pix[0] ne -1 then begin
+           wh=where_array(overlap_pix,*prs[i].PIXELS,cnt)
+           if cnt gt 0 then begin 
+              print,'deoverlapping pixels: ',(*prs[i].PIXELS)[wh]
+              print,'with overlap areas: ',overlap_areas
+              (*prs[i].AREAS)[wh]=(*prs[i].AREAS)[wh]-.5*overlap_areas
+           endif 
+           wh=where_array(overlap_pix,*prs[i+1].PIXELS,cnt)
+           if cnt gt 0 then $
+              (*prs[i+1].AREAS)[wh]=(*prs[i+1].AREAS)[wh]-.5*overlap_areas
+        endif 
+     endif 
+     thisx=nextx & thisy=nexty
+  endfor  
+end
+
 
 ;=============================================================================
 ;       GetRecord - Get the calibration record for a given module and
 ;                   order, or make one, if none yet exists.
 ;=============================================================================
-function SMART_Calib::GetRecord, module, order, MUST_EXIST=me
-  m=smart_module(module)
+function IRS_Calib::GetRecord, module, order, MUST_EXIST=me
+  m=irs_module(module)
   if ptr_valid(self.cal[m]) then begin 
      wh=where((*self.cal[m]).Order eq order,cnt)
      if cnt gt 0 then return,(*self.cal[m])[wh[0]]
   endif 
-  if keyword_set(me) then return,-1
-  st={SMART_CalibRec}           ; Just create a new one
+  if keyword_set(me) then begin 
+     message,'No such record exists: '+ $
+             irs_module(module,/TO_NAME)+' Order: '+strtrim(order,2)
+     return,-1
+  endif 
+  st={IRS_CalibRec}           ; None found, just create a new one
   st.Module=m
   st.Order=order
   return,st
@@ -495,8 +854,8 @@ end
 ;                   overwrite, otherwise append to the end of the
 ;                   list.  
 ;=============================================================================
-pro SMART_Calib::SetRecord, record
-  if tag_names(record,/STRUCTURE_NAME) ne 'SMART_CALIBREC' then $
+pro IRS_Calib::SetRecord, record
+  if tag_names(record,/STRUCTURE_NAME) ne 'IRS_CALIBREC' then $
      message,'Wrong record type: '+tag_names(record,/STRUCTURE_NAME)
   record.Date=systime(/JULIAN) ; The date set
   if ptr_valid(self.cal[record.module]) then begin 
@@ -519,9 +878,9 @@ end
 ;       ReadCalib - Read (up to) all three calibration files for a
 ;                   given module or modules, and record in the object.
 ;=============================================================================
-pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
+pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                            TILT_VERSION=tv,ONLY=only
-  @smart_dir                    ;get smart_calib_dir
+  @irs_dir                    ;get irs_calib_dir
   
   cals=['WAVSAMP','ORDFIND','LINETILT']
   version=[n_elements(wv)  gt 0?fix(wv)>0:0, $
@@ -537,7 +896,7 @@ pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
      version=version[which]
   endif 
 
-  if n_elements(module) ne 0 then modules=[smart_module(module)] $
+  if n_elements(module) ne 0 then modules=[irs_module(module)] $
   else modules=indgen(4)        ;do them all, by default
   
   for i=0,n_elements(modules)-1 do begin 
@@ -550,7 +909,7 @@ pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
         ;; A specific version was requested, check it
         if version[j] gt 0 then begin 
            cfile=base+strtrim(version[j],2)+'.tbl'
-           if file_test(filepath(ROOT=smart_calib_dir,SUBDIR=["data","ssc"], $
+           if file_test(filepath(ROOT=irs_calib_dir,SUBDIR=["data","ssc"], $
                                  cfile),/READ,/REGULAR) eq 0 then begin 
               message,'No such calibration file: '+cfile
               version[j]=0
@@ -559,11 +918,11 @@ pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
         
         ;; Find all versions for this module
         if version[j] eq 0 then begin 
-           cal_files=findfile(COUNT=fcnt,filepath(ROOT=smart_calib_dir, $
+           cal_files=findfile(COUNT=fcnt,filepath(ROOT=irs_calib_dir, $
                                        SUBDIR=["data","ssc"],base+"*.tbl"))
            if fcnt eq 0 then begin 
               message, /CONTINUE,"Didn't find any calibration files: " +$
-                       cals[j]+' for '+smart_module(md,/TO_NAME)
+                       cals[j]+' for '+irs_module(md,/TO_NAME)
               continue
            endif 
            vers=max(fix((stregex(cal_files,base+"([0-9]+)"+".tbl$",$
@@ -579,11 +938,11 @@ end
 
 ;=============================================================================
 ;       ParseWAVSAMP - Read and parse the specified WAVSAMP file,
-;                      clipping the PSUEDO-RECT full-slit polygons for
-;                      fast access.
+;                      clipping and caching the PSUEDO-RECT full-slit
+;                      polygons for fast access.
 ;=============================================================================
-pro SMART_Calib::ParseWAVSAMP,file,module
-  m=smart_module(module)
+pro IRS_Calib::ParseWAVSAMP,file,module
+  m=irs_module(module)
   data=read_ipac_table(file)
   orders=(data.order)[uniq(data.order)]
   for ord=0,n_elements(orders)-1 do begin 
@@ -591,7 +950,7 @@ pro SMART_Calib::ParseWAVSAMP,file,module
      wh=where(data.order eq orders[ord],cnt)
      if cnt eq 0 then continue  ;no data for this order
      ;; Collect the data and create the WAVSAMP structure list
-     pr=replicate({SMART_WAVSAMP_PSEUDORECT},cnt)
+     pr=replicate({IRS_WAVSAMP_PSEUDORECT},cnt)
      pr.lambda=data[wh].wavelength
      pr.angle=data[wh].angle
      pr.x=[transpose(data[wh].x0), $
@@ -603,13 +962,11 @@ pro SMART_Calib::ParseWAVSAMP,file,module
            transpose(data[wh].y2), $
            transpose(data[wh].y3)]
      pr.cen=[transpose(data[wh].x_center),transpose(data[wh].y_center)]
-     ws={SMART_WAVSAMP,{SMART_APERTURE,[0.,0.],[1.,1.]},ptr_new(pr,/NO_COPY)}
+     ws={IRS_WAVSAMP, $
+         0b,0.0,{IRS_APERTURE,[0.,0.],[1.,1.]},ptr_new(pr,/NO_COPY)}
      
      ;; Clean out any old WAVSAMP's
-     if ptr_valid(rec.WAVSAMPS) then begin 
-        self->CleanWAVSAMP,*rec.WAVSAMPS
-        ptr_free,rec.WAVSAMPS
-     endif 
+     self->FreeWAVSAMP,RECORD=rec,/ALL
      
      rec.WAVSAMPS=ptr_new(ws,/NO_COPY)
      ;; Put the record back
@@ -625,24 +982,28 @@ end
 ;       ParseOrdFind - Read and parse the specified ORDFIND file,
 ;                      saving the polynomial fit data in the object.
 ;=============================================================================
-pro SMART_Calib::ParseOrdFind,file,module
-  m=smart_module(module)
+pro IRS_Calib::ParseOrdFind,file,module
+  m=irs_module(module)
   data=read_ipac_table(file)
   for i=0,n_elements(data.order)-1 do begin 
      rec=self->GetRecord(m,data[i].order)
      rec.a=[data[i].a0,data[i].a1,data[i].a2,data[i].a3,data[i].a4,data[i].a5]
      rec.b=[data[i].b0,data[i].b1,data[i].b2,data[i].b3,data[i].b4,data[i].b5]
+     rec.WAV_CENTER=data[i].wavelength_center
+     rec.WAV_MIN=data[i].wavelength_min
+     rec.WAV_MAX=data[i].wavelength_max
+     rec.SLIT_LENGTH=data[i].width_found
      self->SetRecord,rec
   endfor
-  self.ORDER_FILE[m]=file
+  self.ORDER_FILE[m]=file 
 end
 
 ;=============================================================================
 ;       ParseLineTilt - Read and parse the specified LINETILT file,
 ;                       saving the polynomial fit data in the object.
 ;=============================================================================
-pro SMART_Calib::ParseLineTilt,file,module
-  m=smart_module(module)
+pro IRS_Calib::ParseLineTilt,file,module
+  m=irs_module(module)
   data=read_ipac_table(file)
   
   ;; set all of them at once (usually to 0)
@@ -662,20 +1023,29 @@ pro SMART_Calib::ParseLineTilt,file,module
 end
 
 ;=============================================================================
-;       CleanupWAVSAMP - Delete one or more WAVSAMP records by freeing
-;                        the internal pointers.
+;       CleanupWAVSAMP - Delete the contents of one or more WAVSAMP
+;                        records by freeing the internal pointers, or
+;                        just clear the PIXELS and AREAS (and
+;                        optionally POLYGONS) if PA_ONLY set.
 ;=============================================================================
-pro SMART_Calib::CleanWAVSAMP, ws
+pro IRS_Calib::CleanWAVSAMP, ws,PA_ONLY=pao
   for i=0,n_elements(ws)-1 do begin
      pr=ws[i].PR
-     if ptr_valid(pr) then ptr_free,(*pr).PIXELS,(*pr).AREAS,pr
+     if ptr_valid(pr) then begin 
+        ptr_free,(*pr).PIXELS,(*pr).AREAS
+        for j=0,n_elements(*pr)-1 do begin 
+           if ptr_valid((*pr)[j].POLYGONS) then $
+              ptr_free,*(*pr)[j].POLYGONS, (*pr)[j].POLYGONS
+        endfor 
+        if keyword_set(pao) eq 0 then ptr_free,pr
+     endif 
   endfor 
 end
 
 ;=============================================================================
 ;       Cleanup - Free all resources.
 ;=============================================================================
-pro SMART_Calib::Cleanup
+pro IRS_Calib::Cleanup
   for i=0,3 do begin 
      if ptr_valid(self.cal[i]) then begin
         ws_list=(*self.cal[i]).WAVSAMPS
@@ -687,54 +1057,64 @@ pro SMART_Calib::Cleanup
 end
 
 ;=============================================================================
-;       Init - Create a new SMART_Calib object
+;       Init - Create a new IRS_Calib object
 ;=============================================================================
-function SMART_Calib::Init,name
+function IRS_Calib::Init,name
   if n_elements(name) ne 0 then self.Name=name
   return,1
 end
 
 ;=============================================================================
-;       SMART_Calib__define - Define the SMART_Calib class
+;       IRS_Calib__define - Define the IRS_Calib class
 ;=============================================================================
-pro SMART_Calib__define
-  class={SMART_Calib, $         
-         Name: '', $            ;A name for this SMART Calibration object
-         WAVSAMP_FILE:strarr(4), $ ;the names of the wavsamp files (WAVSAMP)
-         TILT_FILE:strarr(4),$  ;the name of the tilt file (c)
-         ORDER_FILE:strarr(4), $ ;the name of the ordfind output file (a & b)
-         cal: ptrarr(4)}        ;Four lists of SMART_CalibRec structs, one
+pro IRS_Calib__define
+  class={IRS_Calib, $         
+         Name: '', $            ;A name for this IRS Calibration object
+         WAVSAMP_FILE:strarr(5), $ ;the names of the wavsamp files (WAVSAMP)
+         TILT_FILE:strarr(5),$  ;the name of the tilt file (c)
+         ORDER_FILE:strarr(5), $ ;the name of the ordfind output file (a & b)
+         detsize:intarr(2,5),  $ ;the x,y size of the detector
+         cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
                                 ;for each module: 0:LH, 1:LL, 2:SH, 3:SL
   
   ;; The complete calibration set for a single order in one module.
   ;; Note that the bonus 1st order segment in the low-res modules is
   ;; known as order "3".
-  st={SMART_CalibRec, $
-      Date:0.0D, $              ;Date First constructed
+  st={IRS_CalibRec, $
       MODULE: 0, $              ;which module 0:LH, 1:LL, 2:SH, 3:SL
       ORDER: 0, $               ;the order number this data corresponds to.
+      Date:0.0D, $              ;Date First constructed
+      WAV_CENTER: 0.0, $        ;the central order wavelength
+      WAV_MIN: 0.0, $           ;the minimum order wavelength
+      WAV_MAX: 0.0, $           ;the maximum order wavelength
+      SLIT_LENGTH: 0.0, $       ;the length of the slit in pixels
       A:fltarr(6), $            ;x(lambda)=sum_i a_i lambda^i
       B:fltarr(6), $            ;y(lambda)=sum_i b_i lambda^i
       C:fltarr(4), $            ;tilt_ang(s)=sum_i c_i s^i
-      WAVSAMPS: ptr_new()}      ;A list of SMART_WAVSAMP structs
+      WAVSAMPS: ptr_new()}      ;A list of IRS_WAVSAMP structs
   
-  
-  ;; A wavsamp set for a single order and a given aperture.
-  st={SMART_WAVSAMP, $
-      Aperture:{SMART_APERTURE}, $ ;The SMART_APERTURE aperture
-      PR: ptr_new()}            ;A list of SMART_WAVSAMP_PSEUDORECT structs
+  ;; A wavsamp set for a single order and a given aperture, either
+  ;; "traditional" (from the WAVSAMP file), or "pixel-based"
+  ;; (generated directly from the A,B and C coefficients).
+  st={IRS_WAVSAMP, $
+      PIXEL_BASED: 0b, $        ;whether traditional or pixel-based WAVSAMP
+      SLIT_WIDTH: 0.0, $        ;if PIXEL_BASED, the width of the PR
+      Aperture:{IRS_APERTURE}, $ ;The IRS_APERTURE aperture
+      PR: ptr_new()}            ;A list of IRS_WAVSAMP_PSEUDORECT structs
   
   ;; A single WAVSAMP pseudo-rectangle (PR), with pre-computed
   ;; full-slit overlap areas.  Vertices are listed counter-clockwise
   ;; from the top-right:
   ;;         1         0
   ;;         2         3
-  st={SMART_WAVSAMP_PSEUDORECT , $
+  st={IRS_WAVSAMP_PSEUDORECT , $
       lambda: 0.0, $            ;wavelength of PR center
       cen:[0.0,0.0], $          ;x,y, center of PR
       x:fltarr(4), $            ;X positions of the PR vertices
       y:fltarr(4), $            ;Y positions of the PR vertices
       angle: 0.0, $             ;Angle, anti-clockwise about x axis
       PIXELS: ptr_new(), $      ;The pixels at least partially inside the PR
-      AREAS: ptr_new()}         ;The area inside the PR for each of PIXELS.
+      AREAS: ptr_new(), $       ;The area inside the PR for each of PIXELS.
+      POLYGONS: ptr_new()}      ;(optional) the resulting clipped polygons
+                                ; as a list of pointers to 2xn coord pairs
 end
