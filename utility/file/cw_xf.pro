@@ -252,6 +252,7 @@ function cw_xf_event, ev
       WIDGET_CONTROL, stash, SET_UVALUE=state, /NO_COPY ;reset state
       return,0
    endif    
+
    CASE ev.ID OF
 
       state.path_id: $          ;***path typed in
