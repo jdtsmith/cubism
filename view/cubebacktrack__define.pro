@@ -97,7 +97,7 @@ pro CubeBackTrack::On
   self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
   title=string(FORMAT='(%"BackTracking: %s")',pn)
   self.msg_head= $
-     "        BCD             Pix          Val       Back       Frac"
+     "        BCD             Pix          Val       Back        Frac   "
   msg=self.msg_base+string(10b)+self.msg_head
   self.wBase=widget_base(/COLUMN, SPACE=1,GROUP_LEADER=self.parent, $
                          TITLE=title, /TLB_SIZE_EVENTS,UVALUE=self)
@@ -107,6 +107,9 @@ pro CubeBackTrack::On
      self.wList=widget_list(self.wBase,XSIZE=52,SCR_YSIZE=self.list_size) $
   else self.wList=widget_list(self.wBase,XSIZE=52,YSIZE=8) 
   widget_control, self.wBase, SET_UVALUE=self,/REALIZE
+  make_widget_adjacent,self.wBase,self.parent
+  
+  ;; Save geometry for re-sizing
   geom=widget_info(self.wList,/GEOMETRY)
   self.list_size_diff=geom.SCR_YSIZE- $
      (widget_info(self.wBase,/GEOMETRY)).SCR_YSIZE
