@@ -83,7 +83,7 @@ pro CubeRec::Message, msg
         if msg.new_cube && self.mode ge 2 then return
         self.cube=msg.cube
         self.cube->GetProperty,WAVELENGTH=wl,/POINTER
-        self.wavelength=wl
+        if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
      end 
   endcase
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
