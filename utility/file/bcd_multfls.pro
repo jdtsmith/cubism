@@ -9,15 +9,15 @@ function bcd_mult_showfits,file
   if err ne 0 then $
      return,string(FORMAT='(A18,5X,A14)',fshow,'------------')
   hdr=headfits(file)
-  ra=radecstring(sxpar(hdr,'RA_SLT'),/RA)
-  dec=radecstring(sxpar(hdr,'DEC_SLT'))
+  ra=sxpar(hdr,'RA_HMS')
+  dec=sxpar(hdr,'DEC_DMS')
   row=sxpar(hdr,'ROW')
   col=sxpar(hdr,'COLUMN')
-  exp=sxpar(hdr,'EXPNUM')
-  date=sxpar(hdr,'DATE')
+  exp=sxpar(hdr,'EXPID')
+  date=sxpar(hdr,'DATE_OBS')
   fov=irs_fov(sxpar(hdr,'FOVID'),/SHORT_NAME)
    
-  return,string(FORMAT='(A18,1X,"[",A10,",",A12,"]",1X,A10,1X,I2,' + $
+  return,string(FORMAT='(A20,1X,"[",A11,",",A10,"]",1X,A10,1X,I2,' + $
                 '"[",I0,",",I0,"]",1X,A)',$
                 fshow,ra,dec,date,exp,row,col,fov)
 end
