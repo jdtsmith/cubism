@@ -200,7 +200,7 @@ pro ObjReport::Error,msg,RETURN_ONLY=ro,_EXTRA=e
         ;; Send a message to be caught by the established OBJREPORT catch
         message,'OBJREPORT-ERROR',/NOPRINT
      endif else if keyword_set(ro) then return else retall 
-  endif else self->orCommandLineReport,msg
+  endif else self->orCommandLineReport,msg,/ERROR
 end
 
 ;=============================================================================

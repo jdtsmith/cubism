@@ -332,7 +332,8 @@ pro ObjMsg::MsgSend,msg
 ;      help, /TRACEBAC
 ;   endif 
                                 ;send all the messages
-  for i=0,n_elements(sendlist)-1 do sendlist[i]->Message,msg  
+  for i=0,n_elements(sendlist)-1 do if obj_valid(sendlist[i]) then $
+     sendlist[i]->Message,msg  
 end
 
 ;=============================================================================
