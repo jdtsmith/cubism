@@ -395,10 +395,17 @@ function IRS_Calib::Info, modules, orders
         for k=0,nw-1 do begin 
            flags=""
            ws=(*rec.WAVSAMPS)[k]
-           apstr=string(FORMAT='(%"            %4.2f->%4.2f : %4.2f->%4.2f' + $
-                        ' -- %03d samples")', $
-                        ws.Aperture.low,ws.Aperture.high, $
-                        n_elements(*(*rec.WAVSAMPS)[k].PR))
+           nsamp=n_elements(*(*rec.WAVSAMPS)[k].PR)
+           
+           if ws.FULL then begin 
+              aps=string(FORMAT='(%"               FULL      %4.2f->%4.2f'+ $
+                         ' -- %03d samples")', $
+                         ws.Aperture.low[0],ws.Aperture.high[0],nsamp)
+           endif else begin 
+              aps=string(FORMAT='(%"            %4.2f->%4.2f : %4.2f->%4.2f'+ $
+                         ' -- %03d samples")', $
+                         ws.Aperture.low,ws.Aperture.high,nsamp) 
+           endelse 
            if ws.PIXEL_BASED ne 0.0 then $
               flags=[string(FORMAT='("pixel-based, width=",F5.3)', $
                             ws.PR_WIDTH)]
@@ -407,10 +414,10 @@ function IRS_Calib::Info, modules, orders
               flags=[flags,"with polygons"]
            nf=n_elements(flags) 
            if flags[0] ne "" and nf gt 0 then $
-              apstr=apstr+" ("+string(FORMAT='('+ $
-                                      strtrim(n_elements(flags),2)+ $
-                                      '(A,:,", "))',flags)+")"
-           str=[str,apstr]
+              aps=aps+" ("+string(FORMAT='('+ $
+                                  strtrim(n_elements(flags),2)+ $
+                                  '(A,:,", "))',flags)+")"
+           str=[str,aps]
         endfor
      endfor
   endfor
@@ -443,27 +450,30 @@ function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
      return,-1
   endif 
   
-  ;; Find full aperture, specified aperture, or any aperture
-  if keyword_set(full) then begin 
-     aper={IRS_APERTURE,[0.,0.],[1.,1.]}
-  endif else if n_elements(aperture) ne 0 then aper=aperture
-  
   if n_elements(pb) eq 0 then pb=0b ;default to non-pb
   if n_elements(width) eq 0 then width=1.0 ;Default to 1xn PRs
+
+  ;; Find specified aperture, or any aperture
+  if n_elements(aperture) ne 0 then aper=aperture
   
-  eps=1.e-5                 ;match tolerance
-  
-  ;; Find WAVSAMPs of the right type (pixel-based or no)
+  ;; Find WAVSAMPs of the right type (pixel-based or traditional)
   wh_pix=where((*rec.WAVSAMPS).PIXEL_BASED eq keyword_set(pb),nsamp)
   if nsamp eq 0 then return,-1
   
-  ;; Find WAVSAMP's with the right slit pixel width (if pixel-based)
+  ;; Find WAVSAMP's with the right slit width (if pixel-based)
+  eps=1.e-5                 ;match tolerance
   if keyword_set(pb) then begin 
      wh_width=where(abs((*rec.WAVSAMPS)[wh_pix].PR_WIDTH-width) $
                     le eps, nsamp)
      if nsamp gt 0 then wh_pix=wh_pix[wh_width] else return,-1
   endif 
   
+  ;; If looking for full, return it...
+  if keyword_set(full) then begin 
+     wh_full=where((*rec.WAVSAMPS).FULL,cnt)
+     if cnt gt 0 then return,wh_pix[wh_full] else return,-1
+  endif 
+
   ;; Search for one of this type already cached with this aperture
   if n_elements(aper) ne 0 then begin 
      aps=(*rec.WAVSAMPS)[wh_pix].Aperture
@@ -494,7 +504,7 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
   ws=self->FindWAVSAMP(module,order,APERTURE=aperture,COUNT=nsamp,FULL=full, $
                        PIXEL_BASED=pb, PR_WIDTH=width)
   
-  if keyword_set(sp) eq 0 then begin 
+  if keyword_set(sp) eq 0 then begin ;no polygons requested
      ;; return the first match
      if nsamp gt 0 then return,*(*rec.WAVSAMPS)[ws[0]].PR 
   endif else begin 
@@ -668,6 +678,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   ws.PR_WIDTH=width
   ws.Aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
   ws.PR=ptr_new(prs,/NO_COPY)
+  ws.FULL=1b
   
   if ptr_valid(rec.WAVSAMPS) then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] else $
      rec.WAVSAMPS=ptr_new(ws,/NO_COPY)
@@ -708,8 +719,6 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
                           PIXEL_BASED=pb, PR_WIDTH=width, SAVE_POLYGONS=sp, $
                           RECORD=rec
   
-  if n_elements(aper) eq 0 then aper={IRS_APERTURE,[0.,0.],[1.,1.]}
-  
   ;; Find the always-present full slit aperture wavsamp clip, i.e.
   ;;    low: [0.,0.] ; high: [1.,1.]
   wh_full=self->FindWAVSAMP(module,order,/FULL,PIXEL_BASED=pb, $
@@ -726,54 +735,38 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
   endif
   
   full=(*rec.WAVSAMPS)[wh_full[0]]
-  
-  new=full
+  new=full                      ;The new clip
+  if n_elements(aper) eq 0 then aper={IRS_APERTURE,[0.,0.],[1.,1.]}
   if keyword_set(clip_full) eq 0 then begin
      new.PR=ptr_new(*full.PR)   ; Copy the psuedo-rects
+     new.FULL=0b
      newap=new.Aperture
      struct_assign,aper,newap
      new.Aperture=newap
-  endif else self->CleanWAVSAMP,new,/PA_ONLY ;just clip "in place"
+  endif else begin 
+     self->CleanWAVSAMP,new,/PA_ONLY ;just clip "in place"
+     new.FULL=1b                ;pure pedantry
+  endelse 
   
   npr=n_elements(*new.PR)
+  if keyword_set(clip_full) eq 0 then begin
+     ;; Scale the aperture from low to high.
+     x=(*new.PR).x & y=(*new.PR).y
+     self->Trim,x,y,APERTURE=aper
+     (*new.PR).x=x & (*new.PR).y=y
+  endif 
+  
   for i=0,npr-1 do begin
-     ;; Unless clipping the full aperture in place, scale the PR's
-     if keyword_set(clip_full) eq 0 then begin
-        ;; Start with the full slit pseudo-rect positions
-        x=(*new.PR)[i].x
-        y=(*new.PR)[i].y
-        
-        ;; Scale each aperture linearly from low to high, preserving angle
-        low=(aper.low[0]+(aper.low[1]-aper.low[0])*float(i)/(npr-1))
-        high=(aper.high[0]+(aper.high[1]-aper.high[0])*float(i)/(npr-1))
-        
-        delx=(x[0]-x[1]) & dely=(y[0]-y[1])
-        x[0] = x[1]+high*delx
-        y[0] = y[1]+high*dely
-        x[1] = x[1]+low *delx
-        y[1] = y[1]+low *dely
-        
-        delx=(x[3]-x[2]) & dely=(y[3]-y[2])
-        x[3] = x[2]+high*delx
-        y[3] = y[2]+high*dely
-        x[2] = x[2]+low *delx
-        y[2] = y[2]+low *dely
-        
-        ;; Set in the updated x,y
-        (*new.PR)[i].x=x
-        (*new.PR)[i].y=y
-     endif
-     
-     ;; Actually clip the new PR
+     ;; Clip the new PRs
      if keyword_set(sp) then $
         pixels=polyfillaa((*new.PR)[i].x,(*new.PR)[i].y,128,128,AREAS=ar, $
                           POLYGONS=polys) $
      else pixels=polyfillaa((*new.PR)[i].x,(*new.PR)[i].y,128,128,AREAS=ar)
      
      if pixels[0] ne -1 then begin 
-        ;; Overwrite the pixel and area pointers with new ones
-        ;;  The old ones were either freed (if FULL), or still valid
-        ;;  somewhere in the original full WAVSAMP (for a copy).
+        ;; Overwrite the pixel and area pointers with new ones The old
+        ;; ones were either freed (if FULL), or remain valid somewhere
+        ;; in the original WAVSAMP set.
         (*new.PR)[i].PIXELS=ptr_new(pixels,/NO_COPY)
         (*new.PR)[i].AREAS =ptr_new(ar,/NO_COPY)
         if keyword_set(sp) then $
@@ -795,6 +788,29 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
 ;     self->DeOverlap,prs
 ;  endif 
   return,new
+end
+
+;=============================================================================
+;  Trim - Trim a set of PRs to the aperture.  x,y are 4xn
+;=============================================================================
+pro IRS_Calib::Trim,x,y,APERTURE=aper
+  ;; Scale each aperture linearly from low to high, preserving angle
+  n=(size(x,/DIMENSIONS))[1]
+  
+  low=(aper.low[0]+(aper.low[1]-aper.low[0])*findgen(n)/(n-1))
+  high=(aper.high[0]+(aper.high[1]-aper.high[0])*findgen(n)/(n-1))
+  
+  delx=(x[0,*]-x[1,*]) & dely=(y[0,*]-y[1,*])
+  x[0,*] = x[1,*]+high*delx
+  y[0,*] = y[1,*]+high*dely
+  x[1,*] = x[1,*]+low *delx
+  y[1,*] = y[1,*]+low *dely
+  
+  delx=(x[3,*]-x[2,*]) & dely=(y[3,*]-y[2,*])
+  x[3,*] = x[2,*]+high*delx
+  y[3,*] = y[2,*]+high*dely
+  x[2,*] = x[2,*]+low *delx
+  y[2,*] = y[2,*]+low *dely
 end
 
 ;=============================================================================
@@ -967,7 +983,7 @@ pro IRS_Calib::ParseWAVSAMP,file,module
            transpose(data[wh].y3)]
      pr.cen=[transpose(data[wh].x_center),transpose(data[wh].y_center)]
      ws={IRS_WAVSAMP, $
-         0b,0.0,{IRS_APERTURE,[0.,0.],[1.,1.]},ptr_new(pr,/NO_COPY)}
+         0b,1b,0.0,{IRS_APERTURE,[0.,0.],[1.,1.]},ptr_new(pr,/NO_COPY)}
      
      ;; Clean out any old WAVSAMP's
      self->FreeWAVSAMP,RECORD=rec,/ALL
@@ -1083,24 +1099,25 @@ pro IRS_Calib__define
   ;; The complete calibration set for a single order in one module.
   ;; Note that the bonus 1st order segment in the low-res modules is
   ;; known as order "3".
-  st={IRS_CalibRec, $
-      MODULE: 0, $              ;which module 0:LH, 1:LL, 2:SH, 3:SL
-      ORDER: 0, $               ;the order number this data corresponds to.
-      Date:0.0D, $              ;Date First constructed
-      WAV_CENTER: 0.0, $        ;the central order wavelength
-      WAV_MIN: 0.0, $           ;the minimum order wavelength
-      WAV_MAX: 0.0, $           ;the maximum order wavelength
-      SLIT_LENGTH: 0.0, $       ;the length of the slit in pixels
-      A:fltarr(6), $            ;x(lambda)=sum_i a_i lambda^i
-      B:fltarr(6), $            ;y(lambda)=sum_i b_i lambda^i
-      C:fltarr(4), $            ;tilt_ang(s)=sum_i c_i s^i
-      WAVSAMPS: ptr_new()}      ;A list of IRS_WAVSAMP structs
+  rec={IRS_CalibRec, $
+       MODULE: 0, $             ;which module 0:LH, 1:LL, 2:SH, 3:SL, 4:MSED
+       ORDER: 0, $              ;the order number this data corresponds to.
+       Date:0.0D, $             ;Date First constructed
+       WAV_CENTER: 0.0, $       ;the central order wavelength
+       WAV_MIN: 0.0, $          ;the minimum order wavelength
+       WAV_MAX: 0.0, $          ;the maximum order wavelength
+       SLIT_LENGTH: 0.0, $      ;the length of the slit in pixels
+       A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
+       B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
+       C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
+       WAVSAMPS: ptr_new()}     ;A list of IRS_WAVSAMP structs
   
   ;; A wavsamp set for a single order and a given aperture, either
   ;; "traditional" (from the WAVSAMP file), or "pixel-based"
   ;; (generated directly from the A,B and C coefficients).
   st={IRS_WAVSAMP, $
       PIXEL_BASED: 0b, $        ;whether traditional or pixel-based WAVSAMP
+      FULL: 0b, $               ;is this the full (untrimmed) WAVSAMP?
       PR_WIDTH: 0.0, $          ;if PIXEL_BASED, the width of the PR
       Aperture:{IRS_APERTURE}, $ ;The IRS_APERTURE aperture
       PR: ptr_new()}            ;A list of IRS_WAVSAMP_PSEUDORECT structs
