@@ -321,8 +321,8 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             PLATE_SCALE=ps,PMASK=pmask,FLUXCON=fluxcon, $
                             KEY_WAV=fluxcon_kw,TUNE=tune
   if arg_present(pmask) then begin 
-     rec=self->GetRecord(module)
-     pmask=rec.PMASK
+     m=irs_module(module)
+     pmask=self.PMASK[m]
   endif 
   if arg_present(name) then name=self.name
   if n_elements(module) ne 0 then $
@@ -1421,6 +1421,7 @@ pro IRS_Calib::Cleanup
         ptr_free,ws_list,self.cal[i]
      endif 
   endfor 
+  ptr_free,self.PMASK
 end
 
 ;=============================================================================
@@ -1470,7 +1471,6 @@ pro IRS_Calib__define
        WAV_MAX: 0.0, $          ;[um] the maximum order wavelength
        SLIT_LENGTH: 0.0, $      ;[pix] the length of the slit
        PLATE_SCALE: 0.0, $      ;[deg/pix] the plate scale along the slit
-       PMASK:ptr_new(), $
        A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
        C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
