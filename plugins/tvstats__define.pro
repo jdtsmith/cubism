@@ -1,5 +1,16 @@
 
-;;**************************OverRiding methods********************************
+;;**************************OverRiding;;methods********************************
+;=============================================================================
+;	GetProperty.
+;=============================================================================
+pro tvStats::GetProperty, min=min, max=max, med=med, avg=avg, std=std, box=box
+  if arg_present(min) then min=self.min
+  if arg_present(max) then max=self.max
+  if arg_present(med) then med=self.med
+  if arg_present(avg) then avg=self.avg
+  if arg_present(std) then std=self.std
+  if arg_present(box) then box=self.Box
+end
 ;=============================================================================
 ;	Message. Only box messages.
 ;=============================================================================
@@ -63,6 +74,7 @@ pro tvStats::Stats
   std=sqrt(total((take-avg)^2)/(n-1))
   str=string(FORMAT=self.form,l,b,r-l+1,t-b+1,max,min,avg,med,std)
   widget_control, self.wSlab, set_value=str
+  self.min=min & self.max=max & self.med=med & self.avg=avg & self.std=std
 end
 
 ;=============================================================================
@@ -114,6 +126,11 @@ pro tvStats__define
   struct={tvStats, $ 
           INHERITS tvPlug, $    ;make it a plug-in
           box:obj_new(), $      ;a tvRBox to use.
+          min:0.0, $             ;the last min
+          max:0.0, $             ;the last max
+          med:0.0,$             ;the last med
+          avg:0.0,$             ;the last avg
+          std:0.0,$             ;the last std
           parent:0L, $          ;the parent of the widget set
           wBase:0L, $           ;a base to put the test widget in
           form:'', $            ;the format to print in 
