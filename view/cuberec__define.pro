@@ -144,9 +144,14 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
 
   if self.mode eq 2 then begin  ;bcd mode
      self->Reset,/DISABLE       ;no need for our extraction tool.
+     if obj_valid(self.oView) then $
+        self.oView->MsgSignup,self,/NONE ;not listening to the view tool
      self.oAper->On
   endif else begin              ; A cube mode
      if NOT self->Enabled() then self->Enable
+     if obj_valid(self.oView) then $
+        self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL, $
+                              /CUBEVIEWSPEC_SAVE
      self.oAper->Off,/RESET
   endelse 
   
