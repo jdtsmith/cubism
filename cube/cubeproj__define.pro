@@ -255,14 +255,16 @@ pro CubeProj::ShowEvent, ev
                            transpose((*self.DR)[sel].file)]) $
         else strlist=string(FORMAT='(A," : ",A)', $
                             (*self.DR)[sel].ID,(*self.DR)[sel].file)
-        self->Info,strlist,TITLE='Filename Listing'
+        self->Info,strlist, $
+                   TITLE='Filename Listing: '+self->ProjectName(),/SCROLL
      end 
      
      'headers':   $
         begin 
         if sel[0] eq -1 then return
         if NOT array_equal(ptr_valid((*self.DR).HEADER),1) then self->Error, $
-           ['No Header available for records',(*self.DR)[wh].ID]
+           ['No header available for records (try restore):', $
+            (*self.DR)[sel].ID]
         xpopdiag,(*self.DR)[sel].ID, (*self.DR)[sel].HEADER, $
                  BUTTON_TEXT='  Done  ', $
                  LABEL='File:', PARENT_GROUP=self->TopBase(), $
