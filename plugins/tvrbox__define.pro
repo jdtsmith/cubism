@@ -106,13 +106,11 @@ pro tvRBox::Message, msg
         self->SendBox
      end
 
-     
      'TVDRAW_POSTDRAW': begin
         ;;  a change of original image, or zoom, etc. occurred
         if self.boxflag eq -1 then return ; only if a box is here
         if NOT self.corners then self->SetUpDisplay
      end 
-     
      
      'TVDRAW_REDRAW': begin     ; the screen was clobbered
         if self->IsDrawn() then begin ; only if a box here
@@ -136,7 +134,8 @@ pro tvRBox::On
   self->tvPlug::On
   ;; Button and redraw events, no more snapshots
   self.oDraw->MsgSignup,self,/DRAW_BUTTON,/DRAW_KEY,/TVDRAW_POSTDRAW, $
-     /TVDRAW_REDRAW,TVDRAW_SNAPSHOT=0
+                        /TVDRAW_REDRAW,TVDRAW_SNAPSHOT=0
+  usersym,*self.ux,*self.uy,/FILL
   if self->IsDrawn() then begin 
      if self.corners then self.oDraw->ReDraw,/SNAPSHOT ;remove bg corners
      self->DrawBox              ;just turned on
@@ -412,7 +411,7 @@ function tvRBox::Init,oDraw,COLOR=color,THICK=thick,HANDLE=handle,KNOBRAD=kr,$
   return,1
 end
 
-pro tvrbox__define
+pro tvRBox__define
   struct={tvRBox, $
           INHERITS tvPlug, $    ;make it a tvDraw plug-in
           snap_mode:0, $        ;using snap mode?
