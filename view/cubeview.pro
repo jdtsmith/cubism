@@ -12,7 +12,7 @@ pro cubeview_event,ev
   endif else widget_control, ev.top, /DESTROY ;quit
 end
 
-pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
+pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
              ODRAW=odraw,CUBE=cube,_EXTRA=e
   if n_elements(sz) eq 0 then sz=[384L,384L]
   if n_elements(sz) eq 1 then sz=[sz,sz]
@@ -36,7 +36,9 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   file_menu=widget_button(mbar,value="File",/MENU) 
   ;;  "Print..." tool in file menu (uses David Fanning's excellent
   ;; `FSC_PSConfig' to configure the print job)
-  tvP=obj_new('tvPrint',oDraw,file_menu,_EXTRA=e)
+  tmp=obj_new('tvPrint',oDraw,file_menu,_EXTRA=e)
+;  tmp=obj_new('tvExportImage',oDraw,file_menu,_EXTRA=e)
+  
   option_menu=widget_button(mbar,value="Options",/MENU) 
   tool_menu=widget_button(mbar,value="Tools",/MENU)
   
@@ -49,8 +51,8 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   ;; mouse-mode (which makes it an exclusive plug-in!)
   stretcher=obj_new('tvColor',base,oDraw,CBAR=cbar,/PROTECT, $
                     /RESERVE,COL_TABLE_MENU=option_menu,/MOUSE_MODE,$
-                    USE_COLORMAPS=[0,1,3,4,6,8,13,32],_EXTRA=e, $
-                    TOP=!D.TABLE_SIZE-6)
+                    USE_COLORMAPS=[0,1,3,4,6,8,13,32],TOP=!D.TABLE_SIZE-6, $
+                    _EXTRA=e)
   
   ;; a slicer object, cyan
   slicer=obj_new('tvSlice',oDraw,COLOR=stretcher->GetColor('Cyan'))
@@ -66,11 +68,11 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   stats=obj_new('tvStats',base,oDraw,COLOR=stretcher->GetColor('Yellow'), $
                 HANDLE=2,_EXTRA=e)
   
-  ;; a photometry tool, blue
+  ;; a photometry tool, blue: adds to base
   phot=obj_new('tvPhot',base,oDraw,COLOR=stretcher->GetColor('Blue'), $
                /HIDE,_EXTRA=e)
 
-  ;; a Cube record tool for extracting and stacking cubes
+  ;; a Cube record tool for extracting and stacking cubes: adds to base
   cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube,APER_OBJECT=aper, $
                   COLOR=stretcher->GetColor('Magenta'),MENU=file_menu,_EXTRA=e)
   ;; make sure the display line gets CubeRec updates
@@ -80,18 +82,30 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   cubeback=obj_new('CubeBackTrack',base,oDraw, $
                    COLOR=stretcher->GetColor('Green'),_EXTRA=e)
   cuberec->MsgSignup,cubeback,/CUBEREC_UPDATE,/CUBEREC_FULL
-
+  
+  ;; a bad pixel selector tool, with updates from cuberec
+  cubebadpix=obj_new('CubeBadPix',base,oDraw,_EXTRA=e)
+  cuberec->MsgSignup,cubebadpix,/CUBEREC_UPDATE
+  
   ;; a pixel table tool (non-exclusive)
-  pxtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
+  pixtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
   
   ;;**********************************************************************
-  exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},9)
-  exc_list.Obj=[zoomer,hist,stretcher,slicer,stats,phot,cuberec,cubeback,aper] 
-  exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'x'    ,'', '']
-
-  tog_list=replicate({Obj:obj_new(), keys:'',Exclusive:0b},1)
-  tog_list.Obj= [pxtbl]
-  tog_list.keys=['t']
+  
+  ;; Mutually exclusive list, to the left in toolbar
+  exc_list=[{Obj:zoomer,     keys:'z',Exclusive:1b}, $
+            {Obj:hist,       keys:'h',Exclusive:1b}, $
+            {Obj:stretcher,  keys:'c',Exclusive:1b}, $
+            {Obj:slicer,     keys:'l',Exclusive:1b}, $
+            {Obj:stats,      keys:'s',Exclusive:1b}, $
+            {Obj:phot,       keys:'p',Exclusive:1b}, $
+            {Obj:cuberec,    keys:'x',Exclusive:1b}, $
+            {Obj:cubeback,   keys:'', Exclusive:1b}, $
+            {Obj:cubebadpix, keys:'b',Exclusive:1b}, $
+            {Obj:aper,       keys:'', Exclusive:1b}]
+  
+  ;; Toggle-able, non-exclusive list, to the right in toolbar
+  tog_list=[{Obj:pixtbl,     keys:'t',Exclusive:0b}]
 
   ;; a switcher for switching among the tools using icons or keypresses
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
