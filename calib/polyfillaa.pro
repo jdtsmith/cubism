@@ -12,7 +12,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
         resolve_routine,'polyclip'
         path=(routine_info('polyclip',/SOURCE)).PATH
         path=strmid(path,0,strpos(path,path_sep(),/REVERSE_SEARCH))
-        make_dll,'polyclip_new','polyclip',INPUT_DIRECTORY=path, $
+        make_dll,'polyclip','polyclip',INPUT_DIRECTORY=path, $
                  DLL_PATH=polyclip_path ;,/REUSE_EXISTING
         polyclip_compiled=1
      endelse 
