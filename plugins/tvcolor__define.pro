@@ -239,10 +239,12 @@ pro tvColor::Message,msg
         endcase 
      end 
      
-     'WIDGET_TRACKING':  if msg.enter eq 1 then begin 
-        self.oDraw->SetWin 
-        self->SetColors,/NO_REDRAW
-     endif
+     'WIDGET_TRACKING':  begin 
+        if msg.enter then begin 
+           self.oDraw->SetWin 
+           self->SetColors,/NO_REDRAW
+        endif
+     end
      else:
   endcase
 end
