@@ -22,9 +22,10 @@
 ;
 ; INPUT KEYWORD PARAMETERS:
 ;
-;    PRE_FTBOTH: Look for the most recent with "preFTBoth" in the name,
-;       indicating a relevant frametable before 2004-07-13, when the
-;       LLBoth (and SLBoth) frame table was updated.
+;    PRE_FTBOTH: Look for the most recent with "preFTBoth" in the
+;       name, indicating a relevant frametable before 2004-07-13, when
+;       the LLBoth (and SLBoth) frame table was updated.  If not set,
+;       calibration files containing preFTBoth will be excluded.
 ;
 ; COMMON BLOCKS:
 ;
@@ -61,8 +62,14 @@
 function irs_recent_calib,PRE_FTBOTH=pre_FTBOTH
   @cubism_dir
   if keyword_set(pre_FTBOTH) then filt='*preFTboth*.cal' else filt='*.cal'
+  files=file_search(filepath(ROOT=irs_calib_dir,SUBDIR="sets",filt))
   
-  files=findfile(filepath(ROOT=irs_calib_dir,SUBDIR="sets",filt))
+  if ~keyword_set(pre_FTBOTH) then begin 
+     wh=where(stregex(files,'preFTboth.*\.cal',/BOOLEAN),cnt, $
+              COMPLEMENT=good,NCOMPLEMENT=ngood)
+     if ngood eq 0 then message,'No matching calibration sets found.'
+     files=files[good]
+  endif 
   dates=lon64arr(2,n_elements(files))
   for i=0,n_elements(files)-1 do begin 
      openr,un,/get_lun,files[i]
