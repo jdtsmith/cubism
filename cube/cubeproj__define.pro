@@ -749,7 +749,7 @@ function CubeProj::Load,file,ERROR=err
   if obj_valid(obj) then begin 
      if NOT obj_isa(obj,obj_class(self)) then $
         self->Error,'Invalid Cube Project'
-     obj->SetProperty,CHANGED=0b,SAVE_FILE=file
+     obj->SetProperty,CHANGED=0b,SAVE_FILE=file_expand_path(file)
      obj->Initialize
   endif      
   return,obj
