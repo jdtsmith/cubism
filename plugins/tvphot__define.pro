@@ -19,6 +19,32 @@ pro tvPhot::Message, msg
   endswitch
 end 
 
+;=============================================================================
+;	On:  Get all our messages.
+;=============================================================================
+pro tvPhot::On
+  if self.active then begin     ;if turned on *again* .. means turn *off*!
+     self.Box->Reset
+     self->Off
+     return
+  end
+  self->tvPlug::On
+  self.box->On
+  self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW
+  if widget_info(self.wSlab,/VALID_ID) eq 0 then self->wShow
+end
+
+;=============================================================================
+;       Off - Our box will stay around for us
+;=============================================================================
+pro tvPhot::Off
+  self->tvPlug::Off
+  self.box->Off
+  self->Erase
+  self.oDraw->MsgSignup,self,/NONE, /TVDRAW_EXCLUSIVE
+  self.oDraw->SendRedraw
+end
+
 function tvPhot::Icon
   return,[[  0b,  0b],[224b,  7b],[248b, 31b],[252b, 63b], $
           [ 60b, 60b],[ 30b,120b],[142b,112b],[142b,115b], $
@@ -51,7 +77,8 @@ end
 pro tvPhot::Draw
   if self.cntrd[0] ne -1. then begin 
      ;; draw a small circle on the centroid center.
-     cendev=round(self.oDraw->Convert(self.cntrd,/FRAC,/DEVICE,ZOOM=zm))
+     cendev=round(self.oDraw->Convert(self.cntrd,/FRAC,/DEVICE))
+     self.oDraw->GetProperty,Zoom=zm
      self.Box->GetProperty,COLOR=cl
      x=findgen(250)/249.*2*!PI & y=sin(x) & x=cos(temporary(x))
      plots,2*x+cendev[0],2*y+cendev[1], COLOR=cl,THICK=1.5,/DEVICE
@@ -94,7 +121,7 @@ pro tvPhot::Phot
      take=(*io)[low[0]:high[0],low[1]:high[1]]
      photcen=self.cntrd-low     ;in terms of our new take
      phot=sm_ap_phot(take,photcen,ERROR=err,SKYRADIUS=SkyRad, $
-                RADIUS=self.rad,/SILENT,SKYVAL=sky)
+                     RADIUS=self.rad,/SILENT,SKYVAL=sky)
      self.photgood=(1b-err)+2b*(cerr eq 2b)
      if self.photgood then begin 
         self.phot=phot
@@ -195,39 +222,13 @@ pro tvPhot::wShow
   widget_control, self.parent,UPDATE=1
 end
 
-;=============================================================================
-;	On:  Get all our messages.
-;=============================================================================
-pro tvPhot::On
-  if self.active then begin     ;if turned on *again* .. means turn *off*!
-     self.Box->Reset
-     self->Off
-     return
-  end
-  self->tvPlug::On
-  self.box->On
-  self->Update,/EXCLUSIVE,/POSTDRAW,/REDRAW
-  if widget_info(self.wSlab,/VALID_ID) eq 0 then self->wShow
-end
-
-;=============================================================================
-;       Off - Our box will stay around for us
-;=============================================================================
-pro tvPhot::Off
-  self->tvPlug::Off
-  self.box->Off
-  self->Erase
-  self->Update,/ALL_OFF, /EXCLUSIVE
-  self.oDraw->SendRedraw
-end
 
 ;=============================================================================
 ;   Init - Initialize the Phot object.  All tvRBox keywords are
 ;          relevant (see tvrbox).  If HIDE is set, the widget is
 ;          hidden when turned off.
 ;=============================================================================
-function tvPhot::Init,parent,oDraw,EXCLUSIVE=exc,HIDE=hide, $
-                      RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
+function tvPhot::Init,parent,oDraw,HIDE=hide,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   self.hide=keyword_set(hide)
   self.parent=parent
@@ -235,7 +236,9 @@ function tvPhot::Init,parent,oDraw,EXCLUSIVE=exc,HIDE=hide, $
   if n_elements(sw) ne 0 then self.SkyWidth=sw else self.SkyWidth=2.5
   self.cntrd=[-1.,-1.]          ;no centroid yet!
   ;; Get a tvrbox object, signing *ourself* up for box messages.
-  self.box=obj_new('tvrbox', oDraw, MsgList=[self],_EXTRA=e)
+  self.Box=obj_new('tvrbox', oDraw,_EXTRA=e)
+  self.Box->MsgSignup,self,/ALL
+  self->Off
   return,1
 end
 
@@ -259,7 +262,3 @@ pro tvPhot__define
           sky:0.0, $            ;the sky flux
           wSlab:0L}             ;a text widget for the stats
 end
-
-
-
-
