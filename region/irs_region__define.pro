@@ -117,8 +117,10 @@ pro IRS_Region::ParseRegion,hdr,file,IPAC_TABLE=ipac_table
            dec=[dec,ext[2],ext[4]]
            aper=make_array(2,n_elements(ra),/DOUBLE)
            for i=0,n_elements(ra)-1 do begin 
-              aper[0,i]=ten(strsplit(ra[i],":",/EXTRACT))*15.0D
-              aper[1,i]=ten(strsplit(dec[i],":",/EXTRACT))
+              get_coords,c,INSTRING=ra[i]+' '+dec[i]
+              c[0]*=15.0D
+              aper[0,i]=c[0]
+              aper[1,i]=c[1]
            endfor 
            break
         endelse 
