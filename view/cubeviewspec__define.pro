@@ -457,7 +457,6 @@ end
 
 ;; draw the beginning of region line
 pro CubeViewSpec::ShowRegionLine
-  print,'got: ',self.got
   if self.got eq -1 then return ; we aren't defining a region
   val=self.pressloc[self.got eq 1]
   if self.got eq 1 then plots,!X.CRANGE,val,COLOR=self.colors_base $
@@ -631,9 +630,8 @@ end
 pro CubeViewSpec::ShowRegions
   y=!Y.CRANGE
   ;;full mode, no region -- simply highlight the chosen wavelength
-  if self.mode eq 0 AND self.got ne 0 AND self.got ne 1 then begin
-     if self.wavelength ne 0.0 then $
-        plots,self.wavelength,y,COLOR=self.colors_base
+  if self.mode eq 0 AND self.wavelength ne 0.0 then begin 
+     plots,self.wavelength,y,COLOR=self.colors_base,THICK=2
      return
   endif
   for j=1,0,-1 do begin
