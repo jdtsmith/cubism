@@ -58,6 +58,7 @@ pro IRS_Spectrum::Save,sf
   
   catch, err
   if err ne 0 then begin
+     catch,/cancel
      self->Error,['Error saving spectrum to file '+sf,!ERROR_STATE.MSG]
   endif 
   widget_control,/HOURGLASS  
@@ -145,10 +146,11 @@ end
 ;=============================================================================
 pro IRS_Spectrum::Read,file
   file=self->ReadFile(file)
-  if size(sf,/TYPE) ne 7 then return
+  if size(file,/TYPE) ne 7 then return
 
   catch, err
   if err ne 0 then begin
+     catch,/cancel
      self->Error,['Error reading spectrum from file '+file,!ERROR_STATE.MSG]
   endif 
   widget_control,/HOURGLASS  
@@ -172,7 +174,7 @@ pro IRS_Spectrum::Read,file
      
      names=tag_names(st)
      off=2
-     if strupcase(st[2]) eq 'ERROR' then begin 
+     if n_elements(names) gt 2 && strupcase(names[2]) eq 'ERROR' then begin 
         self.error=ptr_new(st.error)
         off++
      endif 
