@@ -234,7 +234,7 @@ pro tvColor::Message,msg
            end
            1: begin             ;button release
               self.oDraw->MsgSignup,self,DRAW_MOTION=0
-              self->Stretch
+              self->Stretch,/SNAPSHOT
            end
         endcase 
      end 
@@ -333,18 +333,18 @@ end
 ;              actually change the colors (e.g. for TrueColor
 ;              devices), redraw also.
 ;=============================================================================
-pro tvColor::SetColors,NO_REDRAW=nrd,NO_UPDATE=nm
+pro tvColor::SetColors,NO_REDRAW=nrd,NO_UPDATE=nm,_EXTRA=e
   tvlct,*self.r,*self.g,*self.b,self.bottom
   if self.need_redraw AND NOT keyword_set(nrd) then begin 
      self->DrawCbar,NO_UPDATE=nm
-     self.oDraw->ReDraw         ;Runs the image through the new color table
+     self.oDraw->ReDraw,_EXTRA=e ;Runs the image through the new color table
   endif 
 end
 
 ;=============================================================================
 ;  Stretch - Stretch the colors according to the internal values.
 ;=============================================================================
-pro tvColor::Stretch,NO_UPDATE=nm
+pro tvColor::Stretch,_EXTRA=e
   ;;total colors in our used range
   ncolors=(self.topval-self.bottom-self.nreserve+1)
   
@@ -364,7 +364,7 @@ pro tvColor::Stretch,NO_UPDATE=nm
   (*self.r)[0:ncolors-1]=(*self.rorig)[index]
   (*self.g)[0:ncolors-1]=(*self.gorig)[index]
   (*self.b)[0:ncolors-1]=(*self.borig)[index]
-  self->SetColors, NO_UPDATE=nm ;set them in.
+  self->SetColors,_EXTRA=e ;set them in.
 end
 
 ;=============================================================================
@@ -408,8 +408,7 @@ pro tvColor::CtablEvent, ev
   (*self.rorig)=r[self.bottom:self.topval]
   (*self.gorig)=g[self.bottom:self.topval]
   (*self.borig)=b[self.bottom:self.topval]
-  self->Stretch                 ;restretch
-  if self.need_redraw then self.oDraw->ReDraw,/SNAPSHOT
+  self->Stretch,/SNAPSHOT       ;restretch
 end
 
 pro tvColor_Event, ev
@@ -428,7 +427,7 @@ pro tvColor::Event,ev
   self.high=(float(high)-self.min[1])/(self.max[1]-self.min[1])
   self.low=(float(low)-self.min[0])/(self.max[0]-self.min[0])
   self.gamma=float(gamval)/100.
-  self->Stretch
+  self->Stretch,SNAPSHOT=ev.drag eq 0
 end
 
 ;=============================================================================
