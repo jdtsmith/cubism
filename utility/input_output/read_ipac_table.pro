@@ -113,6 +113,7 @@ function read_ipac_table,file, HEADERS=hdr_in
               endif else hdr=create_struct(hdr,parts[2],val)
            end
            '|': begin
+              line=strtrim(line) ;no trailing blanks, please
               sep_pos=[strsplit(line,'|'),strlen(line)-1]
               tok=strtrim(strsplit(line,'|',/EXTRACT),2) 
               if got_tags eq 0 then begin 
