@@ -119,7 +119,7 @@ pro cvLine::UpdateWAVSAMP,MODULE=md
   if ptr_valid(self.PRs) then $
      ptr_free,(*self.PRs).PRs,(*self.PRs).RANGE,self.PRs
   if obj_valid(self.cube) then $
-     prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords) $
+     prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords,/FULL) $
   else if obj_valid(self.calib) then begin 
      ords=self.calib->Orders(md)
      prs=ptrarr(n_elements(ords))
