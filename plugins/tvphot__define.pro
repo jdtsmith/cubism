@@ -226,7 +226,7 @@ pro tvPhot::Phot
      self.cntrd=self.cntrd+[l,b] ;offset into the full array
      low=(floor(self.cntrd-self.Rad-self.SkyWidth)-1)>0
      high=(ceil(self.cntrd+self.Rad+self.SkyWidth)+1)< $
-          (size(*io,/DIMENSIONS)-1)[0]
+          (size(*io,/DIMENSIONS)-1)
      take=(*io)[low[0]:high[0],low[1]:high[1]]
      photcen=self.cntrd-low     ;relative to our new piece of the image
      self->ApPhot,take,photcen,ERROR=err,/SILENT
