@@ -3,11 +3,6 @@
 ;
 ;    tvDraw
 ;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
-;
 ; DESCRIPTION:
 ;    
 ;    Class interfacing to a draw widget, providing plug-in mechanism
@@ -234,12 +229,6 @@
 ; INHERITANCE TREE:
 ;
 ;     ObjMsg-->OMArray-->tvDraw
-;
-; EXAMPLE:
-;
-;    a=some_init()
-;    SMART_ROUTINE,a,b,KEYWORD=foo
-;    print,foo
 ;
 ; MODIFICATION HISTORY:
 ; 
