@@ -382,11 +382,11 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
             widget_button(rec,value='Disable',uvalue='disablerecord'),$
             widget_button(rec,value='Enable',uvalue='enablerecord'),$
             ;;-------------
-            widget_button(rec,value='View',uvalue='viewrecord',/SEPARATOR), $
-            widget_button(rec,value='View (new viewer)', $
+            widget_button(rec,value='View...',uvalue='viewrecord',/SEPARATOR),$
+            widget_button(rec,value='View (new viewer)...', $
                           uvalue='viewrecord-new'), $
             ((*self.wInfo).MUST_MULTISELECT= $
-             widget_button(rec,value='View Record Stack', $
+             widget_button(rec,value='View Record Stack...', $
                            uvalue='viewrecord-stack')), $
             widget_button(rec,value='Show Header...',uvalue='headers'),$
             widget_button(rec,value='Show Keyword Value(s)...', $
@@ -1845,9 +1845,9 @@ pro CubeProj::ReadMapFile,file,FORERANGES=fr,BACKRANGES=br,WEIGHTS=weights
 end
 
 ;=============================================================================
-;  Stack - Build a stacked image from the cube between any number of
-;          sets of wavelength intervals, optionally weighting the
-;          individual planes with WEIGHTS.
+;  Stack - Build a stacked image from the constructed cube between any
+;          number of sets of wavelength intervals, optionally
+;          weighting the individual planes with WEIGHTS.
 ;
 ;             FORERANGES: A 2xn list of foreground ranges over which
 ;                         to stack.
@@ -1855,7 +1855,7 @@ end
 ;             BACKRANGES: A 2xn list of background wavelength ranges
 ;                         over which to stack.
 ;
-;             BG_fit: A list of two or more parameters which
+;             BG_VALS: A list of two or more parameters which
 ;                     constitute a polynomial fit with wavelength of
 ;                     the continuum to subtract off.  If passed, any
 ;                     BACKRANGES given is ignored.
@@ -1884,9 +1884,10 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   stack=fltarr(self.CUBE_SIZE[0:1])
   fcnt=0
   for i=0,nfr-1 do begin 
-     stack=stack+total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],3)
+     stack=stack+ $
+           total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],/NAN,3)
      fcnt=fcnt+foreranges[1,i]-foreranges[0,i]+1
-  endfor 
+  endfor
   
   stack=stack/fcnt
            
@@ -1904,7 +1905,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   background=fltarr(self.CUBE_SIZE[0:1])
   for i=0,nbr-1 do begin 
      background=background+ $
-                total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]],3)
+                total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]],/NAN,3)
      bcnt=bcnt+backranges[1,i]-backranges[0,i]+1.
   endfor 
   if bcnt gt 0 then begin 
@@ -1927,8 +1928,8 @@ end
 ;=============================================================================
 function CubeProj::Extract,low,high
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to extract'
-  return,total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1),1)/ $
-         (high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+  return,total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
+               1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
 end
 
 ;=============================================================================
@@ -2145,6 +2146,8 @@ end
 ;=============================================================================
 pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
                      COLUMN=col, ROW=row, CMD_POS=cpos, REC_POS=rpos, PA=pa
+  if n_elements(file) ne 0 AND ptr_valid(self.DR) then $
+     if NOT array_equal((*self.DR).file ne file,1b) then return
   s=size(bcd,/DIMENSIONS)
   rec={CUBE_DR}
   if n_elements(s) eq 3 then begin 
@@ -2156,9 +2159,9 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
      rec.BCD=ptr_new(bcd)
   endif
   if size(error,/N_DIMENSIONS) eq 2 then rec.ERROR=ptr_new(error)
-  
   if size(header,/TYPE) ne 7 then self->Error,'Header must be a string array'
   rec.header=ptr_new(header)
+  
   if n_elements(file) ne 0 then rec.file=file
   
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
@@ -2223,12 +2226,13 @@ end
 ;  Send - Send One of our messages
 ;=============================================================================
 pro CubeProj::Send,RECORD=record,CUBE=cube
-  if keyword_set(cube) ne 0 then begin 
+  if keyword_set(cube) then begin 
      self->MsgSend,{CUBEPROJ_CUBE, $
                     self,$
                     string(FORMAT='(%"%s [%dx%d], %s")',self->ProjectName(), $
                            self.NSTEP,jul2date(self.CUBE_DATE)), $
                     self.MODULE,self.WAVELENGTH}
+     return
   endif
   nrec=n_elements(record) 
   if nrec ne 0 then begin 
