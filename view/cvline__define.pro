@@ -10,7 +10,10 @@ pro cvLine::Message,msg
         self.bcd_mode=msg.bcd_mode
         self.module=msg.module
         self.cube=msg.cube
-        if self.bcd_mode then self->UpdateWAVSAMP else self->UpdateAstrometry
+        if self.bcd_mode then begin 
+           self.mask=msg.bmask
+           self->UpdateWAVSAMP 
+        endif else self->UpdateAstrometry
      end
      
      'DRAW_MOTION': begin 
@@ -107,7 +110,7 @@ function cvLine::FindPR,x,y,ORDER=ord
 end
 
 ;=============================================================================
-;  UpdateWAVSAMP - Get the new cube's WAVSAMP list (all orders)
+;  UpdateWAVSAMP - Get the new cube's WAVSAMP list (all orders) for the BCD
 ;=============================================================================
 pro cvLine::UpdateWAVSAMP
   if ptr_valid(self.PRs) then heap_free,self.PRs
@@ -142,19 +145,29 @@ end
 ;  String - The total string
 ;=============================================================================
 function cvLine::String, im,point,LAMBDA=lambda,ORDER=order,RA=ra,DEC=dec
-  if NOT array_equal(point,self.savpoint) then $
-     self.valstring=self->ValString(im,point)
-  return,self.valstring+' | '+(self.bcd_mode?self->PRString(lambda,order):$
-                               self->WCSString(ra,dec))
+  if NOT array_equal(point,self.savpoint) then begin 
+     self.valstring=self->ValString(im,point,EXTRA_STRING=ext)
+     self.extrastring=ext
+  endif 
+  return,self.valstring+' | '+ $
+         (self.bcd_mode?self->PRString(lambda,order):self->WCSString(ra,dec))+$
+         self.extrastring
 end
 
 ;=============================================================================
 ;  ValString - The string value associated with point X,Y
 ;=============================================================================
-function cvLine::ValString, im,point
+function cvLine::ValString, im,point,EXTRA_STRING=ext
   pt=floor(point)
-  return,string(FORMAT='("(",I3,",",I3,") ",G14.8)',pt, $
-                (*im)[pt[0],pt[1]])
+  ext='       '
+  if self.bcd_mode && self.mask then begin 
+     m=(*self.mask)[pt[0],pt[1]]
+     if m ne 0 then begin 
+        irs_bmask,m,CODE_STRING=cs
+        ext=string(FORMAT='(" <",A,">")',cs)
+     endif 
+  endif 
+  return,string(FORMAT='("(",I3,",",I3,") ",G14.8)',pt, (*im)[pt[0],pt[1]])
 end
 
 ;=============================================================================
@@ -187,7 +200,8 @@ end
 ;=============================================================================
 function cvLine::Init,parent,oDraw,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
-  self.wLine=widget_label(parent,value=' ',/dynamic_resize)
+  r=widget_base(parent,/ROW,/SPACE)
+  self.wLine=widget_label(r,value=' ',/dynamic_resize)
   ;; specify motion, tracking and postdraw events... we're always on
   self.oDraw->MsgSignup,self,/DRAW_MOTION,/WIDGET_TRACKING,/TVDRAW_POSTDRAW
   return,1
@@ -203,9 +217,11 @@ pro cvLine__define
           savorder:0, $         ;the saved order found
           savlambda:0.0, $     ;the saved WL found
           valstring:'', $       ;the array value string
+          extrastring:'', $     ;anything else to add
           bcd_mode:0, $         ;whether bcd or cube mode
           PRs:ptr_new(), $      ;all the pseudo-rectangles
           cube:obj_new(), $     ;
+          mask:ptr_new(), $     ;mask data to display
           astrometry:ptr_new(),$ ;cube astrometry record
           module:'', $          ;the module that came with the latest bcd/cube
           wLine:0L}             ;widget id of text line
