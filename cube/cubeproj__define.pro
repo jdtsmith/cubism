@@ -358,7 +358,7 @@ end
 ;=============================================================================
 ;  Show - Run the project interface
 ;=============================================================================
-pro CubeProj::Show,FORCE=force,_EXTRA=e
+pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   if NOT keyword_set(force) then if self->Showing() then return
 
   ;; make the info structure if we need it.
@@ -389,7 +389,7 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
   b1=widget_button(file,VALUE='Rename Project...',uvalue='setprojectname', $
                    /SEPARATOR)
   b1=widget_button(file,VALUE='Export to Command Line...', $
-                   UVALUE='ExportToMain')  
+                   UVALUE='ExportToMain',SENSITIVE=~LMGR(/VM,/RUNTIME))  
 ;   (*self.wInfo).MUST_UNRESTORED=  $
 ;      widget_button(file,value='Restore All Data',uvalue='restoreall', $
 ;                   /SEPARATOR) 
@@ -499,9 +499,13 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
   (*self.wInfo).list_row=(geom.SCR_YSIZE-7)/geom.YSIZE
   (*self.wInfo).list_size_diff=geom.SCR_YSIZE- $
      (widget_info(base,/GEOMETRY)).SCR_YSIZE
+  
+  XManager,'CubeProj_Show:'+self.ProjectName, base,/JUST_REG
+  if keyword_set(spn) then $
+     self->SetProjectName,TITLE='New Project Name'
+  self->UpdateAll
   XManager,'CubeProj_Show:'+self.ProjectName, base,/NO_BLOCK, $
            EVENT_HANDLER='CubeProj_show_event',CLEANUP='CubeProj_show_kill'
-  self->UpdateAll
 end
 
 ;=============================================================================
@@ -544,8 +548,9 @@ end
 ;  Open - Open a Project and show it
 ;=============================================================================
 pro CubeProj::Open,PROJECT=proj,_EXTRA=e
-  xf,pname,/RECENT,FILTERLIST=['*.cpj','*.*','*'], $
-     TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0,_EXTRA=e
+  xf,pname,/RECENT,FILTERLIST=['*.cpj','*.*','*'],$
+     TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0, $
+     /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
   if size(pname,/TYPE) ne 7 then return ;cancelled
   proj=self->Load(pname)
   if NOT obj_valid(proj) then return
@@ -586,7 +591,7 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
      endelse 
      xf,file,/RECENT,FILTERLIST=['*.cpj','*.*','*'],/SAVEFILE, $
         TITLE='Save Cube Project As...',/NO_SHOW_ALL,SELECT=0, $
-        START=start,PARENT_GROUP=self->TopBase()
+        START=start,PARENT_GROUP=self->TopBase(),/MODAL
      if size(file,/TYPE) ne 7 then begin
         canceled=1
         return                
@@ -635,8 +640,7 @@ pro CubeProj::WriteFits,file
      xf,file,/RECENT,FILTERLIST=['*.fits','*.*','*'],/SAVEFILE, $
         TITLE='Save Cube As FITS File...',/NO_SHOW_ALL,SELECT=0, $
         START=strlowcase(strjoin(strsplit(self->ProjectName(),/EXTRACT),'_'))+$
-        ".fits", $
-        PARENT_GROUP=self->TopBase()
+        ".fits", PARENT_GROUP=self->TopBase(),/MODAL
      if size(file,/TYPE) ne 7 then return
   endif
   fxhmake,hdr,*self.CUBE,/extend,/date
@@ -1331,12 +1335,13 @@ end
 ;  LoadCalib - Ensure the calibration object is loaded and available.
 ;=============================================================================
 pro CubeProj::LoadCalib,SELECT=sel
-  @irs_dir
+  @cubism_dir
   if keyword_set(sel) then begin 
      cd,filepath(ROOT_DIR=irs_calib_dir,"sets")
      if self->IsWidget() then begin 
         xf,calname,/RECENT,FILTERLIST=['*.cal','*.*','*'], $
-           TITLE='Load Calibration Object',/NO_SHOW_ALL,SELECT=0
+           TITLE='Load Calibration Object',/NO_SHOW_ALL,SELECT=0,/MODAL, $
+           PARENT_GROUP=self->TopBase()
         if size(calname,/TYPE) eq 7 then begin 
            calname=filestrip(calname)
            if calname ne self.cal_file then begin 
@@ -2245,7 +2250,7 @@ pro CubeProj::SaveMap,map,sf
         TITLE='Save Map As FITS File...', $
         /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(), $
         START=strlowcase(strjoin(strsplit(self->ProjectName(),/EXTRACT),'_'))+$
-        "_map.fits"
+        "_map.fits",/MODAL
      if size(sf,/TYPE) ne 7 then return
   endif
   
@@ -2298,7 +2303,7 @@ pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii
         TITLE='Save Spectrum As '+(fits?'FITS':'Text')+' File...', $
         /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(), $
         START=strlowcase(strjoin(strsplit(self->ProjectName(),/EXTRACT),'_'))+$
-        "_sp"+(fits?".fits":".txt")
+        "_sp"+(fits?".fits":".txt"),/MODAL
      if size(sf,/TYPE) ne 7 then return
   endif
   
