@@ -1,12 +1,12 @@
 ;; Read through headers of passed files and collect into matching
 ;; spectral records.  Pointers are created for the FILES structure
-;; member, and must be freed by the caller.  MAP requires matching
-;; maps (same AOR, FOV, and OBJECT), whereas normally just
-;; OBJECT+MODULE matching is required.  Use RETURN_RECORDS to get a
-;; list of pointers to each record, grouped as specified.  The caller
-;; is responsible for freeing these records.  Specify in EXTRA_KEYS a
-;; list of extra header keywords to return with the RECORDS, provided
-;; only if RETURN_RECORDS is set.
+;; member, and must be freed by the caller.  MODULE_ONLY means only
+;; group by module, otherwise group by AOR and FOV (slit).
+;;
+;; Use RETURN_RECORDS to get a list of pointers to each record,
+;; grouped as specified.  The caller is responsible for freeing these
+;; records.  Specify in EXTRA_KEYS a list of extra header keywords to
+;; return with the RECORDS, provided only if RETURN_RECORDS is set.
 function irs_file_filter,files,COUNT=cnt,MODULE_ONLY=mo,EXTRA_KEYS=ek, $
                          RETURN_RECORDS=rr
   if keyword_set(mo) then begin 
