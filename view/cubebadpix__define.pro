@@ -51,7 +51,7 @@ pro CubeBadPix::Message, msg
               if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
            endif 
            self->Enable
-        endif else self->Off,/DISABLE
+        endif else self->Reset,/DISABLE ;cube mode
      end
   endcase
 end
