@@ -147,9 +147,9 @@ end
 pro tvSlice::EraseIndicator
   ;; Erase indicator + vertical line on the plot window
   wset,self.plotwin
-  low=(convert_coord([self.plotpt[0],!Y.CRANGE[0]],/DATA,/TO_DEVICE))[0:1]-5
+  low=(convert_coord([self.plotpt[0],!Y.CRANGE[0]],/DATA,/TO_DEVICE))[0:1]-6
   high=(convert_coord([self.plotpt[0],!Y.CRANGE[1]], $
-                      /DATA,/TO_DEVICE))[0:1]+5
+                      /DATA,/TO_DEVICE))[0:1]+6
   dist=high-low+1
   device,copy=[low,dist,low,self.plotpixwin]
   
