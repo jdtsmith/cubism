@@ -31,7 +31,7 @@ pro tvPhot::On
   self->tvPlug::On
   self.box->On
   self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW
-  if widget_info(self.wSlab,/VALID_ID) eq 0 then self->wShow
+  if widget_info(self.wBase,/VALID_ID) eq 0 then self->wShow
 end
 
 ;=============================================================================
@@ -39,6 +39,7 @@ end
 ;=============================================================================
 pro tvPhot::Off
   self->tvPlug::Off
+  if widget_info(self.wBase,/VALID_ID) then self->wDestroy
   self.box->Off
   self->Erase
   self.oDraw->MsgSignup,self,/NONE, /TVDRAW_EXCLUSIVE
