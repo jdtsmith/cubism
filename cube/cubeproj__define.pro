@@ -565,7 +565,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                     UVALUE='load-append-badpixels')
   (*self.wInfo).MUST_BPL= $
      [widget_button(cube,VALUE='Save Bad Pixels...',UVALUE='savebadpixels') , $
-      widget_button(cube,VALUE='Clear Bad Pixel List...', $
+      widget_button(cube,VALUE='Clear Bad Pixel List', $
                     UVALUE='clearbadpixels')]
   
   ;;-------------
@@ -699,9 +699,19 @@ end
 ;  SnapshotParameters - Save a snapshot of the as-built parameters
 ;=============================================================================
 pro CubeProj::SnapshotParameters
-  heap_free,self.as_built
+  
   as_built={CUBE_PARAMETERS}
   struct_assign,self,as_built,/NOZERO
+  
+  ;; find locations where old and new share the same pointer
+  for i=0,n_tags(as_built)-1 do begin 
+     ;; XXX Assumes only pointer structure members contain heap data
+     if size(as_built.(i),/TYPE) ne 10 then continue
+     ;; Free existing as_built if it doesn't share global pointer
+     if ptr_valid(as_built.(i)) && as_built.(i) ne self.as_built.(i) then $
+        heap_free,self.as_built.(i)
+  endfor 
+  
   self.as_built=as_built
 end
 
@@ -951,7 +961,14 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset
   if n_elements(rset) ne 0 then rec=self->DCEIDtoRec(rset)
   if n_elements(rec) ne 0 then $
      list=(*self.DR)[rec[0]].BAD_PIXEL_LIST $
-  else list=self.GLOBAL_BAD_PIXEL_LIST
+  else begin 
+     ;; Fork if necessary
+     if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) && $
+        self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST eq self.GLOBAL_BAD_PIXEL_list $
+     then self.GLOBAL_BAD_PIXEL_LIST= $
+        ptr_new(*self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST)
+     list=self.GLOBAL_BAD_PIXEL_LIST
+  endelse 
      
   ;; Add or remove bp from appropriate list
   if n_elements(set) ne 0 then begin 
@@ -967,8 +984,7 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset
      if ngot gt 0 then begin    ;already on list, clear it
         set=0
         if only_set then return
-        if nothers gt 0 then *list=(*list)[others] $
-        else ptr_free,list
+        if nothers gt 0 then *list=(*list)[others] else ptr_free,list
         self.GLOBAL_BP_BYHAND=1b & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
      endif else begin 
         if only_clear then return
@@ -982,6 +998,10 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset
      else self.GLOBAL_BAD_PIXEL_LIST=ptr_new([pix])
      self.GLOBAL_BP_BYHAND=1b & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
   endelse 
+  if ~self.Changed then begin 
+     self.Changed=1b
+     self->UpdateButtons & self->UpdateTitle
+  endif 
 end
 
 ;=============================================================================
@@ -1044,7 +1064,8 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
      ptr_free,self.GLOBAL_BAD_PIXEL_LIST
   self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bp,/NO_COPY)
   self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
-  self->UpdateButtons
+  self.Changed=1b
+  self->UpdateButtons & self->UpdateTitle
   self->Send,/UPDATE
 end
 
@@ -1062,7 +1083,7 @@ pro CubeProj::SaveBadPixels,file
   endif 
   if size(file,/TYPE) ne 7 then return ;cancelled
   openw,un,file,/GET_LUN
-  printf,un,1#(*self.GLOBAL_BAD_PIXEL_LIST)
+  printf,un,transpose(*self.GLOBAL_BAD_PIXEL_LIST)
   
   ;; All of our BPs are now stored in this one file
   self.GLOBAL_BP_SAVEFILE=file
@@ -1087,7 +1108,8 @@ pro CubeProj::ClearBadPixels, file
   ;; None by hand either
   self.GLOBAL_BP_BYHAND=0b
   self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
-  self->UpdateButtons
+  self.Changed=1b
+  self->UpdateButtons & self->UpdateTitle
   self->Send,/UPDATE
 end
 
@@ -1116,7 +1138,7 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err
   readf,un,bg
   free_lun,un
        
-  wh=where_array(bg,(*self.DR).DCEID,cnt)
+  wh=self->DCEIDtoRec(bg,cnt)
   if cnt lt n_elements(bg) then $
      self->Warning,strtrim(n_elements(bg)-cnt,2)+ $
                    ' record(s) not present in project'
@@ -1334,6 +1356,7 @@ pro CubeProj::Revert
      self.Changed=oldchange
   endelse 
   self->UpdateAll
+  self->Send,/UPDATE
 end
 
 ;=============================================================================
@@ -1637,6 +1660,8 @@ end
 ;=============================================================================
 pro CubeProj::ViewBackground,NEW_VIEWER=new
   if NOT ptr_valid(self.BACKGROUND) then self->Error,'No background to view'
+  if ptr_valid(self.BACK_EXP_LIST) then $
+     self->SetListSelect,self->DCEIDtoRec(*self.BACK_EXP_LIST)
   self->FindViewer,NEW_VIEWER=new
   self->Send,/BACKGROUND
 end
@@ -1777,9 +1802,9 @@ end
 ;  DCEIDtoRec - Convert a list of DCEIDs back to a record
 ;                 selection list.
 ;=============================================================================
-function CubeProj::DCEIDtoRec,dceid
+function CubeProj::DCEIDtoRec,dceid,cnt
   if ~ptr_valid(self.DR) then return,-1
-  return,where_array([dceid],(*self.DR).DCEID)
+  return,where_array([dceid],(*self.DR).DCEID,cnt)
 end
 
 ;=============================================================================
@@ -2308,7 +2333,6 @@ function CubeProj::FluxImage
   fimage=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=0.)  
   total_areas=make_array(size(fimage,/DIMENSIONS),VALUE=0.)
   
-  
   prs=self->PRs(/ALL_ORDERS,ORDERS=ords)
   
   for i=0,n_elements(ords)-1 do begin 
@@ -2334,6 +2358,7 @@ function CubeProj::FluxImage
   wh=where(total_areas gt 0.,cnt,COMPLEMENT=wh_none,NCOMPLEMENT=cnt_none)
   if cnt gt 0 then fimage[wh]/=total_areas[wh]
   if cnt_none gt 0 then fimage[wh_none]=1.
+  ptr_free,prs
   return,fimage
 end
 
