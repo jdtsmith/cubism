@@ -17,10 +17,10 @@ pro tvZoom::Message, msg
      'DRAW_BUTTON': begin
         case msg.type of 
            0: begin             ;button press
+              self->UpdateDrawSize
               if msg.press eq 4b then begin ;right, zoom out
-                 if not ptr_valid(self.zoomlist) then return
-                 n=n_elements(*self.zoomlist) 
-                 if msg.clicks eq 2 or n lt 2 then begin ;all the way out
+                 n=ptr_valid(self.zoomlist)?n_elements(*self.zoomlist):0
+                 if msg.clicks eq 2 || n lt 2 then begin ;all the way out
                     self.oDraw->GetProperty, SIZE=size
                     self.oDraw->SetProperty,offset=[0,0],dispsize=size   
                     ptr_free,self.zoomlist ;no zoom list left
@@ -78,6 +78,11 @@ function tvZoom::Description
 end
 ;;************************End OverRiding methods*******************************
 
+pro tvZoom::UpdateDrawSize
+  self.oDraw->GetProperty,WINSIZE=ws
+  self.winsize=ws
+end
+
 pro tvZoom::EraseBox,X,Y
   low=(([X,Y] < self.orig)-1) > 0 ;start two to the left
   high=([X,Y] > self.orig) < self.winsize
@@ -99,7 +104,7 @@ end
 
 pro tvZoom::ZoomIt, X, Y
   self.oDraw->GetProperty,zoom=zoom,pan=pan,offset=offset,size=size, $
-     dispsize=ds,WINSIZE=winsize
+                          dispsize=ds
   left=FIX(((self.orig[0] < X)- $
             pan[0])/zoom) > 0
   right=FIX(((self.orig[0] > X)- $
@@ -112,13 +117,13 @@ pro tvZoom::ZoomIt, X, Y
   ;; point-click: zoom in a factor of two
   if (left ge right) or (bottom ge top) then begin 
      pix=self.oDraw->Convert([X,Y],/SHOWING)
-     if pix[0] eq -1 then begin ; it wasn't showing
+     if pix[0] eq -1 then begin ; it wasn't on a showing pixel
         self->EraseBox,X,Y
         return
      endif 
      ;; show as much as possible at 2x zoom, centered on pix
-     max=winsize/(2*zoom)
-     halfsize=max/2>1
+     max=self.winsize/(2*zoom)
+     halfsize=floor(max/2-1)>1
      left=pix[0]-halfsize[0]>0
      right=pix[0]+halfsize[0]<(size[0]-1)
      bottom=pix[1]-halfsize[1]>0
