@@ -268,15 +268,18 @@
 ;;**************************OverRiding methods********************************
 
 pro tvDraw::Message,msg
-  ;; Only Resize messages
-  old=self.TLBsize
-  self->TLBComputeSize  
-  diff=self.TLBsize-old
-  if array_equal(diff,0) then return
-  
-  self->Resize,self.winsize+diff
-  self->Draw
-  widget_control, msg.id,/CLEAR_EVENTS ;get rid of accumulated events
+  type=tag_names(msg,/STRUCTURE_NAME)
+  if type eq 'TLB_WIDGET_BASE' then begin 
+     ;; Resize messages
+     old=self.TLBsize
+     self->TLBComputeSize  
+     diff=self.TLBsize-old
+     if array_equal(diff,0) then return
+        
+     self->Resize,self.winsize+diff
+     self->Draw
+     widget_control, msg.id,/CLEAR_EVENTS ;get rid of accumulated events
+  endif else self->Focus
 end
 
 ;=============================================================================
@@ -377,14 +380,12 @@ pro tvDraw::SetProperty, IMORIG=io,DISPSIZE=ds,OFFSET=off, $
         self.dispsize=(self.size=s)
      endif
   endif
-  
   if n_elements(ws) ne 0 then begin 
      draw=1
      self->Resize,ws
      self->TLBComputeSize
   endif 
-  
-  if draw and ~keyword_set(nd) then self->Draw,PREDRAW=pre,_EXTRA=e
+  if draw and keyword_set(nd) eq 0 then self->Draw,PREDRAW=pre,_EXTRA=e
 end
 
 ;=============================================================================
@@ -477,6 +478,7 @@ pro tvDraw::CreatePixmaps
   self.dbwin=!D.Window          ;for double buffering
 end
 
+
 pro tvDraw::Focus
   widget_control, self.wDraw,/INPUT_FOCUS
 end
@@ -531,7 +533,7 @@ end
 ;  EraseBackGround - Set the smooth background color
 ;=============================================================================
 pro tvDraw::EraseBackground
-  erase,COLOR=self.bottom+(self.top-self.bottom)/2
+ erase,COLOR=self.bottom+(self.top-self.bottom)/2
 end
   
 ;=============================================================================
@@ -688,7 +690,7 @@ end
 ;  SendMessage - Send a specific message of the specified type (either
 ;                pre or post-draw) to the interested recipients.
 ;=============================================================================
-pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,SNAPSHOT=snap, $
+pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,SNAPSHOT=snap,$ 
                     RESIZE=rs
   if size(msg,/TYPE) eq 8 then begin ; A specific message
      if msg.handler ne self.wDraw then $ ;handle TLB messages as well.
@@ -785,8 +787,8 @@ function tvDraw::Init,parent,IMORIG=imdata,TVD_XSIZE=xs,TVD_YSIZE=ys, $
                   'TLB_WIDGET_BASE','TVDRAW_PREDRAW','TVDRAW_POSTDRAW', $
                   'TVDRAW_REDRAW','TVDRAW_SNAPSHOT','TVDRAW_RESIZE']
   
-  ;; Sign us up for resize events
-  self->MsgSignup,self,/TLB_WIDGET_BASE
+  ;; Sign us up for resize and tracking events
+  self->MsgSignup,self,/TLB_WIDGET_BASE,/TLB_WIDGET_TRACKING
   
   ;; we don't draw it here since our widget is as of yet unrealized.
   return,1
