@@ -3398,7 +3398,8 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
      ri=*rec.REV_ACCOUNT
      if ri[ind] ge ri[ind+1] then continue ;nothing in there
      
-     self->RestoreData,i
+     self->RestoreData,i,RESTORE_CNT=rcnt
+     if rcnt gt 0 then rec=(*self.DR)[i] ;new record copy needed
      
      ;; We've got a match
      if show then show_vec[i]=1b
@@ -3567,8 +3568,9 @@ end
 ;          any number of sets of wavelength intervals, or optionally
 ;          weighting the individual planes with WEIGHTS.
 ;
-;             FORERANGES: A 2xn list of foreground ranges over which
-;                         to stack.
+;             FORERANGES: A 2xn list of foreground index ranges over
+;                         which to stack.  Serve as output when
+;                         MAP_NAME is passed.
 ;
 ;             BACKRANGES: A 2xn list of background wavelength ranges
 ;                         over which to stack.
@@ -3594,16 +3596,16 @@ end
 ;=============================================================================
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                          BG_VALS=bg_vals,MAP_NAME=mname, SAVE=save, $
-                         CONTINUUM_IMAGE=ci, WAVELENGTH_WEIGHTED=ww,ALL=all
-  
-  ;; XXX WW
+                         CONTINUUM_IMAGE=background, WAVELENGTH_WEIGHTED=ww, $
+                         ALL=all, _EXTRA=e
   
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   ;; Get a map set by name
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
      oMap->GetMap,mname,WEIGHTS=weights,FORERANGES=foreranges, $
-                  BACKRANGES=backranges, WAVELENGTH_CONVERT=*self.WAVELENGTH
+                  BACKRANGES=backranges, WAVELENGTH_CONVERT=*self.WAVELENGTH, $
+                  _EXTRA=e
   endif else if keyword_set(all) then $
      foreranges=[0,n_elements(*self.WAVELENGTH)-1]
   
@@ -3618,61 +3620,69 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      endif 
   endif
   
-  nbgv=n_elements(bg_vals)
-  
-  nw=n_elements(weights)
-  use_weights=0
-  if nw gt 0 then if weights[0] ne -1 then use_weights=1
-  if use_weights then begin     ;A weight vector overrides foreground regions
-     stack=total(*self.CUBE * $
-                 rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],$
-                       /SAMPLE),3,/NAN)/total(weights)
-  endif else begin              ;Foreground regions
-     stack=fltarr(self.CUBE_SIZE[0:1])
-     fcnt=lonarr(self.CUBE_SIZE[0:1])
-     bcnt=0
-     for i=0,nfr-1 do begin 
-        if foreranges[0,i] eq foreranges[1,i] then begin 
-           stack+=(*self.CUBE)[*,*,foreranges[0,i]]
-           fcnt+=long(finite((*self.CUBE)[*,*,foreranges[0,i]]))
-        endif else begin 
-           stack+= $
-              total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],/NAN,3)
-           fcnt+=long(total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
-                                                foreranges[1,i]]),3))
-        endelse 
-        bcnt+=foreranges[1,i]-foreranges[0,i]+1
-     endfor
-     if nfr gt 0 then stack/=(fcnt>1L)
-  endelse 
-  
-  if nbr eq 0 AND nbgv eq 0 then return,stack
-  
-  ;; Background Values provided
-  if nbgv gt 0 then begin 
-     if nbgv ne bcnt then $
-        self->Error,'Wrong number of background values passed'
-     stack-=total(bg_vals)/bcnt ; average(fi-bgvi)
-     return,stack
-  endif
   
   ;; Compute a background
-  bcnt=lonarr(self.CUBE_SIZE[0:1])
-  background=fltarr(self.CUBE_SIZE[0:1])
-  for i=0,nbr-1 do begin 
-     if backranges[0,i] eq backranges[1,i] then begin 
-        background+=(*self.CUBE)[*,*,backranges[0,i]]
-        bcnt+=long(finite((*self.CUBE)[*,*,backranges[0,i]]))
-     endif else begin 
-        background+=total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]], $
-                          /NAN,3)
-        bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
-                                             backranges[1,i]]),3))
+  if keyword_set(ww) then begin 
+     ;; Wavelength weighted Backrounds
+     
+  endif else begin 
+     nbgv=n_elements(bg_vals)
+     
+     nw=n_elements(weights)
+     use_weights=0
+     if nw gt 0 then if weights[0] ne -1 then use_weights=1
+     if use_weights then begin  ;A weight vector overrides foreground regions
+        stack=total(*self.CUBE * $
+                    rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],$
+                          /SAMPLE),3,/NAN)/total(weights)
+     endif else begin           ;Foreground regions
+        stack=fltarr(self.CUBE_SIZE[0:1])
+        fcnt=lonarr(self.CUBE_SIZE[0:1])
+        fixed_cnt=0
+        for i=0,nfr-1 do begin 
+           if foreranges[0,i] eq foreranges[1,i] then begin 
+              stack+=(*self.CUBE)[*,*,foreranges[0,i]]
+              fcnt+=long(finite((*self.CUBE)[*,*,foreranges[0,i]]))
+           endif else begin 
+              stack+= $
+                 total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],/NAN,3)
+              fcnt+=long(total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
+                                                   foreranges[1,i]]),3))
+           endelse 
+           fixed_cnt+=foreranges[1,i]-foreranges[0,i]+1
+        endfor
+        if nfr gt 0 then stack=stack/(fcnt>1L)*fixed_cnt
      endelse 
-  endfor 
-  background/=(bcnt>1L)
-  stack-=background
-	  
+     
+     if nbr eq 0 AND nbgv eq 0 then return,stack
+     
+     ;; Background Values provided
+     if nbgv gt 0 then begin 
+        if nbgv ne fixed_cnt then $
+           self->Error,'Wrong number of background values passed'
+        stack-=total(bg_vals)
+        return,stack
+     endif
+     
+     bcnt=lonarr(self.CUBE_SIZE[0:1])
+     background=fltarr(self.CUBE_SIZE[0:1])
+     fixed_cnt=0
+     for i=0,nbr-1 do begin 
+        if backranges[0,i] eq backranges[1,i] then begin 
+           background+=(*self.CUBE)[*,*,backranges[0,i]]
+           bcnt+=long(finite((*self.CUBE)[*,*,backranges[0,i]]))
+        endif else begin 
+           background+=total((*self.CUBE)[*,*,backranges[0,i]: $
+                                          backranges[1,i]], /NAN,3)
+           bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
+                                                backranges[1,i]]),3))
+        endelse 
+        fixed_cnt+=backrange[1-i]-backranges[0,i]+1
+     endfor 
+     background=background/(bcnt>1L)*fixed_cnt
+     stack-=background
+  endelse
+  
   if keyword_set(save) then self->SaveMap,stack,save
   return,stack
 end 
