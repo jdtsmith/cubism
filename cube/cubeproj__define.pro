@@ -747,6 +747,8 @@ pro CubeProj::Initialize
         self->Warning,"Missing DCEIDs: restored"
      endif 
   endif 
+  
+  self.reconstructed_pos=1b;
 end
 
 ;=============================================================================
@@ -2626,14 +2628,14 @@ pro CubeProj::Normalize
   endfor 
   
   ;; XXX No longer necessary with pos-based layout: can have arbitrary steps
-  if (NOT array_equal(stepsper,stepsper[0])) or $
-     (NOT array_equal(stepspar,stepspar[0])) then $
-     self->Error,"BCD's have unequal map size"
-  self.NSTEP=[stepsper[0],stepspar[0]]
-  if (NOT array_equal(stepszper,stepszper[0])) or $
-     (NOT array_equal(stepszpar,stepszpar[0])) then $
-     self->Error,"BCD's have unequal step size"
-  self.STEP_SIZE=[stepszper[0],stepszpar[0]]/3600.D ; in degrees
+;   if (NOT array_equal(stepsper,stepsper[0])) or $
+;      (NOT array_equal(stepspar,stepspar[0])) then $
+;      self->Error,"BCD's have unequal map size"
+   self.NSTEP=[stepsper[0],stepspar[0]]
+;   if (NOT array_equal(stepszper,stepszper[0])) or $
+;      (NOT array_equal(stepszpar,stepszpar[0])) then $
+;      self->Error,"BCD's have unequal step size"
+   self.STEP_SIZE=[stepszper[0],stepszpar[0]]/3600.D ; in degrees
   
   ;; Normalize the slit length
   if self.ORDER gt 0 then begin
@@ -3961,7 +3963,7 @@ pro CubeProj__define
   ;; The account structure is *big* (~1Mb per BCD)
   acc={CUBE_ACCOUNT_LIST, $
        cube_plane:0, $          ;the cube plane it goes to.
-       cube_pix:0, $            ;the cube pixel in that plane
+       cube_pix:0L, $           ;the cube pixel in that plane
        bcd_pix:0, $             ;the bcd pixel it came from
        area:0.0}                ;the area of overlap on the cube pixel
   
