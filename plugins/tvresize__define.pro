@@ -17,6 +17,11 @@ pro tvResize::BuildMenu
 end
 
 
+pro tvResize::Cleanup
+  ptr_free,self.sizes
+  self->tvPlug_lite::Cleanup
+end
+
 function tvResize::Init,oDraw,sizes,SIZE_MENU=menu
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   
