@@ -263,9 +263,9 @@ pro ObjReport::orCommandLineReport,msg,INFO=info,WARNING=warning, $
      msg=newmsg
   endif 
   printmsg=title+': '+msg
-  if keyword_set(warning) then message,printmsg,/CONTINUE,/NOPREFIX $
-  else if keyword_set(error) then message,printmsg,/NOPREFIX $
-  else if keyword_set(info) then message,printmsg,/INFORMATIONAL,/NOPREFIX
+  if keyword_set(warning) then message,printmsg,/CONTINUE,/NONAME $
+  else if keyword_set(error) then message,printmsg,/NONAME $
+  else if keyword_set(info) then message,printmsg,/INFORMATIONAL,/NONAME
   return
 end
 
