@@ -318,8 +318,9 @@
 ;=============================================================================
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
-                            PLATE_SCALE=ps,PMASK=pmask,FLUXCON=fluxcon, $
-                            KEY_WAV=fluxcon_kw,TUNE=tune,SLCF=slcf
+                            PLATE_SCALE=ps,PIXEL_OMEGA=po,PMASK=pmask, $
+                            FLUXCON=fluxcon,KEY_WAV=fluxcon_kw,TUNE=tune, $
+                            SLCF=slcf
   if arg_present(pmask) then begin 
      m=irs_module(module)
      pmask=self.PMASK[m]
@@ -337,6 +338,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   if arg_present(wmn) then  wmn=rec.WAV_MIN
   if arg_present(wmx) then  wmx=rec.WAV_MAX
   if arg_present(ps) then   ps=rec.PLATE_SCALE
+  if arg_present(po) then po=rec.PIXEL_OMEGA
   if arg_present(fluxcon) then fluxcon=rec.FLUXCON
   if arg_present(fluxcon_kw) then fluxcon_kw=rec.FLUXCON_KEY_WAV
   if arg_present(tune) then tune=rec.TUNE
@@ -370,7 +372,8 @@ function IRS_Calib::Info, modules, orders, SHORT=short
   str=' == IRS Calibration Object: '+self.Name+' =='
   str=[str,'', $
        '  PLATESCALE: '+self.PLATESCALE_FILE, $
-       ' FRAME_TABLE: '+self.FRAMETABLE_FILE]
+       ' FRAME_TABLE: '+self.FRAMETABLE_FILE, $
+       ' PIXEL_OMEGA: '+self.PIXEL_OMEGA_FILE]
   for i=0,n_elements(modules)-1 do begin 
      md=irs_module(modules[i])
      module=irs_module(md,/TO_NAME)
@@ -398,6 +401,11 @@ function IRS_Calib::Info, modules, orders, SHORT=short
      if slcff ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'SLCF',slcff)]
      wcf=self.WAVECUT_FILE[md]
      if wcf then str=[str,string(FORMAT='(A12,": ",A)','WAVECUT',wcf)]
+     str=[str,string(FORMAT='(A39,": ",G12.5)',"Plate Scale (deg)", $
+                     (*self.cal[md])[0].PLATE_SCALE)]
+     str=[str,string(FORMAT='(A39,": ",G12.5)', $
+                     "Pixel Effective Solid Angle (sr)", $
+                     (*self.cal[md])[0].PIXEL_OMEGA)]
      
      str=[str,'']
      for j=0,no-1 do begin 
@@ -1066,7 +1074,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                          LINETILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
                          PLATESCALE_VERSION=psv,PMASK_VERSION=pmv, $
                          FLUXCON_VERSION=fcv,SLCF_VERSION=slcfv, $
-                         WAVECUT_VERSION=wvcv, $
+                         WAVECUT_VERSION=wvcv, PIXEL_OMEGA_VERSION=pov, $
                          ONLY=only, RECOVER_FROM_WAVSAMP=rcvfws
   
   cals=[{name:'WAVSAMP'   , group:'single', type:'tbl' }, $
@@ -1077,6 +1085,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
         {name:'SLCF'      , group:'single', type:'tbl' }, $
         {name:'FRAMETABLE', group:'all'   , type:'tbl' }, $
         {name:'PLATESCALE', group:'all'   , type:'tbl' }, $
+        {name:'PIXEL_OMEGA',group:'all'   , type:'tbl' }, $
         {name:'WAVECUT'   , group:'single', type:'tbl' }]
   
   version=[n_elements(wv)  gt 0?fix(wv)>0:0,  $
@@ -1087,6 +1096,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
            n_elements(slcfv) gt 0?fix(slcfv)>0:0, $ 
            n_elements(fv)  gt 0?fix(fv)>0:0,  $
            n_elements(psv) gt 0?fix(psv)>0:0, $
+           n_elements(pov) gt 0?fix(pov)>0:0, $
            n_elements(wvcv) gt 0?fix(wvcv)>0:0]
   
   if keyword_set(only) then begin 
@@ -1098,6 +1108,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                   n_elements(slcfv), $
                   n_elements(fv), $
                   n_elements(psv),$
+                  n_elements(pov), $
                   n_elements(wvcv)] ne 0 ,cnt)
      if cnt eq 0 then return
      cals=cals[which]           ;only these cals are to be used
@@ -1475,6 +1486,21 @@ end
 
 
 ;=============================================================================
+;  ParsePixel_Omega
+;=============================================================================
+pro IRS_Calib::ParsePixel_Omega,file
+  data=read_ipac_table(file)
+  for i=0,4 do begin 
+     if ptr_valid(self.cal[i]) eq 0 then continue
+     wh=where(data.mod_num eq i,cnt)
+     if cnt eq 0 then continue
+     (*self.cal[i]).PIXEL_OMEGA=data[wh[0]].pix_solid_angle
+  endfor 
+  self.PIXEL_OMEGA_FILE=file
+end
+
+
+;=============================================================================
 ;  CleanWAVSAMP - Delete the contents of one or more WAVSAMP records
 ;                 by freeing the internal pointers, or just clear the
 ;                 PIXELS and AREAS (and optionally POLYGONS) if
@@ -1531,7 +1557,8 @@ pro IRS_Calib__define
   class={IRS_Calib, $         
          Name: '', $            ;A name for this IRS Calibration object
          PLATESCALE_FILE:'', $  ;The name of the plate scale file
-         FRAMETABLE_FILE:'', $ 
+         PIXEL_OMEGA_FILE: '', $ ;Name of the pixel solid angle file
+         FRAMETABLE_FILE:'', $  ;name for frametable file
          WAVSAMP_FILE:strarr(5), $ ;the names of the wavsamp files (WAVSAMP)
          TILT_FILE:strarr(5),$  ;the name of the LINETILT file (c)
          ORDER_FILE:strarr(5),$ ;the name of the ORDFIND file (a's & b's)
@@ -1560,6 +1587,7 @@ pro IRS_Calib__define
        WAVECUT: [0.0,0.0], $    ;[um] suggested low and high trim wavelengths
        SLIT_LENGTH: 0.0, $      ;[pix] the length of the slit
        PLATE_SCALE: 0.0, $      ;[deg/pix] the plate scale along the slit
+       PIXEL_OMEGA: 0.0, $      ;[sr] effective solid angle per pixel (2x1)
        A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
        C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
