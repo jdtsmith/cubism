@@ -782,6 +782,7 @@ pro CubeProj::LoadBadPixels,file,ERROR=err
   readf,un,bp
   free_lun,un
   self.bad_pixel_list=ptr_new(bp,/NO_COPY)
+  self->UpdateButtons
 end
 
 
@@ -800,7 +801,6 @@ pro CubeProj::SaveBadPixels,file
   if size(file,/TYPE) ne 7 then return ;cancelled
   openw,un,file,/GET_LUN
   printf,un,1#(*self.bad_pixel_list)
-  self->UpdateButtons
   free_lun,un
 end
 
