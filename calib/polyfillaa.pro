@@ -153,7 +153,9 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      px_out=fltarr((npol+4)*npix,/NOZERO)
      py_out=fltarr((npol+4)*npix,/NOZERO)
      ri_out=lonarr(npix+1)
-
+     if size(px,/TYPE) eq 5 then begin ; No double please
+        px=float(px) & py=float(py)
+     endif
      tmp=call_external(polyclip_path,'polyclip',$
                        VALUE= $
                        [0b,0b,1b,   0b,0b,1b,    0b,    0b,    0b,   0b], $
