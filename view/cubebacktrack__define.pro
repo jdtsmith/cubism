@@ -96,15 +96,15 @@ pro CubeBackTrack::On
   self.cube->GetProperty,PROJECT_NAME=pn
   self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
   title=string(FORMAT='(%"BackTracking: %s")',pn)
-  self.msg_head="        BCD         Pix         Val     Frac"
+  self.msg_head="        BCD              Pix         Val     Frac"
   msg=self.msg_base+string(10b)+self.msg_head
   self.wBase=widget_base(/COLUMN, SPACE=1,GROUP_LEADER=self.parent, $
                          TITLE=title, /TLB_SIZE_EVENTS,UVALUE=self)
   self.wLabel=widget_label(self.wBase,value=msg,/ALIGN_LEFT, $
                            /DYNAMIC_RESIZE)
   if self.list_size gt 0 then $
-     self.wList=widget_list(self.wBase,XSIZE=47,SCR_YSIZE=self.list_size) $
-  else self.wList=widget_list(self.wBase,XSIZE=47,YSIZE=8) 
+     self.wList=widget_list(self.wBase,XSIZE=52,SCR_YSIZE=self.list_size) $
+  else self.wList=widget_list(self.wBase,XSIZE=52,YSIZE=8) 
   widget_control, self.wBase, SET_UVALUE=self,/REALIZE
   geom=widget_info(self.wList,/GEOMETRY)
   self.list_size_diff=geom.SCR_YSIZE- $
@@ -185,20 +185,22 @@ pro CubeBackTrack::UpdateList
   self->EnsureCube
   list=self.cube->BackTrackPix(self.point,self.plane,/FOLLOW)
   oldid=''
-  str=strarr(n_elements(list))
-  for i=0,n_elements(list)-1 do begin 
-     str[i]=string(FORMAT='(" (",I3,",",I3,") ",G9.3,1X,G9.3)', $
-                   list[i].BCD_PIX mod self.bcd_size[0], $
-                   list[i].BCD_PIX/self.bcd_size[0], $
-                   list[i].BCD_VAL, list[i].AREA)
-     if list[i].ID eq oldid then begin 
-        str[i]=string(FORMAT='(16X,A)',str[i])
-     endif else begin 
-        str[i]=string(FORMAT='(A14,2X,A)',list[i].ID, $
-                      str[i])
-        oldid=list[i].ID
-     endelse 
-  endfor
+  if size(list,/N_DIMENSIONS) eq 0 then str='' else begin 
+     str=strarr(n_elements(list))
+     for i=0,n_elements(list)-1 do begin 
+        str[i]=string(FORMAT='(" (",I3,",",I3,") ",G9.3,1X,G9.3)', $
+                      list[i].BCD_PIX mod self.bcd_size[0], $
+                      list[i].BCD_PIX/self.bcd_size[0], $
+                      list[i].BCD_VAL, list[i].AREA)
+        if list[i].ID eq oldid then begin 
+           str[i]=string(FORMAT='(21X,A)',str[i])
+        endif else begin 
+           str[i]=string(FORMAT='(A19,2X,A)',list[i].ID, $
+                         str[i])
+           oldid=list[i].ID
+        endelse 
+     endfor
+  endelse 
   widget_control, self.wList,SET_VALUE=str
   ;ptr_free,self.list
   ;self.list=ptr_new(list,/NO_COPY)
