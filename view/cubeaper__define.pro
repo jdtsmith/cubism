@@ -310,7 +310,7 @@ pro CubeAper::UpdateApDrop
   nord=n_elements(*self.orders) 
   prefix=nap gt 0?(nap eq 1 AND nord gt 1?'All': $
                    string(FORMAT='(I2)',*self.orders)):'--'
-  prefix=prefix+' : '
+  prefix+=' : '
   widget_control,self.wapDrop,SET_DROPLIST_SELECT=ind,SET_VALUE= $
                  prefix+string(FORMAT='(%"%4.2f->%4.2f:%4.2f->%4.2f")',aps)
 end
@@ -351,16 +351,22 @@ end
 function CubeAper::Init,parent,oDraw,COLOR=color
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   self.working_on=-1
-  lab=widget_label(parent,value='WAVSAMP:')
-  base=widget_base(parent,/COLUMN,/FRAME,SPACE=1,/BASE_ALIGN_CENTER) 
-  self.wWSBut=cw_bgroup(base,['Show','Edit','Lock'],/NONEXCLUSIVE, $
+  rbase=widget_base(parent,/ROW,/FRAME,SPACE=1,/ALIGN_RIGHT)
+  lab=widget_label(rbase,value='WAVSAMP:')
+  cbase=widget_base(rbase,/COLUMN,SPACE=1,/BASE_ALIGN_CENTER) 
+  
+  toprbase=widget_base(cbase,/ROW,SPACE=1,/BASE_ALIGN_CENTER) 
+  
+  self.wWSBut=cw_bgroup(toprbase,['Show','Edit','Lock'],/NONEXCLUSIVE, $
                         IDS=ids,EVENT_FUNC='cubeaper_event',/ROW,SPACE=1, $
                         UVALUE=self)
-  self.wapDrop=widget_droplist(base,VALUE='--- : ____->____:____->____', $
-                               EVENT_PRO='CubeAper_DiscardEvent')
-  but=cw_bgroup(parent,['Reset to Full'],UVALUE=self, $
+  but=cw_bgroup(toprbase,['Reset'],UVALUE=self, /NO_RELEASE,$
                 EVENT_FUNC='CubeAper_SetEvent',/COLUMN, $
                 BUTTON_UVALUE=['SetFull'])
+  
+  self.wapDrop=widget_droplist(cbase,VALUE='--- : ____->____:____->____', $
+                               EVENT_PRO='CubeAper_DiscardEvent')
+  
   widget_control, ids[2],SENSITIVE=0
   if n_elements(color) ne 0 then self.color=color
   self.wWSButs=ids
