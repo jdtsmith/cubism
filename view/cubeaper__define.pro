@@ -45,7 +45,6 @@ pro CubeAper::Message, msg
            if self.side eq 0 then ap.low[ind]=ap.high[ind]-.01 else $
               ap.high[ind]=ap.low[ind]+.01
         endif 
-;        print,ap
            
         if array_equal(ap.(self.side)[ind], $
                        (*self.aps)[ap_ind].(self.side)[ind]) then return
@@ -83,6 +82,7 @@ pro CubeAper::Message, msg
 ;                          (['left','right'])[self.side],' Order ', $
 ;                          self.working_on
                     self.save=msg.X
+                    erase
                     self.oDraw->Redraw,/SNAPSHOT
                     self.oDraw->MsgSignup,self,/DRAW_MOTION
                     self->DrawOneWS,self.working_on
@@ -356,7 +356,7 @@ function CubeAper::Init,parent,oDraw,COLOR=color
   self.wWSBut=cw_bgroup(base,['Show','Edit','Lock'],/NONEXCLUSIVE, $
                         IDS=ids,EVENT_FUNC='cubeaper_event',/ROW,SPACE=1, $
                         UVALUE=self)
-  self.wapDrop=widget_droplist(base,VALUE='--- ____->____:____->____', $
+  self.wapDrop=widget_droplist(base,VALUE='--- : ____->____:____->____', $
                                EVENT_PRO='CubeAper_DiscardEvent')
   but=cw_bgroup(parent,['Reset to Full'],UVALUE=self, $
                 EVENT_FUNC='CubeAper_SetEvent',/COLUMN, $
