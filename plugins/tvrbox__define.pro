@@ -77,7 +77,7 @@ pro tvRBox::Message, msg
         ;;  a change of original image, or zoom, etc. occurred
         if self.boxflag eq -1 then return ; only if a box is here
         self.oDraw->GetProperty,ZOOM=zoom,WINSIZE=winsize
-        self.boxoff=self.oDraw->Convert(self.coords,/DEVICE,/TRUNCATE)
+        self.boxoff=self.oDraw->Convert(self.coords,/DEVICE)
         self.boxsize=fix(self.boxsize*(zoom/self.zoom))
         ;; Update our internal mirror of tvDraw data
         self.zoom=zoom & self.winsize=winsize
