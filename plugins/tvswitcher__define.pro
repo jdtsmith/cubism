@@ -42,7 +42,10 @@ end
 pro tvSwitcher::Event, ev
   type=tag_names(ev,/STRUCTURE_NAME)
   if type eq 'WIDGET_TRACKING' then begin 
-     if ev.enter eq 1 then self.Key->Focus
+     if ev.enter eq 1 then begin 
+        self.Key->Focus
+        if obj_valid(self.oColor) then self.oColor->SetColors,/NO_REDRAW
+     endif 
      return
   endif 
   
@@ -139,6 +142,10 @@ pro tvSwitcher::Start
      ;TOOLTIP=objs[i]->Description()
   endfor 
   
+  ;; Get the Color object, if any
+  oCol=self.oDraw->GetMsgObjs(CLASS='tvColor')
+  if obj_valid(oCol[0]) then self.oColor=oCol[0]
+  
   if widget_info(self.toolMenu,/VALID_ID) then begin 
      widget_control, self.toolMenu, EVENT_PRO='tvSwitcher_Event', $
                      SET_UVALUE=self
@@ -229,6 +236,7 @@ pro tvSwitcher__define
       Key:obj_new(), $          ;our key plugin
       UseCase:0b, $             ;whether to consider case
       sBase: [0L,0L], $         ;widget ids of the button bases
+      oColor:obj_new(), $       ;the color object (if any)
       toolMenu: 0L, $           ;the menu for the tools
       wList: ptr_new(), $       ;list of buttons, for each on MsgList
       wTList:ptr_new(), $       ;list of tool menu buttons
