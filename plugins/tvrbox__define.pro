@@ -149,17 +149,16 @@ pro tvRBox::On
 end
 
 pro tvRBox::Off 
-  self->tvPlug::Off
   self.oDraw->MsgSignup,self,/NONE
-  if self->IsDrawn() then begin 
-     self->EraseBox
+  if self->On() && self->IsDrawn() then begin 
      if self.corners then begin 
         ;;corner redraws and new images needed
         self.oDraw->MsgSignup,self,/NONE,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT, $
                               /TVDRAW_RESIZE
         self.oDraw->ReDraw,/SNAPSHOT ;get our corners into the background
-     endif 
+     endif else self->EraseBox
   endif 
+  self->tvPlug::Off
 end
 ;;************************End OverRiding methods*******************************
 
