@@ -67,7 +67,7 @@ pro cvLine::Message,msg
            widget_control, self.wLine, $
                            set_value=self->String(imorig,self.savpoint, $
                                                   LAMBDA=self.savlambda, $
-                                                  ORDER=self.savorder)
+                                                  ORDER=self.savorder,/FORCE)
         endif else begin 
         endelse 
      end
@@ -115,9 +115,17 @@ end
 ;=============================================================================
 ;  UpdateWAVSAMP - Get the new cube's WAVSAMP list (all orders) for the BCD
 ;=============================================================================
-pro cvLine::UpdateWAVSAMP
+pro cvLine::UpdateWAVSAMP,MODULE=md
   if ptr_valid(self.PRs) then heap_free,self.PRs
-  prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords)
+  if obj_valid(self.cube) then $
+     prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords) $
+  else if obj_valid(self.calib) then begin 
+     ords=self.calib->Orders(md)
+     prs=ptrarr(n_elements(ords))
+     for i=0,n_elements(ords)-1 do $
+        prs[i]=ptr_new(self.calib->GetWAVSAMP(md,ords[i],/PIXEL_BASED,/FULL))
+  endif
+  
   nords=n_elements(prs) 
   self.PRs=ptr_new(replicate({ORDER:0,PRs:ptr_new(),MIN:[0.,0.],MAX:[0.,0.], $
                               RANGE:ptr_new()},nords))
@@ -147,8 +155,9 @@ end
 ;=============================================================================
 ;  String - The total string
 ;=============================================================================
-function cvLine::String, im,point,LAMBDA=lambda,ORDER=order,RA=ra,DEC=dec
-  if NOT array_equal(point,self.savpoint) then begin 
+function cvLine::String, im,point,LAMBDA=lambda,ORDER=order,RA=ra,DEC=dec, $
+                         FORCE=force
+  if ~array_equal(point,self.savpoint) || keyword_set(force) then begin 
      self.valstring=self->ValString(im,point,EXTRA_STRING=ext)
      self.extrastring=ext
   endif 
@@ -201,10 +210,19 @@ end
 ;=============================================================================
 ;  Init - Initialize the line.
 ;=============================================================================
-function cvLine::Init,parent,oDraw,_EXTRA=e
+function cvLine::Init,parent,oDraw,CALIB=calib,MODULE=module,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   r=widget_base(parent,/ROW,/SPACE)
   self.wLine=widget_label(r,value=' ',/dynamic_resize)
+  
+  ;; Called outside the cube context
+  if n_elements(module) ne 0 then begin 
+     self.bcd_mode=1
+     if obj_valid(calib) then $
+        self.calib=calib else self.calib=irs_restore_calib(irs_recent_calib())
+     self->UpdateWAVSAMP,MODULE=module
+  endif 
+     
   ;; specify motion, tracking and postdraw events... we're always on
   self.oDraw->MsgSignup,self,/DRAW_MOTION,/WIDGET_TRACKING,/TVDRAW_POSTDRAW
   return,1
@@ -218,12 +236,13 @@ pro cvLine__define
           INHERITS tvPlug_lite,$ ;make it a plug-in
           savpoint: [0,0], $    ;point to save
           savorder:0, $         ;the saved order found
-          savlambda:0.0, $     ;the saved WL found
+          savlambda:0.0, $      ;the saved WL found
           valstring:'', $       ;the array value string
           extrastring:'', $     ;anything else to add
           bcd_mode:0, $         ;whether bcd or cube mode
           PRs:ptr_new(), $      ;all the pseudo-rectangles
           cube:obj_new(), $     ;
+          calib:obj_new(), $    ;
           mask:ptr_new(), $     ;mask data to display
           astrometry:ptr_new(),$ ;cube astrometry record
           module:'', $          ;the module that came with the latest bcd/cube
