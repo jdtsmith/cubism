@@ -297,7 +297,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002 J.D. Smith
+;  Copyright (C) 2001-2004 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -321,16 +321,19 @@
 ;=============================================================================
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
-                            PLATE_SCALE=ps
+                            PLATE_SCALE=ps,PMASK=pmask
+  if arg_present(pmask) then begin 
+     rec=self->GetRecord(module)
+     pmask=rec.PMASK
+  endif 
   rec=self->GetRecord(module,order,/MUST_EXIST)
   if size(rec,/TYPE) ne 8 then return
-  if arg_present(sl) then sl=rec.SLIT_LENGTH
-  if arg_present(wc) then  wc=rec.WAV_CENTER
+  if arg_present(sl) then   sl=rec.SLIT_LENGTH
+  if arg_present(wc) then   wc=rec.WAV_CENTER
   if arg_present(wmn) then  wmn=rec.WAV_MIN
   if arg_present(wmx) then  wmx=rec.WAV_MAX
   if arg_present(name) then name=self.name
-  if arg_present(ps) then ps=rec.PLATE_SCALE
-
+  if arg_present(ps) then   ps=rec.PLATE_SCALE
   ;;if arg_present(sz) then sz=self.detsize[*,0>irs_module(module)<5]
 end
 
@@ -352,16 +355,16 @@ end
 ;=============================================================================
 ;  Print - Print a listing of what this cal object contains.
 ;=============================================================================
-pro IRS_Calib::Print,modules,orders
-  print,transpose(self->Info(modules,orders))
+pro IRS_Calib::Print,modules,orders,_EXTRA=e
+  print,transpose(self->Info(modules,orders,_EXTRA=e))
 end
 
-function IRS_Calib::Info, modules, orders
+function IRS_Calib::Info, modules, orders, SHORT=short
   if n_elements(modules) eq 0 then modules=indgen(4)
   str=' == IRS Calibration Object: '+self.Name+' =='
   str=[str,'', $
-       '   PLATESCALE: '+self.PLATESCALE_FILE, $
-       '  FRAME_TABLE: '+self.FRAMETABLE_FILE]
+       '  PLATESCALE: '+self.PLATESCALE_FILE, $
+       ' FRAME_TABLE: '+self.FRAMETABLE_FILE]
   for i=0,n_elements(modules)-1 do begin 
      md=irs_module(modules[i])
      module=irs_module(md,/TO_NAME)
@@ -381,6 +384,8 @@ function IRS_Calib::Info, modules, orders
      if orf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'ORDER',orf)]
      tif=self.TILT_FILE[md]
      if tif ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'TILT',tif)]
+     pmf=self.PMASK_FILE[md]
+     if pmf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'PMASK',pmf)]
      str=[str,'']
      for j=0,no-1 do begin 
         rec=(*self.cal[md])[ords[j]]
@@ -410,11 +415,11 @@ function IRS_Calib::Info, modules, orders
            nsamp=n_elements(*(*rec.WAVSAMPS)[k].PR)
            
            if ws.FULL then begin 
-              aps=string(FORMAT='(%"               FULL      %4.2f->%4.2f'+ $
+              aps=string(FORMAT='(%"               FULL      %5.2f->%5.2f'+ $
                          ' -- %03d samples")', $
                          ws.Aperture.low[0],ws.Aperture.high[0],nsamp)
            endif else begin 
-              aps=string(FORMAT='(%"            %4.2f->%4.2f : %4.2f->%4.2f'+ $
+              aps=string(FORMAT='(%"            %5.2f->%5.2f:%5.2f->%5.2f'+ $
                          ' -- %03d samples")', $
                          ws.Aperture.low,ws.Aperture.high,nsamp) 
            endelse 
@@ -453,7 +458,7 @@ end
 ;                required, but if APERTURE is omitted, and FULL isn't
 ;                set, matching WAVSAMPs of any aperture in that record
 ;                will be returned.  The default is non-pixelbased, or,
-;                when PIXEL_BASED is set, a PR_WIDTH of 1.
+;                when PIXEL_BASED is set, a PR_WIDTH of 1.  
 ;=============================================================================
 function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
                                  COUNT=nsamp, PIXEL_BASED=pb, PR_WIDTH=width, $
@@ -963,22 +968,24 @@ pro IRS_Calib::SetRecord, record
 end
 
 ;=============================================================================
-;  ReadCalib - Read (up to) all three calibration files for a given
+;  ReadCalib - Read (up to) all four calibration files for a given
 ;              module or modules, and record in the object.  Also read
 ;              module-inspecific calibration files and add data as
 ;              appropriate.
 ;=============================================================================
 pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                          TILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
-                         PLATESCALE_VERSION=psv,ONLY=only
-  cals=replicate({name:'', type:''},5)
-  cals.name=['WAVSAMP', 'ORDFIND', 'LINETILT','FRAMETABLE','PLATESCALE']
-  cals.type='single' & cals[[3,4]].type='all'
+                         PLATESCALE_VERSION=psv,PMASK_VERSION=pmv,ONLY=only
+  cals=replicate({name:'', group:'', type:''},6)
+  cals.name=['WAVSAMP','ORDFIND','PMASK','LINETILT','FRAMETABLE','PLATESCALE']
+  cals.group=['single' ,'single' ,'single','single' ,'all',       'all']
+  cals.type= ['tbl'    ,'tbl'    ,'fits'  ,'tbl'    ,'tbl',       'tbl']
 
-  version=[n_elements(wv)  gt 0?fix(wv)>0:0, $
+  version=[n_elements(wv)  gt 0?fix(wv)>0:0,  $
            n_elements(orv) gt 0?fix(orv)>0:0, $
-           n_elements(tv)  gt 0?fix(tv)>0:0, $
-           n_elements(fv)  gt 0?fix(fv)>0:0, $
+           n_elements(pmv) gt 0?fix(pmv)>0:0, $
+           n_elements(tv)  gt 0?fix(tv)>0:0,  $
+           n_elements(fv)  gt 0?fix(fv)>0:0,  $
            n_elements(psv) gt 0?fix(psv)>0:0]
   
   if keyword_set(only) then begin 
@@ -986,7 +993,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                   n_elements(orv) , $
                   n_elements(tv)  , $
                   n_elements(fv)  , $
-                  n_elements(psv) ] ne 0 ,cnt)
+                  n_elements(psv)] ne 0 ,cnt)
      if cnt eq 0 then return
      cals=cals[which]           ;only these cals are to be used
      version=version[which]
@@ -995,13 +1002,14 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   if n_elements(module) ne 0 then modules=[irs_module(module)] $
   else modules=indgen(4)        ;do them all, by default
   
-  singles=where(cals.type eq 'single',COMPLEMENT=alls,NCOMPLEMENT=acnt,scnt)
+  singles=where(cals.group eq 'single',COMPLEMENT=alls,NCOMPLEMENT=acnt,scnt)
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
      for j=0,scnt-1 do begin 
         base="irs_b"+strtrim(md,2)+"_"+ cals[singles[j]].name+"v"
         cfile=self->CalibrationFileVersion(base,version[singles[j]], $
-                                           cals[singles[j]].name,md)
+                                           cals[singles[j]].name, $
+                                           cals[singles[j]].type,md)
         if size(cfile,/TYPE) ne 7 then continue
         call_method,'Parse'+cals[singles[j]].name,self,cfile,md
      endfor
@@ -1010,7 +1018,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   for j=0,acnt-1 do begin 
      base="irs_"+cals[alls[j]].name+"v"
      cfile=self->CalibrationFileVersion(base,version[alls[j]], $
-                                        cals[alls[j]].name)
+                                        cals[alls[j]].name,cals[alls[j]].type)
      call_method,'Parse'+cals[alls[j]].name,self,cfile 
   endfor
 end
@@ -1019,12 +1027,12 @@ end
 ;=============================================================================
 ;  Return - Latest calibration file, or requested version
 ;=============================================================================
-function IRS_Calib::CalibrationFileVersion,base,version,name,md
+function IRS_Calib::CalibrationFileVersion,base,version,name,type,md
   @cubism_dir                    ;get irs_calib_dir
   ;; A specific version was requested, check it
   if version gt 0 then begin 
      cfile=filepath(ROOT_DIR=irs_calib_dir,SUBDIRECTORY='ssc', $
-                    base+strtrim(version,2)+'.tbl')
+                    base+strtrim(version,2)+'.'+type)
      if ~file_test(cfile,/READ,/REGULAR) then $
         message,'No such calibration file: '+cfile
   endif 
@@ -1032,13 +1040,13 @@ function IRS_Calib::CalibrationFileVersion,base,version,name,md
   ;; Find all versions for this module
   if version eq 0 then begin 
      cal_files=findfile(COUNT=fcnt,filepath(ROOT=irs_calib_dir, $
-                                            SUBDIR="ssc",base+"*.tbl"))
+                                            SUBDIR="ssc",base+"*."+type))
      if fcnt eq 0 then begin 
         message,/CONTINUE,"Didn't find any calibration files: " +$
                 name+(n_elements(md) ne 0?(' for '+irs_module(md,/TO_NAME)):"")
         return,-1
      endif
-     vers=max(fix((stregex(cal_files,base+"([0-9]+)"+".tbl$",$
+     vers=max(fix((stregex(cal_files,base+"([0-9]+)"+"."+type+"$",$
                            /EXTRACT,/SUBEXPR))[1,*]),mpos)
      cfile=cal_files[mpos]      ;use the latest version
   endif 
@@ -1133,6 +1141,18 @@ pro IRS_Calib::ParseLineTilt,file,module
   self.TILT_FILE[m]=file
 end
 
+
+;=============================================================================
+;  ParsePMASK
+;=============================================================================
+pro IRS_Calib::ParsePMASK,file,module
+  m=irs_module(module)
+  self.PMASK[m]=ptr_new(readfits(file,/SILENT))
+  (*self.cal[m]).PMASK=self.PMASK[m] ;set for each order
+  self.PMASK_FILE[m]=file
+end
+
+
 ;=============================================================================
 ;  ParseFrameTable - Parse frame table and update individual orders
 ;                    offsets/angles.
@@ -1170,6 +1190,7 @@ pro IRS_Calib::ParseFrameTable,file
   self.FRAMETABLE_FILE=file
 end
 
+
 ;=============================================================================
 ;  ParsePlateScale
 ;=============================================================================
@@ -1183,6 +1204,7 @@ pro IRS_Calib::ParsePlateScale,file
   endfor 
   self.PLATESCALE_FILE=file
 end
+
 
 ;=============================================================================
 ;  CleanWAVSAMP - Delete the contents of one or more WAVSAMP records
@@ -1242,8 +1264,10 @@ pro IRS_Calib__define
          PLATESCALE_FILE:'', $  ;The name of the plate scale file
          FRAMETABLE_FILE:'', $ 
          WAVSAMP_FILE:strarr(5), $ ;the names of the wavsamp files (WAVSAMP)
-         TILT_FILE:strarr(5),$  ;the name of the tilt file (c)
-         ORDER_FILE:strarr(5), $ ;the name of the ordfind output file (a & b)
+         TILT_FILE:strarr(5),$  ;the name of the LINETILT file (c)
+         ORDER_FILE:strarr(5),$ ;the name of the ORDFIND file (a's & b's)
+         PMASK_FILE:strarr(5),$ ;the name of the pmask files   
+         PMASK:ptrarr(5), $     ;the pmask, one for each order   
          cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
                                 ;for each module: 0:LH, 1:LL, 2:SH, 3:SL 4:MSED
   
@@ -1262,6 +1286,7 @@ pro IRS_Calib__define
        WAV_MAX: 0.0, $          ;[um] the maximum order wavelength
        SLIT_LENGTH: 0.0, $      ;[pix] the length of the slit
        PlATE_SCALE: 0.0, $      ;[deg/pix] the plate scale along the slit
+       PMASK:ptr_new(), $
        A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
        C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
