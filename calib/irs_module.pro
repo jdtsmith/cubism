@@ -5,7 +5,7 @@
 ;
 ; DESCRIPTION:
 ;
-;    Regularize the module, mapping names to integers:
+;    Regularize the module, mapping names to integers and visa versa:
 ;
 ;      0: SL
 ;      1: SH
@@ -47,8 +47,9 @@
 ;    
 ; MODIFICATION HISTORY:
 ;
+;    2002-08-27 (J.D. Smith) Updated integer<->module mapping to track SSC
+;    2002-05-22 SJUH need additional modules as SL and LL have two apertures
 ;    2001-12-08 (J.D. Smith): Written
-;    2002-22-05 SJUH need additional modules as SL and LL have two apertures
 ;-
 ;    $Id$
 ;##############################################################################
