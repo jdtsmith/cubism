@@ -911,6 +911,7 @@ end
 ;               is set, in which case we spawn a new viewer.
 ;=============================================================================
 pro CubeProj::FindViewer,NEW_VIEWER=nv
+  forward_function LookupManagedWidget
   objs=self->GetMsgObjs(CLASS='CubeRec')
   valid_viewer=obj_valid(objs[0])
   if XRegistered('CubeView') eq 0 OR keyword_set(nv) then begin 
