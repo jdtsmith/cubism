@@ -11,15 +11,20 @@ pro tvStats::GetProperty, min=min, max=max, med=med, avg=avg, std=std, box=box
   if arg_present(std) then std=self.std
   if arg_present(box) then box=self.Box
 end
+
 ;=============================================================================
 ;	Message. Only box messages.
 ;=============================================================================
 pro tvStats::Message, msg
   self->tvPlug::Message,msg,TYPE=type
-  switch type of
-     'BOX': self->wShow
-     'TVDRAW_POSTDRAW':self->Stats ;for both types, we redo the stats
-  endswitch
+  case type of
+     'BOX': begin 
+        self->wShow
+        self->Stats
+     end 
+     'TVDRAW_POSTDRAW': self->Stats ;for both types, we redo the stats
+     'TVDRAW_RESIZE': if self->On() then self->Off
+  endcase
 end 
 
 function tvStats::Icon
@@ -44,7 +49,7 @@ pro tvStats::On
   endif
   self->tvPlug::On
   self.Box->On
-  self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW
+  self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW,/TVDRAW_RESIZE
   if self.box->IsDrawn() then begin 
      self->wShow
      self->Stats
