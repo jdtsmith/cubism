@@ -1,12 +1,7 @@
 ;+
 ; NAME:  
 ;
-;    SM_PLOT_WAVSAMP
-;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
+;    PLOT_WAVSAMP
 ;
 ; DESCRIPTION:
 ;    
@@ -14,17 +9,16 @@
 ;    
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
-;    Nominal Extraction
+;    IRS Spectral Reduction, Analysis and Processing.
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    sm_plot_wavsamp,ws_list,[_EXTRA=]
+;    plot_wavsamp,ws_list,[_EXTRA=]
 ;
 ; INPUT PARAMETERS:
 ;
 ;    ws_list: A list of WAVSAMP psuedo-rectangles, as returned by
-;      SMART_Calib::GetWAVSAMP.
+;      IRS_Calib::GetWAVSAMP.
 ;			
 ; INPUT KEYWORD PARAMETERS:
 ;
@@ -35,12 +29,13 @@
 ;			
 ; EXAMPLE:
 ;
-;    sm_plot_wavsamp, $
-;       cal->GetWAVSAMP('LL',1,{SMART_APERTURE,[.2,.5],[.7,.4]}), $
+;    plot_wavsamp, $
+;       cal->GetWAVSAMP('LL',1,{IRS_APERTURE,[.2,.5],[.7,.4]}), $
 ;       COLOR=!D.TABLE_SIZE-4,/NOERASE
 ;
 ; MODIFICATION HISTORY:
 ;    
+;    2002-08-27 (J.D. Smith): Migrated from SMART codebase.
 ;    2001-12-14 (J.D. Smith): Written
 ;    
 ;-
@@ -49,28 +44,26 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
 
-pro sm_plot_wavsamp, ws_list, _EXTRA=e
+pro plot_wavsamp, ws_list, _EXTRA=e
   plot,[0],[0],XRANGE=[0,128],YRANGE=[0,128],XSTYLE=5,YSTYLE=5,/NODATA, $
        POSITION=[0,0,1,1],_EXTRA=e
   for i=0,n_elements(ws_list)-1 do begin 
