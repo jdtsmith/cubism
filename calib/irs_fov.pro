@@ -41,15 +41,15 @@
 ;    RETURN_NAME: Return the fovname.  Usually, the return type is
 ;       defined by the type of the input.
 ;
-;    SHORT_NAME: Return the abbreviated name.
+;    SHORT_NAME: Return or query the abbreviated name.
 ;
-;    SLIT_NAME_ONLY: Return the abbreviated name, without the position
+;    SLIT_NAME: Return the abbreviated slit name, without the position
 ;       information.
 ;
 ; OUTPUTS:
 ;
-;    fovid|fovname: The integer id or string name of the IRS fov
-;       aperture.
+;    fovid|fovname: The integer id (default) or string name (long,
+;       short or slit-only) of the IRS fov aperture.
 ;
 ; NOTES:
 ;  
@@ -91,7 +91,7 @@
 ;##############################################################################
 
 function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
-                  LOOKUP_MODULE=lm, RETURN_NAME=nm, SLIT_NAME_ONLY=sno
+                  LOOKUP_MODULE=lm, RETURN_NAME=nm, SLIT_NAME=sno
   
   void={IRS_FOV,ID:0,NAME:'',SHORT_NAME:'',MODULE:'',ORDER:0,POSITION:0}
   f=[{IRS_FOV,18,'IRS_Red_Peak-Up_FOV_Center',          'PU_R_cen','PUR',0,0},$
@@ -132,7 +132,8 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
               f.position eq long(pos),cnt)
   endif else begin 
      if size(fov,/type) eq 7 then $
-        wh=where(strupcase(f.NAME) eq strupcase(fov),cnt) $
+        wh=where(strupcase(f.NAME) eq strupcase(fov) OR $
+                 strupcase(f.SHORT_NAME) eq strupcase(fov) ,cnt) $
      else wh=where(f.ID eq long(fov),cnt)
   endelse 
   if cnt eq 0 then return,-1
