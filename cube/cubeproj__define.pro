@@ -709,14 +709,23 @@ end
 ;                 unsupported RSI routine routine_names().  Caveat
 ;                 Exportor.  Care is taken to ensure it will at least
 ;                 compile, and trap errors in case routine_names
-;                 vanishes.
+;                 vanishes.  Also supports exporting spectra and maps
+;                 with the SPECTRUM & MAP keywords.
 ;=============================================================================
-pro CubeProj::ExportToMain
+pro CubeProj::ExportToMain, SPECTRUM=sp, MAP=mp
+  name=self->ProjectName()
+  spQ=n_elements(sp) ne 0
+  mpQ=n_elements(mp) ne 0
+  selfQ=~spQ && ~mpQ
+  name+=spQ?'_sp':(mpQ?'_map':'')
+  export=spQ?sp:(mpQ?mp:self)
+  
    ;; Simple fix -- replace dashes/spaces with underscores
-  def=strjoin(strsplit(self->ProjectName(),'[^a-zA-Z0-9_]',$
-                       /EXTRACT,/REGEX),'_')
-  var_name=getinp('Name of exported Cube object var:',def, $
-                  TITLE='Export Cube Project to Command Line', $
+  def=idl_validname(name,/CONVERT_ALL)
+  type=spQ?'spectrum':(mpQ?'map':'Cube object')
+  title=spQ?'Spectrum':(mpQ?'Map':'Cube Project')
+  var_name=getinp('Name of exported '+type+' var:',def, $
+                  TITLE='Export '+title+' to Command Line', $
                   /MODAL, PARENT_GROUP=self->TopBase())
    if var_name eq '' then return
    if strmid(var_name,0,1) eq '$' then $
@@ -738,8 +747,8 @@ pro CubeProj::ExportToMain
    if var_free eq 0 then $
       existing_var=call_function('routine_names',var_name,FETCH=1)
    if n_elements(existing_var) ne 0 then begin 
-      ;;see if we're alread there
-      if size(existing_var,/TYPE) eq 11 then if existing_var[0] eq self $
+      ;;see if we're already there
+      if selfQ && size(existing_var,/TYPE) eq 11 && existing_var[0] eq self $
          then begin
          self->Info,['The project is already exported', $
                      'to variable "'+var_name+'"']
@@ -749,10 +758,10 @@ pro CubeProj::ExportToMain
       self->Error,'A variable named '+var_name+' already exists'
    endif 
    
-   ;; Still here... we need to export ourself to the main level
-   void=call_function('routine_names',var_name,self,store=1)
+   ;; Still here... we need to export to the main level
+   void=call_function('routine_names',var_name,export,store=1)
    self.Spawned=0b              ;no longer spawned
-   print,' *** CUBISM Cube Project exported to variable: '
+   spQ: print,' *** CUBISM ',title,' exported to variable: '
    print,'   ====> '+var_name+' <==='
 end
    
@@ -2364,12 +2373,13 @@ end
 ;  Extract - Extract a Spectrum from the Cube, and possibly save it
 ;            XXX - Other extractions, including physical coordinates
 ;=============================================================================
-function CubeProj::Extract,low,high, SAVE=sf, ASCII=ascii
+function CubeProj::Extract,low,high, EXPORT=exp, SAVE=sf, ASCII=ascii
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to extract'
   sp=total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
            1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
-
-  if keyword_set(sf) then self->SaveSpectrum,sp,sf,ASCII=ascii
+  if keyword_set(exp) then self->ExportToMain, $
+     SPECTRUM=transpose([[*self.WAVELENGTH],[sp]]) else $
+        if keyword_set(sf) then self->SaveSpectrum,sp,sf,ASCII=ascii
   return,sp
 end
 
