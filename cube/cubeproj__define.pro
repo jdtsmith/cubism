@@ -171,6 +171,7 @@ pro CubeProj::ShowEvent, ev
      end 
      
      'add-droop-aor': self->AddAOR,/DROOPRES
+     'add-flatap-aor': self->AddAOR,/FLATAP
      
      'setorder': begin 
         self->GetProperty,CALIB=cal
@@ -432,10 +433,12 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Data Record menu
   rec=widget_button(mbar,VALUE='Record',/MENU)
-  b1=widget_button(rec,VALUE='Add BCD Data...',UVALUE='adddata')
-  b2=widget_button(rec,VALUE='Import BCDs from AOR...',UVALUE='addaor') 
-  b3=widget_button(rec,VALUE='Import DroopRes from AOR...', $
-                   UVALUE='add-droop-aor',/SEPARATOR)
+  b1=widget_button(rec,VALUE='Add Data...',UVALUE='adddata')
+  b2=widget_button(rec,VALUE='Import Data from AOR',/MENU)
+  tmp=widget_button(b2,VALUE='BCD...',UVALUE='addaor')
+  tmp=widget_button(b2,VALUE='DroopRes...',UVALUE='add-droop-aor')
+  tmp=widget_button(b2,VALUE='FlatAp...',UVALUE='add-flatap-aor')
+  
   (*self.wInfo).MUST_UNRESTORED=widget_button(rec, UVALUE='restoreall',$
                                               VALUE='Restore All Record Data')
   wMustSel=[wMustSel, $
@@ -1071,7 +1074,7 @@ function CubeProj::List
    
    for i=0,n-1 do begin 
       if which_list eq 0 then begin ;the standard list
-         tchar=([" ","d","c"])[(*self.DR)[i].type]
+         tchar=([" ","d","c","f"])[(*self.DR)[i].type]
          s=string(FORMAT='(" ",A20,T23,F6.2,T30,A,T49,A,T68,A8,T78,' + $
                   'I3,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
@@ -2995,10 +2998,13 @@ end
 ;  AddAOR - Add an entire AOR from a full AOR directory, with choice
 ;           of module(s) and observations.
 ;=============================================================================
-pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr
-  if n_elements(dir) eq 0 then $
-     xf,dir,/DIRECTORY,/RECENT,TITLE='Select AOR Directory', $
+pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr,FLATAP=fl
+  if n_elements(dir) eq 0 then begin 
+     type=keyword_set(cd)?"Coadd":(keyword_set(dr)? $
+          "Droopres":(keyword_set(fl)?"FlatAp":"BCD"))
+     xf,dir,/DIRECTORY,/RECENT,TITLE='Select '+type+' AOR Directory', $
         PARENT_GROUP=self->TopBase(),/MODAL
+  endif 
   if size(dir,/TYPE) ne 7 then return
   
   if ~file_test(dir,/DIRECTORY) then $
@@ -3007,9 +3013,11 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr
      type='Coadd' & filt='*coa*2d.fits' 
   endif else if keyword_set(dr) then begin 
      type='DroopRes' & filt='*droop{,res}.fits'
+  endif else if keyword_set(fl) then begin 
+     type='FlatAp' & filt='*f2ap.fits'
   endif else begin 
      type='BCD' & filt='*bcd{,_fp}.fits'
-  endelse 
+  endelse
   
   widget_control, /HOURGLASS
   files=file_search(dir,filt,/TEST_REGULAR,COUNT=cnt)
@@ -3111,7 +3119,7 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
      endif else self->Error,'Files required'
   endif
   for i=0,n_elements(files)-1 do begin 
-     bcd=readfits(files[i],header,/SILENT)
+     data=readfits(files[i],header,/SILENT)
      if ~stregex(files[i],'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
         bcdfile=self->FileBCD(files[i])
         if size(bcdfile,/TYPE) eq 7 then header=headfits(bcdfile)
@@ -3121,7 +3129,7 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
      if size(bfile,/TYPE) eq 7 && file_test(bfile,/READ) then $
         bmask=readfits(bfile,/SILENT) else bmask=0
      
-     self->AddBCD,bcd,header,FILE=files[i],BMASK=bmask,ERR=err,_EXTRA=e
+     self->AddBCD,data,header,FILE=files[i],BMASK=bmask,ERR=err,_EXTRA=e
      if keyword_set(err) then break
   endfor
   self->CheckModules            ;Set default build order, and double check.
@@ -3159,7 +3167,8 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   if n_elements(file) ne 0 then rec.file=file
   if stregex(file,'droop(res)?\.fits$',/BOOLEAN) then rec.type=1 else $
      if stregex(file,'coad[^.]*\.fits$',/BOOLEAN) then rec.type=2 else $
-        rec.type=0
+        if stregex(file,'f2ap\.fits$',/BOOLEAN) then rec.type=3 else $   
+           rec.type=0
   
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
      id=filestrip(rec.file)
