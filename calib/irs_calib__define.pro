@@ -510,9 +510,10 @@ pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
         
         ;; Find all versions for this module
         if version[j] eq 0 then begin 
+           ;; FIXME: Upgrade this to v5.5
            if !VERSION.RELEASE le '5.4' then $
               message,"Must specify versions directly with IDL <= v5.4"
-           FORWARD_FUNCTION file_search
+           FORWARD_FUNCTION file_search ; To stop older versions' complaints
            cal_files=file_search(filepath(ROOT=smart_calib_dir, $
                                           SUBDIR=["data","ssc"],base+"*.tbl"),$
                                  /TEST_REGULAR,/TEST_READ,COUNT=fcnt)

@@ -74,6 +74,7 @@ common smart_dir, smart_calib_dir
 
 if n_elements(smart_calib_dir) eq 0 then begin
    ;;figure out the calibration directory
+   ;; FIXME: Upgrade this to v5.5
    if !VERSION.RELEASE le '5.4.1' then sep=":" else $
       sep=call_function('path_sep',/SEARCH_PATH)
    paths=strsplit(!PATH,sep,/EXTRACT)
