@@ -130,7 +130,7 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
   if keyword_set(bcd) then mode=2
   
   if n_elements(mode) ne 0 then begin
-     if mode eq self.mode then begin ;could have been de-sensitived before
+     if mode eq self.mode then begin ;could have been de-sensitized before
         widget_control, self.wBase[self.mode],/SENSITIVE
         return
      endif
