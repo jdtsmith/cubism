@@ -565,7 +565,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   but=widget_button(background,VALUE='Load Background Spectrum...', $
                     /SEPARATOR, UVALUE='readbackgroundfromfile')
   (*self.wInfo).MUST_BG_SP= $
-     widget_button(background,VALUE='Remove Background Spectrum...', $
+     widget_button(background,VALUE='Remove Background Spectrum', $
                    UVALUE='remove-bg-sp')
   
   
