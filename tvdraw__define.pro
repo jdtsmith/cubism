@@ -105,8 +105,11 @@
 ;
 ; MODIFICATION HISTORY:
 ;    $Log$
+;    Revision 1.4  2001/08/27 21:17:32  jdsmith
+;    	Minor cleanup.
+;
 ;    Revision 1.3  2001/08/17 22:49:19  jdsmith
-;              Log cleanup
+;    	Added.
 ;
 ;    Revision 1.2  2001/08/17 18:11:49  jdsmith
 ;	  A substantial rewrite of SCORE-era messaging, with new
@@ -638,10 +641,7 @@ pro tvDraw::Start
   if cnt ne n_elements(*self.plug_list) then  $
      *self.plug_list=(*self.plug_list)[wh]
   ;; Initialize all the plug-ins
-  for i=0,cnt-1 do begin
-     print,'starting ',(*self.plug_list)[i]
-     (*self.plug_list)[i]->Start
-  endfor 
+  for i=0,cnt-1 do (*self.plug_list)[i]->Start
 end
 
 ;=============================================================================

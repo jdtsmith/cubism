@@ -85,7 +85,6 @@ pro tvZoom::tvzoomit, X, Y
            pan[1])/zoom) < (size[1]-1-offset[1])
   bottom=FIX(((self.orig[1] < Y )- $
               pan[1])/zoom) > 0
-  print,left,":",right,'   ',bottom,':',top
   if (left ge right) or (bottom ge top) then begin 
      self->tverasebox,X,Y       ;erase the current box
      return
