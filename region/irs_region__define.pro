@@ -18,7 +18,7 @@ pro IRS_Region::UpdateAstrometry,astr
   endelse 
   
   ad2xy,ra,dec,astr,newx,newy
-  *self.region=transpose([[newx+0.5],[newy+0.5]])
+  *self.region=[newx+0.5,newy+0.5]
   *self.astr=astr
 end
 
@@ -26,16 +26,13 @@ end
 ;=============================================================================
 ;  Region -- Return specified region as 2xn list of celestial coords
 ;=============================================================================
-function IRS_Region::Region,reg_num
-  if n_elements(reg_num) eq 0 then reg_num=0
+function IRS_Region::Region
   if ~ptr_valid(self.region) then return,-1
   
-  reg=*(*self.region)[reg_num]
-  astr=(*self.astr)[reg_num]
-  
-  if ptr_valid(astr) then begin 
+  reg=*self.region
+  if ptr_valid(self.astr) then begin 
      x=reg[0,*] & y=reg[1,*]
-     xy2ad,x-0.5,y-0.5,*astr,ra,dec
+     xy2ad,x-0.5,y-0.5,*self.astr,ra,dec
      reg=transpose([[ra],[dec]])
   endif
   return,reg
@@ -102,7 +99,7 @@ pro IRS_Region::ParseRegion,hdr,file,IPAC_TABLE=ipac_table
      got_box=0
      for i=0,n_elements(hdr)-1 do begin 
         line=strmid(hdr[i],1)
-        if strmid(line,0,1) ne '#' then break
+        if strmid(line,0,1) ne '#' then continue
         if ~got_box then begin 
            if strmid(line,2,4) eq 'Box:' then begin 
               ext=stregex(line,match+','+match+' ; '+match+','+match, $
@@ -115,7 +112,7 @@ pro IRS_Region::ParseRegion,hdr,file,IPAC_TABLE=ipac_table
         endif else begin 
            ext=stregex(line,match+','+match+' ; '+match+','+match,/EXTRACT, $
                        /SUBEXPR)
-           if n_elements(ext) lt 5 then return,-1
+           if n_elements(ext) lt 5 then return
            ra=[ra,ext[1],ext[3]]
            dec=[dec,ext[2],ext[4]]
            aper=make_array(2,n_elements(ra),/DOUBLE)
@@ -124,9 +121,9 @@ pro IRS_Region::ParseRegion,hdr,file,IPAC_TABLE=ipac_table
               aper[1,i]=ten(strsplit(dec[i],":",/EXTRACT))
            endfor 
            break
-        endif 
-     endwhile 
-     self.region=ptr_new(aper,/FREE)
+        endelse 
+     endfor 
+     self.region=ptr_new(aper,/NO_COPY)
      ptr_free,self.astr         ;they're celestial coords already
   endelse 
 end
@@ -135,7 +132,8 @@ end
 ;  Cleanup
 ;=============================================================================
 pro IRS_Region::Cleanup
-  heap_free,self.region,self.astr
+  heap_free,self.region
+  heap_free,self.astr
 end
 
 ;=============================================================================
