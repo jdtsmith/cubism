@@ -217,11 +217,11 @@ end
 
 pro tvRBox::DrawBox
   plots, $
-         [self.boxoff[0],self.boxoff[0],self.boxoff[0]+self.boxsize[0], $
-          self.boxoff[0]+self.boxsize[0], self.boxoff[0]], $
-         [self.boxoff[1],self.boxoff[1]-self.boxsize[1],self.boxoff[1]- $
-          self.boxsize[1], self.boxoff[1], self.boxoff[1]],  $
-         COLOR=self.color,THICK=self.thick, /DEVICE
+        [self.boxoff[0],self.boxoff[0],self.boxoff[0]+self.boxsize[0], $
+         self.boxoff[0]+self.boxsize[0], self.boxoff[0]], $
+        [self.boxoff[1],self.boxoff[1]-self.boxsize[1],self.boxoff[1]- $
+         self.boxsize[1], self.boxoff[1], self.boxoff[1]],  $
+        COLOR=self.color,THICK=self.thick, /DEVICE
   ;;knob
   plots,self.boxoff[0]+self.boxsize[0],self.boxoff[1]-self.boxsize[1], $
         PSYM=8, SYMSIZE=self.hsize,color=self.color,/DEVICE
