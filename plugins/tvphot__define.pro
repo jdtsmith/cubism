@@ -234,6 +234,7 @@ pro tvPhot::Phot
                    self.cntrd,'***','***') 
   endelse 
   widget_control, self.wSlab, set_value=str
+  erase
   self.oDraw->ReDraw,/SNAPSHOT
 end
 
