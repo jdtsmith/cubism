@@ -15,6 +15,7 @@ pro CubeRec::Message, msg
            self->Extract,/SAVE,ASCII=msg.ascii
         return
      end
+     ;; Send updates for these
      'CUBEVIEWSPEC_FULL': begin 
         if ~ptr_valid(self.wavelength) then return
         mn=min(abs(*self.wavelength-msg.wavelength),mpos)
@@ -68,6 +69,7 @@ pro CubeRec::Message, msg
         ;; we don't want BCD mode, but either cube mode will do
         self->SwitchMode,BCD=0
      end
+     'CUBEPROJ_UPDATE':         ;just fall through to update message
   endcase
   self->UpdateView
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
@@ -364,7 +366,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
 
   self->MsgSetup,['CUBEREC_SPEC','CUBEREC_FULL','CUBEREC_UPDATE']
   
-  ;; Get a tvrbox object, signing ourselves up for box messages from it.
+  ;; Get an extractor tvrbox object, signing ourselves up for box messages
   self.Box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,COLOR=color,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
   
