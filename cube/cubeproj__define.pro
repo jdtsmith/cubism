@@ -161,7 +161,8 @@ pro CubeProj::ShowEvent, ev
         ord=popup('Choose Cube Build Order',ords,TITLE='Cube Build Order', $
                   PARENT_GROUP=self->TopBase(),/MODAL, $
                   SELECT=self.ORDER eq 0?0:where(ords eq self.ORDER))
-        if ord eq 'All' then self.ORDER=0 else self.ORDER=ord
+        if ord eq 'All' then ord=0 else ord=ord
+        self->SetProperty,ORDER=ord
      end
      
      'viewcube-new': self->ViewCube,/NEW
@@ -1795,17 +1796,16 @@ pro CubeProj::BuildAccount,_EXTRA=e
               cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
                                           self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
                                           AREAS=areas)
-              
-              if cube_spatial_pix[0] eq -1 then continue
-;                  print,FORMAT='("Not hitting cube for pixel: "' + $
-;                        ',I0,",",I0," -- step [",I0,",",I0,"]")', $
-;                        bcdpixel mod 128, bcdpixel/128, $
-;                        (*self.DR)[i].COLUMN,(*self.DR)[i].ROW
-;                  print, poly
-;                  print,'  original:'
-;                  print,*(*prs[j].POLYGONS)[k]
-;                 continue ;; why isn't our cube big enough?
-;              endif
+              if cube_spatial_pix[0] eq -1 then begin 
+                 print,FORMAT='("Not hitting cube for pixel: "' + $
+                       ',I0,",",I0," -- step [",I0,",",I0,"]")', $
+                       bcdpixel mod 128, bcdpixel/128, $
+                       (*self.DR)[i].COLUMN,(*self.DR)[i].ROW
+                 print, poly
+                 print,'  original:'
+                 print,*(*prs[j].POLYGONS)[k]
+                 continue ;; why isn't our cube big enough?
+             endif
               
               ncp=n_elements(cube_spatial_pix)
               ;; Add space to account list, large chunks at a time
@@ -2180,7 +2180,9 @@ pro CubeProj::BuildCube
         these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
         ;; XXX Error weighting, BMASK, other alternatives
         ;;  need all in one place? ... e.g trimmed mean?
-        
+        ;if array_equal(finite(bcd[these_accts.BCD_PIX]),0b) then $
+        ;   print,rev_acc[rev_acc[i]:rev_acc[i+1]-1],these_accts.BCD_PIX, $
+        ;         bcd[these_accts.BCD_PIX]
         cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
                         total(bcd[these_accts.BCD_PIX] * $
                               these_accts.AREA * $
