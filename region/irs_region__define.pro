@@ -71,12 +71,12 @@ pro IRS_Region::WriteRegion,bhdr,file,IPAC_TBL=ipac_tbl
      endif 
      
      ;; XXX more general ASCII region format here
-        
-     s=string(FORMAT= '("# Box: ",2(A,",",A,:," ; "),"]")', $
+     s='Extraction Rectangle:'
+     s=[s,string(FORMAT= '("# Box: ",2(A,",",A,:," ; "),"]")', $
               radecstring(ra[0],/RA,PRECISION=3), $
               radecstring(dec[0],PRECISION=3), $
               radecstring(ra[1],/RA,PRECISION=3), $
-              radecstring(dec[1],PRECISION=3))
+              radecstring(dec[1],PRECISION=3))]
      s=[s,string(FORMAT='("#      ",2(A,",",A,:," ; "),"]")', $
                  radecstring(ra[2],/RA,PRECISION=3), $
                  radecstring(dec[2],PRECISION=3), $
