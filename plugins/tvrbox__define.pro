@@ -82,18 +82,16 @@ pro tvRBox::Message, msg
         endcase
      end
      
-     'TVDRAW_POSTDRAW': begin
-        ;;  a change of original image, or zoom, etc. occurred
-        if self.boxflag eq -1 then return ; only if a box is here
-        if NOT self.corners then self->SetUpDisplay
-     end 
-     
-     'TVKEY_ARROW': begin 
+     'DRAW_KEY': begin 
         if self->IsDrawn() eq 0 then return
+        if msg.type eq 5 then return ; only arrow keys of interest
+        if msg.key lt 5 or msg.key gt 8 then return
+        if msg.release then return ; press only
+        move=([[-1,0],[1,0],[0,1],[0,-1]])[0:1,msg.key-5]
         if self.snap_mode then begin 
            self.oDraw->GetProperty,OFFSET=off, DISPSIZE=ds
            new_coords=[off[0],off[1]+self.size[1]-1] > $
-                      (self.coords+msg.move) < $
+                      (self.coords+move) < $
                       [off[0]+ds[0]-self.size[0],off[1]+ds[1]-1]
            if array_equal(new_coords,self.coords) then return
            self->EraseBox
@@ -101,17 +99,27 @@ pro tvRBox::Message, msg
         endif else begin 
            self->EraseBox
            self.boxoff=[0,self.boxsize[1]] > $
-                       (self.boxoff+self.zoom*msg.move) < $
+                       (self.boxoff+self.zoom*move) < $
                        [self.winsize[0]-self.boxsize[0]-1,self.winsize[1]-1]
         endelse 
         self->DrawBox
         self->SendBox
      end
+
+     
+     'TVDRAW_POSTDRAW': begin
+        ;;  a change of original image, or zoom, etc. occurred
+        if self.boxflag eq -1 then return ; only if a box is here
+        if NOT self.corners then self->SetUpDisplay
+     end 
+     
      
      'TVDRAW_REDRAW': begin     ; the screen was clobbered
         if self->IsDrawn() then begin ; only if a box here
-           if self->On() then self->DrawBox  $ ;currently on
-           else if self.corners then self->DrawCorners ;currently not on
+           if self->On() then begin 
+              usersym,*self.ux,*self.uy,/FILL
+              self->DrawBox   
+           endif else if self.corners then self->DrawCorners ;currently not on
         endif 
      end
      
@@ -126,11 +134,9 @@ end
 
 pro tvRBox::On
   self->tvPlug::On
-  key=self.oDraw->GetMsgObjs(CLASS='tvKey')
-  if obj_valid(key[0]) then key[0]->MsgSignup,self,/TVKEY_ARROW
   ;; Button and redraw events, no more snapshots
-  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW, $
-     TVDRAW_SNAPSHOT=0
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/DRAW_KEY,/TVDRAW_POSTDRAW, $
+     /TVDRAW_REDRAW,TVDRAW_SNAPSHOT=0
   if self->IsDrawn() then begin 
      if self.corners then self.oDraw->ReDraw,/SNAPSHOT ;remove bg corners
      self->DrawBox              ;just turned on
@@ -141,14 +147,12 @@ end
 pro tvRBox::Off 
   self->tvPlug::Off
   self.oDraw->MsgSignup,self,/NONE
-  key=self.oDraw->GetMsgObjs(CLASS='tvKey')
-  if obj_valid(key[0]) then key[0]->MsgSignup,self,/NONE
   if self->IsDrawn() then begin 
      self->EraseBox
      if self.corners then begin 
         ;;corner redraws and new images needed
         self.oDraw->MsgSignup,self,/NONE,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT
-        self.oDraw->ReDraw,/SNAPSHOT ;get our corners on the background
+        self.oDraw->ReDraw,/SNAPSHOT ;get our corners into the background
      endif 
   endif 
 end

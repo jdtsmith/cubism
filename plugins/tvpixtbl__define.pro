@@ -94,7 +94,7 @@ pro tvPixTbl::Message, msg
            NOT widget_info(self.wBase, /VALID_ID) then return
         pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
         if pt[0] eq -1 then begin 
-           widget_control, self.wtable,USE_TABLE_SELECT=[0,0,self.tblsize], $
+           widget_control, self.wtable,$;USE_TABLE_SELECT=[0,0,self.tblsize], $
                            set_value=make_array(self.tblsize,/string, $
                                                 value='  --')
            self.savpoint=[-1,-1] ;ensure rentry works
@@ -176,7 +176,7 @@ pro tvPixTbl::UpdateTable, im,point
   ;; create row and column labels
   widget_control, self.wTable, SET_VALUE=show, $
                   SET_TABLE_SELECT=[pad,pad], $
-                  USE_TABLE_SELECT=[0,0,self.tblsize], $
+                  USE_TABLE_SELECT=[0,0,self.tblsize-1], $
                   COLUMN_LABELS=strtrim(indgen(self.tblsize[0])-pad[0]+ $
                                         point[0],2), $
                   ROW_LABELS=strtrim(indgen(self.tblsize[1])-pad[1]+point[1],2)

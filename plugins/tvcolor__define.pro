@@ -210,7 +210,7 @@ pro tvColor::Message,msg
            widget_control, self.wLow,SET_VALUE=low
            widget_control, self.wHigh,SET_VALUE=high
         endif
-        self->Stretch
+        self->Stretch,/NO_UPDATE
      end 
      
      'DRAW_BUTTON': begin 
@@ -234,7 +234,7 @@ pro tvColor::Message,msg
            end
            1: begin             ;button release
               self.oDraw->MsgSignup,self,DRAW_MOTION=0
-              if self.need_redraw then self.oDraw->ReDraw,/SNAPSHOT
+              self->Stretch
            end
         endcase 
      end 
@@ -304,37 +304,47 @@ pro tvColor::GetProperty, BAR=bar, NRESERVE=nres, MIN=min, MAX=max, BSIZE=bs, $
 end
 
 ;=============================================================================
+;  SetWin - Set the color-bar window.
+;=============================================================================
+pro tvColor::SetWin, WIN=win
+  widget_control, self.wBar, GET_VALUE=win
+  wset,win
+end
+
+;=============================================================================
 ;  DrawCbar - For drawing the colorbar, call *after* the draw widget
 ;             for the colorbar is realized.  Draws colorbar only for
 ;             given range (bottom:top) in colormap.
 ;=============================================================================
-pro tvColor::DrawCbar, WIN=win
+pro tvColor::DrawCbar, WIN=win,NO_RESET_WIN=nrw,NO_UPDATE=nm
   if self.wBar eq 0L then return
-  widget_control, self.wBar, get_value=win
-  wset,win
+  self->SetWin,WIN=win
   tv,self.bottom+bytscl(lindgen(self.bSize[0],self.bSize[1])  $
                         mod self.bSize[0],  $
                         TOP=self.topval-self.bottom-self.nreserve)
-  self.oDraw->SetWin
+  if keyword_set(nrw) eq 0 then self.oDraw->SetWin
+  if keyword_set(nm) eq 0 then self->MsgSend,{TVCOLOR_REDRAW,self.need_redraw}
 end
 
 ;=============================================================================
 ;  SetColors - Reset the colors to their appropriate values.  Useful
-;              upon re-entry of the widget, in case others have
-;              damaged the map.
+;              upon re-entry to the widget, in case others have
+;              damaged the map.  If setting the colormap doesn't
+;              actually change the colors (e.g. for TrueColor
+;              devices), redraw also.
 ;=============================================================================
-pro tvColor::SetColors,NO_REDRAW=nrd
+pro tvColor::SetColors,NO_REDRAW=nrd,NO_UPDATE=nm
   tvlct,*self.r,*self.g,*self.b,self.bottom
   if self.need_redraw AND NOT keyword_set(nrd) then begin 
-     self->DrawCbar
-     self.oDraw->ReDraw
+     self->DrawCbar,NO_UPDATE=nm
+     self.oDraw->ReDraw         ;Runs the image through the new color table
   endif 
 end
 
 ;=============================================================================
 ;  Stretch - Stretch the colors according to the internal values.
 ;=============================================================================
-pro tvColor::Stretch
+pro tvColor::Stretch,NO_UPDATE=nm
   ;;total colors in our used range
   ncolors=(self.topval-self.bottom-self.nreserve+1)
   
@@ -354,11 +364,12 @@ pro tvColor::Stretch
   (*self.r)[0:ncolors-1]=(*self.rorig)[index]
   (*self.g)[0:ncolors-1]=(*self.gorig)[index]
   (*self.b)[0:ncolors-1]=(*self.borig)[index]
-  self->SetColors               ;set them in.
+  self->SetColors, NO_UPDATE=nm ;set them in.
 end
 
 ;=============================================================================
-;  LoadCT - Load color table, remembering with a system variable !ctabl
+;  LoadCT - Load color table, remembering which with a system variable
+;           !ctabl
 ;=============================================================================
 pro tvColor::LoadCT,table_number, NO_RESET=nr,_REF_EXTRA=e
   defsysv,'!ctabl',Exists=exists
@@ -382,8 +393,8 @@ pro tvColor_ctabl_Event, ev
 end 
 
 ;=============================================================================
-;  CtablEvent - Handle the color selector table events, droplist or
-;               menu items.
+;  CtablEvent - Handle the color selector table events, droplist
+;               and/or menu items.
 ;=============================================================================
 pro tvColor::CtablEvent, ev
   ;; load the color table into range
@@ -401,15 +412,15 @@ pro tvColor::CtablEvent, ev
   if self.need_redraw then self.oDraw->ReDraw,/SNAPSHOT
 end
 
-;=============================================================================
-;  tvColor_Event and Event - Handle the slider stretch events...
-;=============================================================================
 pro tvColor_Event, ev
   ;; only stretch events arrive.
   widget_control, ev.handler, get_uvalue=self
   self->Event,ev
 end
 
+;=============================================================================
+;  Event - Handle the slider stretch events (if any).
+;=============================================================================
 pro tvColor::Event,ev
   widget_control,self.wHigh, get_value=high
   widget_control,self.wLow,  get_value=low
@@ -437,7 +448,7 @@ end
 pro tvColor::Start
   self->tvPlug::Start
   self->DrawCbar
-  device,GET_VISUAL_NAME=vn
+  device,GET_VISUAL_NAME=vn     ;Should DirectColor redraw?
   if vn ne 'PseudoColor' then self.need_redraw=1
 end
 
@@ -567,6 +578,7 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
   
   self->Stretch
   self.protect=keyword_set(prt)
+  self->MsgSetup,'TVCOLOR_REDRAW'
   self->Off
   return,1
 end 
@@ -604,4 +616,5 @@ pro tvColor__define
                                 ; color table changes
           colnames:ptr_new(),$  ;the names of the reserved colors
           wColtabl:0L}          ;the color table widget id
+  msg={TVCOLOR_REDRAW,NEED_REDRAW:0}
 end

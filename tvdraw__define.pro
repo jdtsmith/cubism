@@ -292,11 +292,12 @@ end
 pro tvDraw::ResetWidgetEvents
   ;; adjust widget events to suit recipient list properties.
   widget_control, self.wDraw, $
-                  Draw_Button_Events=self->IsSet('DRAW_BUTTON'), $
-                  Draw_Motion_Events=self->IsSet('DRAW_MOTION'), $
-                  Draw_Viewport_Events=self->IsSet('DRAW_VIEWPORT'),$
-                  Draw_Expose_Events=self->IsSet('DRAW_EXPOSE'), $
-                  Tracking_Events=self->IsSet('WIDGET_TRACKING')
+                  DRAW_BUTTON_EVENTS=self->IsSet('DRAW_BUTTON'), $
+                  DRAW_MOTION_EVENTS=self->IsSet('DRAW_MOTION'), $
+                  DRAW_VIEWPORT_EVENTS=self->IsSet('DRAW_VIEWPORT'),$
+                  DRAW_EXPOSE_EVENTS=self->IsSet('DRAW_EXPOSE'), $
+                  TRACKING_EVENTS=self->IsSet('WIDGET_TRACKING'), $
+                  DRAW_KEYBOARD_EVENTS=self->IsSet('DRAW_KEY')
 end
 
 function tvDraw::GetMsgListObj,list
@@ -309,7 +310,8 @@ end
 function tvDraw::MsgSendWhich, msg
   type=tag_names(msg,/STRUCTURE_NAME)
   if type eq 'WIDGET_DRAW' then begin 
-     type=(['DRAW_BUTTON','DRAW_MOTION','DRAW_VIEWPORT'])[0>(msg.type-1)<2]
+     type=(['DRAW_BUTTON','DRAW_MOTION','DRAW_VIEWPORT','DRAW_EXPOSE', $
+            'DRAW_KEY'])[0>(msg.type-1)<4]
      msg=create_struct(NAME=type,msg)
   endif 
   return,self->OMArray::MsgSendWhich(msg)
@@ -442,6 +444,10 @@ pro tvDraw::SetWin, OLD=old,DOUBLE=dbl
   wset,dw
 end
 
+pro tvDraw::Focus
+  widget_control, self.wDraw,/INPUT_FOCUS
+end
+
 ;; A bit rude, but set the TLB title in which our tvDraw is embedded.
 pro tvDraw::SetTitle,title
   wi=self.wDraw
@@ -555,7 +561,7 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
   *self.imscl=self.bottom+ $
      bytscl((*self.immod)[self.offset[0]:self.offset[0]+self.dispsize[0]-1,$
                           self.offset[1]:self.offset[1]+self.dispsize[1]-1], $
-            TOP=self.top-self.bottom)
+            TOP=self.top-self.bottom,/NAN)
   
   ;; Resize it
   self.zoom=min(float(self.winsize)/self.dispsize)
@@ -610,7 +616,7 @@ end
 ;                pre or post-draw) to the interested recipients.
 ;=============================================================================
 pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,SNAPSHOT=snap
-  if size(msg,/TYPE) eq 8 then begin 
+  if size(msg,/TYPE) eq 8 then begin ; A specific message
      self->ObjMsg::MsgSend,msg
      return
   endif 
@@ -698,8 +704,8 @@ function tvDraw::Init,parent,IMORIG=imdata,TVD_XSIZE=xs,TVD_YSIZE=ys, $
   
   ;; Set-up all the messages we can send
   self->MsgSetup,['DRAW_BUTTON','DRAW_MOTION','DRAW_VIEWPORT','DRAW_EXPOSE', $
-                  'WIDGET_TRACKING','TVDRAW_PREDRAW','TVDRAW_POSTDRAW', $
-                  'TVDRAW_REDRAW','TVDRAW_SNAPSHOT']
+                  'DRAW_KEY','WIDGET_TRACKING','TVDRAW_PREDRAW', $
+                  'TVDRAW_POSTDRAW','TVDRAW_REDRAW','TVDRAW_SNAPSHOT']
   ;; we don't draw it here since our widget is as of yet unrealized.
   return,1
 end

@@ -5,7 +5,7 @@
 ;-
 ;;**************************OverRiding methods********************************
 ;=============================================================================
-;  Message - Expecting TVKEY_KEY or TVPLUG_ON_OFF message
+;  Message - Expecting DRAW_KEY or TVPLUG_ON_OFF message
 ;=============================================================================
 pro tvSwitcher::Message, msg
   self->tvPlug_lite::Message,msg,TYPE=type
@@ -20,7 +20,11 @@ pro tvSwitcher::Message, msg
   endif 
   
   ;; A key press
-  if NOT self.UseCase then char=strlowcase(msg.KEY) else char=msg.KEY
+  if msg.release then return    ; Press only 
+  if msg.type eq 6 then return  ; non-ASCII keys not allowed
+  if (msg.modifiers AND (NOT 5L)) ne 0L then return ; only Shift/Caps Lock
+  
+  if NOT self.UseCase then char=strlowcase(msg.CH) else char=string(msg.CH)
   wh=where((*self.MsgList).keys eq char,cnt)
   if cnt eq 0 then return
   self->Toggle,wh[0]
@@ -37,13 +41,13 @@ pro tvSwitcher_Event, ev
 end
 
 ;=============================================================================
-;  Event - Give the hidden widget_text focus.
+;  Event - Give focus or respond to buttons
 ;=============================================================================
 pro tvSwitcher::Event, ev
   type=tag_names(ev,/STRUCTURE_NAME)
   if type eq 'WIDGET_TRACKING' then begin 
      if ev.enter eq 1 then begin 
-        self.Key->Focus
+        self.oDraw->Focus
         if obj_valid(self.oColor) then self.oColor->SetColors,/NO_REDRAW
      endif 
      return
@@ -105,10 +109,9 @@ pro tvSwitcher::SetButton,object,which
   endelse 
   if widget_info((*self.wList)[which],/VALID_ID) then $
      widget_control, (*self.wList)[which],set_value=val,/SENSITIVE
+  if NOT ptr_valid(self.wTList) then return
   if widget_info((*self.wTList)[which],/VALID_ID) then $
-     widget_control, (*self.wTList)[which],/SENSITIVE ;XXX checked menu status
-;  if NOT ptr_valid(self.wTList) then return
-;  widget_control, (*self.wTList)[which],SET_BUTTON=status
+     widget_control, (*self.wTList)[which],/SENSITIVE,SET_BUTTON=object->On()
 end
 
 ;=============================================================================
@@ -138,9 +141,12 @@ pro tvSwitcher::Start
      (*self.wList)[i]= $
         widget_button(self.sBase[1b-(*self.MsgList)[i].Exclusive], $
                       /NO_RELEASE,value=val,UVALUE=i,/ALIGN_CENTER, $
-                     SENSITIVE=objs[i]->Enabled()) 
-     ;TOOLTIP=objs[i]->Description()
+                      SENSITIVE=objs[i]->Enabled(),$
+                      TOOLTIP=objs[i]->Description())
   endfor 
+  
+  ;; Ask for key events:
+  self.oDraw->MsgSignup,self,/DRAW_KEY
   
   ;; Get the Color object, if any
   oCol=self.oDraw->GetMsgObjs(CLASS='tvColor')
@@ -157,8 +163,8 @@ pro tvSwitcher::Start
   for i=0,ecnt-1 do begin 
      desc=objs[exc[i]]->Description()
      if NOT keyword_set(desc) then continue
-     (*self.wTList)[exc[i]]= $  ;/CHECKED_MENU
-        widget_button(self.toolMenu,value=desc,UVALUE=exc[i], $
+     (*self.wTList)[exc[i]]= $  
+        widget_button(self.toolMenu,value=desc,UVALUE=exc[i],/CHECKED_MENU, $
                       SENSITIVE=objs[exc[i]]->Enabled())
   endfor 
   
@@ -166,9 +172,8 @@ pro tvSwitcher::Start
      desc=objs[tog[i]]->Description()
      if NOT keyword_set(desc) then continue
      (*self.wTList)[tog[i]]= $
-        widget_button(self.toolMenu,value=desc,UVALUE=tog[i], $
+        widget_button(self.toolMenu,value=desc,UVALUE=tog[i],/CHECKED_MENU, $
                       SEPARATOR=i eq 0, SENSITIVE=objs[tog[i]]->Enabled()) 
-                                ;/CHECKED_MENU
   endfor 
 end
 
@@ -197,9 +202,6 @@ end
 function tvSwitcher::Init,parent,oDraw,TOOL_MENU=tm,USECASE=uc,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0
   
-  ;; Get our key object and sign us up.  Important Keywords get Passed On.
-  self.Key=obj_new('tvKey',oDraw)
-  self.Key->MsgSignup,self,/TVKEY_KEY
   self.UseCase=keyword_set(uc) 
   
   ;; see if a valid base was passed, if so make the buttons bases there
@@ -233,7 +235,6 @@ end
 pro tvSwitcher__define
   st={tvSwitcher, $
       INHERITS tvPlug_lite, $   ;tvDraw_lite plugin (no on_off stuff needed)
-      Key:obj_new(), $          ;our key plugin
       UseCase:0b, $             ;whether to consider case
       sBase: [0L,0L], $         ;widget ids of the button bases
       oColor:obj_new(), $       ;the color object (if any)
