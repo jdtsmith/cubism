@@ -74,7 +74,8 @@ common smart_dir, smart_calib_dir
 
 if n_elements(smart_calib_dir) eq 0 then begin 
    ;;figure out the calibration directory
-   paths=strsplit(!PATH,path_sep(/SEARCH_PATH),/EXTRACT)
+;   paths=strsplit(!PATH,path_sep(/SEARCH_PATH),/EXTRACT)
+   paths=strsplit(!PATH,':',/EXTRACT)
    wh=where(stregex(paths,filepath(ROOT="smart","calib")+'$') ne -1,cnt)
    if cnt eq 0 then message,'Cannot locate SMART calibration directory.'
    smart_calib_dir=paths[wh[0]]
