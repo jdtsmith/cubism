@@ -114,7 +114,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
         make_dll,'polyclip','polyclip',INPUT_DIRECTORY=path, $
                  DLL_PATH=polyclip_path,/REUSE_EXISTING
         ;; Test for a correctly compiled library
-        tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE,/UNLOAD)
+        tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE)
         if tmp[0] ne 42b then $
            message,'Testing clipper DLM: Incorrect value returned.'
         polyclip_compiled=1
