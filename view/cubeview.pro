@@ -37,7 +37,6 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   ;;  "Print..." tool in file menu (uses David Fanning's excellent
   ;; `FSC_PSConfig' to configure the print job)
   tvP=obj_new('tvPrint',oDraw,file_menu,_EXTRA=e)
-  bquit=widget_button(file_menu,value="Quit") 
   option_menu=widget_button(mbar,value="Options",/MENU) 
   tool_menu=widget_button(mbar,value="Tools",/MENU)
   
@@ -73,7 +72,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
 
   ;; a Cube record tool for extracting and stacking cubes
   cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube,APER_OBJECT=aper, $
-                  COLOR=stretcher->GetColor('Magenta'),_EXTRA=e)
+                  COLOR=stretcher->GetColor('Magenta'),MENU=file_menu,_EXTRA=e)
   ;; make sure the display line gets CubeRec updates
   cuberec->MsgSignup,line,/CUBEREC_UPDATE
   
@@ -97,6 +96,8 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   ;; a switcher for switching among the tools using icons or keypresses
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
                    TOOL_MENU=tool_menu,_EXTRA=e)
+  
+  bquit=widget_button(file_menu,value="Quit") 
   
   ;; put the tvD into the uvalue, to destroy on cleanup.
   widget_control,base,SET_UVALUE=oDraw,/REALIZE
