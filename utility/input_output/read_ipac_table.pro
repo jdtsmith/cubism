@@ -3,11 +3,6 @@
 ;
 ;    READ_IPAC_TABLE
 ;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
-;
 ; DESCRIPTION:
 ;    
 ;    Reads ascii files in the form of IPAC tables, and returns
@@ -54,11 +49,11 @@
 ; EXAMPLE:
 ;
 ;    foo=read_ipac_table
-;    SMART_ROUTINE,a,b,KEYWORD=foo
 ;    print,foo
 ;
 ; MODIFICATION HISTORY:
 ;    
+;    2002-08-27 (J.D. Smith): Initial migration from SMART codebase.
 ;    2001-12-02 (J.D. Smith): Written, based very loosely on routine
 ;        "read_tbl" provided by Jim Ingalls of the SSC.
 ;        
@@ -68,24 +63,22 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
 
