@@ -738,9 +738,11 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
   full=(*rec.WAVSAMPS)[wh_full[0]]
   new=full                      ;The new clip
   if n_elements(aper) eq 0 then aper={IRS_APERTURE,[0.,0.],[1.,1.]}
+  npr=n_elements(*new.PR)
   if keyword_set(clip_full) eq 0 then begin
      new.PR=ptr_new(*full.PR)   ; Copy the psuedo-rects
      new.FULL=0b
+     (*new.PR).POLYGONS=ptrarr(npr) ;In case these aren't asked for
      newap=new.Aperture
      struct_assign,aper,newap
      new.Aperture=newap
@@ -749,7 +751,6 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
      new.FULL=1b                ;pure pedantry
   endelse 
   
-  npr=n_elements(*new.PR)
   if keyword_set(clip_full) eq 0 then begin
      ;; Scale the aperture from low to high.
      x=(*new.PR).x & y=(*new.PR).y
