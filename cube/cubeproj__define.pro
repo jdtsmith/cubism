@@ -153,7 +153,7 @@ pro CubeProj::ShowEvent, ev
      'viewrecord-stack': self->ViewRecord,/STACK
      'loadcalib': self->LoadCalib,/SELECT
      'feedback': begin 
-        self.feedback=1-self.feedback
+        self.feedback=1b-self.feedback
         widget_control, ev.id, SET_BUTTON=self.feedback
      end
      
@@ -204,6 +204,17 @@ pro CubeProj::ShowEvent, ev
                  strmid(file,0,pos)+to+strmid(file,pos+len)
            endfor
         endif
+     end 
+     
+     'filenames': begin 
+        if sel[0] eq -1 then return
+        if n_elements(sel) gt 1 then $
+           strlist=string(FORMAT='(A," : ",A)', $
+                          [transpose((*self.DR)[sel].ID), $
+                           transpose((*self.DR)[sel].file)]) $
+        else strlist=string(FORMAT='(A," : ",A)', $
+                            (*self.DR)[sel].ID,(*self.DR)[sel].file)
+        self->Info,strlist,TITLE='Filename Listing'
      end 
      
      'headers':   $
@@ -406,6 +417,7 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
             ((*self.wInfo).MUST_MULTISELECT= $
              widget_button(rec,VALUE='View Record Stack...', $
                            UVALUE='viewrecord-stack')), $
+            widget_button(rec,VALUE='Show Filenames...',UVALUE='filenames'),$
             widget_button(rec,VALUE='Show Header...',UVALUE='headers'),$
             widget_button(rec,VALUE='Show Keyword Value(s)...', $
                           UVALUE='header-keyword')]
@@ -446,17 +458,17 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
   headmap=widget_base(headbase) 
   (*self.wInfo).wHead[0]= $
      cw_bgroup(/NONEXCLUSIVE,headmap, $
-               ['ID         ', $
+               ['ID               ', $
                 'ITime  ', $
                 'Observed      ', $
-                'Added        ', $
-                'Type',$
+                'Added      ', $
+                'Type ',$
                 'Step'],UVALUE='sort',/ROW)
   (*self.wInfo).wHead[1]= $  
      cw_bgroup(/NONEXCLUSIVE,headmap, $
-               ['ID         ', $
-                'RA      ', $
-                'Dec     ', $
+               ['ID               ', $
+                'RA     ', $
+                'Dec      ', $
                 'Error', $
                 'Account'], $
                BUTTON_UVALUE=[0,6,7,8,9],UVALUE='sort',/ROW,MAP=0)
@@ -465,7 +477,7 @@ pro CubeProj::Show,FORCE=force,_EXTRA=e
   
   (*self.wInfo).SList= $
      widget_list(b,/MULTIPLE,/ALIGN_LEFT, $
-                 YSIZE=6>self->N_Records()<15,XSIZE=80,/FRAME)
+                 YSIZE=6>self->N_Records()<15,XSIZE=85,/FRAME)
   
   bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup', $
                 ['Enable','Disable','Delete','Header', $
@@ -848,7 +860,7 @@ function CubeProj::List
    
    for i=0,n-1 do begin 
       if which_list eq 0 then begin ;the standard list
-         s=string(FORMAT='(" ",A,T16,F7.2,T27,A,T46,A,T65,A7,T73,' + $
+         s=string(FORMAT='(" ",A,T23,F7.2,T31,A,T50,A,T69,A7,T78,' + $
                   'I2,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
                   (*self.DR)[i].TIME, $
@@ -863,10 +875,10 @@ function CubeProj::List
                else acct="Yes"
             endif else acct="Invalid"
          endif else acct="No"
-         s=string(FORMAT='(" ",A,T16,A10,T28,A12,T43,A3,T54,A)', $
+         s=string(FORMAT='(" ",A,T23,A10,T34,A12,T48,A3,T59,A)', $
                   (*self.DR)[i].ID, $
-                  radecstring((*self.DR)[i].CMD_POS[0],/RA), $
-                  radecstring((*self.DR)[i].CMD_POS[1]), $
+                  radecstring((*self.DR)[i].RQST_POS[0],/RA), $
+                  radecstring((*self.DR)[i].RQST_POS[1]), $
                   ptr_valid((*self.DR)[i].ERROR)?'Yes':'No', $
                   acct)
       endelse       
@@ -1053,8 +1065,8 @@ pro CubeProj::Sort,sort
      3: s=sort((*self.DR).DATE)
      4: s=sort((*self.DR).FOVID)
      5: s=sort((*self.DR).EXP)
-     6: s=sort((*self.DR).CMD_POS[0])
-     7: s=sort((*self.DR).CMD_POS[1])
+     6: s=sort((*self.DR).RQST_POS[0])
+     7: s=sort((*self.DR).RQST_POS[1])
      8: s=sort(ptr_valid((*self.DR).ERROR))
      9: s=sort(ptr_valid((*self.DR).ACCOUNT))
   endcase
@@ -1081,9 +1093,10 @@ function CubeProj::Info,entries, NO_DATA=nd
   str=['IRS Spectral Cube: '+self->ProjectName()]
   str=[str,' Cube Created: '+ $
        (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))]
-  str=[str,' '+(self.MODULE?self.MODULE:"(no module)")+ $
+  str=[str,' ' + (self.MODULE?self.MODULE:"(no module)")+ $
        (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
-                        ' all orders')]
+        ' all orders') + (self->N_Records() gt 0? $
+       (' -- '+strtrim(self->N_Records(),2)+' BCDs '):"")]
   str=[str,' Using IRS Calib object '+(self.cal_file?self.cal_file:"(none)")+ $
        " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
   
@@ -1105,7 +1118,7 @@ function CubeProj::Info,entries, NO_DATA=nd
   str=[str, $
        ' '+string(FORMAT='(I0,"x",I0," steps = ",F7.3," x ",F7.3,' + $
                   '" arcsec"," (",F6.3," arcsec/pixel)")',self.NSTEP, $
-                  self.STEP_SIZE*3600*self.NSTEP,self.PLATE_SCALE*3600)]
+                  self.STEP_SIZE*3600.0D*self.NSTEP,self.PLATE_SCALE*3600.0D)]
   str=[str,' '+string(FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")',$
                       self.PR_SIZE)]
   
@@ -1119,8 +1132,8 @@ function CubeProj::Info,entries, NO_DATA=nd
   for i=0,n_elements(entries)-1 do begin 
      rec=(*self.DR)[entries[i]]
      str=[str,rec.id+":"+rec.file]
-     sign=rec.CMD_POS[1] ge 0.0?'+':'-'
-     radec,rec.CMD_POS[0],abs(rec.CMD_POS[1]),rh,rm,rs,dd,dm,ds
+     sign=rec.RQST_POS[1] ge 0.0?'+':'-'
+     radec,rec.RQST_POS[0],abs(rec.RQST_POS[1]),rh,rm,rs,dd,dm,ds
      ra=string(FORMAT='(I0,"h",I2.2,"m",F5.2,"s")',rh,rm,rs)
      dec=sign+string(FORMAT='(I0,"d",I2.2,"m",F5.2,"s")',abs(dd),dm,ds)
      str=[str,string(FORMAT='(%"   EXP: %2.0d (%d/%d) (%2.0d,%2.0d) ' + $
@@ -1137,8 +1150,7 @@ end
 ;                longer valid.
 ;=============================================================================
 pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
-                          MODULE=md,ORDER=ord,SLIT_SIZE=slitsz, $
-                          SLIT_LENGTH=slitl, SLIT_WIDTH=slitw, PR_WIDTH=prw, $
+                          MODULE=md,ORDER=ord, PR_WIDTH=prw, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
                           APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb
@@ -1167,25 +1179,6 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
         self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif 
   endif 
-  if n_elements(slitsz) eq 2 then begin 
-     if self.SLIT_SIZE ne slitsz then begin 
-        self.SLIT_SIZE=slitsz
-        self.ACCOUNTS_VALID=0b & self.Changed=1b
-     endif 
-  endif else begin 
-     if n_elements(slitl) ne 0 then begin 
-        if self.SLIT_SIZE[0] ne slitl then begin 
-           self.SLIT_SIZE[0]=slitl
-           self.ACCOUNTS_VALID=0b & self.Changed=1b
-        endif
-     endif
-     if n_elements(slitw) ne 0 then begin 
-        if self.SLIT_SIZE[1] ne slitw then begin 
-           self.SLIT_SIZE[1]=slitw
-           self.ACCOUNTS_VALID=0b & self.Changed=1b
-        endif
-     endif
-  endelse
   if n_elements(prw) ne 0 then begin 
      prw=0.>prw 
      if prw ne self.PR_SIZE[1] then begin 
@@ -1388,8 +1381,7 @@ end
 ;               the orders get interpolated, and where.
 ;=============================================================================
 pro CubeProj::MergeSetup,ORDS=ords
-  if self.ORDER eq 0 then ords=self.cal->Orders(self.MODULE) else $
-     ords=self.ORDER
+  ords=self->BuildOrders()
   ptr_free,self.WAVELENGTH
   heap_free,self.MERGE
   wave1=(self.cal->GetWAVSAMP(self.MODULE,ords[0],/PIXEL_BASED, $
@@ -1615,24 +1607,23 @@ pro CubeProj::BuildAccount,_EXTRA=e
   self->MergeSetup
   self.CUBE_SIZE[2]=n_elements(*self.WAVELENGTH) 
   
-  stepsz=float(self.STEP_SIZE/self.PLATE_SCALE) ; slit step size, in pixels
+  ;; XXX Stepsize is currently very wrong!
+  ;;stepsz=float(self.STEP_SIZE/self.PLATE_SCALE) ; slit step size, in pixels
   
-  ;; Are we treating one order, or all of them?
-  if self.ORDER eq 0 then ords=self.cal->Orders(self.MODULE) else $
-     ords=self.ORDER
+  ords=self->BuildOrders()
   nap=n_elements(*self.APERTURE) 
   
   ;;Feedback plots
   if self.feedback then begin 
      aspect=float(self.CUBE_SIZE[0])/self.CUBE_SIZE[1] ;x=y*aspect
      
-     ;; Keep the position outline square, 700 is the largest dimension
+     ;; Keep the position outline square, 800 is the largest dimension
      ;; pos=[15,15]+[x,y]-[15,4]
      if self.CUBE_SIZE[0] gt self.CUBE_SIZE[1] then begin 
-        xsize=700
+        xsize=800
         ysize=xsize/aspect
      endif else begin 
-        ysize=700
+        ysize=800
         xsize=ysize*aspect
      endelse 
      xsize=xsize+30 & ysize=ysize+19
@@ -1649,7 +1640,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
                          (self.MODULE?self.MODULE:"(no module)")+ $
                          (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
                           ' all orders'), $
-                         self.NSTEP,self.STEP_SIZE*3600*self.NSTEP)
+                         self.NSTEP,self.STEP_SIZE*3600.0D*self.NSTEP)
      plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
           POSITION=[15,15,xsize-15,ysize-4],/DEVICE, $
           yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
@@ -1660,29 +1651,35 @@ pro CubeProj::BuildAccount,_EXTRA=e
   endif 
   ;; End debugging plots
   
-  ;; If the cube size was changed, we might need to shift existing
-  ;; accounts by one or more pixels ... only relevant with
+  ;; Time saver: If the cube size was changed, we might need to shift
+  ;; existing accounts by one or more pixels ... only relevant with
   ;; POSITION-based (not GRID-based) cube layout.  E.g. making a cube
   ;; with overlapping maps taken at different epochs.
+  
   ;; if self.ACCOUNTS_VALID eq 2b then begin 
   ;;    new=where(NOT ptr_valid((*self.DR).ACCOUNT)) ;newly added BCD's
   
   
-  ;; For shifting each sample based on the actual apertures chosen
-  mlow=1. & mhigh=0.
-  for ap=0,n_elements(*self.APERTURE)-1 do begin 
-     mlow=mlow<min((*self.APERTURE)[ap].low)
-     mhigh=mhigh>max((*self.APERTURE)[ap].high)
-  endfor
-  if mlow+mhigh ne 1. then  $
-     ap_offset=(.5-.5*(mlow+mhigh))*self.PR_SIZE[0]/(mhigh-mlow) $
-  else ap_offset=0.
+  ;; For shifting each sample based on the actual apertures chosen, to
+  ;; conserve space on the sky grid (XXX vestigial for pos-based
+  ;; offsets).
+;   mlow=1. & mhigh=0.
+;   for ap=0,n_elements(*self.APERTURE)-1 do begin 
+;      mlow=mlow<min((*self.APERTURE)[ap].low)
+;      mhigh=mhigh>max((*self.APERTURE)[ap].high)
+;   endfor
+;   if mlow+mhigh ne 1. then  $
+;      ap_offset=(.5-.5*(mlow+mhigh))*self.PR_SIZE[0]/(mhigh-mlow) $
+;   else ap_offset=0.
   
+  rot_pa=self->RotFlipMatrix()
+  exp_off=-1
   for i=0L,n_elements(*self.DR)-1 do begin 
      ;; skip disabled records unconditionally
      if (*self.DR)[i].DISABLED then continue 
-     
      feedback_only=0            ;might just show the feedback
+     if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
+     color=!D.TABLE_SIZE-5+((*self.DR)[i].EXP-exp_off) mod 4
      
      ;; if the accounts are fully valid and an account exists for this
      ;; DR, assume it's valid.
@@ -1699,20 +1696,21 @@ pro CubeProj::BuildAccount,_EXTRA=e
      ;; XXX The details of this depend on the exact layout of the "+y"
      ;; direction w.r.t the detector coordinates, i.e. do maps start
      ;; top left, bottom left, etc  Revisit.
-     basic_offset=[((*self.DR)[i].ROW-1)*stepsz[0], $
-                   self.cube_size[1]-((*self.DR)[i].COLUMN-1)*stepsz[1]-1] + $
-                  self.PR_SIZE/2.
+;      basic_offset=[((*self.DR)[i].ROW-1)*stepsz[0], $
+;                    self.cube_size[1]-((*self.DR)[i].COLUMN-1)*stepsz[1]-1] + $
+;                   self.PR_SIZE/2.
+     offset=float(self.CUBE_SIZE[0:1])/2 + $
+            rot_pa ## ((*self.DR)[i].RQST_POS  - self.POSITION)/ $
+            self.PLATE_SCALE
      
      ;; (Small) difference between PA of this BCD and the mean map PA
-     pa_delta=((*self.DR)[i].PA-self.PA)
+     delta_PA=(*self.DR)[i].PA_RQST-self.PA
      
      for ord=0,n_elements(ords)-1 do begin
         aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
         prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
                                  /PIXEL_BASED, /SAVE_POLYGONS, $
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
-        ;; XXX offset along PA, not along +x
-        offset=[basic_offset[0]+ap_offset,basic_offset[1]]
         
         ;; Pre-allocate an account list 
         if NOT feedback_only then begin 
@@ -1723,7 +1721,6 @@ pro CubeProj::BuildAccount,_EXTRA=e
            prmin=1L & prmax=1L
         endelse 
         acc_ind=0L
-        
         for j=prmin,prmax do begin ; iterate over all the PRs
            ;; Setup the rotation matrix to rotate back to the +x
            ;; direction
@@ -1733,11 +1730,11 @@ pro CubeProj::BuildAccount,_EXTRA=e
            ;; rotation), but *put in* the correct delta(PA) between
            ;; BCD and PA_0 as chosen for the cube.  Ensure this works
            ;; correctly, i.e. in the correct sense.
-           angle=prs[j].angle+pa_delta
+           angle=-prs[j].angle+delta_PA
            if angle ne 0.0D then begin 
               ct=cos(angle/!radeg) & st=sin(angle/!radeg)
-              rot=transpose([[ ct, st], $
-                             [-st, ct]])
+              rot=transpose([[ ct,-st], $
+                             [ st, ct]])
            endif
            ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
@@ -1745,20 +1742,17 @@ pro CubeProj::BuildAccount,_EXTRA=e
               ;; associated polygon (2xn list) this pixel got clipped to
               ;; by the PR on the detector grid
               poly=*(*prs[j].POLYGONS)[k]
-              ;; Offset to poly's center 
-              
-              ;; XXX Should rotate about canonical slit center, not
-              ;; arbitrary aperture center.  Offsets then won't require
+              ;; Offset to canonical slit center 
               poly=poly-rebin(prs[j].cen,size(poly,/DIMENSIONS))
               ;; Rotate this polygon to the cube sky grid, if necessary
-              if angle ne 0.0 then poly=rot#poly
+              if angle ne 0.0 then poly=rot#poly ;XXX check!!!
               ;; Offset the polygon correctly into the sky grid
               poly=poly+rebin(offset,size(poly,/DIMENSIONS))
               if self.feedback AND j eq 1L then begin
                  plots,[reform(poly[0,*]),poly[0,0]], $
                        [reform(poly[1,*]),poly[1,0]], $
-                       COLOR=!D.TABLE_SIZE-5+i mod 4
-                 plots,offset,PSYM=4,COLOR=!D.TABLE_SIZE-5+i mod 4
+                       COLOR=color
+                 plots,offset,PSYM=4,COLOR=color
                  wait,0
               endif
               
@@ -1828,46 +1822,234 @@ pro CubeProj::BuildRevAcct
   self->UpdateButtons
 end
 
+;=============================================================================
+;  ResetAccounts - Remove all accounting info, so a cube build will
+;                  proceed anew.
+;=============================================================================
 pro CubeProj::ResetAccounts
   self.ACCOUNTS_VALID=0b
   self->UpdateButtons
 end
 
 ;=============================================================================
-;  BackTrackPix - Find the BCDs, pixels, and overlap fractions
-;                 influencing the specified full cube pixel.  If
-;                 FOLLOW is set, highlight the indicated BCDs too.
+;  Normalize - Map header info in the BCD's to cube-specific data, and
+;              returns the status of the normalization.
 ;=============================================================================
-function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
-  nrec=self->N_Records()
-  if nrec eq 0 then return,-1
-  if NOT ptr_valid((*self.DR)[0].REV_ACCOUNT) then self->BuildRevAcct
-  if n_elements(pix) eq 2 then pix=pix[0]+pix[1]*self.CUBE_SIZE[0]
-  if n_elements(plane) ne 0 then $
-     z=pix+plane*self.CUBE_SIZE[0]*self.CUBE_SIZE[1] $
-  else z=pix
-  show=keyword_set(follow) AND self->Showing()
-  if show then show_vec=bytarr(nrec)
-  for i=0,nrec-1 do begin 
-     if z lt (*self.DR)[i].REV_MIN then continue
-     thisz=z-(*self.DR)[i].REV_MIN
-     ri=*(*self.DR)[i].REV_ACCOUNT
-     if ri[thisz] eq ri[thisz+1] then continue
-     if show then show_vec[i]=1b
-     accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[thisz]:ri[thisz+1]-1]]
-     ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,BCD_VAL:0.0,AREA:0.0}, $
-                   n_elements(accs))
-     ret.BCD_PIX=accs.BCD_PIX 
-     ret.BCD_VAL=(*(*self.DR)[i].BCD)[accs.BCD_PIX]
-     ret.AREA=accs.AREA
-     if n_elements(all) eq 0 then all=[ret] else all=[all,ret]
+pro CubeProj::Normalize
+  self->LoadCalib
+  
+  if NOT ptr_valid(self.DR) then $
+     self->Error,'No data records'
+  
+  ;; For low-res use the target order as the order, if they're all the same.
+;   if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
+;      self.ORDER eq 0 AND $
+;      (self.module eq 'SL' OR self.module eq 'SH') $
+;      then self.ORDER=(*self.DR)[0].TARGET_ORDER
+  
+  
+  ;; Plate scale for our module
+  self.cal->GetProperty,self.module,self.order,PLATE_SCALE=ps
+  self.PLATE_SCALE=ps
+    
+  ;; Normalize the number of steps and step size (they should all be the same)
+  stepsper=(stepspar=lonarr(n_elements(*self.DR)))
+  stepszper=(stepszpar=dblarr(n_elements(*self.DR)))
+  for i=0,n_elements(*self.DR)-1 do begin 
+     stepsper[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPER')
+     stepspar[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPAR')
+     stepszpar[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPAR')
+     stepszper[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPER')
   endfor 
-  if n_elements(all) ne 0 then begin 
-     if show then $
-        widget_control, (*self.wInfo).SList, SET_LIST_SELECT=where(show_vec)
-     return,all 
-  endif else return,-1
+  
+  ;; XXX No longer necessary with pos-based layout
+  if (NOT array_equal(stepsper,stepsper[0])) or $
+     (NOT array_equal(stepspar,stepspar[0])) then $
+     self->Error,"BCD's have unequal map size"
+  self.NSTEP=[stepsper[0],stepspar[0]]
+  if (NOT array_equal(stepszper,stepszper[0])) or $
+     (NOT array_equal(stepszpar,stepszpar[0])) then $
+     self->Error,"BCD's have unequal step size"
+  self.STEP_SIZE=[stepszpar[0],stepszper[0]]/3600.D ; in degrees
+  
+  ;; Normalize the slit length
+  if self.ORDER gt 0 then begin
+     self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
+     self.PR_SIZE[0]=sl
+  endif else begin ;; find the longest slit and use it
+     ords=self.cal->Orders(self.module)
+     slmax=0.
+     for i=0,n_elements(ords)-1 do begin 
+        self.cal->GetProperty,self.module,ords[i],SLIT_LENGTH=sl
+        slmax=sl>slmax
+     endfor 
+     self.PR_SIZE[0]=slmax
+  endelse 
+  
+  ;; Check to ensure all steps are present and accounted for
+  self->CheckSteps
+  
+  len=0.                        ;adjust for a non-full aperture
+  if ptr_valid(self.APERTURE) then begin 
+     for i=0,n_elements(*self.APERTURE)-1 do begin 
+        m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
+        len=m>len
+     endfor 
+     self.PR_SIZE[0]=self.PR_SIZE[0]*len
+  endif   
+  
+  ;; The PR Width
+  if self.PR_SIZE[1] eq 0.0 then begin
+     self.ACCOUNTS_VALID=0b
+     self.PR_SIZE[1]=1.D        ;the default, 1xn XXX
+  endif 
+  
+  ;; Normalize the build aperture(s)
+  self->NormalizeApertures
+  
+  ;; And the cube size and center
+  self->LayoutBCDs
 end
+
+;=============================================================================
+;  NormalizeApertures - Make sure the apertures are all something useful
+;=============================================================================
+pro CubeProj::NormalizeApertures
+  ;; Normalize the build aperture(s)
+  if ptr_valid(self.APERTURE) then begin 
+     for i=0,n_elements(*self.APERTURE)-1 do begin 
+        ap=(*self.APERTURE)[i]
+        ;; default to the full aperture
+        if array_equal(ap.low,0.) AND array_equal(ap.high,0.) then $
+           (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
+     endfor 
+  endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
+end
+
+;=============================================================================
+;  RotFlipMatrix - Matrix for transforming between celestial and sky
+;                  coordinate systems.
+;=============================================================================
+function CubeProj::RotFlipMatrix
+  ;; CW rotation + flip of coordinates (for left-handed sky map)
+  ;; orthogonal,symmetric rotation: rot^-1=rot
+  c=cos((90.0D + self.PA)/!RADEG) & s=sin((90.0D + self.PA)/!RADEG)
+  return,[[-c, s], $
+          [ s, c]]
+end
+
+;=============================================================================
+;  LayoutBCDs - Determine the BCD layout on the sky grid based on
+;               positions and PA's.
+;=============================================================================
+pro CubeProj::LayoutBCDs
+  ;; Find the PA of the most populated AOR
+  aorids=(*self.DR).AORKEY
+  uniqids=aorids[uniq(aorids,sort(aorids))]
+  cnt=0
+  
+  for i=0,n_elements(uniqids)-1 do begin 
+     wh=where(aorids eq uniqids[i],thiscnt)
+     if thiscnt gt cnt then begin 
+        cnt=thiscnt
+        use=wh
+     endif
+  endfor 
+  self.PA=mean((*self.DR)[use].PA_RQST) ;match our PA to the most numerous
+  rot_pa=self->RotFlipMatrix()
+  
+  ords=self->BuildOrders()
+  nap=n_elements(*self.APERTURE)
+  ;; Construct the bounding aperture for all orders being combined into cube
+  for i=0,n_elements(ords)-1 do begin 
+     ap=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[i]
+     left=min(ap.low)           ;The bounding aperture for this order
+     right=max(ap.high)
+     ;; Celestial (degree) left/right offsets from slit center
+     off=([left,right]-.5)*self.PR_SIZE[0]*self.PLATE_SCALE 
+     if n_elements(final_off) eq 0 then final_off=off else begin 
+        final_off[0]=final_off[0]<off[0] ;Bounding aperture assumes same 
+        final_off[1]=final_off[1]>off[1] ;slit length for all build orders
+     endelse 
+  endfor 
+  
+  skyc=dblarr(2,n_elements(*self.DR))
+  prs=dblarr(8,n_elements(*self.DR))
+  ;; Rotate and offset final bounding polygon for each DR.
+  prw=self.PR_SIZE[1]*self.PLATE_SCALE ;pr width
+  for i=0,n_elements(*self.DR)-1 do begin 
+     pr_rect=[[final_off[0],-prw/2], $
+              [final_off[0], prw/2], $
+              [final_off[1], prw/2], $
+              [final_off[1],-prw/2]]
+     ;; Account for any differential rotation of this DR to sky coordinates
+     delta_PA=(*self.DR)[i].PA_RQST-self.PA
+     if delta_PA ne 0.0D then begin 
+        ct=cos(delta_PA/!radeg) & st=sin(delta_PA/!radeg)
+        ;; positive delta_PA ==> CCW rotation on sky grid
+        rot=[[ ct, -st], $
+             [ st,  ct]]
+        pr_rect=transpose(rot ## transpose(pr_rect))
+     endif
+     
+     ;; Rotate celestial coordinates into this left-handed <+w> -> +x system
+     ;; If PA=0, <+w>=+x=North, <+v>=+y=East
+     sky_coords=reform(rot_pa ## (*self.DR)[i].RQST_POS)
+     skyc[*,i]=sky_coords
+     
+     pr_rect=pr_rect+rebin(sky_coords,2,4,/SAMPLE)
+     prs[*,i]=pr_rect
+     if n_elements(pos_min) eq 0 then pos_min=min(pr_rect,DIMENSION=2) else $
+        pos_min=pos_min<min(pr_rect,DIMENSION=2)
+     if n_elements(pos_max) eq 0 then pos_max=max(pr_rect,DIMENSION=2) else $
+        pos_max=pos_max>max(pr_rect,DIMENSION=2)
+  endfor
+  
+  
+  ;; Establish the dimensions of the cube in the sky coordinate system
+  exact_size=(pos_max-pos_min)/self.PLATE_SCALE
+  new_size=ceil(exact_size)
+  if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
+     self.CUBE_SIZE[0:1]=new_size
+     self.ACCOUNTS_VALID=2b
+  endif
+    
+;  skyc=3600.D*(skyc-rebin(total(skyc,2)/(n_elements(skyc)/2), $
+;                          size(skyc,/DIMENSIONS)))
+;  plot,skyc[0,*],skyc[1,*],PSYM=4
+    
+  ;; Find the center in celestial coordinate system, left align it
+  cen_xy=pos_min+float(new_size)/2.*self.PLATE_SCALE
+  self.POSITION=rot_pa ## cen_xy ;rot_pa^-1=rot_pa
+  
+  ;; Debug stuff!!!
+;   del=(pos_max-pos_min)
+;   plot,[0],/NODATA, /XSTYLE, /YSTYLE, $
+;        XRANGE=[pos_min[0]-.1*del[0],pos_max[0]+.1*del[0]], $
+;        YRANGE=[pos_min[1]-.1*del[1],pos_max[1]+.1*del[1]]
+  
+;   for i=0,new_size[0] do $
+;      plots,pos_min[0]+i*self.PLATE_SCALE, $
+;            [pos_min[1],pos_min[1]+new_size[1]*self.PLATE_SCALE], $
+;            COLOR=!D.TABLE_SIZE/2
+  
+;   for i=0,new_size[1] do $
+;      plots,[pos_min[0],pos_min[0]+new_size[0]*self.PLATE_SCALE], $
+;            pos_min[1]+i*self.PLATE_SCALE, $
+;            COLOR=!D.TABLE_SIZE/2
+  
+;   for i=0,n_elements(prs)/8-1 do begin 
+;      rect=prs[*,i]
+;      x=rect[indgen(4)*2] & y=rect[indgen(4)*2+1]
+;      plots,[x,x[0]],[y,y[0]],PSYM=-4
+;      plots,skyc[0,i],skyc[1,i],PSYM=7
+;   endfor 
+  
+;  plots,cen_xy[0],cen_xy[1],THICK=2,PSYM=6,SYMSIZE=2
+  ;; XXX Apply FOV offset (often zero when targetting slit center)
+;  wait,5
+end
+
 
 ;=============================================================================
 ;  BuildCube - Assemble the Cube from the accounting information, the
@@ -2016,6 +2198,42 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
 end
 
 ;=============================================================================
+;  BackTrackPix - Find the BCDs, pixels, and overlap fractions
+;                 influencing the specified full cube pixel.  If
+;                 FOLLOW is set, highlight the indicated BCDs too.
+;=============================================================================
+function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
+  nrec=self->N_Records()
+  if nrec eq 0 then return,-1
+  if NOT ptr_valid((*self.DR)[0].REV_ACCOUNT) then self->BuildRevAcct
+  if n_elements(pix) eq 2 then pix=pix[0]+pix[1]*self.CUBE_SIZE[0]
+  if n_elements(plane) ne 0 then $
+     z=pix+plane*self.CUBE_SIZE[0]*self.CUBE_SIZE[1] $
+  else z=pix
+  show=keyword_set(follow) AND self->Showing()
+  if show then show_vec=bytarr(nrec)
+  for i=0,nrec-1 do begin 
+     if z lt (*self.DR)[i].REV_MIN then continue
+     thisz=z-(*self.DR)[i].REV_MIN
+     ri=*(*self.DR)[i].REV_ACCOUNT
+     if ri[thisz] eq ri[thisz+1] then continue
+     if show then show_vec[i]=1b
+     accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[thisz]:ri[thisz+1]-1]]
+     ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,BCD_VAL:0.0,AREA:0.0}, $
+                   n_elements(accs))
+     ret.BCD_PIX=accs.BCD_PIX 
+     ret.BCD_VAL=(*(*self.DR)[i].BCD)[accs.BCD_PIX]
+     ret.AREA=accs.AREA
+     if n_elements(all) eq 0 then all=[ret] else all=[all,ret]
+  endfor 
+  if n_elements(all) ne 0 then begin 
+     if show then $
+        widget_control, (*self.wInfo).SList, SET_LIST_SELECT=where(show_vec)
+     return,all 
+  endif else return,-1
+end
+
+;=============================================================================
 ;  SaveMap - Save a Stacked Map to FITS 
 ;=============================================================================
 pro CubeProj::SaveMap,map,sf
@@ -2127,6 +2345,7 @@ end
 ;  CheckSteps - Ensure that all of the BCD's for this map are present.
 ;=============================================================================
 pro CubeProj::CheckSteps
+  ;; XXX Account for multiple sub-slit maps or multiple map cycles?
   if NOT ptr_valid(self.DR) then self->Error,'No BCD Data loaded.'
   got=bytarr(self.NSTEP)
   got[(*self.DR).ROW-1,(*self.DR).COLUMN-1]=1b
@@ -2138,7 +2357,7 @@ pro CubeProj::CheckSteps
 end
 
 ;=============================================================================
-;  CheckModules - Make sure only one module is present.
+;  CheckModules - Make sure only data from one module is present.
 ;=============================================================================
 pro CubeProj::CheckModules,id,ERROR=err
   ;; Check the data's module type
@@ -2170,114 +2389,11 @@ pro CubeProj::CheckModules,id,ERROR=err
      self->Error,["Data from only one module is permitted: ", $
                   "   "+strjoin(modules[u],",")],/RETURN_ONLY
   self.module=modules[u[0]]
-  if array_equal(orders,orders[0]) then self.ORDER=orders[0]
-end
-
-;=============================================================================
-;  Normalize - Map header info in the BCD's to cube-specific data, and
-;              returns the status of the normalization.
-;=============================================================================
-pro CubeProj::Normalize
-  self->LoadCalib
-  
-  if NOT ptr_valid(self.DR) then $
-     self->Error,'No data records'
-  
-  ;; For low-res use the target order as the order, if they're all the same.
-;   if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
-;      self.ORDER eq 0 AND $
-;      (self.module eq 'SL' OR self.module eq 'SH') $
-;      then self.ORDER=(*self.DR)[0].TARGET_ORDER
-  
-  ;; Normalize the plate scale... they should all be the same!
-  ps=dblarr(2*n_elements(*self.DR))
-  for i=0,n_elements(*self.DR)-1 do $
-     ps[2*i]=sxpar(*(*self.DR)[i].HEADER,'CDELT*') 
-  psm=mean(ps)
-  if NOT array_equal(abs(ps-psm) lt 1.e-4,1b) then $
-     self->Error,"Plate scale mismatch among input BCD's"
-  self.PLATE_SCALE=psm
-  
-  ;; Normalize the number of steps and step size (they should all be the same)
-  stepsper=(stepspar=lonarr(n_elements(*self.DR)))
-  stepszper=(stepszpar=dblarr(n_elements(*self.DR)))
-  for i=0,n_elements(*self.DR)-1 do begin 
-     stepsper[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPER')
-     stepspar[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPAR')
-     stepszpar[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPAR')
-     stepszper[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPER')
-  endfor 
-  if (NOT array_equal(stepsper,stepsper[0])) or $
-     (NOT array_equal(stepspar,stepspar[0])) then $
-     self->Error,"BCD's have unequal map size"
-  self.NSTEP=[stepspar[0],stepsper[0]]
-  if (NOT array_equal(stepszper,stepszper[0])) or $
-     (NOT array_equal(stepszpar,stepszpar[0])) then $
-     self->Error,"BCD's have unequal step size"
-  self.STEP_SIZE=[stepszpar[0],stepszper[0]]/3600.D
-  
-  ;; Normalize the slit length
-  if self.ORDER gt 0 then begin 
-     self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
-     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=sl*self.PLATE_SCALE
-     self.PR_SIZE[0]=sl
-  endif else begin ;; find the longest slit and use it
-     ords=self.cal->Orders(self.module)
-     slmax=0.
-     for i=0,n_elements(ords)-1 do begin 
-        self.cal->GetProperty,self.module,ords[i],SLIT_LENGTH=sl
-        slmax=sl>slmax
-     endfor 
-     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=slmax*self.PLATE_SCALE
-     self.PR_SIZE[0]=slmax
+  if array_equal(orders,orders[0]) then self.ORDER=orders[0] else begin 
+     h=histogram(BINSIZE=1,orders,OMIN=om)
+     mx=max(h,mpos)
+     self.ORDER=om+mpos
   endelse 
-  
-  ;; Check to ensure all steps are present and accounted for
-  self->CheckSteps
-  
-  len=0.                        ;adjust for a non-full aperture
-  if ptr_valid(self.APERTURE) then begin 
-     for i=0,n_elements(*self.APERTURE)-1 do begin 
-        m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
-        len=m>len
-     endfor 
-     self.PR_SIZE[0]=self.PR_SIZE[0]*len
-  endif   
-  
-  ;; The PR Width
-  if self.PR_SIZE[1] eq 0.0 then begin
-     self.ACCOUNTS_VALID=0b
-     self.PR_SIZE[1]=1.D        ;the default, 1xn XXX
-  endif 
-  
-  ;; Normalize the build aperture(s)
-  self->NormalizeApertures
-  
-  ;; Find the average position angle over the entire map
-  pa=mean((*self.DR).PA)
-  
-  ;; Establish the dimensions of the cube in the slit coordinate system
-  new_size=ceil((self.NSTEP-1L)*self.STEP_SIZE/self.PLATE_SCALE+ $
-                self.PR_SIZE-.01) ;at least 1% of the row/col required
-  if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
-     self.CUBE_SIZE[0:1]=new_size
-     self.ACCOUNTS_VALID=2b
-  endif
-end
-
-;=============================================================================
-;  NormalizeApertures - Make sure the apertures are all something useful
-;=============================================================================
-pro CubeProj::NormalizeApertures
-  ;; Normalize the build aperture(s)
-  if ptr_valid(self.APERTURE) then begin 
-     for i=0,n_elements(*self.APERTURE)-1 do begin 
-        ap=(*self.APERTURE)[i]
-        ;; default to the full aperture
-        if array_equal(ap.low,0.) AND array_equal(ap.high,0.) then $
-           (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
-     endfor 
-  endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
 end
 
 ;=============================================================================
@@ -2339,7 +2455,8 @@ end
 ;           header derived values.
 ;=============================================================================
 pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
-                     COLUMN=col, ROW=row, CMD_POS=cpos, REC_POS=rpos, PA=pa
+                     COLUMN=col, ROW=row, RQST_POS=rqpos, REC_POS=rpos, PA=pa
+  self->LoadCalib
   if n_elements(file) ne 0 AND ptr_valid(self.DR) then $
      if NOT array_equal((*self.DR).file ne file,1b) then return
   s=size(bcd,/DIMENSIONS)
@@ -2360,8 +2477,12 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
   
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
      id=filestrip(rec.file)
-     suffix=strpos(id,".fits",/REVERSE_SEARCH)
-     if suffix[0] ne -1 then id=strmid(id,0,suffix)
+     if stregex(id,'IRSX.*\.fits',/BOOLEAN) then begin ;Sandbox style names
+        id=strmid(id,42,11,/REVERSE_OFFSET)+strmid(id,29,9,/REVERSE_OFFSET)
+     endif else begin ; XXX also treat long archive names specially
+        suffix=strpos(id,".fits",/REVERSE_SEARCH)
+        if suffix[0] ne -1 then id=strmid(id,0,suffix)
+     endelse 
      rec.id=id
   endif 
   
@@ -2378,27 +2499,46 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
      rec.TARGET_POS=target_pos
   endif 
   
+  ;; AOR
+  rec.AORKEY=sxpar(header,'AORKEY')
+  
+  ;; Logical map sequencing
   if n_elements(exp) ne 0 then rec.EXP=exp else $
-     rec.EXP=sxpar(header,'EXPNUM')
+     rec.EXP=sxpar(header,'EXPID')
   if n_elements(cycle) ne 0 then rec.cycle=cycle else $
-     rec.CYCLE=sxpar(header,'CYCLENUM')
+     rec.CYCLE=sxpar(header,'DCENUM')
   if n_elements(col) ne 0 then rec.COLUMN=col else $
      rec.COLUMN=sxpar(header,'COLUMN')
   if n_elements(row) ne 0 then rec.ROW=row else $
      rec.ROW=sxpar(header,'ROW')
-  if n_elements(cpos) eq 2 then rec.CMD_POS=cpos else $
-     rec.CMD_POS=[sxpar(header,'RA_CMD'),sxpar(header,'DEC_CMD')]
-  if n_elements(rpos) eq 3 then rec.REC_POS=rpos else $
-     rec.REC_POS=sxpar(header,'CRVAL*')
-  if n_elements(pa) ne 0 then rec.PA=pa else $
-     rec.PA=sxpar(header,'PA')
-  if array_equal(self.slit_size,0.0) then $
-     self.slit_size=[sxpar(header,'SLITSZ2'),sxpar(header,'SLITSZ1')]
   rec.NCYCLES=sxpar(header,'NCYCLES')
-  rec.DATE_OBS=sxpar(header,'MJD_OBS')+2400000.5D
-  rec.TIME=sxpar(header,'EXPTIME')
+  
+  ;; Requested Positions/PA
+  if n_elements(rqpos) eq 2 then rec.RQST_POS=rqpos else $
+     rec.RQST_POS=[sxpar(header,'RA_RQST'),sxpar(header,'DEC_RQST')]
+  if n_elements(pa_rqst) ne 0 then rec.PA_RQST=pa_rqst else begin 
+     rec.PA_RQST=sxpar(header,'PA_RQST')
+     self.cal->TransformCoords,self.module,[0,0],rec.PA_RQST,void,new_pa
+     rec.PA_RQST=new_pa          ; transform requested PA to the slit
+  endelse 
+  
+  ;; RQST is SIRTF-field-centric, not FOV-centric.
+  ;;PA_RQST =     253.118909799814 / [deg] Requested pos. angle of axis 2 (E of N)  
+  
+  ;; Achieved (reconstructed) positions/PA
+  if n_elements(rpos) eq 3 then rec.REC_POS=rpos else $
+     rec.REC_POS=[sxpar(header,'RA_SLT'),sxpar(header,'DEC_SLT')]
+  if n_elements(pa) ne 0 then rec.PA=pa else $
+     rec.PA=sxpar(header,'PA_SLT')
+  
+  
+  ;; Date/Obstime
+  ;; J2000 Ephemeris time at MJD5144.5
+  rec.DATE_OBS=sxpar(header,'UTCS_OBS')/3600.D/24.0D + 51544.5D + 2400000.5D
+  
+  rec.TIME=sxpar(header,'RAMPTIME')
   rec.DATE=systime(/JULIAN)
- 
+  
   if ptr_valid(self.DR) then *self.DR=[*self.DR,rec] else $
      self.DR=ptr_new(rec,/NO_COPY)
   self.Changed=1b
@@ -2453,6 +2593,14 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
      self->MsgSend,{CUBEPROJ_RECORD, $
                     self,str,self.MODULE,self.ORDER,self.CAL,bcd_p,err_p}
   endif
+end
+
+;=============================================================================
+;  BuildOrders
+;=============================================================================
+function CubeProj::BuildOrders
+  ;; Are we treating one order, or all of them?
+  return,self.ORDER eq 0?self.cal->Orders(self.MODULE):self.ORDER
 end
 
 ;=============================================================================
@@ -2511,7 +2659,6 @@ pro CubeProj__define
      CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
      NSTEP:[0L,0L], $           ;parallel (col), perpendicular (row) steps
      STEP_SIZE: [0.0D,0.0D], $  ;parallel, perpendicular slit step sizes (deg)
-     SLIT_SIZE:[0.0D,0.0D], $   ;the parallel, perpendicular slit size (deg)
      PLATE_SCALE:0.0D, $        ;the plate scale (degrees/pixel)
      PR_SIZE:[0.0,0.0], $       ;the , parallel (long axis), perpendicular
                                 ; (short axis) size of the PRs to use (pixels)
@@ -2525,7 +2672,8 @@ pro CubeProj__define
                                 ; directory, in the "calib/" subdir)
      Changed:0b, $              ;if the project is changed since last saved.
      Spawned:0b, $              ;whether we were opened by another instance
-     feedback:0, $              ;whether to show feedback when building cube
+     feedback:0b, $             ;whether to show feedback when building cube
+     reconstructed_pos:0b, $    ;whether to build with reconstructed positions
      SaveFile:'', $             ;the file it was saved to
      sort:0b, $                 ;our sorting order
      version:'', $              ;the Cubism version of this cube
@@ -2549,14 +2697,16 @@ pro CubeProj__define
        REV_ACCOUNT: ptr_new(),$ ;reverse indices of the CUBE_INDEX histogram
        REV_MIN:0L, $            ;minimum cube index affected
        REV_CNT:0L, $            ;how many bins in the cube_index histogram?
-       CMD_POS: [0.0D,0.0D], $  ;Commanded RA,DEC position of slit center
+       RQST_POS: [0.0D,0.0D], $ ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
        FOVID: 0, $              ;The IRS Field of View ID
        TARGET_ORDER: 0, $       ;which order was targetted by pointing
                                 ;  (or 0 for module center targetting)
        TARGET_POS: 0, $         ;For low-res: 0, 1, or 2 for centered on
                                 ; module, slit position 1, or slit position 2
-       PA: 0.0D, $              ;Position angle of slit E of N
+       PA: 0.0D, $              ;Position angle of slit (+w?) E of N
+       PA_RQST: 0.0D, $         ;Requestion PA of slit (+w?)
+       AORKEY: 0L, $            ;the AOR ID KEY
        BCD: ptr_new(), $        ;the BCD
        ERROR:ptr_new(), $       ;the BCD's error image
        BMASK:ptr_new(), $       ;the BCD's BMASK image
@@ -2567,7 +2717,7 @@ pro CubeProj__define
        ROW:0L, $                ;the step number parallel to the slit
        DATE:0.0D, $             ;the date this BCD was added
        DATE_OBS:0.0D, $         ;the date this BCD was observed
-       HEADER: ptr_new()}       ;a pointer to a string array.
+       HEADER: ptr_new()}       ;a pointer to a string array
   
   ;; The widget info
   winfo={cubeProj_wInfo,$
@@ -2580,16 +2730,25 @@ pro CubeProj__define
          lines:0, $             ;number of list lines last set
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
-         MUST_SELECT:lonarr(15),$ ;the SW buttons which require any selected
+         MUST_SELECT:lonarr(16),$ ;the SW buttons which require any selected
          MUST_MULTISELECT:0L,$  ;must have more than one selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
          MUST_PROJ:0L, $        ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4)}   ;SW button requires valid cube created.
 
-    
   ;; XXX WCS STUFF SHOULD GO TOO
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),BCD:ptr_new(),ERROR:ptr_new()}
 end
+
+
+;; Switch to properties-based config using IDLitComponent
+;; Properties:
+;;   Cube Build:
+;;     Build Order(s)
+;;     Bonus Order (if appropriate)
+;;     Requested or Reconstructed Positions
+;;     Show feedback
+;;     Reconstructed Positions
