@@ -1,49 +1,26 @@
 ;+
-; NAME: tvPlug
+; NAME:
 ;
-; PURPOSE: An object interface for plug-in's to a draw widget.
-; 	These plug-in's may or may not send messages (via events or
-; 	otherwise
+;    tvPlug
 ;
-; CATEGORY: Object-Based Drawing Widget
+; DESCRIPTION:
 ;
-; CALLING SEQUENCE:
-; 
-; INPUTS:
+;    An object interface for plug-in's to a draw widget.  These
+;    plug-ins can receive ObjMsg message, and may or may not send
+;    messages themselves, but they are restricted to using the OMArray
+;    message helper class.  This means there message recipient lists
+;    are boolean values (either send the message, or don't).  See OMArray.
 ;
-; OPTIONAL INPUTS:
-;	
-; KEYWORD PARAMETERS:
+; CATEGORY: Object-Based Drawing Widget Plug-In
 ;
-; OUTPUTS:
-;
-; OPTIONAL OUTPUTS:
-;
-; COMMON BLOCKS:
-;
-; SIDE EFFECTS:
-;
-; RESTRICTIONS:
-;
-; INHERITANCE TREE: ObjMsg --> tvPlug
-;
-; EXAMPLE:
-;
-; MODIFICATION HISTORY:
 ;-
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
-;	Message.  Handle EXCLUSIVE messages for the plug-ins
+;	Message.  Just return the type for them.
 ;=============================================================================
 pro tvPlug::Message,msg, TYPE=type
   type=tag_names(msg,/STRUCTURE_NAME)
-  ;; if it's a change in exclusive message, which we'll handle for
-  ;; every type of plug-in.
-;   if type eq 'TVDRAW_EXCLUSIVE' then begin
-;      if msg.obj eq self then $  ;we are now the active exclusive
-;         self->On else if self.active then self->Off
-;   endif
 end
 
 ;=============================================================================
@@ -59,6 +36,7 @@ end
 ;=============================================================================
 pro tvPlug::On
   self.active=1b
+  self->MsgSend,{TVPLUG_ON_OFF,self,1b}
 end
 
 ;=============================================================================
@@ -66,6 +44,7 @@ end
 ;=============================================================================
 pro tvPlug::Off
   self.active=0b
+  self->MsgSend,{TVPLUG_ON_OFF,self,0b}
 end
 
 ;;*************************End OverRiding methods******************************
@@ -110,7 +89,9 @@ end
 ;=============================================================================
 pro tvPlug__define
   struct={tvPlug, $
+          INHERITS OMArray,$    ;helper class for ObjMsg
           INHERITS ObjMsg, $
           oDraw:obj_new(), $    ;the tvDraw object 
-          active:0b}            ;whether we're active
+          active:0b}            ;flag: whether we're active
+  message={TVPLUG_ON_OFF, Object:obj_new(), Status:0b} ;an on or off message.
 end
