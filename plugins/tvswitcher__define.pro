@@ -68,6 +68,7 @@ pro tvSwitcher::Toggle, hit
   if self->MsgListLen() eq 0 then return
   list=*self.MsgList
   obj=self->GetMsgListObj(list[hit])
+  if ~obj->Enabled() then return
   if list[hit].Exclusive then obj->On else $
      if obj->On() then obj->Off else obj->On
 end
