@@ -963,7 +963,6 @@ end
 pro CubeProj::LoadBadPixels,file,ERROR=err
   catch, err
   if err ne 0 then begin 
-     catch,/cancel
      if n_elements(un) ne 0 then free_lun,un
      self->Error,['Error loading bad pixel list from '+file,!ERROR_STATE.MSG],$
                  /RETURN_ONLY
@@ -974,6 +973,7 @@ pro CubeProj::LoadBadPixels,file,ERROR=err
         TITLE='Load Bad Pixels...',/NO_SHOW_ALL,SELECT=0, $
         /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
   endif 
+  catch,/cancel
   if size(file,/TYPE) ne 7 then return ;cancelled
   openr,un,file,/GET_LUN
   bp=lonarr(file_lines(file),/NOZERO)
@@ -1023,7 +1023,6 @@ end
 pro CubeProj::LoadBackGroundList,file,ERROR=err
   catch, err
   if err ne 0 then begin 
-     catch,/cancel
      if n_elements(un) ne 0 then free_lun,un
      self->Error,['Error loading background list from '+ $
                   file,!ERROR_STATE.MSG],$
@@ -1035,6 +1034,7 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err
         TITLE='Load Background List',/NO_SHOW_ALL,SELECT=0, $
         /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
   endif 
+  catch,/cancel
   if size(file,/TYPE) ne 7 then return ;cancelled
   openr,un,file,/GET_LUN
   bg=lonarr(file_lines(file),/NOZERO)
@@ -1923,7 +1923,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            SAVE_ACCOUNT=sa, DATE_OBS=dobs, BAD_PIXEL_LIST=bpl,$
                            ALL_RECORDS=all_recs,RECORDS=recs, $
                            RECORD_SET=rec_set, POINTER=ptr
-  ptr=keyword_set(ptr) 
+  ptr=keyword_set(ptr)
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
      account=ptr?self.account:*self.account
   if arg_present(wave) && ptr_valid(self.WAVELENGTH) then $
