@@ -19,12 +19,12 @@
 ; INPUT PARAMETERS:
 ;
 ;    low, high: Either the low and high normalized coordinates to
-;       scale to (one or two values each), or, if px_sz is passed, the
-;       normalized position and wavelength fiducial.
+;       scale to (one or two values each), or, if width is passed, the
+;       wavelength fiducial and normalized position.
 ;
 ; OPTIONAL INPUT PARAMETERS:
 ;
-;    pix_sz: The size of the aperture in pixels at the wavelength
+;    width: The normalized width of the aperture at the wavelength
 ;       fiducial.  If this argument is passed, a scaled wavelength
 ;       aperture is returned, otherwise a normal aperture is returned.
 ;
@@ -39,7 +39,7 @@
 ; EXAMPLE:
 ;
 ;    st=irs_aperture(.1,[.8,.7])  ; normal ap: left edge@.1, right .8->.7
-;    st2=irs_aperture(.3,18.,4.5) ; wave-scaled ap: 4.5pix @ 18um, centered .3
+;    st2=irs_aperture(18.,.3,.7) ; wave-scaled ap: 70% @ 18um, centered @0.3
 ;
 ; MODIFICATION HISTORY:
 ;
@@ -69,10 +69,11 @@
 ;
 ;##############################################################################
 
-function irs_aperture, low, high, px_sz
+function irs_aperture, low, high, width
   ap={IRS_APERTURE}
-  if keyword_set(px_sz) then begin 
-     ap.scaled=[low,high,px_sz]
+  if keyword_set(width) then begin 
+     ap.wavscl=1b
+     ap.scale=[width,low,high]
   endif else begin 
      if n_elements(low) eq 1 then low=[low,low]
      if n_elements(high) eq 1 then high=[high,high]
