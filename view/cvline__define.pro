@@ -104,24 +104,17 @@ end
 ;  UpdateWAVSAMP - Get the new cube's WAVSAMP list (all orders)
 ;=============================================================================
 pro cvLine::UpdateWAVSAMP
-  self.cube->GetProperty,APERTURE=aps,CALIB=cal
   if ptr_valid(self.PRs) then heap_free,self.PRs
-  
-  self.cube->GetProperty,APERTURE=aps,CALIB=cal
-  nap=n_elements(aps)
-  ords=cal->Orders(self.MODULE)
-  nords=n_elements(ords)
+  prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords)
+  nords=n_elements(prs) 
   self.PRs=ptr_new(replicate({ORDER:0,PRs:ptr_new(),MIN:[0.,0.],MAX:[0.,0.], $
                               RANGE:ptr_new()},nords))
   for ord=0,nords-1 do begin
-     if nap gt 0 then ap=nap eq 1?aps[0]:aps[ord]
-     ;; What about PR width? Probably the cube should tell us this.
-     prs=cal->GetWAVSAMP(self.MODULE,ords[ord],/PIXEL_BASED,APERTURE=ap)
-     minx=min(prs.x,DIMENSION=1,max=maxx)
-     miny=min(prs.y,DIMENSION=1,max=maxy)
+     minx=min((*prs[ord]).x,DIMENSION=1,max=maxx) ; min and max
+     miny=min((*prs[ord]).y,DIMENSION=1,max=maxy) ; for each PR sample
      (*self.PRs)[ord].RANGE=ptr_new([transpose(minx),transpose(miny), $
                                      transpose(maxx),transpose(maxy)])
-     (*self.PRs)[ord].PRs=ptr_new(prs,/NO_COPY)
+     (*self.PRs)[ord].PRs=prs[ord]
      minx=min(minx)& maxx=max(maxx) ;for the order in general
      miny=min(miny) & maxy=max(maxy)
      (*self.PRs)[ord].MIN=[minx,miny]
@@ -172,6 +165,7 @@ end
 ;=============================================================================
 pro cvLine::Cleanup
   heap_free,self.PRs
+  self->tvPlug_lite::Cleanup
 end
 
 ;=============================================================================
