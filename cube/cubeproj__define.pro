@@ -74,11 +74,13 @@
 ;
 ; EXAMPLE:
 ;
-;    a=some_init()
-;    CUBISM_ROUTINE,a,b,KEYWORD=foo
-;    print,foo
-;
+;    a=obj_new('CubeProj')
+;    a->Show
+;    
 ; MODIFICATION HISTORY:
+;
+;    2003-12-05 (J.D. Smith): Position based-offsets and realisted
+;      header parsing.
 ;
 ;    2002-12-06 (J.D. Smith): Communication with CubeView, per-BCD
 ;      accounting for speed and flexibility, enable/disable BCD
