@@ -280,9 +280,8 @@ pro CubeViewSpec::Event,ev
         return
      end 
      
-     self.wSaveBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0,0}
-     self.wSaveASCBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0,1}
-     self.wExportBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,1,0}
+     self.wSaveBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0}
+     self.wExportBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,1}
      
      self.wToggles: self->Plot
 
@@ -1008,8 +1007,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
                        SET_VALUE=0,/NO_RELEASE)
   
   file=widget_button(mbar,value='File',/MENU)
-  self.wSaveBut=widget_button(file,value='Save Spectrum as FITS...')
-  self.wSaveASCBut=widget_button(file,value='Save Spectrum as ASCII...')
+  self.wSaveBut=widget_button(file,value='Save Spectrum As...')
   self.wExportBut=widget_button(file,SENSITIVE=~LMGR(/VM,/RUNTIME),  $
                                 value='Export Spectrum to Command Line...')
   self.wQuit=widget_button(file,value='Quit')
@@ -1151,7 +1149,6 @@ pro CubeViewSpec__define
       wFull:0L, $               ;widget id for selecting full mode
       wParams:0L , $            ;widget where the fitted parameters are listed
       wSaveBut:0L, $            ;save to fits
-      wSaveASCBut:0L,$          ;save to ascii
       wExportBut:0L, $          ;export spectrum button
       colors_base:0L}           ;5 linear shades
   
@@ -1170,5 +1167,5 @@ pro CubeViewSpec__define
        wavelength:0.0}          ;the wavelength we're at
   
   msg={CUBEVIEWSPEC_SAVE, $     ;save the current extraction
-       export:0, ascii:0}
+       export:0}
 end
