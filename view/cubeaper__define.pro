@@ -165,43 +165,60 @@ pro CubeAper::Message, msg
            self->Off            ;no longer relevant
            return
         endif 
-        self.cube=msg.cube
-        self.cube->GetProperty,APERTURE=aps,CALIB=cal,SLIT_LENGTH=sl
-        if ptr_valid(self.prs) then begin 
-           if ptr_valid(self.orders) then ords_old=*self.orders
-           ptr_free,*self.prs,self.prs,self.orders
-        endif
-        self.slit_length=sl
-        nords_old=self->NOrds()
-        self.prs=ptr_new(self.cube->PRs(ORDERS=ords,/FULL))
-        nords=n_elements(ords) 
-        if nords ne nords_old then begin 
-           ptr_free,self.bottom_corners,self.top_corners,self.sides
-           self.bottom_corners=ptr_new(fltarr(4,nords,/NOZERO))
-           self.top_corners=ptr_new(fltarr(4,nords,/NOZERO))
-           self.sides=ptr_new(fltarr(4,nords,/NOZERO))
-        endif            
-        if nords_old gt 0 && ~array_equal(ords_old,ords) then $
-           begin 
-           ;; A new order, set wavelength and wavescl position to something
-           ;; sensible
-           lambda=(*(*self.prs)[0]).lambda
-           self.wavscl_pos=n_elements(lambda)/2
-        endif 
-        self.orders=ptr_new(ords,/NO_COPY)
-        ptr_free,self.aps
-        widget_control, self.wWSBut,GET_VALUE=val
-        val[2]=n_elements(aps) eq 1 ;should lock be an option?
-        val[3]=~array_equal(aps.wavscl,0) ;do we have wavelength scaling?
-        self.mode=(self.mode AND 3b) OR ishft(val[2],2) OR ishft(val[3],3)
-        widget_control, self.wWSBut,SET_VALUE=val
-        self.aps=ptr_new(aps,/NO_COPY)
-        
-        self->UpdateApDrop
-        self.cal=cal
-        ;if self.mode AND 1b then self.oDraw->ReDraw,/SNAPSHOT
+        if self.cube ne msg.cube then begin 
+           self.cube=msg.cube
+           self.cube->GetProperty,WAVECUT=wc
+           self.wavecut=wc
+           self->UpdatePRInfo
+        endif else if msg.calib_update then self->UpdatePRInfo
      end
   endcase 
+end
+
+;=============================================================================
+;  UpdatePRInfo - Update all info on the PRs from the cube.
+;============================================================================
+pro CubeAper::UpdatePRInfo,NO_BUTTON_UPDATE=nbu
+  self.cube->GetProperty,APERTURE=aps,CALIB=cal,SLIT_LENGTH=sl
+  if ptr_valid(self.prs) then begin 
+     if ptr_valid(self.orders) then ords_old=*self.orders
+     ptr_free,*self.prs,self.prs,self.orders
+  endif
+  ;;print,'UPDATING PRS, etc for Aper'
+  self.slit_length=sl
+  nords_old=self->NOrds()
+  self.prs=ptr_new(self.cube->PRs(ORDERS=ords,/FULL,WAVECUT=self.wavecut))
+  nords=n_elements(ords) 
+  if nords ne nords_old then begin 
+     ptr_free,self.bottom_corners,self.top_corners,self.sides
+     self.bottom_corners=ptr_new(fltarr(4,nords,/NOZERO))
+     self.top_corners=ptr_new(fltarr(4,nords,/NOZERO))
+     self.sides=ptr_new(fltarr(4,nords,/NOZERO))
+  endif            
+  lambda=(*(*self.prs)[0]).lambda
+  if (nords_old gt 0 && ~array_equal(ords_old,ords)) || $
+     self.wavscl_pos ge n_elements(lambda) then begin 
+     ;; A new order, set wavelength and wavescl position to something
+     ;; sensible
+     self.wavscl_pos=n_elements(lambda)/2
+  endif 
+  self.orders=ptr_new(ords,/NO_COPY)
+  ptr_free,self.aps
+  
+  ;; Update button status based on new apertures which have arrived
+  if ~keyword_set(nbu) then begin 
+     widget_control, self.wWSBut,GET_VALUE=val
+     val[2]=n_elements(aps) eq 1 ;should lock be an option?
+     val[3]=~array_equal(aps.wavscl,0) ;do we have wavelength scaling?
+     val[4]=self.wavecut
+     self.mode=(self.mode AND 3b) OR ishft(val[2],2) OR ishft(val[3],3)
+     widget_control, self.wWSBut,SET_VALUE=val
+  endif 
+  
+  self.aps=ptr_new(aps,/NO_COPY)
+  self->UpdateApDrop
+  self.cal=cal
+  ;;if self.mode AND 1b then self.oDraw->ReDraw,/SNAPSHOT
 end
 
 ;=============================================================================
@@ -239,6 +256,11 @@ end
 ;============================================================================
 function CubeAper_Event,ev
   widget_control, ev.id,get_uvalue=self
+  catch,err
+  if err ne 0 then begin 
+     catch,/cancel
+     self->Error,!ERROR_STATE.MSG
+  endif 
   call_method,'Event',self,ev
   return,1
 end
@@ -297,9 +319,14 @@ pro CubeAper::Event,ev
               (*self.aps)[i].scale=[len,wav,cen]
            endif 
         endfor 
+        self->UpdateApDrop
         self.oDraw->ReDraw,/SNAPSHOT
         if self.working_on ge 0 then self->DrawOneWS,self.working_on
      endif 
+  endif else if ev.value eq 4 then begin ; Trim wavelengths
+     self.wavecut=val[4]
+     self->UpdatePRInfo,/NO_BUTTON_UPDATE
+     self.oDraw->ReDraw,/SNAPSHOT
   endif 
 end
 
@@ -408,8 +435,8 @@ end
 ;  SetAper - Set the Aperture into the cube
 ;=============================================================================
 pro CubeAper::SetAper
-  if NOT obj_valid(self.cube) then return
-  if NOT ptr_valid(self.aps) then return
+  if ~obj_valid(self.cube) then return
+  if ~ptr_valid(self.aps) then return
   self.cube->SetProperty,APERTURE=*self.aps
 end
 
@@ -455,20 +482,18 @@ function CubeAper::Init,parent,oDraw,COLOR=color
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   self.working_on=-1
   cbase=widget_base(parent,/COLUMN,SPACE=1,/BASE_ALIGN_CENTER,/FRAME)
-  toprbase=widget_base(cbase,/ROW,SPACE=1,/BASE_ALIGN_CENTER)
-  lab=widget_label(toprbase,value='WAVSAMP:')
+  toprbase=widget_base(cbase,/ROW,SPACE=0)
+  lab=widget_label(toprbase,value='WS:',/ALIGN_LEFT)
   self.wapDrop=widget_droplist(toprbase,VALUE='--- : ____->____:____->____', $
                                EVENT_PRO='CubeAper_DiscardEvent')
-
-  bottomrbase=widget_base(cbase,/ROW,SPACE=1,/BASE_ALIGN_CENTER) 
-  self.wWSBut=cw_bgroup(bottomrbase,['Show','Edit','Lock','WavScl'], $
-                        /NONEXCLUSIVE, $
-                        IDS=ids,EVENT_FUNC='cubeaper_event',/ROW,SPACE=1, $
-                        UVALUE=self)
-  but=cw_bgroup(bottomrbase,['Reset'],UVALUE=self, /NO_RELEASE,$
+  but=cw_bgroup(toprbase,['Reset'],UVALUE=self, /NO_RELEASE,$
                 EVENT_FUNC='CubeAper_SetEvent',/COLUMN, $
                 BUTTON_UVALUE=['SetFull'])
 
+  self.wWSBut=cw_bgroup(cbase,['Show','Edit','Lock','WvScl','WvTrim'], $
+                        /NONEXCLUSIVE, $
+                        IDS=ids,EVENT_FUNC='cubeaper_event',/ROW,SPACE=0, $
+                        UVALUE=self)
   widget_control, ids[2],SENSITIVE=0
   if n_elements(color) ne 0 then self.color=color
   self.wWSButs=ids
@@ -488,8 +513,9 @@ pro CubeAper__define
       sides:ptr_new(), $        ;the device coords of the side handles (4xn)
       save:[0,0], $             ;a saved device X coordinate
       wavscl_pos:0L,$           ;the index of the wavscl
+      wavecut: 0b, $            ;whether to show trimmed PR sets
       wWSBut:0L, $              ;the button group
-      wWSButs:lonarr(4), $      ;The WAVSAMP buttons
+      wWSButs:lonarr(5), $      ;The WAVSAMP buttons
       wapDrop:0L, $             ;aperture droplist
       aps:ptr_new(), $          ;The aperture(s) (1 or n)
       prs:ptr_new(), $          ;The lists of pseudo-rects, for each order (n)
