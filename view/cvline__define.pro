@@ -1,0 +1,204 @@
+;=============================================================================
+;  Message - Display the values.  We have signed up for motion and
+;            tracking messages, and will hear from the CubeRec widget
+;            on changes in mode, etc.
+;=============================================================================
+pro cvLine::Message,msg
+  self->tvPlug_lite::Message,msg,TYPE=type ;pass it up
+  case type of 
+     'CUBEREC_UPDATE': begin    ;cuberec tells us about new bcd's/cubes
+        self.bcd_mode=msg.bcd_mode
+        self.module=msg.module
+        self.cube=msg.cube
+        if self.bcd_mode then self->UpdateWAVSAMP ;possibly a new one
+     end
+     
+     'DRAW_MOTION': begin 
+        self.oDraw->GetProperty,IMORIG=imorig
+        if NOT ptr_valid(imorig) then return
+        pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING,/FRACTIONAL)
+        if pt[0] eq -1 then begin ;not showing
+           widget_control, self.wLine,set_value=' '
+           self.savpoint=[-1,-1] ;ensure rentry works
+           return
+        endif
+        if self.bcd_mode then begin ;bcd mode
+           pr=self->FindPR(pt[0],pt[1],ORDER=order)
+           if array_equal(pt,self.savpoint) then begin 
+              if size(pr,/TYPE) ne 8 then return
+              if pr.lambda eq self.savlambda AND order eq self.savorder then $
+                 return         ;nothing to see here, move along
+           endif 
+           if size(pr,/TYPE) ne 8 then begin 
+              lambda=0. & order=0
+           endif else lambda=pr.lambda
+           widget_control, self.wLine,SET_VALUE= $
+                           self->String(imorig,pt,LAMBDA=lambda,ORDER=order)
+           self.savlambda=lambda & self.savorder=order & self.savpoint=pt
+        endif else begin        ; wcs mode
+           ;; ra/dec always get updated.
+           widget_control, self.wLine,set_value=self->ValString(imorig,pt)
+        endelse 
+     end
+     
+     'WIDGET_TRACKING': begin 
+        if msg.enter eq 0 then begin ;just left window -- clear status line
+           widget_control,self.wLine,set_value=' '
+           self.savpoint=[-1,-1]
+           self.savlambda=0.0
+           self.savorder=-1
+        endif 
+     end
+     
+     'TVDRAW_POSTDRAW': begin
+        if self.savpoint[0] eq -1 then return ;not on a point
+        self.oDraw->GetProperty,IMORIG=imorig
+        if self.bcd_mode then begin 
+           widget_control, self.wLine, $
+                           set_value=self->String(imorig,self.savpoint, $
+                                                  LAMBDA=self.savlambda, $
+                                                  ORDER=self.savorder)
+        endif else begin 
+        endelse 
+     end
+  endcase 
+end 
+
+;=============================================================================
+;  FindPR - Find the relevant PR which contains point, if any.
+;=============================================================================
+function cvLine::FindPR,x,y,ORDER=ord
+  !EXCEPT=2
+  ;; Global order min/max cut
+  wh=where(x ge (*self.PRs).MIN[0,*] AND $
+           y ge (*self.PRs).MIN[1,*] AND $
+           x le (*self.PRs).MAX[0,*] AND $
+           y le (*self.PRs).MAX[1,*],ocnt)
+  if ocnt eq 0 then return,-1
+  
+  ;; Go through the matching orders and return first PR with the point
+  ;; inside it (if any)
+  for i=0,ocnt-1 do begin       
+     theseprs=*(*self.PRs)[wh[i]].PRs
+     theserange=*(*self.PRs)[wh[i]].RANGE
+     whclose=where(x ge theserange[0,*] AND y ge theserange[1,*] AND $
+                   x le theserange[2,*] AND y le theserange[3,*],cnt)
+     if cnt eq 0 then continue
+     for j=0,cnt-1 do begin 
+        thispr=theseprs[whclose[j]]
+        xp=thispr.x & yp=thispr.y
+        yp2=shift(yp,1) & xp2=shift(xp,1)
+        ;; Check for odd number of crossings (remember odd numbers are true!)
+        if fix(total(((yp le y AND y lt yp2) OR (yp2 le y AND y lt yp)) AND $
+                     (x lt ((xp2 - xp)*(y - yp)/((yp2 - yp)>1) + xp)))) $
+           then begin 
+           ord=(*self.PRs)[wh[i]].ORDER
+           return,thispr
+        endif 
+     endfor 
+  endfor 
+  return,-1
+end
+
+;=============================================================================
+;  UpdateWAVSAMP - Get the new cube's WAVSAMP list (all orders)
+;=============================================================================
+pro cvLine::UpdateWAVSAMP
+  self.cube->GetProperty,APERTURE=aps,CALIB=cal
+  if ptr_valid(self.PRs) then heap_free,self.PRs
+  
+  self.cube->GetProperty,APERTURE=aps,CALIB=cal
+  nap=n_elements(aps)
+  ords=cal->Orders(self.MODULE)
+  nords=n_elements(ords)
+  self.PRs=ptr_new(replicate({ORDER:0,PRs:ptr_new(),MIN:[0.,0.],MAX:[0.,0.], $
+                              RANGE:ptr_new()},nords))
+  for ord=0,nords-1 do begin
+     if nap gt 0 then ap=nap eq 1?aps[0]:aps[ord]
+     ;; What about PR width? Probably the cube should tell us this.
+     prs=cal->GetWAVSAMP(self.MODULE,ords[ord],/PIXEL_BASED,APERTURE=ap)
+     minx=min(prs.x,DIMENSION=1,max=maxx)
+     miny=min(prs.y,DIMENSION=1,max=maxy)
+     (*self.PRs)[ord].RANGE=ptr_new([transpose(minx),transpose(miny), $
+                                     transpose(maxx),transpose(maxy)])
+     (*self.PRs)[ord].PRs=ptr_new(prs,/NO_COPY)
+     minx=min(minx)& maxx=max(maxx) ;for the order in general
+     miny=min(miny) & maxy=max(maxy)
+     (*self.PRs)[ord].MIN=[minx,miny]
+     (*self.PRs)[ord].MAX=[maxx,maxy]
+     (*self.PRs)[ord].ORDER=ords[ord]
+  endfor
+end
+
+
+;=============================================================================
+;  String - The total string
+;=============================================================================
+function cvLine::String, im,point,LAMBDA=lambda,ORDER=order,RA=ra,DEC=dec
+  if NOT array_equal(point,self.savpoint) then $
+     self.valstring=self->ValString(im,point)
+  return,self.valstring+' | '+(self.bcd_mode?self->PRString(lambda,order):$
+                             self->WCSString(ra,dec))
+  
+end
+
+;=============================================================================
+;  ValString - The string value associated with point X,Y
+;=============================================================================
+function cvLine::ValString, im,point
+  pt=floor(point)
+  return,string(FORMAT='("(",I3,",",I3,") ",G14.8)',pt, $
+                (*im)[pt[0],pt[1]])
+end
+
+;=============================================================================
+;  PRString - The string value associated with wavelength and order
+;=============================================================================
+function cvLine::PRString, lambda,order
+  if order eq 0 then $
+     return,string(FORMAT='(%"%6sum (ord %2s)")','___','__')  else $
+     return,string(FORMAT='(%"%6.3fum (ord %d)")',lambda,order)
+end
+
+;=============================================================================
+;  WCSString - The string value associated with the position
+;=============================================================================
+function cvLine::WCSString, ra,dec
+  return,radecstring(ra,/RA)+' '+radecstring(dec)
+end
+
+;=============================================================================
+;  Cleanup
+;=============================================================================
+pro cvLine::Cleanup
+  heap_free,self.PRs
+end
+
+;=============================================================================
+;  Init - Initialize the line.
+;=============================================================================
+function cvLine::Init,parent,oDraw,_EXTRA=e
+  if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
+  self.wLine=widget_label(parent,value=' ',/dynamic_resize)
+  ;; specify motion, tracking and postdraw events... we're always on
+  self.oDraw->MsgSignup,self,/DRAW_MOTION,/WIDGET_TRACKING,/TVDRAW_POSTDRAW
+  return,1
+end 
+
+;=============================================================================
+;  cvLine__define - Prototype the cvLine class.
+;=============================================================================
+pro cvLine__define
+  struct={cvLine, $ 
+          INHERITS tvPlug_lite,$ ;make it a plug-in
+          savpoint: [0,0], $    ;point to save
+          savorder:0, $         ;the saved order found
+          savlambda:0.0, $     ;the saved WL found
+          valstring:'', $       ;the array value string
+          bcd_mode:0, $         ;whether bcd or cube mode
+          PRs:ptr_new(), $      ;all the pseudo-rectangles
+          cube:obj_new(), $     ;
+          module:'', $          ;the module that came with the latest bcd/cube
+          wLine:0L}             ;widget id of text line
+  return
+end
