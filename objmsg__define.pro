@@ -276,6 +276,9 @@
 ;
 ; MODIFICATION HISTORY:
 ;    $Log$
+;    Revision 1.6  2001/08/17 22:49:19  jdsmith
+;            Sped up MsgRemove with array formulation.  Minor other changes.
+;
 ;    Revision 1.5  2001/08/02 17:34:40  jdsmith
 ;    	Added GetRecord.
 ;
@@ -325,21 +328,21 @@
 ;      The term 'message' encapsulates both flavors.
 ;============================================================================= 
 pro ObjMsg::MsgSend,msg
-   ;; don't do a MsgListClean -- for speed reasons... this can be done
-   ;; during all other list operations.
-   if NOT ptr_valid(self.MsgList) then return 
-   sendlist=self->MsgSendWhich(msg)
-   if size(sendlist,/TYPE) ne 11 then return ;an object list *not* returned
-   
-   ;; Compile something in here like this to debug...
+  ;; don't do a MsgListClean -- for speed reasons... this can be done
+  ;; during all other list operations.
+  if NOT ptr_valid(self.MsgList) then return 
+  sendlist=self->MsgSendWhich(msg)
+  if size(sendlist,/TYPE) ne 11 then return ;an object list *not* returned
+  
+  ;; Compile something in here like this to debug...
 ;   if tag_names(msg,/STRUCTURE_NAME) ne 'WIDGET_DRAW' then begin 
 ;      print,obj_class(self),': sending to: ',sendlist, ' message'
 ;      help,/st,msg
 ;      help, /TRACEBAC
 ;   endif 
-   
-   ;send all the messages
-   for i=0,n_elements(sendlist)-1 do sendlist[i]->Message,msg  
+  
+                                ;send all the messages
+  for i=0,n_elements(sendlist)-1 do sendlist[i]->Message,msg  
 end
 
 ;=============================================================================
@@ -347,22 +350,23 @@ end
 ;      are to be sent the given message, and return that list of objects.
 ;============================================================================= 
 function ObjMsg::MsgSendWhich,msg
-   return,self->GetObj(*self.MsgList) ;defaults to all of them !
+  return,self->GetObj(*self.MsgList) ;defaults to all of them !
 end
 
 ;=============================================================================
 ;      MsgList - Get Current Message list
 ;=============================================================================
 pro ObjMsg::GetProperty,MsgList=msglist
-   if arg_present(msglist) then msglist=self.MsgList 
+  if arg_present(msglist) then msglist=self.MsgList 
 end
 
 ;=============================================================================
 ;      GetRecord - Return Message Recipient record for obj, if exists.
 ;      Otherwise return -1.
 ;=============================================================================
-pro ObjMsg::GetRecord,obj
-  wh=where(self->GetMsgObjs() eq obj,cnt)
+function ObjMsg::GetRecord,obj
+  if NOT self->MsgListClean() then return,-1
+  wh=where(self->GetObj(*self.MsgList) eq obj,cnt)
   if cnt eq 0 then return,-1
   return,(*self.MsgList)[wh[0]]
 end
@@ -371,8 +375,8 @@ end
 ;      MsgListLen - Return Length of current message list
 ;=============================================================================
 function ObjMsg::MsgListLen
-   if self->MsgListClean() then return,n_elements(*self.MsgList) else  $
-    return,0
+  if self->MsgListClean() then return,n_elements(*self.MsgList) else  $
+     return,0
 end
 
 ;=============================================================================
@@ -380,23 +384,23 @@ end
 ;      list is no longer defined, 1 if it is defined.
 ;=============================================================================
 function ObjMsg::MsgListClean
-   if ptr_valid(self.MsgList) then begin 
-      list=self->GetObj(*self.MsgList)
-      wh=where(obj_valid(list),cnt)
-      if cnt ne 0 then begin    ;some are valid
-         ;; find the ObjMsg's on the list.
-         wh2=where(obj_isa(list[wh],'ObjMsg'),cnt)
-         if cnt ne 0 then begin ;we have some valid ObjMsg objects.
-            ;; remove danglers
-            if cnt ne n_elements(list) then  $
-             *self.MsgList=(*self.MsgList)[wh[wh2]]
-         endif else ptr_free,self.MsgList
-      endif else begin 
-         ptr_free,self.MsgList 
-         return, 0
-      endelse 
-   endif else return,0
-   return,1                     ;only get here if a valid list remains.
+  if ptr_valid(self.MsgList) then begin 
+     list=self->GetObj(*self.MsgList)
+     wh=where(obj_valid(list),cnt)
+     if cnt ne 0 then begin     ;some are valid
+        ;; find the ObjMsg's on the list.
+        wh2=where(obj_isa(list[wh],'ObjMsg'),cnt)
+        if cnt ne 0 then begin  ;we have some valid ObjMsg objects.
+           ;; remove danglers
+           if cnt ne n_elements(list) then  $
+              *self.MsgList=(*self.MsgList)[wh[wh2]]
+        endif else ptr_free,self.MsgList
+     endif else begin 
+        ptr_free,self.MsgList 
+        return, 0
+     endelse 
+  endif else return,0
+  return,1                      ;only get here if a valid list remains.
 end
 
 ;=============================================================================
@@ -408,52 +412,44 @@ end
 ;      is provided to extract the object reference.
 ;============================================================================= 
 pro ObjMsg::MsgList, owObjlist  
-   pvalid=self->MsgListClean()  ;clean and check for a valid list
-   no=n_elements(owObjlist)
-   if no ne 0 then addobs=self->GetObj(owObjlist) else return
-   oi=Obj_Isa(addobs,'ObjMsg')
-   bad=where(oi eq 0,cnt)
-   if cnt gt 0 then begin
-      if cnt gt 1 then m='s are' else m=' is'
-      print,owObjlist[bad]
-      message,'Specified object'+m+' not derived from ObjMsg... Not added',$
-       /INFO
-   endif 
-   good=where(oi eq 1,cnt)
-   if cnt eq 0 then return 
-   addobs=addobs[good]
-   if NOT pvalid then self.MsgList=Ptr_New(owObjlist[good]) else begin 
-      for i=0,cnt-1 do begin    ; add or modify an existing list
-         listobs=self->GetObj(*self.MsgList)
-         wh=where(listobs eq addobs[i],cnt) ;object already in the list?
-         ;; *** Append recipient, or replace with possibly new 
-         ;; here we trust that wh is a single element... no object ever gets
-         ;; two entries in the list, so this should always be true
-         if cnt eq 0 then *self.MsgList=[*self.MsgList,owObjlist[i]] $
-         else (*self.MsgList)[wh[0]]=owObjlist[i] 
-      endfor
-   endelse  
+  pvalid=self->MsgListClean()   ;clean and check for a valid list
+  no=n_elements(owObjlist)
+  if no ne 0 then addobs=self->GetObj(owObjlist) else return
+  oi=Obj_Isa(addobs,'ObjMsg')
+  bad=where(oi eq 0,COMPLEMENT=good,cnt)
+  if cnt gt 0 then begin
+     if cnt gt 1 then m='s are' else m=' is'
+     print,owObjlist[bad]
+     message,'Specified object'+m+' not derived from ObjMsg... Not added',$
+             /INFO
+  endif 
+  if good[0] eq -1 then return 
+  addobs=addobs[good]
+  if NOT pvalid then self.MsgList=Ptr_New(owObjlist[good]) else begin 
+     listobs=self->GetObj(*self.MsgList)
+     for i=0,n_elements(addobs)-1 do begin ; add or modify an existing list
+        wh=where(listobs eq addobs[i],cnt) ;object already in the list?
+        ;; *** Append recipient, or replace with possibly new 
+        ;; here we trust that wh is a single element... no object ever gets
+        ;; two entries in the list, so this should always be true
+        if cnt eq 0 then begin 
+           listobs=[listobs,addobs[i]]
+           *self.MsgList=[*self.MsgList,owObjlist[i]] 
+        endif else (*self.MsgList)[wh[0]]=owObjlist[i] 
+     endfor
+  endelse  
 end
 
 ;=============================================================================
 ;      MsgRemove - Remove an ObjMsg inherited object from the
 ;      message recipient list
 ;============================================================================= 
-pro ObjMsg::MsgRemove, owObjlist
-   if NOT self->MsgListClean() then return ;none left to remove !
-   no=n_elements(owObjlist) 
-   if no ne 0 then rmobs=self->GetObj(owObjlist) else return
-   listobs=self->GetObj(*self.MsgList)
-   for i=0,no-1 do begin  
-      nl=n_elements(*self.MsgList) 
-      wh=where(listobs ne rmobs[i],cnt)
-      if cnt ne 0 then begin    ; remove it, *if* it existed
-         if cnt ne nl then *self.MsgList=(*self.MsgList)[wh] 
-      endif else begin          ;removing *all* list members
-         ptr_free,self.MsgList  ;free the list (no more members)
-         return  ;; no need to stick around
-      endelse 
-   endfor 
+pro ObjMsg::MsgRemove, rmobjs
+  if NOT self->MsgListClean() then return ;none left to remove !
+  listobjs=self->GetObj(*self.MsgList)
+  wh=where_not_array([rmobjs],[listobjs],cnt)
+  if cnt eq 0 then ptr_free,self.MsgList else $
+     *self.MsgList=(*self.MsgList)[wh] 
 end
 
 ;=============================================================================
@@ -462,16 +458,16 @@ end
 ;      to do something useful with them.
 ;=============================================================================
 pro ObjMsg::Message, ev
-   ;; Efficient ObjMsg derivatives should limit the number of possible
-   ;; messages sent. It is the programmer's responsibility to know
-   ;; which messages are sent from an object, and to send appropriate
-   ;; messages of its own.  This may involve a more complex message
-   ;; recipient list.  For instance, an ObjMsg derivative which
-   ;; contains a draw widget might summarize the different possible
-   ;; messages (e.g draw events) with a Long int flag, allow requests
-   ;; for any combination of those possible messages, and turn on and
-   ;; off the associated widget events in accordance with the status
-   ;; of that event request list.
+  ;; Efficient ObjMsg derivatives should limit the number of possible
+  ;; messages sent. It is the programmer's responsibility to know
+  ;; which messages are sent from an object, and to send appropriate
+  ;; messages of its own.  This may involve a more complex message
+  ;; recipient list.  For instance, an ObjMsg derivative which
+  ;; contains a draw widget might summarize the different possible
+  ;; messages (e.g draw events) with a Long int flag, allow requests
+  ;; for any combination of those possible messages, and turn on and
+  ;; off the associated widget events in accordance with the status
+  ;; of that event request list.
 end
 
 ;=============================================================================
@@ -481,7 +477,7 @@ end
 ;      data types. 
 ;============================================================================= 
 function ObjMsg::GetObj,msglist
-   return, msglist
+  return, msglist
 end
 
 ;=============================================================================
@@ -491,50 +487,49 @@ end
 ;      returned.
 ;============================================================================= 
 function ObjMsg::GetMsgObjs, CLASS=class
-   if NOT self->MsgListClean() then return,-1 ;none on here
-   objs=self->GetObj(*self.msglist) ;get the objects on our list.
-   if size(class,/TYPE) eq 7 then begin
-      wh=where(obj_isa(objs,class),cnt)
-      if cnt eq 0 then return,-1
-      return,objs[wh]
-   endif 
-   return,objs
+  if NOT self->MsgListClean() then return,-1 ;none on here
+  objs=self->GetObj(*self.MsgList) ;get the objects on our list.
+  if size(class,/TYPE) eq 7 then begin
+     wh=where(obj_isa(objs,class),cnt)
+     if cnt eq 0 then return,-1 else return,objs[wh]
+  endif 
+  return,objs
 end
 
 ;=============================================================================
 ;      Init - Initialize the object, and add to the list.
 ;============================================================================= 
 function ObjMsg::Init,MsgList=ml
-   s=n_elements(ml)
-   if s eq 0 then return,1
-   objlist=self->GetObj(ml)
-   wh=where(obj_isa(objlist,'ObjMsg') eq 0, cnt)
-   if cnt gt 0 then begin
-      if cnt gt 1 then m='s are' else m=' is'
-      print,objlist[wh]
-      message,'Specified object'+m+' not derived from ObjMsg.',/INFO
-      return,0
-   endif 
-   self.MsgList=ptr_new(ml)     ;allocate the good list
-   return,1
+  s=n_elements(ml)
+  if s eq 0 then return,1
+  objlist=self->GetObj(ml)
+  wh=where(obj_isa(objlist,'ObjMsg') eq 0, cnt)
+  if cnt gt 0 then begin
+     if cnt gt 1 then m='s are' else m=' is'
+     print,objlist[wh]
+     message,'Specified object'+m+' not derived from ObjMsg.',/INFO
+     return,0
+  endif 
+  self.MsgList=ptr_new(ml)      ;allocate the good list
+  return,1
 end
 
 ;=============================================================================
 ;      Cleanup - Cleanup the object, destroy the message list.
 ;============================================================================= 
 pro ObjMsg::Cleanup
-   if self->MsgListClean() then begin
-      ptr_free,self.MsgList
-   endif    
+  if self->MsgListClean() then begin
+     ptr_free,self.MsgList
+  endif    
 end
 
 ;=============================================================================
 ;      __define - define the ObjMsg Class structure.
 ;============================================================================= 
 pro ObjMsg__define
-   ;; define a class with a generic, redefineable,  message recipient list, for
-   ;; receipt and delivery of object messages.
-   struct={ObjMsg, $
-           MsgList:Ptr_New()}   ;the list -- elements are of unspecified type
-   return
+  ;; define a class with a generic, redefineable,  message recipient list, for
+  ;; receipt and delivery of object messages.
+  struct={ObjMsg, $
+          MsgList:Ptr_New()}    ;the list -- elements are of unspecified type
+  return
 end
