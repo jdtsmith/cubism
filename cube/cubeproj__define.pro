@@ -11,7 +11,8 @@
 ; DESCRIPTION:
 ;    
 ;    A wrapper for CUBISM spectral mapping projects, containing the
-;    input data, and the routines to convert them into spectral cubes.
+;    input BCD and calibration data, along with the routines to
+;    convert them into spectral cubes.
 ;    
 ; CATEGORY:
 ;
@@ -19,7 +20,7 @@
 ;    	
 ; SIDE EFFECTS:
 ;
-;    Especially for procedures with no return values.  May be unnecessary.
+;    A GUI interface to CubeProj is available.
 ;
 ; RESTRICTIONS:
 ;
@@ -27,48 +28,27 @@
 ;
 ; METHODS:
 ;
-;    N.B. The `METHODS' section is used in class definition files only
-;    (like class__define.pro) which contain all the methods of that
-;    class.  In it, only the PUBLIC methods should be documented in
-;    this header.  Methods which are internal to the class, and not
-;    for general consumption, should be informally documented in the
-;    body of the code.  Within each individual METHOD section, the
-;    subsections DESCRIPTION, and INPUT PARAMETERS through
-;    RESTRICTIONS above (which should be omitted) can be included for
-;    each method, as appropriate, and at an increased indentation.
-;    See those sections above for style guidelines.
-;
 ;    Init:  (always start with the INIT method function)
 ;
 ;       CALLING SEQUENCE:
 ;
-;          obj=obj_new('CubeProj',[name])
+;          cube=obj_new('CubeProj',[name])
 ;
 ;       OPTIONAL INPUT PARAMETERS:
 ;
 ;          name:  A name for the project.  Will otherwise be left blank.
 ;
-;       INPUT KEYWORD PARAMETERS:
-;
-;          KEYWORD:
-;       ...
-;
-;    Method1:
+;    Show:
 ;  
 ;	DESCRIPTION:
 ;
-;	   This method makes possible short duration levitation.
+;          Run the GUI interface.  See the routine CUBISM for an
+;          easier way to open an existing or new cube project and show
+;          it.
 ;	
 ;       CALLING SEQUENCE:
 ;
-;          obj->Method1, req_arg1, req_arg2, ..., 
-;             [opt_arg1,...,/BIN_KEYWORD,KEYWORD=]
-;
-;       INPUT PARAMETERS:
-;
-;          req_arg1:
-;       ...
-;    ...
+;          cube->Show
 ;
 ; PROCEDURES:
 ;
@@ -121,12 +101,530 @@
 ;
 ;##############################################################################
 
+;;=================  Interface ===============================================
+
+pro CubeProj_show_event, ev
+   widget_control, ev.top, get_uvalue=self
+   self->ShowEvent,ev
+end
+
+;=============================================================================
+;  ShowEvent - Handle events from the show interface, or dispatch to
+;              the appropriate method
+;=============================================================================
+pro CubeProj::ShowEvent, ev
+  if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_BASE' then begin ;size
+;     diff=ev.Y-(*self.wInfo).original_height[0]
+;     line_diff=(diff lt 0?-1:1)*fix(abs(diff/(*self.wInfo).list_row))
+;     new_lines=2>((*self.wInfo).original_height[1]+line_diff)
+;     if new_lines eq (*self.wInfo).lines then return
+;     (*self.wInfo).lines=new_lines
+     widget_control, (*self.wInfo).SList, $
+                     SCR_YSIZE=ev.Y+(*self.wInfo).list_size_diff
+     return
+  endif 
+  sel=widget_info((*self.wInfo).SList,/LIST_SELECT)
+  n_sel=n_elements(sel) 
+  nr=self->N_Records()
+  if ev.id eq (*self.wInfo).SList then begin ;somebody clicked
+     self->UpdateButtons
+     if nr eq 0 then return     ;just the blank nothing line
+     if ev.clicks eq 2 then action='viewrecord' else return 
+  endif else widget_control, ev.id, get_uvalue=action
+  if action eq 'bargroup' then action=ev.value
+  
+  widget_control, /HOURGLASS
+  case action of
+     'save-as': self->Save,/AS
+     
+     'viewrecord-new': self->ViewRecord,/NEW
+     'loadcalib': self->LoadCalib,/SELECT
+     'feedback': begin 
+        self.feedback=1-self.feedback
+        print,self.feedback
+        widget_control, ev.id, set_value=(self.feedback?"*":" ")+ $
+                        'Use Cube Build Feedback' ;XXX checkbox
+     end
+     
+     'setorder': begin 
+        self->GetProperty,CALIB=cal
+        ords=strtrim(cal->Orders(self.MODULE),2)
+        
+        if self.MODULE eq 'SH' or self.MODULE eq 'LH' then ords=['All',ords]
+        ord=popup('Choose Cube Build Order',ords,TITLE='Cube Build Order', $
+                  PARENT_GROUP=self->TopBase(),/MODAL)
+        if ord eq 'All' then self.ORDER=0 else self.ORDER=ord
+     end
+     
+     'setaperture': begin 
+        if ptr_valid(self.APERTURE) then begin 
+           ap=(*self.APERTURE)[0]
+           if ap.low[0] eq ap.low[1] AND ap.high[0] eq ap.high[1] then $
+              ap_now=string(FORMAT='(F4.2,:," ")', ap.low[0],ap.high[0]) $ 
+           else ap_now=string(FORMAT='(F4.2,:," ")', ap.low,ap.high)
+        endif else ap_now='0.0 1.0'
+        ap=getinp("Aperture (Low High):",ap_now, $
+                  TITLE='Set Aperture',PARENT_GROUP=self->TopBase(),/MODAL)
+        if ap eq '' then return
+        ap=float(strsplit(ap,/EXTRACT))
+        if n_elements(ap) eq 0 then self->Error,'Not enough aperture elements'
+        if min(ap) lt 0. or max(ap) gt 1. then $
+           self->Error,'Aperture out of range [0-1]'
+        if n_elements(ap) eq 2 then ap=[ap[0],ap[0],ap[1],ap[1]]
+        if ptr_valid(self.APERTURE) then $
+           if array_equal([(*self.APERTURE)[0].low,(*self.APERTURE)[0].high], $
+                          ap) then return
+        ptr_free,self.APERTURE
+        self.APERTURE=ptr_new({IRS_APERTURE,ap[0:1],ap[2:3]})
+        self.ACCOUNTS_VALID=0 
+        self->UpdateList
+     end
+        
+        
+     'viewcube-new': self->ViewCube,/NEW
+     
+     'select-all': begin        ;select all records
+        top=widget_info((*self.wInfo).SList,/LIST_TOP)
+        widget_control, (*self.wInfo).SList, $
+                        SET_LIST_SELECT=lindgen(self->N_Records())
+        widget_control, (*self.wInfo).SList,SET_LIST_TOP=top
+        self->UpdateButtons
+     end
+     
+     'replace-string': $
+        begin 
+        if sel[0] eq -1 then return
+        files=(*self.DR)[sel].FILE
+        cnt=0
+        for i=0,n_sel-1 do $
+           if n_elements(f) eq 0 then f=[*files[i]] else f=[f,*files[i]]
+        nf=n_elements(f) 
+        if nf gt 1 then begin 
+           lab='Replacing text of '+strtrim(nf,2)+' files:'
+           wh=where(total(byte(f) eq shift(byte(f),0,1),2) ne nf,cnt)
+           def=strmid(f[0],0,wh[0])
+           t=twoin(from,to,def,def,LABEL=lab, $
+                   TEXT1='Replace Substring (regexp):', $
+                   TEXT2='With:',PARENT_GROUP=self->TopBase(),/SCROLL, $
+                   TITLE='Replace File Substring',TEXT_LAB=f,YSIZE=nf<6)
+        endif else begin
+           t=twoin(from,to,f[0],f[0],TEXT1='Replace Substring (regexp):', $
+                   TEXT2='With:',PARENT_GROUP=self->TopBase(), $
+                   TITLE='Replace File Substring')
+        endelse 
+        if t then begin 
+           for i=0,n_sel-1 do begin
+              file=(*self.DR)[sel[i]].FILE
+              pos=stregex(file,from,length=len)
+              (*self.DR)[sel[i]].FILE= $
+                 strmid(file,0,pos)+to+strmid(file,pos+len)
+           endfor
+        endif
+     end 
+     
+     'headers':   $
+        begin 
+        if sel[0] eq -1 then return
+        if NOT array_equal(ptr_valid((*self.DR).HEADER),1) then self->Error, $
+           ['No Header available for records',(*self.DR)[wh].ID]
+        xpopdiag,(*self.DR)[sel].ID, (*self.DR)[sel].HEADER, $
+                 BUTTON_TEXT='  Done  ', $
+                 LABEL='File:', PARENT_GROUP=self->TopBase(), $
+                 TITLE=self->ProjectName()+': Header Info', $
+                 TSIZE=[65,15],TOP_LAB=self->ProjectName()
+     end 
+     
+     'header-keyword': $
+        begin 
+        if sel[0] eq -1 then return
+        ;; The first header of the first selected is used
+        keys=strmid(*(*self.DR)[sel[0]].HEADER,0,8)
+        which=popup('Choose Keyword',keys,TITLE='HEADER KEYWORDS', $
+                    PARENT_GROUP=self->TopBase(),/MODAL)
+        hlist=(*self.DR)[sel].HEADER
+        for j=0,n_elements(hlist)-1 do begin
+           key=sxpar(*hlist[j],which)
+           switch size(key,/TNAME) of
+              'BYTE': begin
+                 form='A' & key=key?'TRUE':'FALSE'
+                 break
+              end
+              'STRING': begin 
+                 key=strtrim(key,2) & form='A'
+                 break
+              end
+              'LONG': begin 
+                 form='I0'
+                 break
+              end
+              'DOUBLE':
+              'FLOAT': form='G0.7'
+           endswitch
+
+           str=string(FORMAT='(A,": ",'+form+')',(*self.DR)[sel[j]].ID,key) 
+           if n_elements(strlist) eq 0 then strlist=[str] else  $
+              strlist=[strlist,str]
+        endfor 
+        which=strtrim(which,2)
+        self->Info,[which+':',strlist],TITLE=which+' Keyword Listing'
+     end 
+     
+     'switchlist': begin 
+        widget_control, ev.id,get_value=val
+        val=val eq "<"?">":"<"
+        which=val eq "<"?1:0
+        widget_control, (*self.wInfo).wHead[1-which],MAP=0
+        widget_control, (*self.wInfo).wHead[which],/MAP
+        (*self.wInfo).which_list=which
+        widget_control, ev.id,set_value=val
+        self->UpdateColumnHeads
+        self->UpdateList
+     end
+     
+     'sort': begin 
+        flags=bytarr((*self.wInfo).which_list eq 0?6:5)
+        self.sort=ev.value
+        flags[ev.value-(5*(ev.value ge 6))]=1b ;keep ID selected if set
+        widget_control, (*self.wInfo).Base,UPDATE=0
+        widget_control,ev.id,SET_VALUE=flags
+        self->UpdateList
+        widget_control, (*self.wInfo).Base,/UPDATE
+     end 
+     
+     'delete': if sel[0] ne -1 then self->RemoveBCD,sel
+     
+     'phist': self->Info,self->Info(/NO_DATA), $
+                         TITLE=self->ProjectName()+': History'
+     
+     'calset': begin 
+        info=ptrarr(4) & modules=strarr(4)
+        for md=0,3 do begin 
+           modules[md]=irs_module(md,/TO_NAME)
+           info[md]=ptr_new(self.cal->Info(md))
+        endfor  
+        xpopdiag,modules,info,PARENT_GROUP=self->TopBase(), $
+                 BUTTON_TEXT='  Done  ',LABEL='Module:', $
+                 TITLE=self->ProjectName()+': Calibration Set <'+ $
+                 filestrip(self.cal_file)+'>',TSIZE=[80,15], $
+                 DEFAULT=irs_module(self.MODULE),/FREE_POINTERS
+     end
+     
+     'about': self->Info,TITLE='About Cube Project', $
+                         ['*********************************', $
+                          '       Cube Project v0.1         ', $
+                          '          CUBISM v0.01           ', $
+                          '                                 ', $
+                          '         JD Smith -- 2002        ', $
+                          '  http://sings.sirtf.edu/cubism  ', $
+                          '*********************************']
+     
+     else: call_method,action,self ;all others, just call the named method
+  endcase     
+end
+
+pro CubeProj_Show_kill,id
+  widget_control, id, get_uvalue=self
+  self->Exit
+end
+
+;=============================================================================
+;  Exit - Get out of here, possibly committing hara kiri on the way.
+;=============================================================================
+pro CubeProj::Exit
+  if self.Changed then begin 
+     status=self.Spawned?"(changes will be lost)": $
+            "(project available on command line)"
+     ans=dialog_message(["Save changes to project "+self->ProjectName()+"?", $
+                         self.SaveFile?"to file "+self.SaveFile:"",status], $
+                        /QUESTION,TITLE="Save "+self->ProjectName()+"?", $
+                        DIALOG_PARENT=self->TopBase(),/CANCEL,/DEFAULT_CANCEL)
+     if ans eq 'Cancel' then canceled=1 $
+     else if ans eq 'Yes' then self->Save,CANCELED=canceled
+     if keyword_set(canceled) then begin 
+        if NOT widget_info((*self.wInfo).SList,/VALID_ID) then self->Show
+        return
+     endif 
+  endif 
+  if self->isWidget() then if widget_info((*self.wInfo).SList,/VALID_ID) $
+     then widget_control, (*self.wInfo).Base,KILL_NOTIFY='',/DESTROY
+  if self.Spawned then obj_destroy,self
+end
+     
+;=============================================================================
+;  Show - Run the project interface
+;=============================================================================
+pro CubeProj::Show,FORCE=force,_EXTRA=e
+  if NOT keyword_set(force) then if self->Showing() then return
+
+  ;; make the info structure if we need it.
+  if NOT ptr_valid(self.wInfo) then begin
+     self.wInfo=ptr_new({CubeProj_wInfo})
+  endif 
+  
+  self.feedback=1               ;default to showing cube build feedback
+  
+  base=widget_base(/COLUMN,/BASE_ALIGN_RIGHT,APP_MBAR=mbar,SPACE=1, $
+                   /TLB_SIZE_EVENTS,_EXTRA=e)
+  (*self.wInfo).Base=base
+  self->UpdateTitle
+  
+  ;; Populate the menu-bar
+  
+  ;;*** File menu
+  file=widget_button(mbar,value='File',/MENU)
+  b1=widget_button(file,value='New...',uvalue='newproject') 
+  b1=widget_button(file,value='Open...',uvalue='open')
+  b1=widget_button(file,value='Save',uvalue='save')
+  b1=widget_button(file,value='Save As...',uvalue='save-as')
+  wMustCube=widget_button(file,value='Write FITS Cube...',uvalue='writefits')
+  ;;-------------
+  (*self.wInfo).MUST_SAVE_CHANGED= $
+     widget_button(file,value='Revert To Saved...',uvalue='revert',/SEPARATOR)
+  ;;-------------
+  b1=widget_button(file,value='Rename Project...',uvalue='setprojectname', $
+                   /SEPARATOR)
+  b1=widget_button(file,value='Export to Command Line...', $
+                   uvalue='ExportToMain')  
+;   (*self.wInfo).MUST_UNRESTORED=  $
+;      widget_button(file,value='Restore All Data',uvalue='restoreall', $
+;                   /SEPARATOR) 
+  ;;-------------
+  b1=widget_button(file,value='Load New Calibration Set...', $
+                   uvalue='loadcalib', /SEPARATOR)
+  b1=widget_button(file,value='Close',uvalue='exit',/SEPARATOR)
+  
+  ;;*** Edit menu
+  edit=widget_button(mbar,value='Edit',/MENU)
+  b1=widget_button(edit,value='Select All',uvalue='select-all')
+  wMustSel=widget_button(edit,value='Replace File Substring...', $
+                         uvalue='replace-string') 
+  
+  ;;*** Data Record menu
+  rec=widget_button(mbar,value='Record',/MENU)
+  b1=widget_button(rec,value='Add BCD Data...',UVALUE='adddata')
+  wMustSel=[wMustSel, $
+            widget_button(rec,value='Delete',uvalue='delete'),$
+            widget_button(rec,value='Rename',uvalue='renamerecord'),$
+            widget_button(rec,value='Disable',uvalue='disablerecord'),$
+            widget_button(rec,value='Enable',uvalue='enablerecord'),$
+            ;;-------------
+            widget_button(rec,value='View',uvalue='viewrecord',/SEPARATOR), $
+            widget_button(rec,value='View (new viewer)', $
+                          uvalue='viewrecord-new'), $
+            widget_button(rec,value='Show Header...',uvalue='headers'),$
+            widget_button(rec,value='Show Keyword Value(s)...', $
+                          uvalue='header-keyword')]
+  
+
+  cube=widget_button(mbar,value='Cube',/MENU)
+  (*self.wInfo).MUST_PROJ= $
+     widget_button(cube,value='Build Cube',UVALUE='buildcube') 
+  ;;-------------
+  b1=widget_button(cube,value=(self.feedback?'*':' ')+ $
+                   'Use Cube Build Feedback',UVALUE='feedback', $
+                   /SEPARATOR)  ;v5.6 checkbox
+  ;;-------------
+  (*self.wInfo).MUST_MODULE= $
+     widget_button(cube,value='Set Cube Build Order...',UVALUE='setorder', $
+                   /SEPARATOR)
+  wMustCal=widget_button(cube,value='Set Aperture(s)...',UVALUE='setaperture')
+  wMustCube=[wMustCube, $
+             ;;-------------
+             widget_button(cube,value='View Cube...',UVALUE='viewcube', $
+                           /SEPARATOR) , $
+             widget_button(cube,value='View Cube (new viewer)...', $
+                           UVALUE='viewcube-new')]
+  
+  ;;*** Info menu
+  info=widget_button(mbar,value='Info',/MENU)
+  b1=widget_button(info,value='Project History...',uvalue='phist') 
+  (*self.wInfo).MUST_CAL= $
+     [wMustCal, $
+      widget_button(info,value='Calibration Set Details...',uvalue='calset')]
+  ;;-------------
+  b1=widget_button(info,value='About CubeProject',uvalue='about',/SEPARATOR)
+  
+  b=widget_base(base,/COLUMN,/BASE_ALIGN_LEFT,SPACE=1,YPAD=0,XPAD=0) 
+  headbase=widget_base(b,/ROW,XPAD=0,YPAD=0,/FRAME,SPACE=1) 
+  headmap=widget_base(headbase) 
+  (*self.wInfo).wHead[0]= $
+     cw_bgroup(/NONEXCLUSIVE,headmap, $
+               ['ID         ', $
+                'ITime  ', $
+                'Observed      ', $
+                'Added        ', $
+                'Type',$
+                'Step'],UVALUE='sort',/ROW)
+  (*self.wInfo).wHead[1]= $  
+     cw_bgroup(/NONEXCLUSIVE,headmap, $
+               ['ID         ', $
+                'RA      ', $
+                'Dec     ', $
+                'Error', $
+                'Account'], $
+               BUTTON_UVALUE=[0,6,7,8,9],UVALUE='sort',/ROW,MAP=0)
+  
+  b1=widget_button(headbase,value='>',uvalue='switchlist')
+  
+  (*self.wInfo).SList= $
+     widget_list(b,/MULTIPLE,/ALIGN_LEFT, $
+                 YSIZE=6>self->N_Records()<15,XSIZE=80,/FRAME)
+  
+  bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup', $
+                ['Enable','Disable','Delete','Header', $
+                 'View Record','View Cube','Add Data','Save','Close'],$
+                BUTTON_UVALUE= $
+                ['enablerecord','disablerecord','delete','headers', $
+                 'viewrecord','viewcube','adddata','save','exit'])
+  ;; list of buttons that require a selection to be meaningful
+  (*self.wInfo).MUST_SELECT=[wMustSel,ids[0:4]]
+  
+  ;; a cube must exist
+  (*self.wInfo).MUST_CUBE=[wMustCube,ids[5]]
+  
+  widget_control, base,set_uvalue=self,/REALIZE
+  
+  geom=widget_info((*self.wInfo).SList,/GEOMETRY)
+  (*self.wInfo).list_row=(geom.SCR_YSIZE-7)/geom.YSIZE
+  (*self.wInfo).list_size_diff=geom.SCR_YSIZE- $
+     (widget_info(base,/GEOMETRY)).SCR_YSIZE
+  XManager,'CubeProj_Show:'+self.ProjectName, base,/NO_BLOCK, $
+           EVENT_HANDLER='CubeProj_show_event',CLEANUP='CubeProj_show_kill'
+  self->UpdateAll
+end
+
+;=============================================================================
+;  NewProject - Create a new empty project and Show it
+;=============================================================================
+pro CubeProj::NewProject
+  proj=obj_new(obj_class(self),name)
+  proj->Show,/FORCE
+  proj->SetProjectName,TITLE='New Project Name'
+  proj->SetProperty,/SPAWNED
+end
+
+;=============================================================================
+;  ProjectName - (function) Return the project name
+;=============================================================================
+function CubeProj::ProjectName
+  return,self.ProjectName?self.ProjectName:"(untitled)"
+end
+
+;=============================================================================
+;  SetProjectName - (procedure) Set the project name, with input.
+;=============================================================================
+pro CubeProj::SetProjectName,pn,TITLE=title
+  if n_elements(pn) eq 0 then begin 
+     if self->IsWidget() then begin 
+        if n_elements(title) eq 0 then title='Rename Project'
+        pn=getinp('Project Name:',self.ProjectName,TITLE=title, $
+                  PARENT_GROUP=self->TopBase(),/MODAL,XSIZE=32)
+        ;; Put the new name on the list, for XRegistered.
+        if pn then AddManagedWidget,'CubeProj_Show:'+pn,self->TopBase()
+     endif else self->Error,'Project name required'
+  endif
+  if pn then begin 
+     self->SetProperty,PROJECTNAME=pn
+     self->UpdateTitle
+  endif 
+end
+
+;=============================================================================
+;  Open - Open a Project and show it
+;=============================================================================
+pro CubeProj::Open,PROJECT=proj,_EXTRA=e
+  xf,pname,/RECENT,FILTERLIST=['*.cpj','*.*','*'], $
+     TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0,_EXTRA=e
+  if size(pname,/TYPE) ne 7 then return ;cancelled
+  proj=self->Load(pname)
+  if NOT obj_valid(proj) then return
+  proj->SetProperty,/SPAWNED
+  proj->Show
+end
+
+;=============================================================================
+;  Load - Load a Project from file
+;=============================================================================
+function CubeProj::Load,file,ERROR=err
+  catch, err
+  if err then begin 
+     catch,/cancel
+     self->Error,['Error loading project from '+file,!ERROR_STATE.MSG],$
+                 /RETURN_ONLY
+     return,-1
+  endif 
+  obj=restore_object(file,obj_class(self))
+  if obj_valid(obj) then begin 
+     if NOT obj_isa(obj,obj_class(self)) then $
+        self->Error,'Invalid Cube Project'
+     obj->SetProperty,CHANGED=0b,SAVE_FILE=file
+  endif      
+  return,obj
+end
+
+;=============================================================================
+;  Save - Save a Project to file
+;=============================================================================
+pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
+  if (size(file,/TYPE) ne 7 AND self.SaveFile eq '') OR keyword_set(as) $
+     then begin 
+     if self.SaveFile then start=self.SaveFile else begin 
+        start=strlowcase(self->ProjectName())+".cpj"
+        start=strjoin(strsplit(start,/EXTRACT),'_')
+     endelse 
+     xf,file,/RECENT,FILTERLIST=['*.cpj','*.*','*'],/SAVEFILE, $
+        TITLE='Save Cube Project As...',/NO_SHOW_ALL,SELECT=0, $
+        START=start,PARENT_GROUP=self->TopBase()
+     if size(file,/TYPE) ne 7 then begin
+        canceled=1
+        return                
+     endif 
+  endif else if size(file,/TYPE) ne 7 then file=self.SaveFile
+  
+  ;; Detach the stuff we don't want to save!
+  detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the info
+  detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
+  detCal=self.cal & self.cal=obj_new() ;or the calibration object
+  if ptr_valid(self.DR) then begin 
+     detRevAccts=(*self.DR).REV_ACCOUNT 
+     (*self.DR).REV_ACCOUNT=ptrarr(self->N_Records())
+  endif
+  oldchange=self.Changed        ;we want the file written to have changed=0!
+  self.Changed=0b               ;but save the old preference incase we fail
+  catch, serr
+  if serr ne 0 then begin       ;it failed!
+     catch,/CANCEL
+     self.wInfo=detInfo         ;reattach them
+     self.MsgList=detMsgList
+     self.cal=detCal
+     if ptr_valid(self.DR) then (*self.DR).REV_ACCOUNT=detRevAccts
+     self.Changed=oldchange     ;reassign our old changed status
+     self->Error,['Error Saving to File: ',file]
+  endif 
+  save,self,FILENAME=file,COMPRESS=comp
+  catch,/CANCEL
+  ;; Reattach 
+  self.wInfo=detInfo           
+  self.MsgList=detMsgList   
+  self.cal=detCal
+  if ptr_valid(self.DR) then (*self.DR).REV_ACCOUNT=detRevAccts
+  if strlen(self.SaveFile) eq 0 or keyword_set(AS) then self.SaveFile=file
+  self->UpdateTitle
+end
+
 ;=============================================================================
 ;  WriteFits - Write the Cube, Error, etc. to FITS file
 ;=============================================================================
-pro cubeProj::WriteFits,file
+pro CubeProj::WriteFits,file
   if NOT ptr_valid(self.CUBE) then return 
   if NOT ptr_valid(self.WAVELENGTH) then return
+  if size(file,/TYPE) ne 7 then begin 
+     xf,file,/RECENT,FILTERLIST=['*.fits','*.*','*'],/SAVEFILE, $
+        TITLE='Save Cube As FITS File...',/NO_SHOW_ALL,SELECT=0, $
+        START=strlowcase(self->ProjectName())+".fits", $
+        PARENT_GROUP=self->TopBase()
+     if size(file,/TYPE) ne 7 then return
+  endif
   fxhmake,hdr,*self.CUBE,/extend,/date
   ;; Description
   sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
@@ -183,73 +681,429 @@ pro cubeProj::WriteFits,file
 end
 
 ;=============================================================================
-;  Save - Save the full cube project 
+;  ExportToMain - Send ourselves to the $MAIN$ level, using the
+;                 unsupported RSI routine routine_names().  Caveat
+;                 Exportor.  Care is taken to ensure it will at least
+;                 compile, and trap errors in case routine_names
+;                 vanishes.
 ;=============================================================================
-pro cubeProj::Save, file,AS=as
-  if size(file,/TYPE) ne 7 or keyword_set(as) or $
-     strlen(self.SaveFile) eq 0 then begin 
-     ;; select a file
+pro CubeProj::ExportToMain
+   ;; Simple fix -- replace dashes/spaces with underscores
+  def=strjoin(strsplit(self->ProjectName(),'[^a-zA-Z0-9_]',/EXTRACT),'_')
+  var_name=getinp('Name of exported Cube object var:',def, $
+                  TITLE='Export Cube Project to Command Line', $
+                  /MODAL, PARENT_GROUP=self->TopBase())
+   if var_name eq '' then return
+   if strmid(var_name,0,1) eq '$' then $
+      self->Error,'Variable name must not start with $'
+   if NOT execute(var_name+'=1',1) then $
+      self->Error,'Not a valid variable name: '+var_name
+   var_free=0
+   catch, err
+   if err ne 0 then begin       
+      ;;An UNDEFVAR indicates routine_info ran and the variable is free
+      if !ERROR_STATE.NAME ne 'IDL_M_UNDEFVAR' then begin 
+         catch,/cancel
+         self->Error,"Can't complete export operation"
+      endif
+      var_free=1
+   endif 
+   
+   ;; Don't overwrite an existing variable
+   if var_free eq 0 then $
+      existing_var=call_function('routine_names',var_name,FETCH=1)
+   if n_elements(existing_var) ne 0 then begin 
+      ;;see if we're alread there
+      if size(existing_var,/TYPE) eq 11 then if existing_var[0] eq self $
+         then begin
+         self->Info,['The project is already exported', $
+                     'to variable "'+var_name+'"']
+         return
+      endif 
+      catch,/cancel
+      self->Error,'A variable named '+var_name+' already exists'
+   endif 
+   
+   ;; Still here... we need to export ourself to the main level
+   void=call_function('routine_names',var_name,self,store=1)
+   self.Spawned=0b              ;no longer spawned
+   print,' *** CUBISM Cube Project exported to variable: '
+   print,'   ====> '+var_name+' <==='
+end
+   
+;=============================================================================
+;  Revert - Revert to the old version on disk
+;=============================================================================
+pro CubeProj::Revert
+  if strlen(self.SaveFile) eq 0 then return ;can only revert to a file
+  openr,un,/get_lun,self.SaveFile
+  time=systime(0,(fstat(un)).mtime)
+  free_lun,un
+  if self->IsWidget() then begin 
+     ans=dialog_message(['Revert Project '+self->ProjectName()+ $
+                         ' from file:', '  '+self.SaveFile,'last modified '+ $
+                         time+"?"], $
+                        /QUESTION,TITLE='Revert Project', $
+                        DIALOG_PARENT=self->TopBase())
+     if ans ne 'Yes' then return
   endif 
   
-  ;; Detach the stuff we don't want to save!
-  detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the info
-  detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
-  detCal=self.cal & self.cal=obj_new() ;or the calibration object
-  
-  oldchange=self.Changed        ;we want the file written to have changed=0!
-  self.Changed=0b               ;but save the old preference in case we fail
-  
-  catch, serr
-  if serr ne 0 then begin       ;it failed!
-     catch,/CANCEL
-     self.wInfo=detInfo         ;reattach them
-     self.MsgList=detMsgList
-     self.cal=detCal
-     self.Changed=oldchange     ;reassign our old changed status
-     self->Error,'Error Saving to File: '+file
-     return
-  endif 
-  save,self,FILENAME=file
-  catch,/CANCEL
-  ;; Reattach 
-  self.wInfo=detInfo           
-  self.MsgList=detMsgList   
-  self.cal=detCal
+  oldself=self                  ;our old self, soon to be history!
+  wsav=self.wInfo               ;detach wInfo and MsgList from Self, to retach
+  msav=self.MsgList             ;to the transmogrified self.
+  nsav=self.ProjectName
+  self.wInfo=ptr_new() & self.MsgList=ptr_new() ;the detachment
+  oldchange=self.Changed
+  self.Changed=0b               ;to ensure we won't try to save ourselves 
+  self.ProjectName=''           ;avoid name conflict with new self.
+
+  ;; Restore the on-disk self to this space.. this sets Changed to 0
+  ;; on the new object, and sets up the new object's SaveFile, only
+  ;; if the object was actually read in correctly.
+  self=self->Load(self.SaveFile,ERROR=rerr)
+  if rerr eq 0 then begin 
+     ;; Self has been overwritten by restore.... kill our old self.
+     
+     obj_destroy,oldself        ;kill our old self, except wInfo and MsgList
+     self.wInfo=wsav            ;attach wInfo and MsgList to new self
+     self.MsgList=msav
+     self->UpdateList           ;just in case things changed
+     
+     ;; let any widgets know about the change in self!
+     if self->isWidget() then $
+        widget_control,(*self.wInfo).Base,SET_UVALUE=self
+     
+     ;; make sure the title is set correctly!
+     self->UpdateTitle
+  endif else begin              ;failed, restore the old self
+     self.ProjectName=nsav
+     self.wInfo=wsav & self.MsgList=msav 
+     self.Changed=oldchange
+  endelse 
+  self->UpdateAll
 end
 
 ;=============================================================================
-;  Print - Print the cube's contents
+;  Showing - Is the project showing?
 ;=============================================================================
-pro cubeProj::Print,entries, NO_DATA=nd
-  print,'IRS Spectral Cube: '+self.ProjectName,' Created: '+ $
-        (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))
-  print,self.MODULE,self.ORDER ne 0? $
-        ' Order '+strtrim(self.ORDER,2): $
-        ' all orders'
-  print,'Using IRS Calib object ',self.cal_file, $
-        " (",(obj_valid(self.cal)?"":"not")+"loaded",")"
-  print,FORMAT='(I0,"x",I0," steps = ",F6.3," x ",F6.3," arcsec",' + $
-        '" (",F6.3," arcsec/pixel)")',self.NSTEP, $
-        self.STEP_SIZE*3600*self.NSTEP,self.PLATE_SCALE*3600
-  print,FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")', $
-        self.PR_SIZE
-  if keyword_set(nd) then return
-  if NOT ptr_valid(self.DR) then begin
-     print,'No data'
+function CubeProj::Showing
+  return,XRegistered('CubeProj_Show:'+self.ProjectName,/NOSHOW)
+end
+
+;=============================================================================
+;  TopBase - The top base (non-widget safe)
+;=============================================================================
+function CubeProj::TopBase
+  return,ptr_valid(self.wInfo)?(*self.wInfo).Base:0L
+end
+
+;=============================================================================
+;  UpdateTitle - Update the Show GUI Title
+;=============================================================================
+pro CubeProj::UpdateTitle
+  if self->IsWidget() then $
+     widget_control, (*self.wInfo).Base,  $
+                     TLB_SET_TITLE='CUBISM Project: '+self->ProjectName()+ $
+                     "  <"+(self.SaveFile?filestrip(self.SaveFile): $
+                            "(unsaved)")+">"
+end
+
+;=============================================================================
+;  UpdateList - Update the BCD list
+;=============================================================================
+pro CubeProj::UpdateList,CLEAR_SELECTION=cs
+  self->Sort
+  if NOT self->IsWidget() then return
+  if keyword_set(cs) then begin 
+     widget_control, (*self.wInfo).SList, set_value=self->List(), $
+                     SET_LIST_SELECT=-1,SET_LIST_TOP=t
+  endif else begin 
+     ls=self->CurrentSelect()<(self->N_Records()-1)
+     t=widget_info((*self.wInfo).SList,/LIST_TOP) 
+     widget_control, (*self.wInfo).SList, set_value=self->List(), $
+                     SET_LIST_SELECT=ls,SET_LIST_TOP=t
+  endelse
+end
+
+;=============================================================================
+;  List - List the data records
+;=============================================================================
+function CubeProj::List
+   n=self->N_Records()
+   if n eq 0 then return,' '
+   which_list=0
+   if self->isWidget() then if (*self.wInfo).which_list then which_list=1 
+   
+   for i=0,n-1 do begin 
+      if which_list eq 0 then begin ;the standard list
+         s=string(FORMAT='(" ",A,T16,F7.2,T27,A,T46,A,T65,A7,T73,' + $
+                  'I2,"[",I0,",",I0,"]")', $
+                  (*self.DR)[i].ID, $
+                  (*self.DR)[i].TIME, $
+                  jul2date((*self.DR)[i].DATE_OBS,FORM='D*T'), $
+                  jul2date((*self.DR)[i].DATE,FORM='D*T'), $
+                  irs_fov((*self.DR)[i].FOVID,/SHORT_NAME), $
+                  (*self.DR)[i].EXP,(*self.DR)[i].ROW,(*self.DR)[i].COLUMN)
+      endif else begin          ;the additional list
+         if ptr_valid((*self.DR)[i].ACCOUNT) then begin 
+            if self.ACCOUNTS_VALID then begin 
+               if ptr_valid((*self.DR)[i].REV_ACCOUNT) then acct="Yes (+rev)" $
+               else acct="Yes"
+            endif else acct="Invalid"
+         endif else acct="No"
+         s=string(FORMAT='(" ",A,T16,A10,T28,A12,T43,A3,T54,A)', $
+                  (*self.DR)[i].ID, $
+                  radecstring((*self.DR)[i].CMD_POS[0],/RA), $
+                  radecstring((*self.DR)[i].CMD_POS[1]), $
+                  ptr_valid((*self.DR)[i].ERROR)?'Yes':'No', $
+                  acct)
+      endelse       
+      if (*self.DR)[i].DISABLED then begin 
+         b=byte(s)
+         b[where(b eq 32b)]=45b ;replace space with dash
+         s=string(b)
+      endif
+      if i eq 0 then list=s else list=[list,s]
+   endfor 
+   return,list
+end
+
+;=============================================================================
+;  UpdateButtons - Change Button sensitivity
+;=============================================================================
+pro CubeProj::UpdateButtons
+  if NOT self->IsWidget() then return
+  sel=self->CurrentSelect()
+  for i=0,n_elements((*self.wInfo).MUST_SELECT)-1  do  $
+     widget_control,((*self.wInfo).MUST_SELECT)[i],  $
+                    SENSITIVE=ptr_valid(self.DR) AND sel[0] ne -1
+  
+  for i=0,n_elements((*self.wInfo).MUST_CAL)-1  do  $
+     widget_control,((*self.wInfo).MUST_CAL)[i],  $
+                    SENSITIVE=obj_valid(self.cal)
+  
+  widget_control, (*self.wInfo).MUST_PROJ, SENSITIVE=ptr_valid(self.DR)
+  widget_control, (*self.wInfo).MUST_MODULE,SENSITIVE=self.MODULE ne ''
+  
+  for i=0,n_elements((*self.wInfo).MUST_CUBE)-1 do $
+     widget_control, ((*self.wInfo).MUST_CUBE)[i], $
+                     SENSITIVE=ptr_valid(self.CUBE)
+  
+  widget_control, (*self.wInfo).MUST_SAVE_CHANGED,SENSITIVE= $
+                  strlen(self.SaveFile) ne 0 AND keyword_set(self.Changed)
+end
+
+;=============================================================================
+;  UpdateColumnHeads - Update the sort selected button
+;=============================================================================
+pro CubeProj::UpdateColumnHeads
+  if NOT self->IsWidget() then return
+  flags=bytarr(9)
+  flags[self.sort]=1b
+  if (*self.wInfo).which_list eq 0 then flags=flags[0:5] else $
+     flags=[flags[0],flags[6:*]]
+  widget_control, (*self.wInfo).wHead[(*self.wInfo).which_list],SET_VALUE=flags
+end
+
+pro CubeProj::UpdateAll
+  self->UpdateButtons
+  self->UpdateColumnHeads
+  self->UpdateList
+end
+
+;=============================================================================
+;  FindViewer - Find a CubeView to which to send message.  We send
+;               messages to one and only one viewer.
+;=============================================================================
+pro CubeProj::FindViewer,NEW_VIEWER=nv
+  objs=self->GetMsgObjs(CLASS='CubeRec')
+  valid_viewer=obj_valid(objs[0])
+  if XRegistered('CubeView') eq 0 OR keyword_set(nv) then begin 
+     if valid_viewer then self->MsgListRemove,objs ;get rid of old ones
+     cubeview,CUBE=self         ;have them sign themselves up for our messages
      return
+  endif 
+  
+  if obj_valid(objs[0]) then return ;a viewer is already listening
+  
+  ;; We need to find a cubeview to talk to
+  resolve_routine,'XManager',/COMPILE_FULL_FILE
+  ids=LookupManagedWidget('CubeView')
+  rec=widget_info(ids[0],FIND_BY_UNAME='CubeRec') 
+  if widget_info(rec,/VALID_ID) then begin 
+     widget_control, rec,GET_UVALUE=rec
+  ;; sign them up for our messages
+     if obj_valid(rec)?obj_isa(rec,'CubeRec'):0 then self->MsgSignup,rec $
+     else cubeview,CUBE=self
+  endif else cubeview,CUBE=self
+end
+
+;=============================================================================
+;  ViewCube - View the cube in an existing or new viewer
+;=============================================================================
+pro CubeProj::ViewCube,NEW_VIEWER=new
+  if NOT ptr_valid(self.CUBE) then self->Error,'No cube to view'
+  self->FindViewer,NEW_VIEWER=new
+  self->Send,/CUBE
+end
+
+;=============================================================================
+;  ViewRecord - View the record in an existing or new viewer
+;=============================================================================
+pro CubeProj::ViewRecord,rec,NEW_VIEWER=new
+  self->RecOrSelect,rec
+  self->FindViewer,NEW_VIEWER=new
+  widget_control, (*self.wInfo).SList,SET_LIST_SELECT=[rec[0]]
+  self->Send,RECORD=rec[0]
+end
+
+;=============================================================================
+;  EnableRecord - Remove the records disable flag
+;=============================================================================
+pro CubeProj::EnableRecord,recs
+  self->DisableRecord,recs,DISABLE=0b
+end
+
+;=============================================================================
+;  DisableRecord - Set the records disable flag, so that it doesn't
+;                  get used when building the cube.
+;=============================================================================
+pro CubeProj::DisableRecord,recs,DISABLE=dis
+  if NOT ptr_valid(self.DR) then return
+  if n_elements(dis) eq 0 then dis=1b
+  self->RecOrSelect,recs
+  (*self.DR)[recs].DISABLED=dis
+  self->UpdateList
+  self.Changed=1b
+  self->UpdateButtons
+end
+
+;=============================================================================
+;  EnableRecord - Remove the records disable flag.
+;=============================================================================
+pro CubeProj::RenameRecord,rec,name
+  self->RecOrSelect,rec
+  if n_elements(name) eq 0 AND self->IsWidget() then begin 
+     name=getinp('New Name:',(*self.DR)[rec[0]].ID,TITLE="Rename Record", $
+                 PARENT_GROUP=self->TopBase(),/MODAL)
+     if name eq '' then return
+  endif
+  wh=where((*self.DR).ID eq name,cnt)
+  if cnt ne 0 AND wh[0] ne rec[0] then $
+     self->Error,'ID '+name+' already exists'
+  (*self.DR)[rec[0]].ID=name
+  self.Changed=1b
+  self->UpdateButtons & self->UpdateList  
+end
+
+;=============================================================================
+;  CurrentSelect - Return the currently selected records (if any).
+;=============================================================================
+function CubeProj::CurrentSelect
+  if NOT self->IsWidget() then return,-1
+  return,widget_info((*self.wInfo).SList, /LIST_SELECT)
+end
+
+;=============================================================================
+;  RecOrSelect - Convenience routine: use specified records, or take
+;                from the GUI selection.
+;=============================================================================
+pro CubeProj::RecOrSelect,recs
+  if n_elements(recs) eq 0 then begin 
+     recs=self->CurrentSelect()
+     if recs[0] eq -1 then $
+        self->Error,'No Records Selected or Passed'
   endif   
-  print,' ===== DATA ====='
+end
+
+;=============================================================================
+;  Sort - Sort the Data records. 
+;=============================================================================
+pro CubeProj::Sort,sort
+  n=self->N_Records()
+  if n le 1 then return         ;no sort for one only
+  case self.sort of
+     0: s=sort((*self.DR).ID)
+     1: s=sort((*self.DR).TIME)
+     2: s=sort((*self.DR).DATE_OBS)
+     3: s=sort((*self.DR).DATE)
+     4: s=sort((*self.DR).FOVID)
+     5: s=sort((*self.DR).EXP)
+     6: s=sort((*self.DR).CMD_POS[0])
+     7: s=sort((*self.DR).CMD_POS[1])
+     8: s=sort(ptr_valid((*self.DR).ERROR))
+     9: s=sort(ptr_valid((*self.DR).ACCOUNT))
+  endcase
+  *self.DR=(*self.DR)[s]        ;rearrange
+  if self->IsWidget() then begin 
+     ;; Preserve selections
+     ls=widget_info((*self.wInfo).SList,/LIST_SELECT)<(n-1)
+     if ls[0] eq -1 then return
+     b=bytarr(n)
+     b[ls]=1b
+     b=b[s]
+     widget_control,(*self.wInfo).SList,SET_LIST_SELECT=where(b)
+  endif 
+end
+
+pro CubeProj::Print,entries,_EXTRA=e
+  print,transpose(self->Info(entries,_EXTRA=e))
+end
+
+;=============================================================================
+;  Info - Info on the cube's contents and history
+;=============================================================================
+function CubeProj::Info,entries, NO_DATA=nd
+  str=['IRS Spectral Cube: '+self->ProjectName()]
+  str=[str,' Cube Created: '+ $
+       (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))]
+  str=[str,' '+(self.MODULE?self.MODULE:"(no module)")+ $
+       (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
+                        ' all orders')]
+  str=[str,' Using IRS Calib object '+(self.cal_file?self.cal_file:"(none)")+ $
+       " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
+  
+  aps=' Apertures:'
+  if NOT ptr_valid(self.APERTURE) OR self.MODULE eq '' then begin 
+     aps=aps+' (default)' 
+  endif else begin 
+     ords=self.cal->Orders(self.MODULE)
+     nap=n_elements(*self.APERTURE)
+     for i=0,nap-1 do begin 
+        ap=(*self.APERTURE)[i]
+        aps=[aps,string(FORMAT='(%"  %s  %4.2f->%4.2f : %4.2f->%4.2f")',$
+                        (nap eq 1?"All Orders":("Order "+strtrim(ords[i],2))),$
+                        ap.low,ap.high)]
+     endfor 
+  endelse 
+  str=[str,aps]
+  
+  str=[str, $
+       ' '+string(FORMAT='(I0,"x",I0," steps = ",F6.3," x ",F6.3,' + $
+                  '" arcsec"," (",F6.3," arcsec/pixel)")',self.NSTEP, $
+                  self.STEP_SIZE*3600*self.NSTEP,self.PLATE_SCALE*3600)]
+  str=[str,' '+string(FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")',$
+                      self.PR_SIZE)]
+  
+  if keyword_set(nd) then return,str
+  if NOT ptr_valid(self.DR) then begin
+     str=[str,'No data']
+     return,str
+  endif   
+  str=[str,' ===== DATA =====']
   if n_elements(entries) eq 0 then entries=lindgen(n_elements(*self.DR))
   for i=0,n_elements(entries)-1 do begin 
      rec=(*self.DR)[entries[i]]
-     print,rec.id,":",rec.file
+     str=[str,rec.id+":"+rec.file]
      sign=rec.CMD_POS[1] ge 0.0?'+':'-'
      radec,rec.CMD_POS[0],abs(rec.CMD_POS[1]),rh,rm,rs,dd,dm,ds
-     ra=string(format='(I0,"h",I2.2,"m",F5.2,"s")',rh,rm,rs)
-     dec=sign+string(format='(I0,"d",I2.2,"m",F5.2,"s")',abs(dd),dm,ds)
-     print,FORMAT='(%"  EXP: %2.0d (%d/%d) (%2.0d,%2.0d) RA: %s, DEC: %s")', $
-           rec.EXP,rec.CYCLE,rec.NCYCLES,rec.ROW,rec.COLUMN, ra,dec
+     ra=string(FORMAT='(I0,"h",I2.2,"m",F5.2,"s")',rh,rm,rs)
+     dec=sign+string(FORMAT='(I0,"d",I2.2,"m",F5.2,"s")',abs(dd),dm,ds)
+     str=[str,string(FORMAT='(%"   EXP: %2.0d (%d/%d) (%2.0d,%2.0d) ' + $
+                     'RA: %s, DEC: %s")', $
+                     rec.EXP,rec.CYCLE,rec.NCYCLES,rec.ROW,rec.COLUMN, ra,dec)]
   endfor 
+  return,str
 end
 
 ;=============================================================================
@@ -258,52 +1112,53 @@ end
 ;                actually changed, indicate that the account is no
 ;                longer valid.
 ;=============================================================================
-pro cubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
+pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           MODULE=md,ORDER=ord,SLIT_SIZE=slitsz, $
                           SLIT_LENGTH=slitl, SLIT_WIDTH=slitw, PR_WIDTH=prw, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
-                          APERTURE=aper
+                          APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
+                          PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
         self.PLATE_SCALE=ps
-        self.ACCOUNTS_VALID=0b
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif 
   endif 
   if n_elements(nstep) ne 0 then self.NSTEP=nstep
   if n_elements(stepsz) ne 0 then begin 
      if NOT array_equal(self.STEP_SIZE,stepsz) then begin 
         self.STEP_SIZE=stepsz
-        self.ACCOUNTS_VALID=0b
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif 
   endif 
   if n_elements(md) ne 0 then begin 
      if md ne self.MODULE then begin
         self.MODULE=md
-        self.ACCOUNTS_VALID=0b
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif 
   endif 
   if n_elements(ord) ne 0 then begin 
      if ord ne self.ORDER then begin 
         self.ORDER=ord
-        self.ACCOUNTS_VALID=0b
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif 
   endif 
   if n_elements(slitsz) eq 2 then begin 
      if self.SLIT_SIZE ne slitsz then begin 
         self.SLIT_SIZE=slitsz
-        self.ACCOUNTS_VALID=0b
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif 
   endif else begin 
      if n_elements(slitl) ne 0 then begin 
         if self.SLIT_SIZE[0] ne slitl then begin 
            self.SLIT_SIZE[0]=slitl
-           self.ACCOUNTS_VALID=0b
+           self.ACCOUNTS_VALID=0b & self.Changed=1b
         endif
      endif
      if n_elements(slitw) ne 0 then begin 
         if self.SLIT_SIZE[1] ne slitw then begin 
            self.SLIT_SIZE[1]=slitw
-           self.ACCOUNTS_VALID=0b
+           self.ACCOUNTS_VALID=0b & self.Changed=1b
         endif
      endif
   endelse
@@ -311,41 +1166,53 @@ pro cubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      prw=0.>prw 
      if prw ne self.PR_SIZE[1] then begin 
         self.PR_SIZE[1]=prw
-        self.ACCOUNTS_VALID=0b
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif
   endif
   if n_elements(prz) ne 0 then begin 
      if NOT array_equal(self.PR_SIZE,prz) then begin 
         self.PR_SIZE=prz
-        self.ACCOUNTS_VALID=0b
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif
   endif
   if n_elements(cal_file) ne 0 then begin 
      if self.cal_file ne cal_file then begin 
         if obj_valid(self.cal) then obj_destroy,self.cal
         self.cal_file=cal_file
+        self.ACCOUNTS_VALID=0b & self.Changed=1b
      endif 
   endif
   if n_elements(cal) ne 0 then begin 
      if obj_isa(cal,'IRS_Calib') then begin 
         if self.cal ne cal then begin 
            self.cal=cal 
-           self.ACCOUNTS_VALID=0b
+           self.ACCOUNTS_VALID=0b & self.Changed=1b
         endif 
-     endif else message,'Calibration object not of correct type.'
+     endif else self->Error,'Calibration object not of correct type.'
   endif
   if n_elements(aper) ne 0 then begin 
      ptr_free,self.APERTURE
      self.APERTURE=ptr_new(aper)
-     self.ACCOUNTS_VALID=0b
+     self.ACCOUNTS_VALID=0b & self.Changed=1b
   endif 
+  if n_elements(sf) ne 0 then self.SaveFile=sf
+  if n_elements(pn) ne 0 then begin 
+     pn=strmid(pn,0,32)         ;limit it
+     self.ProjectName=pn
+     self.Changed=1b
+  endif
+  if n_elements(chngd) ne 0 then self.Changed=chngd
+  if n_elements(spn) ne 0 then self.Spawned=spn
+  if n_elements(fb) ne 0 then self.feedback=fb
+  self->UpdateAll
 end
 
 ;=============================================================================
 ;  GetProperty
 ;=============================================================================
-pro cubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
-                           ERROR=err, PR_SIZE=prz, CALIB=calib
+pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
+                           ERROR=err, PR_SIZE=prz, CALIB=calib,MODULE=module, $
+                           APERTURE=ap,PROJECT_NAME=pn,DR=dr
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -359,166 +1226,87 @@ pro cubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      self->LoadCalib            ;ensure it's loaded
      calib=self.cal
   endif 
+  if arg_present(module) then module=self.MODULE
+  if arg_present(ap) then if ptr_valid(self.APERTURE) then ap=*self.APERTURE
+  if arg_present(pn) then pn=self->ProjectName()
+  if arg_present(dr) then dr=self.DR
+end
+
+;=============================================================================
+;  PRs - Return the WAVSAMP Pseudo-Rectangle Sample currently
+;        set. ORDERS is input/output.  If passed, return PRs for the
+;        specified orders.  Otherwise, use the orders setup for
+;        building the cube, or the FULL set of orders..
+;=============================================================================
+function CubeProj::PRs,ORDERS=ords,FULL=full
+  if n_elements(ords) eq 0 or keyword_set(full) then begin 
+     if self.ORDER eq 0 OR keyword_set(full) then $
+        ords=self.cal->Orders(self.MODULE) else ords=self.ORDER
+  endif
+  nap=n_elements(self.APERTURE) 
+  for i=0,n_elements(ords) do begin 
+     pr=self.cal->GetWAVSAMP(self.MODULE,self.ORDER,/PIXEL_BASED, $
+                             APERTURE=nap eq 1?(*self.APERTURE)[0]: $
+                             (*self.APERTURE)[ord])
+     if n_elements(prs) eq 0 then prs=pr else prs=[prs,pr]
+  endfor 
+  return,wvs
 end
 
 ;=============================================================================
 ;  Cube
 ;=============================================================================
-function cubeProj::Cube
-  if ptr_valid(self.CUBE) then return,*self.CUBE 
-  return,-1
+function CubeProj::Cube,pln
+  if NOT ptr_valid(self.CUBE) then return,-1
+  if n_elements(pln) ne 0 then return,(*self.CUBE)[*,*,pln]
+  return,*self.CUBE 
 end
 
 ;=============================================================================
 ;  BCD
 ;=============================================================================
-function cubeProj::BCD, which
-  return,(*self.DR)[which].BCD
+function CubeProj::BCD, which,ERROR=err
+  if which lt 0 or which ge self->N_Records() then $
+     self->Error,"Invalid record number: "+strtrim(which,2)
+  return,*(*self.DR)[which].BCD
+  if arg_present(err) then err=*(*self.DR)[which].ERR
 end
 
 ;=============================================================================
 ;  LoadCalib - Ensure the calibration object is loaded and available.
 ;=============================================================================
-pro cubeProj::LoadCalib
-  if obj_isa(self.cal,'IRS_Calib') then return
-  if self.cal_file eq '' then $
-     message,'Error: no calibration object and no cal file specified.'
-  self.cal=irs_restore_calib(self.cal_file)
-  self.ACCOUNTS_VALID=0b
-end
+pro CubeProj::LoadCalib,SELECT=sel
+  @irs_dir
+  if keyword_set(sel) then begin 
+     cd,filepath(ROOT_DIR=irs_calib_dir,"sets")
+     if self->IsWidget() then begin 
+        xf,calname,/RECENT,FILTERLIST=['*.cal','*.*','*'], $
+           TITLE='Load Calibration Object',/NO_SHOW_ALL,SELECT=0
+        if size(calname,/TYPE) eq 7 then begin 
+           calname=filestrip(calname)
+           if calname ne self.cal_file then begin 
+              self.cal_file=calname
+              self.ACCOUNTS_VALID=0b
+           endif 
+        endif else return
+     endif 
+  endif else if obj_isa(self.cal,'IRS_Calib') then return
 
-;=============================================================================
-;  CheckSteps - Ensure that all of the BCD's for this map are present.
-;=============================================================================
-pro cubeProj::CheckSteps
-  if NOT ptr_valid(self.DR) then message, 'No BCD Data loaded.'
-  got=bytarr(self.NSTEP)
-  got[(*self.DR).ROW-1,(*self.DR).COLUMN-1]=1b
-  wh=where(got eq 0b, cnt)
-  if cnt eq 0 then return
-  message,'Missing Steps: '+ string(10b)+ $
-          string(FORMAT='('+strtrim(cnt,2)+'("[",I0,", ",I0,"]"))', $
-                 [1#(wh mod self.NSTEP[0]+1),1#(wh/self.NSTEP[0]+1)])
-end
-
-;=============================================================================
-;  Normalize - Map header info in the BCD's to cube-specific data, and
-;              returns the status of the normalization.
-;=============================================================================
-pro cubeProj::Normalize
-  self->LoadCalib
-
-  if NOT ptr_valid(self.DR) then $
-     message,'No data records'
-  
-  ;; Normalize the module type
-  modules=strarr(n_elements(*self.DR))
-  for i=0,n_elements(*self.DR)-1 do begin 
-     fovid=sxpar(*(*self.DR)[i].HEADER,'FOVID',COUNT=cnt) 
-     if cnt eq 0 then message,"No FOVID keyword present"
-     fovname=irs_fov(fovid,MODULE=module)
-     modules[i]=module
-  endfor 
-  u=uniq(modules,sort(modules))
-  if n_elements(u) gt 1 then $
-     message,string(FORMAT='("Too many module types: ",A0, : ",")',modules[u])
-  self.module=modules[u[0]]
-  
-  ;; For low-res use the target order as the order, if they're all the same.
-  if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
-     self.ORDER eq 0 AND $
-     (self.module eq 'SL' OR self.module eq 'SH') $
-     then self.ORDER=(*self.DR)[0].TARGET_ORDER
-  
-  ;; Normalize the plate scale... they should all be the same!
-  ps=dblarr(2*n_elements(*self.DR))
-  for i=0,n_elements(*self.DR)-1 do $
-     ps[2*i]=sxpar(*(*self.DR)[i].HEADER,'CDELT*') 
-  psm=mean(ps)
-  if NOT array_equal(abs(ps-psm) lt 1.e-4,1b) then $
-     message,"Plate scale mismatch among input BCD's"
-  self.PLATE_SCALE=psm
-  
-  ;; Normalize the number of steps and step size (they should all be the same)
-  stepsper=(stepspar=lonarr(n_elements(*self.DR)))
-  stepszper=(stepszpar=dblarr(n_elements(*self.DR)))
-  for i=0,n_elements(*self.DR)-1 do begin 
-     stepsper[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPER')
-     stepspar[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPAR')
-     stepszpar[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPAR')
-     stepszper[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPER')
-  endfor 
-  if (NOT array_equal(stepsper,stepsper[0])) or $
-     (NOT array_equal(stepspar,stepspar[0])) then $
-     message,"BCD's have unequal map size."
-  self.NSTEP=[stepspar[0],stepsper[0]]
-  if (NOT array_equal(stepszper,stepszper[0])) or $
-     (NOT array_equal(stepszpar,stepszpar[0])) then $
-     message,"BCD's have unequal step size."
-  self.STEP_SIZE=[stepszpar[0],stepszper[0]]/3600.D
-  
-  ;; Normalize the slit length
-  if self.ORDER gt 0 then begin 
-     self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
-     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=sl*self.PLATE_SCALE
-     self.PR_SIZE[0]=sl
-  endif else begin ;; find the longest slit and use it
-     ords=self.cal->Orders(self.module)
-     slmax=0.
-     for i=0,n_elements(ords)-1 do begin 
-        self.cal->GetProperty,self.module,ords[i],SLIT_LENGTH=sl
-        slmax=sl>slmax
-     endfor 
-     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=slmax*self.PLATE_SCALE
-     self.PR_SIZE[0]=slmax
-  endelse 
-  
-  ;; Check to ensure all steps are present and accounted for
-  self->CheckSteps
-  
-  len=0.                        ;adjust for a non-full aperture
-  if ptr_valid(self.APERTURE) then begin 
-     for i=0,n_elements(*self.APERTURE)-1 do begin 
-        m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
-        len=m>len
-     endfor 
-     self.PR_SIZE[0]=self.PR_SIZE[0]*len
-  endif   
-  
-  ;; The PR Width
-  if self.PR_SIZE[1] eq 0.0 then begin
+  if self.cal_file eq '' then begin 
+     self.cal_file=filestrip(irs_recent_calib())
      self.ACCOUNTS_VALID=0b
-     self.PR_SIZE[1]=1.D        ;the default, 1xn XXX
-  endif 
-  
-  ;; Normalize the build aperture(s)
-  if ptr_valid(self.APERTURE) then begin 
-     for i=0,n_elements(*self.APERTURE)-1 do begin 
-        ap=(*self.APERTURE)[i]
-        ;; default to the full aperture
-        if array_equal(ap.low,0.) AND array_equal(ap.high,0.) then $
-           (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
-     endfor 
-  endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
-  
-  ;; Find the average position angle over the course of the map
-  pa=mean((*self.DR).PA)
-  
-  ;; Establish the dimensions of the cube in the slit coordinate system
-  new_size=ceil((self.NSTEP-1L)*self.STEP_SIZE/self.PLATE_SCALE+ $
-                self.PR_SIZE)
-  if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
-     self.CUBE_SIZE[0:1]=new_size
-     self.ACCOUNTS_VALID=0b
+     self->Info,['Loading most recent calibration set: ','  '+self.cal_file]
   endif
+  obj_destroy,self.cal
+  self.cal=irs_restore_calib(self.cal_file)
+  self->UpdateButtons
 end
-
 
 ;=============================================================================
 ;  AddMergeRec - Add a merge record for a given order, index and
 ;                wavelength set.
 ;=============================================================================
-pro cubeProj::AddMergeRec,order,planes,wave,OFFSET=off
+pro CubeProj::AddMergeRec,order,planes,wave,OFFSET=off
   if n_elements(planes) ne 0 then begin 
      if ptr_valid((*self.MERGE)[order].planes) then $
         *(*self.MERGE)[order].planes=[*(*self.MERGE)[order].planes,planes] $
@@ -533,16 +1321,17 @@ pro cubeProj::AddMergeRec,order,planes,wave,OFFSET=off
 end 
 
 ;=============================================================================
-;  MergeSetup - Setup the merge by finding interpolating wavelengths,
-;               and recording which parts of the orders get
-;               interpolated, and where.
+;  MergeSetup - Setup the account merge by finding interpolating
+;               wavelengths, and saving information on which parts of
+;               the orders get interpolated, and where.
 ;=============================================================================
-pro cubeProj::MergeSetup,ORDS=ords
+pro CubeProj::MergeSetup,ORDS=ords
   if self.ORDER eq 0 then ords=self.cal->Orders(self.MODULE) else $
      ords=self.ORDER
   ptr_free,self.WAVELENGTH
   heap_free,self.MERGE
   wave1=(self.cal->GetWAVSAMP(self.MODULE,ords[0],/PIXEL_BASED, $
+                              PR_WIDTH=self.PR_SIZE[1], $
                               APERTURE=(*self.APERTURE)[0])).lambda
   if self.ORDER gt 0 then begin ;nothing to do
      self.WAVELENGTH=ptr_new(wave1)
@@ -566,8 +1355,9 @@ pro cubeProj::MergeSetup,ORDS=ords
   for ord=1L,nord-1L do begin
      ;; Work with previous, overlap with current order
      wave2=(self.cal->GetWAVSAMP(self.MODULE,ords[ord],/PIXEL_BASED, $
-                                 APERTURE=nap eq 1?(*self.APERTURE)[0]: $
-                                 (*self.APERTURE)[ord])).lambda
+                                 PR_WIDTH=self.PR_SIZE[1], $
+                                 APERTURE=(nap eq 1?(*self.APERTURE)[0]: $
+                                           (*self.APERTURE)[ord]))).lambda
      nw1=n_elements(wave1) & nw2=n_elements(wave2) 
      min_wav1=min(wave1,max=max_wav1)
      min_wav2=min(wave2,max=max_wav2)
@@ -630,12 +1420,12 @@ pro cubeProj::MergeSetup,ORDS=ords
      if wh_clear1[0] ne -1 then wave1=wave1[wh_clear1] 
      if wh_clear2[0] ne -1 then wave2=wave2[wh_clear2]
      
-     ;; Concat wave1 and overlap onto wavelengths:
-     ;;  [wave1 use_wav wave2] or [wave2 use_wav wave1]
+     ;; Concat wave1 and overlap onto wavelengths: either
+     ;;  [wave1 use_wav wave2] or [wave2 use_wav wave1], depending on order
      if prepend then begin
         if n_elements(wave) gt 0 then wave=[use_wav,wave1,wave] $
         else wave=[use_wav,wave1]
-        wave_zero[0:ord-1]=wave_zero[0:ord-1]+n_elements(wave2) 
+        wave_zero[0:ord-1]=wave_zero[0:ord-1]+n_elements(wave2) ;shift down
      endif else begin           
         ;; appending new ones
         if n_elements(wave) gt 0 then wave=[wave,wave1,use_wav] $
@@ -650,14 +1440,17 @@ pro cubeProj::MergeSetup,ORDS=ords
   
   (*self.MERGE).offset=wave_zero
   
-  ;; Finish the merge vector, computing split fractions and merge locations
+  ;; Finish the merge vector, computing plane split fractions and
+  ;; merge locations
   for ord=0,nord-1 do begin 
      ;; Interpolate those being merged onto the new wavelength grid.  
      if NOT ptr_valid((*self.MERGE)[ord].wave) then continue
      merge_wave=*(*self.MERGE)[ord].wave
+     ;; Location in the newly computed cube wavelength grid these
+     ;; wavelengths must be merged onto.
      map_loc=value_locate(wave,merge_wave)
      if NOT array_equal(map_loc ne -1,1b) then $
-        message,'Cannot merge non-bracketed wavelengths.'
+        self->Error,'Cannot merge non-bracketing wavelengths'
      ;;  the fraction in the first bin (independent of up-going vs. down-going)
      (*self.MERGE)[ord].frac=ptr_new((wave[map_loc+1]-merge_wave)/ $
                                      (wave[map_loc+1]-wave[map_loc]))
@@ -675,10 +1468,10 @@ end
 ;                 planes with with linear interpolation.  If they
 ;                 don't overlap, just concatenate the accounting
 ;                 cubes.  ORDER is the logical order number index in
-;                 sequence (as opposed to the optical order).
+;                 sequence (as opposed to the optical grating order
+;                 number).
 ;=============================================================================
-pro cubeProj::MergeAccount,dr,order,account
-  
+pro CubeProj::MergeAccount,dr,order,account
   if NOT ptr_valid(self.MERGE) then begin ; only one order
      (*self.DR)[dr].ACCOUNT=ptr_new(account)
      return
@@ -717,10 +1510,10 @@ pro cubeProj::MergeAccount,dr,order,account
      split_acc=account[changers]
      
      ;; The first plane (gets frac worth)
-     account[changers].areas=account[changers].areas*frac
+     account[changers].area=account[changers].area*frac
      account[changers].CUBE_PLANE=to_plane
      ;; The next plane (gets 1-frac worth)
-     split_acc.areas=split_acc.areas*(1.-frac)
+     split_acc.area=split_acc.area*(1.-frac)
      split_acc.CUBE_PLANE=to_plane+1
      
      if n_elements(new_acc) eq 0 then new_acc=[split_acc] else $
@@ -740,7 +1533,7 @@ end
 ;                 the pixel in that BCD which overlapped, and fraction
 ;                 which overlapped the corresponding cube pixel.
 ;=============================================================================
-pro cubeProj::BuildAccount,_EXTRA=e
+pro CubeProj::BuildAccount,_EXTRA=e
   self->Normalize
   self->MergeSetup
   self.CUBE_SIZE[2]=n_elements(*self.WAVELENGTH) 
@@ -752,53 +1545,98 @@ pro cubeProj::BuildAccount,_EXTRA=e
      ords=self.ORDER
   nap=n_elements(*self.APERTURE) 
   
-    ;;Debugging plots
-  tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b],1
-  plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
-       yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
-  for i=0,self.cube_size[0] do plots,i,!Y.CRANGE
-  for i=0,self.cube_size[1] do plots,!X.CRANGE,i
-  wait,0
+  ;;Feedback plots
+  if self.feedback then begin 
+     aspect=float(self.CUBE_SIZE[0])/self.CUBE_SIZE[1] ;x=y*aspect
+     
+     ;; Keep the position outline square, 700 is the largest dimension
+     ;; pos=[15,15]+[x,y]-[15,4]
+     if self.CUBE_SIZE[0] gt self.CUBE_SIZE[1] then begin 
+        xsize=700
+        ysize=xsize/aspect
+     endif else begin 
+        ysize=700
+        xsize=ysize*aspect
+     endelse 
+     xsize=xsize+30 & ysize=ysize+19
+     
+     tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b],!D.TABLE_SIZE-5
+     save_win=!D.WINDOW
+     window,XSIZE=xsize,YSIZE=ysize,TITLE='Building Cube: '+self->ProjectName()
+     plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
+          POSITION=[15,15,xsize-15,ysize-4],/DEVICE, $
+          yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
+     ;; The grid
+     for i=0,self.cube_size[0] do plots,i,!Y.CRANGE
+     for i=0,self.cube_size[1] do plots,!X.CRANGE,i
+     wait,0
+  endif 
   ;; End debugging plots
-
+  
+  ;; If the cube size was changed, we might need to shift existing
+  ;; accounts by one or more pixels ... only relevant with
+  ;; POSITION-based (not GRID-based) cube layout.  E.g. making a cube
+  ;; with overlapping maps taken at different epochs.
+  ;; if self.ACCOUNTS_VALID eq 2b then begin 
+  ;;    new=where(NOT ptr_valid((*self.DR).ACCOUNT)) ;newly added BCD's
+  
+  
+  ;; For shifting each sample based on the actual apertures chosen
+  mlow=1. & mhigh=0.
+  for ap=0,n_elements(*self.APERTURE)-1 do begin 
+     mlow=mlow<min((*self.APERTURE)[ap].low)
+     mhigh=mhigh>max((*self.APERTURE)[ap].high)
+  endfor
+  if mlow+mhigh ne 1. then  $
+     ap_offset=(.5-.5*(mlow+mhigh))*self.PR_SIZE[0]/(mhigh-mlow) $
+  else ap_offset=0.
+  
   for i=0L,n_elements(*self.DR)-1 do begin 
      ;; skip disabled records unconditionally
      if (*self.DR)[i].DISABLED then continue 
      
-     ;; if the accounts are still valid and an account exists for this
-     ;; DR, assume it's valid.
-     if self.ACCOUNTS_VALID AND ptr_valid((*self.DR)[i].ACCOUNT) then $
-        continue else ptr_free,(*self.DR)[i].ACCOUNT
+     feedback_only=0            ;might just show the feedback
      
-     ;; Compute the pixel offset of the slit center for this BCD
-     ;; The slit is laid out differently in Spectral Maps and BCD's (ughh)
-     ;; so ROW<-->COLUMN.  
-     basic_offset=([(*self.DR)[i].ROW,(*self.DR)[i].COLUMN]-1)*stepsz+ $
+     ;; if the accounts are fully valid and an account exists for this
+     ;; DR, assume it's valid.
+     if self.ACCOUNTS_VALID eq 1b AND ptr_valid((*self.DR)[i].ACCOUNT) $
+        then begin 
+        if self.feedback then feedback_only=1 else continue 
+     endif else ptr_free,(*self.DR)[i].ACCOUNT
+     
+     ;; Compute the pixel offset of the canonical PR's center for this
+     ;; BCD N.B. The slit is laid out differently in Spectral Maps and
+     ;; BCD's (ughh) so ROW<-->COLUMN.  A non-full aperture will
+     ;; introduce a correction to this center.
+     
+     ;; XXX The details of this depend on the exact layout of the "+y"
+     ;; direction w.r.t the detector coordinates, i.e. do maps start
+     ;; top left, bottom left, etc  Revisit.
+     basic_offset=([(*self.DR)[i].ROW-1, $
+                    self.cube_size[1]-(*self.DR)[i].COLUMN])*stepsz+ $
                   self.PR_SIZE/2.
      
      ;; (Small) difference between PA of this BCD and the mean map PA
      pa_delta=((*self.DR)[i].PA-self.PA)
+     
      for ord=0,n_elements(ords)-1 do begin
         aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
         prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
                                  /PIXEL_BASED, /SAVE_POLYGONS, $
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
-        offset=basic_offset
-        
-        ;;X-Offset for non-centered aperture
-        mlow=min(aper.low) & mhigh=max(aper.high)
-        if mlow+mhigh ne 1. then $
-           offset[0]=offset[0]-(.5*(mlow+mhigh)-.5)* $
-                     self.PR_SIZE[0]/(mhigh-mlow)
+        offset=[basic_offset[0]+ap_offset,basic_offset[1]]
         
         ;; Pre-allocate an account list 
-        nacc=4*n_elements(prs) 
-        account=replicate({CUBE_ACCOUNT_LIST, $
-                           cube_plane:0L,cube_pix:0L, bcd_pix:0L, areas:0.0}, $
-                          nacc)
-        
+        if NOT feedback_only then begin 
+           nacc=4*n_elements(prs) 
+           account=replicate({CUBE_ACCOUNT_LIST},nacc)
+           prmin=0L & prmax=n_elements(prs)-1
+        endif else begin 
+           prmin=1L & prmax=1L
+        endelse 
         acc_ind=0L
-        for j=0L,n_elements(prs)-1 do begin ; iterate over all the PRs
+        
+        for j=prmin,prmax do begin ; iterate over all the PRs
            ;; Setup the rotation matrix to rotate back to the +x direction
            angle=prs[j].angle+pa_delta
            if angle ne 0.0D then begin 
@@ -822,12 +1660,16 @@ pro cubeProj::BuildAccount,_EXTRA=e
 
               ;; Offset the polygon correctly into the sky grid
               poly=poly+rebin(offset,size(poly,/DIMENSIONS))
-              if j eq 1 then begin 
+              
+              if self.feedback AND j eq 1L then begin
                  plots,[reform(poly[0,*]),poly[0,0]], $
-                       [reform(poly[1,*]),poly[1,0]],COLOR=1+i mod 4
-                 plots,offset,PSYM=4,COLOR=1+i mod 4
+                       [reform(poly[1,*]),poly[1,0]], $
+                       COLOR=!D.TABLE_SIZE-5+i mod 4
+                 plots,offset,PSYM=4,COLOR=!D.TABLE_SIZE-5+i mod 4
                  wait,0
-              endif 
+              endif
+              
+              if feedback_only then continue
               
               ;; Clip it against the sky grid
               cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
@@ -854,18 +1696,35 @@ pro cubeProj::BuildAccount,_EXTRA=e
               account[acc_ind:acc_ind+ncp-1].cube_pix=cube_spatial_pix
               account[acc_ind:acc_ind+ncp-1].cube_plane=j ;just this order's
               account[acc_ind:acc_ind+ncp-1].bcd_pix=bcdpixel
-              account[acc_ind:acc_ind+ncp-1].areas=areas
+              account[acc_ind:acc_ind+ncp-1].area=areas
               acc_ind=acc_ind+ncp
            endfor
         endfor
+        if feedback_only then continue
         account=account[0:acc_ind-1] ; trim this order's account to size
         
         ;; Merge this account into the full cube account
         self->MergeAccount,i,ord,account
      endfor
-     ;; Compute the total reverse index of the full cube indices for
-     ;; this DR's accounting.  E.g. the account records from this BCD
-     ;; pertaining to cube pixel z are: ri[ri[z]:ri[z+1]-1].
+  endfor
+  self->BuildRevAcct            ;we need these too...
+  if self.feedback then wset,save_win
+  self.ACCOUNTS_VALID=1b
+end
+
+;=============================================================================
+;  BuildRevAcct - Build the reverse accounts from the regular accounts.
+;=============================================================================
+pro CubeProj::BuildRevAcct
+  for i=0L,n_elements(*self.DR)-1 do begin 
+     if (*self.DR)[i].DISABLED then continue 
+     if self.ACCOUNTS_VALID eq 1b AND ptr_valid((*self.DR)[i].REV_ACCOUNT) $
+        then continue else ptr_free,(*self.DR)[i].REV_ACCOUNT
+     
+     ;; Compute the total reverse index of the full cube index
+     ;; histogram for this DR's accounting.  E.g. the account records
+     ;; from this BCD pertaining to cube pixel z are:
+     ;; ri[ri[z]:ri[z+1]-1].
      h=histogram((*(*self.DR)[i].ACCOUNT).cube_pix+ $
                  (*(*self.DR)[i].ACCOUNT).cube_plane* $
                  self.CUBE_SIZE[0]*self.CUBE_SIZE[1], $
@@ -874,119 +1733,344 @@ pro cubeProj::BuildAccount,_EXTRA=e
      (*self.DR)[i].REV_CNT=n_elements(h) 
      (*self.DR)[i].REV_MIN=om
   endfor
-
-  self.ACCOUNTS_VALID=1b
+  self->UpdateButtons
 end
 
 ;=============================================================================
 ;  BuildCube - Assemble the Cube from the accounting information, the
 ;              BCD data and the uncertainties.
 ;=============================================================================
-pro cubeProj::BuildCube
+pro CubeProj::BuildCube
   if NOT ptr_valid(self.DR) then return
-  if NOT self.ACCOUNTS_VALID OR $
-     NOT array_equal(ptr_valid((*self.DR).ACCOUNT),1b) then self->BuildAccount
+  if self.ACCOUNTS_VALID ne 1b OR $
+     NOT array_equal(ptr_valid((*self.DR).ACCOUNT),1b) OR $
+     self.feedback then self->BuildAccount else self->BuildRevAcct
   
   cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
-  big_bcd=(*self.DR).BCD        ;pre-cache all the BCDs.. big (128KB*n_bcd)!
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
-
-  bcd_size=128L*128L*2L         ;each BCD is two planes XXX not for MIPSSED
-  error_offset=128L*128L        ;the error plane is second
   
   for dr=0,n_elements(*self.DR)-1 do begin 
      if (*self.DR)[dr].DISABLED then continue
      acct=*(*self.DR)[dr].ACCOUNT
      rev_acc=*(*self.DR)[dr].REV_ACCOUNT
      rev_min=(*self.DR)[dr].REV_MIN
+     bcd=*(*self.DR)[dr].BCD
+     use_err=ptr_valid((*self.DR)[dr].ERROR)
+     if use_err then err=*(*self.DR)[dr].ERROR
      ;; Use the reverse account to populate the cube
      for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
         if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
-        pix_acc=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
+        these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
         ;; XXX Error weighting, other alternatives
         ;;  need all in one place? ... e.g trimmed mean?
         cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
-           total(big_bcd[dr*bcd_size+pix_acc.BCD_PIX] * pix_acc.AREAS)
-        areas[rev_min+i]=areas[rev_min+i]+total(pix_acc.AREAS)
+           total(bcd[these_accts.BCD_PIX] * these_accts.AREA)
+        areas[rev_min+i]=areas[rev_min+i]+total(these_accts.AREA)
      endfor
   endfor 
   
   areas=areas>1.e-7
   ptr_free,self.CUBE,self.ERR
   self.CUBE=ptr_new(cube/areas,/NO_COPY)
+  self.CUBE_DATE=systime(/JULIAN)
+  self->UpdateButtons & self->UpdateList
 end
 
 ;=============================================================================
-;  Stack - Extract a stack from the built cube between two wavelength
-;          intervals, optionally weighting the individual planes with
-;          WEIGHTS
+;  Stack - Build a stacked image from the cube between any number of
+;          sets of wavelength intervals, optionally weighting the
+;          individual planes with WEIGHTS.
+;
+;             FORERANGES: A 2xn list of foreground wavelength ranges
+;                         over which to stack.
+;             BACKRANGES: A 2xn list of background wavelength ranges
+;                         over which to stack.
+
+;             BG_VALS: A list of background values, one for each
+;                      foreground plane, in the order present in
+;                      FOREREANGES, to subtract.  If passed,
+;                      BACKRANGES is ignored.
+
+;             WEIGHTS: A list of n pointers to weight vectors [0-1]
+;                      spanning the same number of elements as the
+;                      foreground range.
 ;=============================================================================
-function cubeProj::Stack,lam1,lam2,WEIGHTS=weights
-  if NOT ptr_valid(self.CUBE) then message,'No cube to stack'
-  p1=value_locate(*self.WAVELENGTH,lam1)+1 ;not less than lam1
-  p2=value_locate(*self.WAVELENGTH,lam2) ;not greater than lam2
-  nw=n_elements(weights) 
-  if nw ne 0 then begin 
-     if nw ne p2-p1+1 then message,'Incorrect number of weights passed'
-     return,total(*self.CUBE[*,*,p1:p2] * $
-                  rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw], $
-                        /SAMPLE), 3)
+function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
+                         BG_VALS=bg_vals
+  if NOT ptr_valid(self.CUBE) then self->Error,'No cube to stack'
+  
+  sf=size(foreranges,/DIMENSIONS)
+  if n_elements(sf) eq 2 then nfr=sf[1] else nfr=1
+  
+  if n_elements(backranges) ne 0 then begin 
+     sb=size(backranges,/DIMENSIONS)
+     if n_elements(sb) eq 2 then nbr=sb[1] else nbr=1
+  endif else nbr=0
+  nbgv=n_elements(bg_vals) 
+  
+  stack=fltarr(self.CUBE_SIZE[0:1])
+  fcnt=0
+  for i=0,nfr-1 do begin 
+     stack=stack+total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],3)
+     fcnt=fcnt+foreranges[1,i]-foreranges[0,i]+1
+  endfor 
+  
+  stack=stack/fcnt
+           
+  if nbr eq 0 AND nbgv eq 0 then return,stack
+  
+  if nbgv gt 0 then begin 
+     if nbgv ne fcnt then $
+        self->Error,'Wrong number of background values passed'
+     stack=stack-total(bg_vals)/fcnt ;average(fi-bgvi)
+     print,'stacking with: ',bg_vals
+     return,stack
   endif 
-  return,total(*self.CUBE[*,*,p1:p2],3)
+  
+  ;; Compute a background
+  bcnt=0
+  background=fltarr(self.CUBE_SIZE[0:1])
+  for i=0,nbr-1 do begin 
+     background=background+ $
+                total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]],3)
+     bcnt=bcnt+backranges[1,i]-backranges[0,i]+1.
+  endfor 
+  if bcnt gt 0 then begin 
+     background=background/bcnt
+     stack=stack-background
+  endif
+  return,stack
+  
+;   nw=n_elements(weights) 
+;   if nw ne 0 then begin 
+;      return,total(*self.CUBE[*,*,p1:p2] * $
+;                 rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw], $
+;                       /SAMPLE), 3)
+;   endif 
+;  return,total(*self.CUBE[*,*,p1:p2],3)
 end
 
+;=============================================================================
+;  Extract - Extract a Spectrum from the Cube
+;=============================================================================
+function CubeProj::Extract,low,high
+  if NOT ptr_valid(self.CUBE) then self->Error,'No cube to extract'
+  return,total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1),1)/ $
+         (high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+end
 
 ;=============================================================================
-;  N_Records
+;  CheckSteps - Ensure that all of the BCD's for this map are present.
 ;=============================================================================
-function cubeProj::N_Records
-   if ptr_valid(self.DR) then return,n_elements(*self.DR) else return,0
+pro CubeProj::CheckSteps
+  if NOT ptr_valid(self.DR) then self->Error,'No BCD Data loaded.'
+  got=bytarr(self.NSTEP)
+  got[(*self.DR).ROW-1,(*self.DR).COLUMN-1]=1b
+  wh=where(got eq 0b, cnt)
+  if cnt eq 0 then return
+  self->Error,['Missing Steps: ',$
+               string(FORMAT='('+strtrim(cnt,2)+'("[",I0,", ",I0,"]"))', $
+                      [1#(wh mod self.NSTEP[0]+1),1#(wh/self.NSTEP[0]+1)])]
+end
+
+;=============================================================================
+;  CheckModules - Make sure only one module is present.
+;=============================================================================
+pro CubeProj::CheckModules,id,ERROR=err
+  ;; Check the data's module type
+  err=0
+  nr=self->N_Records()
+
+  if n_elements(id) ne 0 then begin ;just check this id against the new one
+     if nr eq 0 then self.MODULE='' ;no module without some data records
+     fovname=irs_fov(id,MODULE=module)
+     if self.MODULE ne '' then begin 
+        if module ne self.MODULE then begin 
+           err=1
+           self->Error,["Data from only one module is permitted: ", $
+                        "   "+self.module+","+module],/RETURN_ONLY
+        endif 
+     endif else self.MODULE=module ;no module yet, just set this one
+     return                     
+  endif
+  
+  modules=strarr(nr)
+  orders=intarr(nr)
+  for i=0,n_elements(*self.DR)-1 do begin 
+     fovname=irs_fov((*self.DR)[i].FOVID,MODULE=module,ORDER=order)
+     modules[i]=module
+     orders[i]=order
+  endfor
+  u=uniq(modules,sort(modules))
+  if n_elements(u) gt 1 then $
+     self->Error,["Data from only one module is permitted: ", $
+                  "   "+strjoin(modules[u],",")],/RETURN_ONLY
+  self.module=modules[u[0]]
+  if array_equal(orders,orders[0]) then self.ORDER=orders[0]
+end
+
+;=============================================================================
+;  Normalize - Map header info in the BCD's to cube-specific data, and
+;              returns the status of the normalization.
+;=============================================================================
+pro CubeProj::Normalize
+  self->LoadCalib
+  
+  if NOT ptr_valid(self.DR) then $
+     self->Error,'No data records'
+  
+  self->CheckModules
+  
+  ;; For low-res use the target order as the order, if they're all the same.
+  if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
+     self.ORDER eq 0 AND $
+     (self.module eq 'SL' OR self.module eq 'SH') $
+     then self.ORDER=(*self.DR)[0].TARGET_ORDER
+  
+  ;; Normalize the plate scale... they should all be the same!
+  ps=dblarr(2*n_elements(*self.DR))
+  for i=0,n_elements(*self.DR)-1 do $
+     ps[2*i]=sxpar(*(*self.DR)[i].HEADER,'CDELT*') 
+  psm=mean(ps)
+  if NOT array_equal(abs(ps-psm) lt 1.e-4,1b) then $
+     self->Error,"Plate scale mismatch among input BCD's"
+  self.PLATE_SCALE=psm
+  
+  ;; Normalize the number of steps and step size (they should all be the same)
+  stepsper=(stepspar=lonarr(n_elements(*self.DR)))
+  stepszper=(stepszpar=dblarr(n_elements(*self.DR)))
+  for i=0,n_elements(*self.DR)-1 do begin 
+     stepsper[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPER')
+     stepspar[i]=sxpar(*(*self.DR)[i].HEADER,'STEPSPAR')
+     stepszpar[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPAR')
+     stepszper[i]=sxpar(*(*self.DR)[i].HEADER,'SIZEPER')
+  endfor 
+  if (NOT array_equal(stepsper,stepsper[0])) or $
+     (NOT array_equal(stepspar,stepspar[0])) then $
+     self->Error,"BCD's have unequal map size"
+  self.NSTEP=[stepspar[0],stepsper[0]]
+  if (NOT array_equal(stepszper,stepszper[0])) or $
+     (NOT array_equal(stepszpar,stepszpar[0])) then $
+     self->Error,"BCD's have unequal step size"
+  self.STEP_SIZE=[stepszpar[0],stepszper[0]]/3600.D
+  
+  ;; Normalize the slit length
+  if self.ORDER gt 0 then begin 
+     self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
+     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=sl*self.PLATE_SCALE
+     self.PR_SIZE[0]=sl
+  endif else begin ;; find the longest slit and use it
+     ords=self.cal->Orders(self.module)
+     slmax=0.
+     for i=0,n_elements(ords)-1 do begin 
+        self.cal->GetProperty,self.module,ords[i],SLIT_LENGTH=sl
+        slmax=sl>slmax
+     endfor 
+     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=slmax*self.PLATE_SCALE
+     self.PR_SIZE[0]=slmax
+  endelse 
+  
+  ;; Check to ensure all steps are present and accounted for
+  self->CheckSteps
+  
+  len=0.                        ;adjust for a non-full aperture
+  if ptr_valid(self.APERTURE) then begin 
+     for i=0,n_elements(*self.APERTURE)-1 do begin 
+        m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
+        len=m>len
+     endfor 
+     self.PR_SIZE[0]=self.PR_SIZE[0]*len
+  endif   
+  
+  ;; The PR Width
+  if self.PR_SIZE[1] eq 0.0 then begin
+     self.ACCOUNTS_VALID=0b
+     self.PR_SIZE[1]=1.D        ;the default, 1xn XXX
+  endif 
+  
+  ;; Normalize the build aperture(s)
+  if ptr_valid(self.APERTURE) then begin 
+     for i=0,n_elements(*self.APERTURE)-1 do begin 
+        ap=(*self.APERTURE)[i]
+        ;; default to the full aperture
+        if array_equal(ap.low,0.) AND array_equal(ap.high,0.) then $
+           (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
+     endfor 
+  endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
+  
+  ;; Find the average position angle over the course of the map
+  pa=mean((*self.DR).PA)
+  
+  ;; Establish the dimensions of the cube in the slit coordinate system
+  new_size=ceil((self.NSTEP-1L)*self.STEP_SIZE/self.PLATE_SCALE+ $
+                self.PR_SIZE)
+  if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
+     self.CUBE_SIZE[0:1]=new_size
+     self.ACCOUNTS_VALID=2b
+  endif
 end
 
 ;=============================================================================
 ;  AddData - Add one or more BCD data files to the cube.
 ;=============================================================================
-pro cubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
+pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
   if n_elements(files) eq 0 AND n_elements(pat) ne 0 then begin 
      if n_elements(dir) ne 0 then $
         files=findfile(dir+pat) $
      else files=findfile(pat)   ;assume pat contains the pattern
   endif 
-  if n_elements(files) eq 0 then message,'No files or data passed'
+  if n_elements(files) eq 0 then begin 
+     if self->IsWidget() then begin 
+        files=bcd_multfls(PARENT_GROUP=self->TopBase())
+        if size(files,/TYPE) ne 7 then return
+     endif else self->Error,'Files required'
+  endif
   for i=0,n_elements(files)-1 do begin 
      bcd=readfits(files[i],header,/SILENT)
      self->AddBCD,bcd,header,FILE=files[i],_EXTRA=e
   endfor
+  self->UpdateList & self->UpdateButtons
 end
 
 ;=============================================================================
 ;  AddBCD - Add a bcd image to the cube, optionally overriding the
 ;           header derived values.
 ;=============================================================================
-pro cubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
+pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
                      COLUMN=col, ROW=row, CMD_POS=cpos, REC_POS=rpos, PA=pa
   s=size(bcd,/DIMENSIONS)
   rec={CUBE_DR}
   if n_elements(s) eq 3 then begin 
-     if array_equal(s,[128,128,2]) then begin 
-        rec.BCD=bcd
-     endif else message,'Incorrect BCD dimensions'
+     if s[2] eq 2 then begin 
+        rec.BCD=ptr_new(bcd[*,*,0]) & rec.ERROR=ptr_new(bcd[*,*,1])
+     endif else self->Error,'Incorrect BCD dimensions'
   endif else if n_elements(s) eq 2 then begin 
-     if array_equal(s,[128,128]) then begin 
-        if array_equal(size(error,/DIMENSIONS),[128,128]) then $
-           rec.BCD=[ [[bcd]], [[error]] ] else $
-           rec.BCD=[ [[bcd]], [[make_array(/FLOAT,128,128,VALUE=1.)]] ]
-     endif else message,"BCD's must be 128x128[x2]"
-  endif else message,"BCD's must be 128x128[x2]"
-  if size(header,/TYPE) ne 7 then message,'Header must be a string array'
+     rec.BCD=ptr_new(bcd)
+  endif
+  if size(error,/N_DIMENSIONS) eq 2 then rec.ERROR=ptr_new(error)
+  
+  if size(header,/TYPE) ne 7 then self->Error,'Header must be a string array'
   rec.header=ptr_new(header)
   if n_elements(file) ne 0 then rec.file=file
   
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
-     id=strmid(rec.file,strpos(rec.file,path_sep(),/REVERSE_SEARCH)+1)
+     id=filestrip(rec.file)
      suffix=strpos(id,".fits",/REVERSE_SEARCH)
      if suffix[0] ne -1 then id=strmid(id,0,suffix)
      rec.id=id
+  endif 
+  
+  rec.FOVID=sxpar(header,'FOVID',COUNT=cnt)
+  self->CheckModules,rec.FOVID,ERROR=err
+  if err then begin 
+     heap_free,rec
+     return
+  endif 
+  
+  if cnt gt 0 then begin 
+     fovname=irs_fov(rec.FOVID,ORDER=target_order,POSITION=target_pos)
+     rec.TARGET_ORDER=target_order
+     rec.TARGET_POS=target_pos
   endif 
   
   if n_elements(exp) ne 0 then rec.EXP=exp else $
@@ -1006,78 +2090,84 @@ pro cubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
   if array_equal(self.slit_size,0.0) then $
      self.slit_size=[sxpar(header,'SLITSZ2'),sxpar(header,'SLITSZ1')]
   rec.NCYCLES=sxpar(header,'NCYCLES')
-  fovid=sxpar(header,'FOVID',COUNT=cnt)
-  if cnt gt 0 then begin 
-     fovname=irs_fov(fovid,ORDER=target_order,POSITION=target_pos)
-     rec.TARGET_ORDER=target_order
-     rec.TARGET_POS=target_pos
-  endif 
-  
+  rec.DATE_OBS=sxpar(header,'MJD_OBS')+2400000.5D
+  rec.TIME=sxpar(header,'EXPTIME')
+  rec.DATE=systime(/JULIAN)
+ 
   if ptr_valid(self.DR) then *self.DR=[*self.DR,rec] else $
      self.DR=ptr_new(rec,/NO_COPY)
+  self.Changed=1b
 end
 
 ;=============================================================================
 ;  RemoveBCD - Remove one or more BCD's
 ;=============================================================================
-pro cubeProj::RemoveBCD,recs
+pro CubeProj::RemoveBCD,recs
   heap_free,(*self.DR)[recs]
-  keep=where(histogram(recs,MIN=0,MAX=self->N_Records()) eq 0,cnt)
-  if cnt ne 0 then begin
-     (*self.DR)=(*self.DR)[keep] 
-     wh=where(keep eq self.cur,cnt) ;see if current is kept... shift it
-     if cnt ne 0 then self.cur=wh[0] else self.cur=-1
-  endif else ptr_free,self.DR
-  self->UpdateList
+  keep=where(histogram([recs],MIN=0,MAX=self->N_Records()-1) eq 0,cnt)
+  if cnt ne 0 then (*self.DR)=(*self.DR)[keep] $
+  else ptr_free,self.DR
   self.Changed=1b               ;but accounts remain valid!
+  self->UpdateList,/CLEAR_SELECTION & self->UpdateButtons
 end
 
 ;=============================================================================
-;  Sort - Sort the Data records. 
+;  Send - Send One of our messages
 ;=============================================================================
-pro scoreProj::Sort,sort
-  n=self->N_Records()
-  if n le 1 then return         ;no sort for one only
-  if n_elements(sort) ne 0 then sort=0>sort<5
-  
-  case sort of
-     0: s=sort((*self.DR).ID)
-     1: s=sort((*self.DR).Object)
-     2: s=sort((*self.DR).ITIME)
-     3: s=sort((*self.DR).DATE)
-     4: s=sort((*self.DR).Date)
-  endcase
-  *self.DR=(*self.DR)[s]        ;rearrange
+pro CubeProj::Send,RECORD=record,CUBE=cube
+  if keyword_set(cube) ne 0 then begin 
+     self->MsgSend,{CUBEPROJ_CUBE, $
+                    self,$
+                    string(FORMAT='(%"%s [%dx%d], %s")',self->ProjectName(), $
+                           self.NSTEP,jul2date(self.CUBE_DATE)), $
+                    self.MODULE,self.WAVELENGTH}
+  endif
+  if n_elements(record) ne 0 then begin 
+     rec=(*self.DR)[record]
+     self->MsgSend,{CUBEPROJ_RECORD, $
+                    self,$
+                    string(FORMAT='(%"%s <%s> %s")', $
+                           self->ProjectName(),rec.ID, $
+                           irs_fov(rec.FOVID,/SHORT_NAME)), $
+                    self.MODULE,self.ORDER,self.CAL,rec.BCD,rec.ERROR}
+  endif   
+end
+
+;=============================================================================
+;  N_Records
+;=============================================================================
+function CubeProj::N_Records
+   if ptr_valid(self.DR) then return,n_elements(*self.DR) else return,0
 end
 
 ;=============================================================================
 ;  Cleanup 
 ;=============================================================================
-pro cubeProj::Cleanup
-  ;; !!! Write a real cleanup.
+pro CubeProj::Cleanup
   heap_free,self.DR
   heap_free,self.MERGE
   ptr_free,self.APERTURE,self.CUBE,self.ERR,self.wInfo
+  if self.spawned then obj_destroy,self.cal ;noone else will see it.
 end
 
 ;=============================================================================
 ;  Init 
 ;=============================================================================
-function cubeProj::Init, name, _EXTRA=e
+function CubeProj::Init, name, _EXTRA=e
   if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up (add msglist)
-  self.cur=-1                   ;none yet set current
   self.Changed=0b               ;coming into existence doesn't count
-  self.SpaceSaver=1b            ;use spacesaver by default
   if n_elements(e) ne 0 then self->SetProperty,_EXTRA=e
+  self->ObjReport::SetProperty,TITLE_BASE='CUBISM Project'
   return,1
 end
 
 ;=============================================================================
 ;  CubeProj - IRS Spectral (+MIPS SED) Cubes
 ;=============================================================================
-pro cubeProj__define
-  c={cubeProj, $
+pro CubeProj__define
+  c={CubeProj, $
      INHERITS ObjMsg, $         ;make it an object messanger
+     INHERITS ObjReport, $      ;for error, etc. reporting
      ProjectName:'', $          ;the name of the current project 
      MODULE:'', $               ;The name of the module, one of
                                 ;   SL,LL,SH,LH (IRS),MSED (MIPS)
@@ -1089,6 +2179,7 @@ pro cubeProj__define
      DR: ptr_new(), $           ;All the BCD's: pointer to list of
                                 ; data record structures of type CUBE_DR
      ACCOUNTS_VALID: 0b,$       ; are the account records valid?
+                                ;  0: no, 1:yes, 2:size changed
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      ERR:  ptr_new(),$          ;a pointer to the nxmxl error cube
 ;     ITIME: ptr_new(),$         ;nxmxl integration time per pixel
@@ -1104,25 +2195,30 @@ pro cubeProj__define
      POSITION:[0.0D,0.0D], $    ;optimized position of the cube center
      PA:0.0D, $                 ;optimized position angle of the cube
      MERGE:ptr_new(),$          ;a set of records to aid merging the orders
-                                ;  {offset,inds,wave,to,frac}
-     cur:0, $                   ;the current record.
+                                ;  ptr to list of {offset,inds,wave,to,frac}
      cal:obj_new(), $           ;the irs_calib object.
      cal_file:'', $             ;the calibration file used (if not a full
                                 ; directory, in the "calib/" subdir)
      Changed:0b, $              ;if the project is changed since last saved.
-     SpaceSaver:0b,  $          ;whether to use space saver -- omits saving raw
+     Spawned:0b, $              ;whether we were opened by another instance
+     feedback:0, $              ;whether to show feedback when building cube
      SaveFile:'', $             ;the file it was saved to
+     sort:0b, $                 ;our sorting order
      wInfo:ptr_new()}           ;the widget info struct.... a diconnectable ptr
   
-  acc={CUBE_ACCOUNT, $
-       DR: 0L, $                ;index into the DR list
-       pixel: 0L, $             ;which pixel in the BCD overlapped
-       frac: 0.0}               ;the fraction of overlap
+  
+  ;; The account structure is *big* (~1Mb per BCD)
+  acc={CUBE_ACCOUNT_LIST, $
+       cube_plane:0, $          ;the cube plane it goes to.
+       cube_pix:0, $            ;the cube pixel in that plane
+       bcd_pix:0, $             ;the bcd pixel it came from
+       area:0.0}                ;the area of overlap on the cube pixel
   
   ;; The data structure for each input BCD
   rec={CUBE_DR, $
        ID:'',$                  ;A unique (hopefully) ID
        file:'', $               ;the original file read for this data
+       TIME:0.0, $              ;The integration time
        DISABLED: 0b, $          ;whether this DR is disabled
        ACCOUNT: ptr_new(), $    ;list of {CUBE_PLANE,CUBE_PIX,BCD_PIX,AREAS}
        REV_ACCOUNT: ptr_new(),$ ;reverse indices of the CUBE_INDEX histogram
@@ -1130,106 +2226,41 @@ pro cubeProj__define
        REV_CNT:0L, $            ;how many bins in the cube_index histogram?
        CMD_POS: [0.0D,0.0D], $  ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
+       FOVID: 0, $              ;The IRS Field of View ID
        TARGET_ORDER: 0, $       ;which order was targetted by pointing
                                 ;  (or 0 for module center targetting)
        TARGET_POS: 0, $         ;For low-res: 0, 1, or 2 for centered on
                                 ; module, slit position 1, or slit position 2
        PA: 0.0D, $              ;Position angle of slit E of N
-       BCD: fltarr(128,128,2), $ ;the 2 plane BCD (error plane second).
+       BCD: ptr_new(), $        ;the BCD
+       ERROR:ptr_new(), $       ;the BCD's error plane
        EXP: 0L, $               ;the exposure number in the mapping sequence
        CYCLE:0L, $              ;the cycle number at this position
        NCYCLES:0L,$             ;the number of cycles at this position
        COLUMN: 0L,$             ;the step number perpendicular to the slit
        ROW:0L, $                ;the step number parallel to the slit
-       Date:0.0D, $             ;the date this BCD was added
+       DATE:0.0D, $             ;the date this BCD was added
+       DATE_OBS:0.0D, $         ;the date this BCD was observed
        HEADER: ptr_new()}       ;a pointer to a string array.
-end
+  
+  ;; The widget info
+  winfo={cubeProj_wInfo,$
+         Base:0L, $             ;the Show Widget, DR list display base
+         SList:0L, $            ;the Widget List for Show 
+         wHead:lonarr(2), $    ;the widget heads
+         list_row:0.0, $        ;the height of list rows in pixels
+         which_list:0, $        ;which list we're using
+         list_size_diff:0, $    ;the difference in ysize between list and base
+         lines:0, $             ;number of list lines last set
+         MUST_MODULE:lonarr(1),$ ;must have a module set
+         MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
+         MUST_SELECT:lonarr(14),$ ;the SW buttons which require any selected
+         MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
+         MUST_PROJ:0L, $        ;SW button which requires a valid project
+         MUST_CUBE:lonarr(4)}   ;SW button requires valid cube created.
 
-; NOTES:
-;
-; speedup possibilities:
-;
-;   Drop the ragged 4d array format for the accounting cubes.  Cube
-;   pixels can have 0 or more contributing pixels.  Code the index as
-;   a single integer master BCD index into the large 128x128x(2*n*bcd)
-;   array, e.g.:
-;
-;      DR: 4, PIXEL:5206 ====> INDEX:4*128*128*2+5206=136278L
-;   
-;   cache the 128x128x(2*n_bcd) *(self.DR).BCD array prior to building
-;   the cube.  Index it in parallel using the full index as developed
-;   above.  This index will change when you add or remove cubes (so
-;   will the cube number, so it's not such a big deal).  Do you always
-;   have to rebuild the ACCOUNT when you make a new cube?  What's the
-;   use of separating it then?  I guess you could *disable* cubes
-;   without rebuilding the account, but adding or removing any messes
-;   things up.  It seems account isn't as flexible as I had thought.
-;   If there are different options for weighting the various
-;   contributing data, at least *that* doesn't mess up the account.
-;
-;   Make a flat 4D hypercube of accounting info with up to 4 entries
-;   per pixel.  Additional entries (beyond 4) are stored as a big list
-;   of form:
-;
-;     [ {cube_pixel, master_bcd_index, fraction}, ..., ]
-;
-;   Too much of a pain.  What about using this type of list for the
-;   full accounting structure?  Building the cube then would be as
-;   simple then as:
-;
-;     cube[cube_pixel]=cube[cube_pixel]+big_bcd[master_bcd_index]*fraction
-;   
-;   except this doesn't work, thanks to repeated indices being ignored
-;   in assignment (thanks IDL).  Also, when you want the accounting
-;   information for a pixel, you have to search through the *long*
-;   list.  Oh for the want of hashes.... AHA... use the sparse array
-;   technique, with the slight difference that you compute:
-;
-;     val=big_bcd[master_bcd_index]*frac
-;
-;   it would go something like:
-;
-;     At cube build time:
-;     
-;     super_ind=acct.DR*128L*128L*2L+acct.PIXEL
-;     mx=max(super_ind)
-;     h1=histogram(super_ind,MIN=0,REVERSE_INDICES=ri1) 
-;     col=ri1[n_elements(h1)+1:*]
-;     h2=histogram(total(h1,/cumulative)-1,MIN=0,reverse_indices=ri2)
-;     row=ri2[0:n_elements(h2)-1]-ri2[0]+om ; chunk indices = row number
-;     sparse_array=sprsin(col,row,replicate(1.,n_ind),(mx+1)>n_ind)
-;     if mx ge n_ind then $
-;      vec4=sprsax(sparse_array,[val,replicate(0.,mx+1-n_ind)]) $
-;     else vec4=(sprsax(sparse_array,val))[0:mx]
-;
-;   Instead of using 1. as the value to multiply by, you could use:
-;
-;     area_i*time_i/sigma_i^2, and then apply a sparse array of 1.'s
-;     to this quantity as the X vector to generate the normalizing sum
-;     over weights.
-;
-;   Hmmm... well, just pre-caching the big_bcd was fast enough.  Now
-;   we need to concentrate on avoiding the need to rebuild the
-;   Accounting cube.  With no histogram, when you delete a BCD, you
-;   need to rebuild.  You could have an "ACTIVE" flag for each DR to
-;   multiply in to both the numerator and denominator of the total.
-;   This would allow you to temporarily disable a certain BCD or group
-;   of BCDs without rebuilding the account.  To *add* BCD's, you could
-;   do a partial accounting build, where you just add to the existing
-;   accounting information for those smaller number of pixels in the
-;   cube which are affected.  This will be especially useful for very
-;   large cubes.  It only works if the new BCD fits in the same cube
-;   as the before, and doesn't bump the map's size.  Hmm...
-;
-;   Also, with no histogram, we won't easily be able to de-overlap 2xn
-;   PRs by summing over fractions requested for a single pixel.  This
-;   is probably required.  
-;     
-;   When deleting BCD's, you can use the reverse indices to find and
-;   re-calculate only those account list entries which are affected!
-;
-;   The 4D + extras is inconvenient too: you index and search a
-;   (presumably smaller) list for any extras to append.
-;
-;
-;   Could use a fast histogram method to search the accounting list.
+  ;; XXX WCS STUFF SHOULD GO TOO
+  msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
+  msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
+       CAL:obj_new(),BCD:ptr_new(),ERROR:ptr_new()}
+end
