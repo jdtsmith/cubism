@@ -1699,8 +1699,8 @@ pro CubeProj::BuildAccount,_EXTRA=e
      ;; XXX The details of this depend on the exact layout of the "+y"
      ;; direction w.r.t the detector coordinates, i.e. do maps start
      ;; top left, bottom left, etc  Revisit.
-     basic_offset=([(*self.DR)[i].ROW-1, $
-                    self.cube_size[1]-(*self.DR)[i].COLUMN])*stepsz+ $
+     basic_offset=[((*self.DR)[i].ROW-1)*stepsz[0], $
+                   self.cube_size[1]-((*self.DR)[i].COLUMN-1)*stepsz[1]-1] + $
                   self.PR_SIZE/2.
      
      ;; (Small) difference between PA of this BCD and the mean map PA
