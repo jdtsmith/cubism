@@ -344,9 +344,9 @@ pro tvColor::Stretch
   if self.gamma eq 1.0 then index=long((ncolors-1)*index) else  $
      index=long((ncolors-1)*index^self.gamma)
   ;; Index into the original colors
-  (*self.r)[self.bottom:self.bottom+ncolors-1]=(*self.rorig)[index]
-  (*self.g)[self.bottom:self.bottom+ncolors-1]=(*self.gorig)[index]
-  (*self.b)[self.bottom:self.bottom+ncolors-1]=(*self.borig)[index]
+  (*self.r)[0:ncolors-1]=(*self.rorig)[index]
+  (*self.g)[0:ncolors-1]=(*self.gorig)[index]
+  (*self.b)[0:ncolors-1]=(*self.borig)[index]
   self->SetColors               ;set them in.
 end
 
