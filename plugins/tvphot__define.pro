@@ -1,12 +1,10 @@
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
-;	Message. Only exclusive,redraw, and box messages.
+;	Message. Only redraw, and box messages.
 ;=============================================================================
 pro tvPhot::Message, msg
-  ;; let tvPlug handle the exclusive messages, if any...
   self->tvPlug::Message,msg,TYPE=type
-  
   ;; Whenever we get a POST, or a BOX, a redraw will let us change up
   switch type of
      'BOX':
@@ -30,7 +28,7 @@ pro tvPhot::On
   end
   self->tvPlug::On
   self.box->On
-  self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW
+  self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW
   if widget_info(self.wBase,/VALID_ID) eq 0 then self->wShow
 end
 
@@ -42,7 +40,7 @@ pro tvPhot::Off
   if widget_info(self.wBase,/VALID_ID) then self->wDestroy
   self.box->Off
   self->Erase
-  self.oDraw->MsgSignup,self,/NONE, /TVDRAW_EXCLUSIVE
+  self.oDraw->MsgSignup,self,/NONE
   self.oDraw->SendRedraw
 end
 

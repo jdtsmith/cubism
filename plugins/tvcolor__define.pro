@@ -254,19 +254,16 @@ end
 ;=============================================================================
 pro tvColor::On
   self->tvPlug::On
-  if self.mouse_mode then begin 
-     self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE, $
-        WIDGET_TRACKING=self.protect, /DRAW_BUTTON 
-  endif else self.oDraw->MsgSignup,WIDGET_TRACKING=self.protect
+  self.oDraw->MsgSignup,self,WIDGET_TRACKING=self.protect, $
+     DRAW_BUTTON=self.mouse_mode
 end
 
 ;=============================================================================
-;       Off: Possibly keep getting exclusive and tracking messages.
+;       Off: Possibly keep getting tracking messages.
 ;=============================================================================
 pro tvColor::Off
   self->tvPlug::Off
-  self.oDraw->MsgSignup,self,/NONE,TVDRAW_EXCLUSIVE=self.mouse_mode, $
-     TRACKING=self.protect
+  self.oDraw->MsgSignup,self,/NONE,TRACKING=self.protect
 end
 
 function tvColor::Icon
@@ -517,7 +514,7 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
   self.gorig=ptr_new(g[self.bottom:self.topval]) 
   self.borig=ptr_new(b[self.bottom:self.topval])
   
-  ;; Use mouse mode (tvColor as an exclusive tool)
+  ;; Use mouse mode (tvColor as an exclusive tool with button events)
   self.mouse_mode=keyword_set(mm) 
   
   ;; Use sliders stuck into the base.

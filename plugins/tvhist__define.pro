@@ -35,7 +35,7 @@ pro tvHist::Off
   ;; If we have no box ever drawn, shut down the message flow
   if self.box->IsDrawn() eq 0 then begin 
      if obj_valid(self.colobj) then self.colobj->DrawCbar
-     self.oDraw->MsgSignup,self,/NONE,/TVDRAW_EXCLUSIVE
+     self.oDraw->MsgSignup,self,/NONE
   endif
 end
 
@@ -128,7 +128,7 @@ end
 ;       Init - Initialize the histogram with a tvDraw object.  All
 ;              tvRBox keywords are relevant (see tvrbox).  
 ;=============================================================================
-function tvHist::Init,oDraw,EXCLUSIVE=exc,NBINS=nb,_EXTRA=e
+function tvHist::Init,oDraw,NBINS=nb,_EXTRA=e
   if (self->tvPlug::Init(oDraw) ne 1) then return,0 ;chain up
   if n_elements(nb) eq 0 then self.nbins=200 else self.nbins=nb
   ;; Get a tvrbox object, signing ourselves up for box messages from it.

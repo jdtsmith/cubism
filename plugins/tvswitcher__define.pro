@@ -11,10 +11,7 @@ pro tvSwitcher::Message, msg
   if NOT self.UseCase then char=strlowcase(msg.KEY) else char=msg.KEY
   wh=where((*self.MsgList).keys eq char,cnt)
   if cnt eq 0 then return
-  self.cur=wh[0]                ;this is now the current one
-  obj=self->GetObj((*self.MsgList)[self.cur])
-  self.oDraw->MsgSend,EXCLUSIVE=obj
-  self->Button,obj
+  self->Toggle,wh[0]
 end
 
 function tvSwitcher::GetObj, ml
@@ -38,62 +35,72 @@ pro tvSwitcher::Event, ev
   endif 
   
   ;; Button Clicked
-  wh=(where(*self.wList eq ev.id))[0] ;which button
-
-  ;; have the tvDraw object send out the exclusive message
-  obj=self->GetObj((*self.MsgList)[wh])
-  self.oDraw->MsgSend,EXCLUSIVE=obj
-  
-  self.cur=wh
-  self->Button,obj
+  wh=where(*self.wList eq ev.id) ;which button
+  self->Toggle,wh[0]
 end
 
 ;=============================================================================
-;       Button - Set the buttons correctly.
+;       Toggle - Turn object on or off, depending on status and type,
+;                and set button.
 ;=============================================================================
-pro tvSwitcher::Button, obj
-  if NOT ptr_valid(self.wList) then return
-  ;; It's up to the object whether he's on or off...
-  if obj->Status() then begin 
-     ;; turn *on* the newly clicked one, and others off
-     all=self->GetMsgObjs()
-     for i=0,n_elements(all)-1 do begin 
-        ic=all[i]->Icon()
-        if all[i] eq obj then begin ;turned on
-           if size(ic,/N_DIMEN) eq 2 then val=ic else val='*'+ic+'*'
-        endif else begin        ;turned off
-           if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic
+pro tvSwitcher::Toggle,hit
+  ;; Toggle On/Off, depending on type.
+  no=self->MsgListLen()
+  for i=0,no-1 do begin 
+     obj=self->GetObj((*self.MsgList)[i])
+     if (*self.MsgList)[i].Exclusive then begin 
+        if i eq hit then begin  ; Hit it -- turn "on"
+           obj->On              ; just let them decide what On will do
+        endif else begin ;; An exclusive which wasn't the one hit.
+           if obj->Status() then obj->Off
         endelse 
-        widget_control, (*self.wList)[i],set_value=val
-     endfor 
-  endif else begin
-     ;; turn *off* the current button, Status is down (inactive)
-     if self.cur ne -1 then begin
-        ic=obj->Icon()
-        if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic
-        widget_control,(*self.wList)[self.cur],set_value=val
-     endif
-  endelse
+     endif else begin           ;just a regular toggler
+        if obj->Status() then obj->Off else obj->On
+     endelse 
+  endfor 
+  self->UpdateButtons
 end
 
 ;=============================================================================
-;	Start - Setup the icons in the base, if necessary.
+;       UpdateButtons - Update the buttons' states
+;=============================================================================
+pro tvSwitcher::UpdateButtons
+  if NOT ptr_valid(self.wList) then return
+  objs=self->GetMsgObjs()
+  for i=0,self->MsgListLen()-1 do begin 
+     ic=objs[i]->Icon()
+     if objs[i]->Status() then begin ;on
+        if size(ic,/N_DIMEN) eq 2 then val=ic else val='*'+ic+'*'
+     endif else begin           ;off
+        if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic
+     endelse 
+     widget_control, (*self.wList)[i],set_value=val
+  endfor 
+end
+
+;=============================================================================
+;	Start - Setup the icons in two bases, if necessary.
 ;=============================================================================
 pro tvSwitcher::Start
-  if widget_info(self.sBase,/VALID) eq 0 then return
   objs=self->GetMsgObjs()
-  if obj_valid(objs[0]) then begin
-     widget_control, self.sBase, EVENT_PRO='tvSwitcher_Event', $
+  if obj_valid(objs[0]) eq 0 then return
+  
+  ;; Set up the base(s)' event handler
+  for type=0,1 do begin 
+     if widget_info(self.sBase[type],/VALID_ID) eq 0 then continue
+     widget_control, self.sBase[type], EVENT_PRO='tvSwitcher_Event', $
                      set_uvalue=self, /TRACKING_EVENTS
-     no=n_elements(objs) 
-     self.wList=ptr_new(lonarr(no,/NOZERO))            
-     for i=0,no-1 do begin
-        ic=objs[i]->Icon()
-        if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic   
-        (*self.wList)[i]= $
-           widget_button(self.sBase, /NO_RELEASE, value=val,/DYNAMIC_RESIZE)
-     endfor 
-  endif 
+  endfor 
+  
+  no=n_elements(objs) 
+  self.wList=ptr_new(lonarr(no,/NOZERO))
+  for i=0,no-1 do begin 
+     ic=objs[i]->Icon()
+     if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic   
+     (*self.wList)[i]= $
+        widget_button(self.sBase[1b-(*self.MsgList)[i].Exclusive], $
+                      /NO_RELEASE,value=val,/DYNAMIC_RESIZE)
+  endfor 
 end
 
 ;=============================================================================
@@ -117,7 +124,7 @@ end
 ;              keys to toggle activity on.  Note that no actual
 ;              messages are sent, only the toggling is done.
 ;=============================================================================
-function tvSwitcher::Init,oDraw,USECASE=uc, SELECT_BASE=sb, _EXTRA=e
+function tvSwitcher::Init,parent,oDraw,USECASE=uc,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0
   
   ;; Get our key object and sign us up.  Important Keywords get Passed On.
@@ -126,14 +133,20 @@ function tvSwitcher::Init,oDraw,USECASE=uc, SELECT_BASE=sb, _EXTRA=e
   
   self.UseCase=keyword_set(uc) 
   
-  ;; see if a valid base was passed, if so make the buttons there
-  if n_elements(sb) ne 0 then $
-     if widget_info(sb,/VALID) then $
-     if widget_info(sb,/TYPE) eq 0 then self.sBase=sb ;it's a good base
+  ;; see if a valid base was passed, if so make the buttons bases there
+  if widget_info(parent,/VALID_ID) eq 0 then return,0
   
-  self.cur=-1                   ;none yet active
-  if self->MsgListLen() ne 0 and NOT self.UseCase then  $
-     (*self.MsgList).keys=strlowcase((*self.MsgList).keys)
+  ;; Set up the base(s) for the buttons (actually create them in Start)
+  if self->MsgListLen() ne 0 then begin 
+     if NOT self.UseCase then  $
+        (*self.MsgList).keys=strlowcase((*self.MsgList).keys)
+     exc=where((*self.MsgList).Exclusive,exc_cnt,COMPLEMENT=tog, $
+               NCOMPLEMENT=tog_cnt)
+     if exc_cnt gt 0 then $
+        self.sBase[0]=widget_base(parent,/ROW,SPACE=1,/ALIGN_LEFT) 
+     if tog_cnt gt 0 then $
+        self.sBase[1]=widget_base(parent,/ROW,SPACE=1,/ALIGN_LEFT) 
+  endif 
   return,1
 end
 
@@ -145,8 +158,8 @@ pro tvSwitcher__define
           INHERITS tvPlug, $    ;make it a tvDraw plug-in
           Key:obj_new(), $      ;our key plug-in
           UseCase:0b, $         ;whether to consider case
-          sBase: 0L, $          ;widget id of the button base
-          wList: ptr_new(), $   ;a list of buttons
+          sBase: [0L,0L], $     ;widget ids of the button bases
+          wList: ptr_new(), $    ;list of buttons, for each on MsgList
           cur:0}                ;which is currently the active one
   return
 end

@@ -1,5 +1,5 @@
 ;;**************************OverRiding methods********************************
-;; Exclusive, motion, and button messages expected
+;; Motion and button messages expected
 pro tvSlice::Message,msg
   self->tvPlug::Message,msg,TYPE=type
   case type of 
@@ -85,7 +85,7 @@ pro tvSlice::Off
   self.plotpt=[-1,-1]           ;no longer plotting it
   if widget_info(self.wBase,/VALID) then  $
      widget_control, self.wBase,/DESTROY
-  self.oDraw->MsgSignup,self,/NONE,/TVDRAW_EXCLUSIVE
+  self.oDraw->MsgSignup,self,/NONE
 end
 
 

@@ -1,7 +1,7 @@
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
-;	Message. Only exclusive and box messages.
+;	Message. Only box messages.
 ;=============================================================================
 pro tvStats::Message, msg
   self->tvPlug::Message,msg,TYPE=type
@@ -30,7 +30,7 @@ pro tvStats::On
   endif
   self->tvPlug::On
   self.Box->On
-  self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE,/TVDRAW_POSTDRAW
+  self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW
   if self.box->IsDrawn() then begin 
      self->wShow
      self->Stats
@@ -43,7 +43,7 @@ end
 pro tvStats::Off
   self->tvPlug::Off
   self.Box->Off
-  self.oDraw->MsgSignup,self,/NONE,/TVDRAW_EXCLUSIVE
+  self.oDraw->MsgSignup,self,/NONE
   if widget_info(self.wBase,/VALID_ID) then self->wDestroy
 end
 ;;************************End OverRiding methods*******************************

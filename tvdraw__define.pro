@@ -433,8 +433,7 @@ end
 ;                     (either pre or post-draw) to the interested
 ;                     recipients.
 ;=============================================================================
-pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,EXCLUSIVE=obj
-  if obj_valid(obj) then self->ObjMsg::MsgSend,{TVDRAW_EXCLUSIVE,obj}
+pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr
   if keyword_set(pre) then self->ObjMsg::MsgSend,{TVDRAW_PREDRAW,self.immod}  
   if keyword_set(post) then self->ObjMsg::MsgSend,{TVDRAW_POSTDRAW,self.imdisp}
   if keyword_set(redr) then self->ObjMsg::MsgSend,{TVDRAW_REDRAW,self.imdisp}
@@ -513,7 +512,7 @@ function tvDraw::Init,parent,IMORIG=imdata,TVD_XSIZE=xs,TVD_YSIZE=ys, $
   ;; Set-up all the messages we can send
   self->MsgSetup,['DRAW_BUTTON','DRAW_MOTION','DRAW_VIEWPORT','DRAW_EXPOSE', $
                   'WIDGET_TRACKING','TVDRAW_PREDRAW','TVDRAW_POSTDRAW', $
-                  'TVDRAW_REDRAW','TVDRAW_EXCLUSIVE']
+                  'TVDRAW_REDRAW']
   ;; we don't draw it here since our widget is as of yet unrealized.
   return,1
 end
@@ -547,7 +546,6 @@ pro tvDraw__define
           dispsize:[0,0]}       ;current [xsize,ysize] of displayed portion
                                 ;    of array
   ;; Messages (other than widget events) we send.
-  msg={TVDRAW_EXCLUSIVE,obj:obj_new()} ; for exclusive plug-ins
   msg={TVDRAW_PREDRAW,im:ptr_new()} ; sent before draw, for modification
   msg={TVDRAW_POSTDRAW,im:ptr_new()} ; sent after draw, for interpretation
   msg={TVDRAW_REDRAW,im:ptr_new()} ; sent when screen gets clobbered

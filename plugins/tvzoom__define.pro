@@ -49,12 +49,12 @@ end
 pro tvZoom::On
   if self.active eq 1 then self->Off ;already on
   self->tvPlug::On
-  self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE,/DRAW_BUTTON
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON
 end
 
 pro tvZoom::Off
   self->tvPlug::Off
-  self.oDraw->MsgSignup,self,/NONE,/TVDRAW_EXCLUSIVE
+  self.oDraw->MsgSignup,self,/NONE
 end
 
 function tvZoom::Icon
