@@ -47,6 +47,7 @@ pro CubeRec::Message, msg
         self.bcd=msg.BCD
         self.bcd_UNC=msg.UNC
         self.bcd_BMASK=msg.BMASK
+        self.bcd_BACKGROUND=msg.BACKGROUND
         self.module=msg.MODULE
         self->SwitchMode,/BCD
      end
@@ -185,10 +186,36 @@ pro CubeRec::UpdateView
            self.oDraw->SetProperty,/NO_RESIZE,IMORIG=*self.STACK
      end
      2: begin                   ;show the record
+        widget_control, self.wBGSub,SENSITIVE=ptr_valid(self.BCD_BACKGROUND)
         if ptr_valid(self.BCD) then $
-           self.oDraw->SetProperty,/NO_RESIZE,IMORIG=*self.BCD
+           self.oDraw->SetProperty,/NO_RESIZE,IMORIG= $
+                                   (widget_info(self.wBGSub,/BUTTON_SET) && $
+                                    ptr_valid(self.BCD_BACKGROUND)) ? $
+                                   (*self.BCD - *self.BCD_BACKGROUND) : $
+                                   *self.BCD
      end
   endcase 
+end
+
+;=============================================================================
+;  Export - Export the image to the command line
+;=============================================================================
+pro CubeRec::Export
+  case self.mode of
+     0: begin                   ;full cube, show the correct plane
+        widget_control, self.wLambda,SET_COMBOBOX_SELECT=self.cur_wav
+        im=self.cube->Cube(self.cur_wav)
+     end
+     1: begin                   ;show the stack
+        if ~ptr_valid(self.STACK) then return
+        im=*self.STACK
+     end
+     2: begin                   ;show the record
+        if ~ptr_valid(self.BCD) then return
+        im=*self.BCD
+     end
+  endcase
+  self.cube->ExportToMain,MAP=im,TYPE=self.mode eq 2?"_im":void
 end
 
 ;=============================================================================
@@ -203,7 +230,10 @@ end
 
 pro CubeRec_event,ev
   widget_control, ev.handler, get_uvalue=uv
-  call_method,uv.method,uv.self,ev
+  if uv.event then $
+     call_method,uv.method,uv.self,ev $
+  else $
+     call_method,uv.method,uv.self     
 end
 
 ;=============================================================================
@@ -342,7 +372,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
 
   ;; Populate the first base: the full cube
   self.wBase[0]=widget_base(mapbase,/COLUMN,MAP=0, $
-                            UVALUE={self:self,method:'FullEvent'}, $
+                            UVALUE={self:self,method:'FullEvent',event:1}, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
 
   base=widget_base(self.wBase[0],/ROW,SPACE=1,/BASE_ALIGN_LEFT) 
@@ -362,7 +392,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
   
   ;; Populate the second base: the stacked cube
   self.wBase[1]=widget_base(mapbase,/ROW,MAP=0, $
-                            UVALUE={self:self,method:'StackEvent'}, $
+                            UVALUE={self:self,method:'StackEvent',event:1}, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
   self.oRose=obj_new('CubeRose',oDraw,_EXTRA=e)
   self->MsgSignup,self.oRose,/CUBEREC_UPDATE ;give them our message
@@ -372,12 +402,22 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
   self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
   self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
   self->MsgSignup,self.oAper,/CUBEREC_UPDATE ;give them our message
+  b3=widget_base(self.wBase[2],/COLUMN,/NONEXCLUSIVE,/FRAME,SPACE=1)
+  self.wBGsub=widget_button(b3,VALUE='BGSub', $
+                            /FRAME,EVENT_PRO='cuberec_event', $
+                            UVALUE=[{self:self,method:'UpdateView',event:0}])
   
-  ;; Add a menu element if allowed
-  if n_elements(menu) ne 0 then if widget_info(menu,/VALID_ID) then $
+  ;; Add a menu items if allowed
+  if n_elements(menu) ne 0 then if widget_info(menu,/VALID_ID) then begin 
      self.wMapSaveBut=widget_button(menu,value='Save Map as FITS...', $
                                     SENSITIVE=0,EVENT_PRO='cuberec_event', $
-                                    UVALUE={self:self,method:'SaveMapEvent'})
+                                    UVALUE={self:self,method:'SaveMapEvent', $
+                                            event:1})
+     but=widget_button(menu,value='Export to Command Line...', $
+                       SENSITIVE=~LMGR(/VM,/RUNTIME), $
+                       EVENT_PRO='cuberec_event', $
+                       UVALUE={self:self,method:'Export',event:0})
+  endif
   return,1
 end
 
@@ -402,6 +442,7 @@ pro CubeRec__define
       BCD:ptr_new(), $          ;the BCD data
       BCD_UNC:ptr_new(), $      ;the BCD error
       BCD_BMASK:ptr_new(), $    ;the BCD mask data
+      BCD_BACKGROUND:ptr_new(),$ ;the BCD background to subtract (togglable)
       MODULE:'',$               ;the modules for cube or rec
       cal:obj_new(), $          ;the calibration object
       ;; Widget ID's
@@ -411,7 +452,8 @@ pro CubeRec__define
       wBrowse:0L, $             ;wavelength browser buttons
       wPlayStop:0L,$            ;the play/stop button
       wSlider:0L, $             ;play speed slider
-      wCompass:0L, $            ;compass
+      wCompass:0L, $            ;compass button
+      wBGSub:0L, $              ;background subtract button
       wStackInfo:0L, $          ;The stack information
       wFull:0L,$                ;The "Switch to Full mode" button
       wMapSaveBut:0L}           ;The Save Map as FITS button
