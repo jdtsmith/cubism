@@ -11,7 +11,7 @@ pro CubeBadPix::Message, msg
         if pt[0] eq -1 then return
         ;; Non-first button only: cycle through group
         if msg.press eq 4b then begin $
-           self.showing=1-self.showing 
+           self.showing=(self.showing+1) mod 3
            self.oDraw->Redraw,/SNAPSHOT
            return
         endif else if msg.press ne 1b then return
@@ -38,7 +38,7 @@ pro CubeBadPix::Message, msg
      'TVDRAW_SNAPSHOT': begin 
         self.oDraw->GetProperty,ZOOM=zm
         self.zoom=zm
-        if self.showing eq 0 then self->MarkStatic,/ALL
+        if self.showing ne 2 then self->MarkStatic,/ALL
         ;; Only put bpl in background when On
         if ~self->On() then self->MarkAll
      end
@@ -152,7 +152,7 @@ pro CubeBadPix::MarkStatic,ind,ALL=all
         ;; don't show off-flat values
         bind=where((*self.bmask)[ind] AND ok_mask gt 0,bcnt)
         if bcnt gt 0 then bind=ind[bind]
-        fbind=where((*self.bmask AND fatal_mask) gt 0,fbcnt)
+        fbind=where((*self.bmask)[ind] AND fatal_mask gt 0,fbcnt)
         if fbcnt gt 0 then fbind=ind[fbind]        
      endif else begin 
         bcnt=0 & fbcnt=0
@@ -163,19 +163,21 @@ pro CubeBadPix::MarkStatic,ind,ALL=all
      endif else pcnt=0
   endif else self->Error,'Must pass index, or display All'
 
-  for i=0,bcnt-1 do begin 
-     pt=self.oDraw->Convert(bind[i],/DEVICE,/SHOWING)
-     if pt[0] eq -1 then continue
-     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=4, $
-           SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
-  endfor 
-  for i=0,fbcnt-1 do begin
+  if self.showing ne 1 then begin ; draw non-fatal marks
+     for i=0,bcnt-1 do begin 
+        pt=self.oDraw->Convert(bind[i],/DEVICE,/SHOWING)
+        if pt[0] eq -1 then continue
+        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=4, $
+              SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
+     endfor 
+  endif 
+  for i=0,fbcnt-1 do begin      ;draw fatal marks
      pt=self.oDraw->Convert(fbind[i],/DEVICE,/SHOWING)
      if pt[0] eq -1 then continue
      plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=7, $
            SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
   endfor
-  for i=0,pcnt-1 do begin 
+  for i=0,pcnt-1 do begin       ;draw permanent marks
      pt=self.oDraw->Convert(pind[i],/DEVICE,/SHOWING)
      if pt[0] eq -1 then continue
      plots,pt[0],pt[1],/DEVICE,COLOR=self.color[2],PSYM=1, $
@@ -195,12 +197,12 @@ end
 ;  DrawMark - Mark or erase a single index
 ;=============================================================================
 pro CubeBadPix::DrawMark,ind,ERASE=erase
- pt=self.oDraw->Convert(ind,/DEVICE,/SHOWING)
+  pt=self.oDraw->Convert(ind,/DEVICE,/SHOWING)
   if pt[0] eq -1 then return
   if keyword_set(erase) then begin 
      self.oDraw->Erase,pt-self.zoom/2,[self.zoom,self.zoom]+2
      ;; put the static mark back if necessary
-     if self.showing eq 0 then self->MarkStatic,ind       
+     if self.showing ne 2 then self->MarkStatic,ind       
   endif else $
      plots,pt[0],pt[1],/DEVICE,COLOR=self.color[0],PSYM=7, $
            SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
@@ -254,7 +256,7 @@ pro CubeBadPix__define
       bp_list:ptr_new(), $      ;the bad pixel list
       bmask:ptr_new(), $        ;the per-BCD mask plane
       pmask:ptr_new(), $        ;the static mask plane
-      showing:0, $              ;showing 0) all 1) user BPs
+      showing:0, $              ;showing 0) all 1) no non-fatal 2) only user
       parent:0L}
 
 end
