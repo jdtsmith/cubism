@@ -138,7 +138,10 @@ pro CubeProj::ShowEvent, ev
   if ev.id eq (*self.wInfo).SList then begin ;somebody clicked
      self->UpdateButtons
      if nr eq 0 then return     ;just the blank nothing line
-     if ev.clicks eq 2 then action='viewrecord' else return 
+     if ev.clicks eq 2 then begin 
+        widget_control, (*self.wInfo).SList,SET_LIST_SELECT=sel[0]
+        action='viewrecord' 
+     endif else return 
   endif else widget_control, ev.id, get_uvalue=action
   if action eq 'bargroup' then action=ev.value
   
@@ -147,7 +150,6 @@ pro CubeProj::ShowEvent, ev
      'save-as': self->Save,/AS
      
      'viewrecord-new': self->ViewRecord,/NEW
-     'viewrecord-stack': self->ViewRecord,/STACK
      'loadcalib': self->LoadCalib,/SELECT
      'feedback': begin 
         self.feedback=1b-self.feedback
@@ -410,18 +412,16 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
             widget_button(rec,VALUE='Disable',UVALUE='disablerecord'),$
             widget_button(rec,VALUE='Enable',UVALUE='enablerecord'),$
             ;;-------------
-            widget_button(rec,VALUE='View...',UVALUE='viewrecord',/SEPARATOR),$
-            widget_button(rec,VALUE='View (new viewer)...', $
-                          UVALUE='viewrecord-new'), $
-            ((*self.wInfo).MUST_MULTISELECT= $
-             widget_button(rec,VALUE='View Record Stack...', $
-                           UVALUE='viewrecord-stack')), $
+            ((*self.wInfo).view_ids[0:1]= $
+             [widget_button(rec,VALUE='View...      ',UVALUE='viewrecord', $
+                            /SEPARATOR),$
+              widget_button(rec,VALUE='View (new viewer)...      ', $
+                            UVALUE='viewrecord-new')]), $
             widget_button(rec,VALUE='Show Filenames...',UVALUE='filenames'),$
             widget_button(rec,VALUE='Show Header...',UVALUE='headers'),$
             widget_button(rec,VALUE='Show Keyword Value(s)...', $
                           UVALUE='header-keyword')]
   
-
   cube=widget_button(mbar,VALUE='Cube',/MENU)
   (*self.wInfo).MUST_PROJ= $
      widget_button(cube,VALUE='Build Cube',UVALUE='buildcube') 
@@ -487,6 +487,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                  'viewrecord','viewcube','addaor','save','exit'])
   ;; list of buttons that require a selection to be meaningful
   (*self.wInfo).MUST_SELECT=[wMustSel,ids[0:4]]
+  (*self.wInfo).view_ids[2]=ids[4]
   
   ;; a cube must exist
   (*self.wInfo).MUST_CUBE=[wMustCube,ids[5]]
@@ -595,7 +596,7 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
         return                
      endif 
   endif else if size(file,/TYPE) ne 7 then file=self.SaveFile
-  
+  widget_control, /HOURGLASS
   ;; Detach the stuff we don't want to save!
   detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the info
   detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
@@ -713,12 +714,13 @@ end
 ;                 vanishes.  Also supports exporting spectra and maps
 ;                 with the SPECTRUM & MAP keywords.
 ;=============================================================================
-pro CubeProj::ExportToMain, SPECTRUM=sp, MAP=mp
+pro CubeProj::ExportToMain, SPECTRUM=sp, MAP=mp, TYPE=map_type
   name=self->ProjectName()
   spQ=n_elements(sp) ne 0
   mpQ=n_elements(mp) ne 0
+  if n_elements(map_type) eq 0 then map_type="_map"
   selfQ=~spQ && ~mpQ
-  name+=spQ?'_sp':(mpQ?'_map':'')
+  name+=spQ?'_sp':(mpQ?map_type:'')
   export=spQ?sp:(mpQ?mp:self)
   
    ;; Simple fix -- replace dashes/spaces with underscores
@@ -916,9 +918,24 @@ pro CubeProj::UpdateButtons
   for i=0,n_elements((*self.wInfo).MUST_SELECT)-1  do  $
      widget_control,((*self.wInfo).MUST_SELECT)[i],  $
                     SENSITIVE=ptr_valid(self.DR) AND sel[0] ne -1
-  
-  widget_control,(*self.wInfo).MUST_MULTISELECT,SENSITIVE=n_elements(sel) gt 1
-
+  nsel=n_elements(sel) 
+  if (nsel gt 1) ne ((*self.wInfo).nsel_sav gt 1)then begin 
+     if nsel gt 1 then begin 
+        widget_control,(*self.wInfo).view_ids[0],SET_VALUE='View Stack...'
+        widget_control,(*self.wInfo).view_ids[1], $
+                       SET_VALUE='View Stack (new viewer)...'
+        widget_control,(*self.wInfo).view_ids[2], $
+                       SET_VALUE='View Stack '
+     endif else begin 
+        widget_control,(*self.wInfo).view_ids[0],SET_VALUE='View...'
+        widget_control,(*self.wInfo).view_ids[1], $
+                       SET_VALUE='View (new viewer)...'
+        widget_control,(*self.wInfo).view_ids[2], $
+                       SET_VALUE='View Record'
+     endelse 
+     (*self.wInfo).nsel_sav=nsel
+  endif 
+     
   for i=0,n_elements((*self.wInfo).MUST_CAL)-1  do  $
      widget_control,((*self.wInfo).MUST_CAL)[i], SENSITIVE=obj_valid(self.cal)
   
@@ -998,14 +1015,12 @@ pro CubeProj::ViewCube,NEW_VIEWER=new
 end
 
 ;=============================================================================
-;  ViewRecord - View the record in an existing or new viewer
+;  ViewRecord - View the record(s) in an existing or new viewer
 ;=============================================================================
-pro CubeProj::ViewRecord,rec,NEW_VIEWER=new,STACK=vs
+pro CubeProj::ViewRecord,rec,NEW_VIEWER=new
   self->RecOrSelect,rec
   self->FindViewer,NEW_VIEWER=new
-  if NOT keyword_set(vs) then $
-     widget_control, (*self.wInfo).SList,SET_LIST_SELECT=[rec[0]]
-  self->Send,RECORD=keyword_set(vs)?rec:rec[0]
+  self->Send,RECORD=rec
 end
 
 ;=============================================================================
@@ -1797,13 +1812,13 @@ pro CubeProj::BuildAccount,_EXTRA=e
                                           self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
                                           AREAS=areas)
               if cube_spatial_pix[0] eq -1 then begin 
-                 print,FORMAT='("Not hitting cube for pixel: "' + $
-                       ',I0,",",I0," -- step [",I0,",",I0,"]")', $
-                       bcdpixel mod 128, bcdpixel/128, $
-                       (*self.DR)[i].COLUMN,(*self.DR)[i].ROW
-                 print, poly
-                 print,'  original:'
-                 print,*(*prs[j].POLYGONS)[k]
+                 ; print,FORMAT='("Not hitting cube for pixel: "' + $
+;                        ',I0,",",I0," -- step [",I0,",",I0,"]")', $
+;                        bcdpixel mod 128, bcdpixel/128, $
+;                        (*self.DR)[i].COLUMN,(*self.DR)[i].ROW
+;                  print, poly
+;                  print,'  original:'
+;                 print,*(*prs[j].POLYGONS)[k]
                  continue ;; why isn't our cube big enough?
              endif
               
@@ -2275,9 +2290,9 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   
   ;; Background Values provided
   if nbgv gt 0 then begin 
-     if nbgv ne fcnt then $
+     if nbgv ne bcnt then $
         self->Error,'Wrong number of background values passed'
-     stack=stack-total(bg_vals)/bcnt ; average(fi-bgvi)
+     stack-=total(bg_vals)/bcnt ; average(fi-bgvi)
      return,stack
   endif
   
@@ -2941,10 +2956,11 @@ pro CubeProj__define
          which_list:0, $        ;which list we're using
          list_size_diff:0, $    ;the difference in ysize between list and base
          lines:0, $             ;number of list lines last set
+         view_ids:lonarr(3), $  ;record view button ids
+         nsel_sav: 0, $          ;save number of selected records
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
-         MUST_SELECT:lonarr(16),$ ;the SW buttons which require any selected
-         MUST_MULTISELECT:0L,$  ;must have more than one selected
+         MUST_SELECT:lonarr(15),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
          MUST_PROJ:0L, $        ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
