@@ -59,9 +59,12 @@
 ;          to decide how to report errors. Defaults to
 ;          (*self.wInfo).Base.
 ;
-;       useWidget: Returns a boolean which determines whether to use
+;       IsWidget: Returns a boolean which determines whether to use
 ;          the widget popup or not.  Can be overridden to default to a
-;          fixed behaviour, but normally this isn't necessary.
+;          fixed behaviour, but normally this isn't necessary, as long
+;          as TestWidget() returns a widget ID which can be tested for
+;          validity.  May also be useful directly in your method
+;          classes for testing whether a widget is running or not.
 ;
 ; NOTES:
 ;  
@@ -177,64 +180,86 @@
 ;##############################################################################
 
 ;=============================================================================
-; Error - Signal an error, returning all the way to the command line
-;         or to the widget loop catch, if using a widget.
+;  SetProperty 
 ;=============================================================================
-pro ObjReport::Error,msg,_EXTRA=e
-  if self->useWidget() then begin 
-     self->Popup,msg,/Error,PARENT=parent,_EXTRA=e
-     if self->isBlocking() then begin
+pro ObjReport::SetProperty,TITLE_BASE=tb
+  if n_elements(tb) ne 0 then self.or_title_base=tb
+end
+
+;=============================================================================
+;  Error - Signal an error, returning all the way to the command line
+;          or to the widget loop catch, if using a widget.
+;=============================================================================
+pro ObjReport::Error,msg,RETURN_ONLY=ro,_EXTRA=e
+  on_error,2
+  if self->IsWidget() then begin 
+     self->PopupReport,msg,/Error,PARENT=parent,_EXTRA=e
+     if self->IsBlocking() then begin
         ;; Send a message to be caught by the established OBJREPORT catch
         message,'OBJREPORT-ERROR',/NOPRINT
-     endif else retall          ;the main level *is* the widget loop
-  endif else message,msg
-  !ERROR
-  catch,
-  return
+     endif else if keyword_set(ro) then return else retall 
+  endif else self->CommandLineReport,msg
 end
 
 ;=============================================================================
-; Warning - Post a warning but otherwise continue
+;  Warning - Post a warning but otherwise continue
 ;=============================================================================
-pro ObjReport::Warning,msg,PARENT=parent,TITLE=title
-  if self->useWidget() then $
-     self->Popup,msg,/WARNING,PARENT=parent,TITLE=title  $
-  else self->Report,msg,/WARNING,TITLE=title
+pro ObjReport::Warning,msg,PARENT=parent,_EXTRA=e
+  if self->IsWidget() then $
+     self->PopupReport,msg,/WARNING,PARENT=parent,_EXTRA=e $
+  else self->CommandLineReport,msg,/WARNING,_EXTRA=e
 end 
 
 ;=============================================================================
-; Info - Post some info but otherwise continue
+;  Info - Post some info but otherwise continue
 ;=============================================================================
-pro ObjReport::Info,msg,PARENT=parent,TITLE=title
-  if self->useWidget() then $
-     self->Popup,msg,/INFO,PARENT=parent,TITLE=title  $
-  else message,msg,/INFO,TITLE=title
+pro ObjReport::Info,msg,PARENT=parent,_EXTRA=e
+  if self->IsWidget() then $
+     self->PopupReport,msg,/INFO,PARENT=parent,_EXTRA=e $
+  else self->CommandLineReport,msg,/INFO,_EXTRA=e
 end 
 
 ;=============================================================================
-; Popup - Create a blocking or non-blocking popup with the associated msg
+;  Popup - Create a blocking or non-blocking popup with the associated
+;          msg
 ;=============================================================================
-pro ObjReport::Popup,msg,INFO=info,WARNING=warning,ERROR=error,PARENT=parent, $
-                     TITLE=title
+pro ObjReport::PopupReport,msg,INFO=info,WARNING=warning,ERROR=error, $
+                           PARENT=parent,TITLE=title,SCROLL=scroll,_EXTRA=e
   title_type=keyword_set(error)?"error":keyword_set(warning)?"warning": $
              keyword_set(info)?"info":"error"
-  if n_elements(title) eq 0 then title=obj_class(self)+' '+title_type
-  if n_elements(parent) eq 0 then parent=self.widget else $
-     if NOT widget_info(parent,/VALID_ID) then parent=self.widget
-  if keyword_set(info) or keyword_set(error) then $
-     void=dialog_message(msg,DIALOG_PARENT=parent, $
-                         INFORMATION=keyword_set(info) , $
-                         ERROR=keyword_set(error),TITLE=title) $
-  else void=dialog_message(msg,DIALOG_PARENT=parent,TITLE=title)
+  if strlen(self.or_title_base) eq 0 then $
+     self.or_title_base=obj_class(self)
+  if n_elements(title) eq 0 then title=self.or_title_base+' '+title_type
+  if n_elements(parent) eq 0 then parent=self.or_widget else $
+     if NOT widget_info(parent,/VALID_ID) then parent=self.or_widget
+  if keyword_set(scroll) then begin 
+     xdisplayfile,'',TEXT=msg,/MODAL,GROUP=parent,TITLE=title, $
+                  DONE_BUTTON='  OK  ',_EXTRA=e
+  endif else begin 
+     if keyword_set(info) or keyword_set(error) then $
+        void=dialog_message(msg,DIALOG_PARENT=parent, $
+                            INFORMATION=keyword_set(info) , $
+                            ERROR=keyword_set(error),TITLE=title,_EXTRA=e) $
+     else void=dialog_message(msg,DIALOG_PARENT=parent,TITLE=title,_EXTRA=e)
+  endelse 
 end
 
 ;=============================================================================
-; Report - Print messages to the command line
+;  CommandLineReport - Print messages to the command line
 ;=============================================================================
-pro ObjReport::Report,msg,INFO=info,WARNING=warning,ERROR=error,TITLE=title
+pro ObjReport::CommandLineReport,msg,INFO=info,WARNING=warning, $
+                                 ERROR=error,TITLE=title
+  on_error,2
   title_type=keyword_set(error)?"error":keyword_set(warning)?"warning": $
              keyword_set(info)?"info":"error"
-  if n_elements(title) eq 0 then title=obj_class(self)+' '+title_type
+  if strlen(self.or_title_base) eq 0 then $
+     self.or_title_base=obj_class(self)  
+  if n_elements(title) eq 0 then title=self.or_title_base+' '+title_type
+  if n_elements(msg) gt 1 then begin
+     newmsg=msg[0]
+     for i=1,n_elements(msg)-1 do newmsg=newmsg+string(10b)+msg[i]
+     msg=newmsg
+  endif 
   printmsg=title+': '+msg
   if keyword_set(warning) then message,printmsg,/CONTINUE,/NOPREFIX $
   else if keyword_set(error) then message,printmsg,/NOPREFIX $
@@ -243,41 +268,44 @@ pro ObjReport::Report,msg,INFO=info,WARNING=warning,ERROR=error,TITLE=title
 end
 
 ;=============================================================================
-; TestWidget - Return the widget to test the validity of to decide
-;              between graphical and text-based errors/warnings.
-;              Should be overridden.  By default, looks for a class
-;              tag "wInfo" which is a ptr to an info structure with a
-;              "Base" tag.  
+;  TestWidget - Return the widget to test the validity of to decide
+;               between graphical and text-based errors/warnings.
+;               Should be overridden.  By default, looks for a class
+;               tag "wInfo" which is a ptr to an info structure with a
+;               "Base" tag.
 ;=============================================================================
 function ObjReport::TestWidget
   catch, err
-  if err ne 0 then $
+  if err ne 0 then begin 
+     catch,/cancel
      message, "No class tag pointer `wInfo' with tag `Base' found.  " + $
               "Change/Override TestWidget Method?"
+  endif
   if ptr_valid(self.wInfo) then return,((*self.wInfo).Base)
+  return,-1L
 end
 
 ;=============================================================================
-; isBlocking - Is the widget part of a blocking widget, or not?
+;  isBlocking - Is the widget part of a blocking widget, or not?
 ;=============================================================================
-function ObjReport::isBlocking
-  return,widget_info(self.widget,/XMANAGER_BLOCK)
+function ObjReport::IsBlocking
+  return,widget_info(self.or_widget,/XMANAGER_BLOCK)
 end
 
 ;=============================================================================
-; useWidget - Use a widget for popup messages?
+;  isWidget - Do we use a widget for popup messages?
 ;=============================================================================
-function ObjReport::useWidget
-  self.widget=self->TestWidget() ;re-get the widget, it could be changing
-  return,widget_info(self.widget,/VALID_ID)
+function ObjReport::IsWidget
+  self.or_widget=self->TestWidget() ;re-get the widget, it could be changing
+  return,widget_info(self.or_widget,/VALID_ID)
 end
 
 ;=============================================================================
-; ObjReport - Special error and warning message helper class
+;  ObjReport - Special error and warning message helper class
 ;=============================================================================
 pro ObjReport__define
   class={ObjReport, $
-         widget:0L, $           ;the widget, which, if valid, will cause
+         or_title_base:'',$     ;the root of the title
+         or_widget:0L}          ;the widget, which, if valid, will cause
                                 ;graphicsl messages to appear
-         }
 end
