@@ -9,8 +9,12 @@ pro CubeBadPix::Message, msg
         if msg.type ne 0 then return ;presses only
         pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING,/SINGLE_INDEX)
         if pt[0] eq -1 then return
-        ;; First button only
-        if msg.press ne 1b then return
+        ;; Non-first button only: cycle through group
+        if msg.press eq 4b then begin $
+           self.showing=1-self.showing 
+           self.oDraw->Redraw,/SNAPSHOT
+           return
+        endif else if msg.press ne 1b then return
         ;; Add or remove bp from list
         if ptr_valid(self.bp_list) then begin 
            got=where(*self.bp_list eq pt,ngot, $
@@ -34,10 +38,13 @@ pro CubeBadPix::Message, msg
      'TVDRAW_SNAPSHOT': begin 
         self.oDraw->GetProperty,ZOOM=zm
         self.zoom=zm
-        self->MarkStatic,/ALL
-        self->MarkAll           ;put them back on
+        if self.showing eq 0 then self->MarkStatic,/ALL
+        ;; Only put bpl in background when On
+        if ~self->On() then self->MarkAll
      end
           
+     'TVDRAW_REDRAW': self->MarkAll
+     
      'CUBEREC_UPDATE': begin 
         if msg.BCD_MODE then begin ; We only work in BCD mode
            self.bmask=msg.BMASK
@@ -69,8 +76,12 @@ end
 ;=============================================================================
 pro CubeBadPix::Off,_EXTRA=e
   ;; Nothing but snapshot
-  if self->On() then self.oDraw->MsgSignup,self,/NONE,/TVDRAW_SNAPSHOT
+  if self->On() then begin 
+     was_on=1
+     self.oDraw->MsgSignup,self,/NONE,/TVDRAW_SNAPSHOT
+  endif else was_on=0
   self->tvPlug::Off,_EXTRA=e
+  if was_on then self.oDraw->Redraw,/SNAPSHOT ;to get everything into bg.
 end
 
 ;=============================================================================
@@ -83,7 +94,7 @@ pro CubeBadPix::On
      return
   endif 
   self->tvPlug::On
-  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_SNAPSHOT
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_SNAPSHOT,/TVDRAW_REDRAW
   self.oDraw->Redraw,/SNAPSHOT
 end
 
@@ -103,6 +114,12 @@ end
 function CubeBadPix::Description
   return,'Mark Bad BCD Pixels'
 end
+
+
+function CubeBadPix::MouseHelp
+  return,['Mark/Remove','','Show/Hide Static']
+end
+
 
 ;=============================================================================
 ;  ReportWidget - Where to position our error and other messages
@@ -162,11 +179,12 @@ end
 ;  DrawMark - Mark or erase a single index
 ;=============================================================================
 pro CubeBadPix::DrawMark,ind,ERASE=erase
-  pt=self.oDraw->Convert(ind,/DEVICE,/SHOWING)
+ pt=self.oDraw->Convert(ind,/DEVICE,/SHOWING)
   if pt[0] eq -1 then return
   if keyword_set(erase) then begin 
      self.oDraw->Erase,pt-self.zoom/2,[self.zoom,self.zoom]+2
-     self->MarkStatic,ind       ;put the static mark back if necessary
+     ;; put the static mark back if necessary
+     if self.showing eq 0 then self->MarkStatic,ind       
   endif else $
      plots,pt[0],pt[1],/DEVICE,COLOR=self.color[0],PSYM=7, $
            SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
@@ -220,6 +238,7 @@ pro CubeBadPix__define
       bp_list:ptr_new(), $      ;the bad pixel list
       bmask:ptr_new(), $        ;the per-BCD mask plane
       pmask:ptr_new(), $        ;the static mask plane
+      showing:0, $              ;showing 0) all 1) user BPs
       parent:0L}
 
 end
