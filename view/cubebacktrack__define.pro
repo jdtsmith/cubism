@@ -96,7 +96,8 @@ pro CubeBackTrack::On
   self.cube->GetProperty,PROJECT_NAME=pn
   self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
   title=string(FORMAT='(%"BackTracking: %s")',pn)
-  self.msg_head="        BCD              Pix         Val     Frac"
+  self.msg_head= $
+     "        BCD             Pix          Val       Back       Frac"
   msg=self.msg_base+string(10b)+self.msg_head
   self.wBase=widget_base(/COLUMN, SPACE=1,GROUP_LEADER=self.parent, $
                          TITLE=title, /TLB_SIZE_EVENTS,UVALUE=self)
@@ -188,10 +189,10 @@ pro CubeBackTrack::UpdateList
   if size(list,/N_DIMENSIONS) eq 0 then str='' else begin 
      str=strarr(n_elements(list))
      for i=0,n_elements(list)-1 do begin 
-        str[i]=string(FORMAT='(" (",I3,",",I3,") ",G9.3,1X,G9.3)', $
+        str[i]=string(FORMAT='(" (",I3,",",I3,") ",G9.3,1X,G9.3,1X,G9.3)', $
                       list[i].BCD_PIX mod self.bcd_size[0], $
                       list[i].BCD_PIX/self.bcd_size[0], $
-                      list[i].BCD_VAL, list[i].AREA)
+                      list[i].BCD_VAL, list[i].BACK_VAL, list[i].AREA)
         if list[i].ID eq oldid then begin 
            str[i]=string(FORMAT='(21X,A)',str[i])
         endif else begin 
