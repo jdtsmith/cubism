@@ -6,7 +6,7 @@ pro multchoice_event,ev
      widget_control, ev.top,/DESTROY 
      return
   endif 
-  (*ptr)[uv]=1b
+  (*ptr)[uv]=ev.select
 end
 
 
