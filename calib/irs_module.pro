@@ -1,38 +1,24 @@
 ;+
 ; NAME:  
 ;
-;    smart_module
-;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
+;    irs_module
 ;
 ; DESCRIPTION:
-;    
+;
 ;    Regularize the module, mapping names to integers:
 ;
-;      0: LH
-;      1: LL
-;      2: SH
-;      3: SL
+;      0: SL
+;      1: SH
+;      2: LL
+;      3: LH
 ;    
-;sjuh
-; our definition is 
-;      0: SL1
-;      1: SL2
-;      2: LL1
-;      3: LL2
-;      4: SH
-;      5: LH  
-;
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
+;    IRS Spectral Reduction, Analysis and Processing.
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    mod_num_or_name=smart_module(module_name_or_number, [/TO_NAME])
+;    mod_num_or_name=irs_module(module_name_or_number, [/TO_NAME])
 ;
 ; INPUT PARAMETERS:
 ;
@@ -56,8 +42,8 @@
 ;
 ; EXAMPLE:
 ;
-;    mod=smart_module('Long Low')
-;    mod_name=smart_module(3,/TO_NAME)
+;    mod=irs_module('Long Low')
+;    mod_name=irs_module(3,/TO_NAME)
 ;    
 ; MODIFICATION HISTORY:
 ;
@@ -69,42 +55,34 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
-function smart_module,module, TO_NAME=tn
+function irs_module,module, TO_NAME=tn
   if size(module[0],/TYPE) eq 7 then begin 
      for i=0,n_elements(module)-1 do begin 
         match=0
         long='^L(o|on|ong)?'
         short='^S(h|ho|hor|hort)?'
         high='H(i|ig|igh)?$'
-        low='L(o|ow|1|2)?$'
+        low='L(o|ow)?$'
         sep='[ -/=+~]*'
-        mod_match=[long+sep+high,long+sep+low,short+sep+high,short+sep+low]
-
-;need to updat the integers and see if used in smart_calib????
-
-;  if strmid(low,0,1,/reverse_offset) eq '1' then
-
-
+        mod_match=[short+sep+low,short+sep+high,long+sep+low,long+sep+high]
         for j=0,3 do begin 
            if stregex(module[i],mod_match[j],/FOLD_CASE,/BOOLEAN) then begin 
               match=1
@@ -117,12 +95,6 @@ function smart_module,module, TO_NAME=tn
      endfor  
   endif else ret=0>fix(module)<3
 
-  if keyword_set(tn) then return,(['LH','LL','SH','SL'])[ret]
-  print,'Returned from smart_module'
+  if keyword_set(tn) then return,(['SL','SH','LL','LH'])[ret]
   return,ret
 end
-
-
-
-
-
