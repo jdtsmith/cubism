@@ -138,11 +138,12 @@ pro tvSwitcher::Start
      ic=objs[i]->Icon()
      if NOT keyword_set(ic) then continue
      if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic   
+     desc=objs[i]->Description()
+     if (*self.MsgList)[i].keys then desc+=" ("+(*self.MsgList)[i].keys+")"
      (*self.wList)[i]= $
         widget_button(self.sBase[1b-(*self.MsgList)[i].Exclusive], $
                       /NO_RELEASE,value=val,UVALUE=i,/ALIGN_CENTER, $
-                      SENSITIVE=objs[i]->Enabled(),$
-                      TOOLTIP=objs[i]->Description())
+                      SENSITIVE=objs[i]->Enabled(),TOOLTIP=desc)
   endfor 
   
   ;; Ask for key events:
@@ -162,6 +163,7 @@ pro tvSwitcher::Start
   exc=where((*self.MsgList).EXCLUSIVE,ecnt,COMPLEMENT=tog,NCOMPLEMENT=tcnt)
   for i=0,ecnt-1 do begin 
      desc=objs[exc[i]]->Description()
+     if (*self.MsgList)[i].keys then desc+=" ("+(*self.MsgList)[i].keys+")"
      if NOT keyword_set(desc) then continue
      (*self.wTList)[exc[i]]= $  
         widget_button(self.toolMenu,value=desc,UVALUE=exc[i],/CHECKED_MENU, $
