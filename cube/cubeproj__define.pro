@@ -3692,16 +3692,20 @@ pro CubeProj::CheckModules,id,ERROR=err
                   "   "+strjoin(modules[u],",")],/RETURN_ONLY
   self.module=modules[u[0]]
   
-  if array_equal(orders,0) && (self.module eq 'LL' || self.module eq 'SL') $
-  then begin 
-     self.ORDER=(self.cal->Orders(self.module))[0]
-  endif else if array_equal(orders,orders[0]) then $
-     self.ORDER=orders[0] $
-  else begin 
-     h=histogram(BINSIZE=1,orders,OMIN=om)
-     mx=max(h,mpos)
-     self.ORDER=om+mpos
-  endelse 
+  if (self.module eq 'LL' || self.module eq 'SL') then begin 
+     if array_equal(orders,0) then begin 
+        self.ORDER=(self.cal->Orders(self.module))[0]
+     endif else if array_equal(orders,orders[0]) then $
+        self.ORDER=orders[0] $
+     else begin 
+        ;; Only change if it's not yet set
+        if self.ORDER eq 0 then begin 
+           h=histogram(BINSIZE=1,orders,OMIN=om)
+           mx=max(h,mpos)
+           self.ORDER=om+mpos
+        endif 
+     endelse 
+  endif 
 end
 
 ;=============================================================================
