@@ -91,7 +91,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002 J.D. Smith
+;  Copyright (C) 2001,2002,2003,2004 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
