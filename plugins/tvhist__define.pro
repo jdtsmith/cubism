@@ -110,6 +110,17 @@ end
 ;          and/or the scaling mode present.
 ;=============================================================================
 pro tvHist::Histo,im
+  boxon=self.Box->IsDrawn()
+  if boxon then begin 
+     self.Box->GetLRTB,l,r,t,b  ;get box sides
+     if NOT ((l lt r) and (b lt t)) then return
+     self.oDraw->GetProperty,SIZE=sz
+     if r ge sz[0] OR t ge sz[1] then begin 
+        self->Reset             ;panic
+        return
+     endif   
+  endif
+  
   if self.freeze then begin 
      switch self.scale_mode of
         0:
@@ -131,9 +142,10 @@ pro tvHist::Histo,im
      endswitch
      return
   endif   
-  ;; Non frozen modes
-  if self.Box->IsDrawn() eq 0 then begin 
-     ;; linear with no hist box: do nothing
+  
+  ;; Non-frozen modes
+  if boxon then take=(*im)[l:r,b:t] else begin 
+     ;; linear with no hist box: do nothing, except record range
      if self.scale_mode eq 0 then begin 
         self.min=min(*im,MAX=mx)
         self.max=mx
@@ -141,17 +153,7 @@ pro tvHist::Histo,im
      endif
      boxon=0
      take=*im
-  endif else begin 
-     self.Box->GetLRTB,l,r,t,b  ;get box sides
-     if NOT ((l lt r) and (b lt t)) then return
-     self.oDraw->GetProperty,SIZE=sz
-     if r ge sz[0] OR t ge sz[1] then begin 
-        self->Reset             ;panic
-        return
-     endif 
-     boxon=1
-     take=(*im)[l:r,b:t]
-  endelse 
+  endelse
   
   switch self.scale_mode of 
      0: begin                   ; linear
