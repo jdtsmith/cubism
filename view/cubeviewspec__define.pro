@@ -165,7 +165,8 @@ pro CubeViewSpec::Event,ev
                  (*self.reg[self.seltype])[*,self.selected]=range
               self->MergeRegs
               self->Plot
-              if n_elements(*self.fit) eq 0 then self->Send
+              if n_elements(*self.fit) ne 0 then self->ResetFit
+              self->Send
            end 
               
            0b: case ev.press of ;press events
@@ -250,7 +251,7 @@ pro CubeViewSpec::Event,ev
               if moved eq 0 then return
               self.movestart=ind ;relative to here
               widget_control, self.wLine,SET_VALUE= $
-                              string(FORMAT='("[",F7.3,":",G9.6,"]")', $
+                              string(FORMAT='("[",F7.3,":",G9.4,"]")', $
                                      (*self.lam)[ind],(*self.sp)[ind])
               ;; Maybe Moving a region
               if self.press then begin 
@@ -261,8 +262,9 @@ pro CubeViewSpec::Event,ev
                  range[1]=range[1] < (nl-1) > delta
                  (*self.reg[self.seltype])[*,self.selected]=range
                  self->MergeRegs
-                 if n_elements(*self.fit) eq 0 then self->Send
+                 if n_elements(*self.fit) ne 0 then self->ResetFit
                  self->Plot
+                 self->Send
               endif else if self->ShowingValueLine() then self->Plot
            end 
         endcase 
@@ -406,21 +408,22 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
         msg.info="Stack: "+strjoin(string(FORMAT='(F5.2,"-",F5.2)',lams),", ")
         if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
         msg.foreground=self.reg[1]
-        msg.background=self.reg[0]
         msg.weights=self.weights
         ;; Send either the fit, or the background regions themselves.
-        if n_elements(*self.fit) gt 0 AND self.medlam ne 0. then begin 
-           msg.bg_fit=ptr_new(*self.fit*10.^self.renorm)
+        if ptr_valid(self.reg[0]) && n_elements(*self.fit) gt 0 && $
+           self.medlam ne 0. then begin 
+           msg.background=ptr_new(poly( $
+                          (*self.lam)[self->RegionIndices(*self.reg[1])], $
+                          *self.fit)*10.^self.renorm)
            msg.info=msg.info+' -- Fit'
-           free_back=1
-        endif 
+        endif else msg.background=self.reg[0]
         ;;if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
         if ptr_valid(self.reg[0]) then msg.info=msg.info+')'
      endelse 
   endelse 
   self->MsgSend,msg
   if keyword_set(js) eq 0 then self->SetWin ;in case it was taken away
-  if free_back then ptr_free,msg.bg_fit
+
 end
 
 ;=============================================================================
@@ -453,11 +456,7 @@ pro CubeViewSpec::Fit
   if NOT ptr_valid(self.reg[0]) then return
   
   ;;collect the continuum bits
-  for i=0,n_elements(*self.reg[0])/2-1 do begin 
-     range=(*self.reg[0])[*,i]
-     range=range[0]+indgen(range[1]-range[0]+1)
-     if n_elements(whcont) ne 0 then whcont=[whcont,range] else whcont=range
-  endfor 
+  whcont=self->RegionIndices(*self.reg[0])
   
   ;; Get the fit order
   d=widget_info(self.wOrder,/DROPLIST_SELECT) 
@@ -467,12 +466,7 @@ pro CubeViewSpec::Fit
   
   if ptr_valid(self.reg[1]) then begin 
      ;;collect the peak bits (we allow overlap in continuum and peak)
-     for i=0,n_elements(*self.reg[1])/2-1 do begin 
-        range=(*self.reg[1])[*,i]
-        range=range[0]+indgen(range[1]-range[0]+1)
-        if n_elements(whpeak) ne 0 then whcont=[whpeak,range] else $
-           whpeak=range
-     endfor 
+     whpeak=self->RegionIndices(*self.reg[1])
      
      ;; Average continuum there
      cont_under=poly((*self.lam)[whpeak],*self.fit)
@@ -682,10 +676,17 @@ pro CubeViewSpec::Reset,KEEP=k
      self.selected=-1
   endif                         ;Sets up axes for region drawing
   self.medlam=0                 ;This signals no fit.
-  ptr_free,self.fit & self.fit=ptr_new(/ALLOCATE_HEAP)
+  self->ResetFit
   self->UpdateParams
   self->Plot
   self->Send
+end
+
+;=============================================================================
+;  ResetFit - Reset the fit.
+;=============================================================================
+pro CubeViewSpec::ResetFit
+  ptr_free,self.fit & self.fit=ptr_new(/ALLOCATE_HEAP)
 end
 
 ; pro CubeViewSpec::Load, lam, sp
@@ -940,7 +941,20 @@ pro CubeViewSpec::FindReg, xpos,FOUND=found
 end
 
 ;=============================================================================
-;  SetColors - Give us a nice dull to bright red then white.
+;  RegionIndices - Return a all indices corresponding to a passed
+;                  region set
+;=============================================================================
+function CubeViewSpec::RegionIndices, regs
+  for i=0,n_elements(regs)/2-1 do begin 
+     range=regs[*,i]
+     range=range[0]+indgen(range[1]-range[0]+1)
+     if n_elements(ret) ne 0 then ret=[ret,range] else ret=range
+  endfor 
+  return, n_elements(ret) eq 0?-1:ret
+end
+
+;=============================================================================
+;  SetColors - Give us a nice dull to bright red then white
 ;=============================================================================
 pro CubeViewSpec::SetColors
   tvlct,[110b,147b,184b,255b,255b], $
@@ -1142,10 +1156,9 @@ pro CubeViewSpec__define
        foreground:ptr_new(), $  ;a 2xn list of foreground wavelength index
                                 ; ranges over which to average
        weights:ptr_new(), $     ;a 2xn list of weights
-       background:ptr_new(),$   ;a 2xn list of continuum wavelength ranges to
-                                ; average
-       bg_fit:ptr_new()}        ;a list of n parameters in an
-                                ; n-1th order polynomial fit to the
+       background:ptr_new()}    ;a 2xn list of continuum wavelength ranges to
+                                ; average, or a list of background values
+
                                 ; background over wavelength.
   msg={CUBEVIEWSPEC_FULL, $     ;switch to full mode
        wavelength:0.0}          ;the wavelength we're at
