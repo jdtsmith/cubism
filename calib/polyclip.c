@@ -188,7 +188,6 @@ void polyclip(int argc, void *argv[]) {
     }
     areas_out[pix]/=2.;
     if(areas_out[pix]<0.) areas_out[pix]=-areas_out[pix];
-
     /* Update the running index */
     ri_ind+=ind;
     ri_out[pix+1]=ri_ind;
@@ -197,5 +196,5 @@ void polyclip(int argc, void *argv[]) {
 }
 
 char polyclip_test() {
-  return 1;
+  return 42;
 }
