@@ -83,11 +83,12 @@ pro tvStats::Stats
      return
   endif
   take=(*io)[l:r,b:t]
-  n=n_elements(take) 
+  wh=where(finite(take),n)
+  if n le 1 then return
   max=max(take,MIN=min)
   med=median(take)
-  avg=total(take)/n
-  std=sqrt(total((take-avg)^2)/(n-1))
+  avg=total(take,/NAN)/n
+  std=sqrt(total((take-avg)^2,/NAN)/(n-1))
   str=string(FORMAT=self.form,l,b,r-l+1,t-b+1,max,min,avg,med,std)
   widget_control, self.wSlab, set_value=str
   self.min=min & self.max=max & self.med=med & self.avg=avg & self.std=std
