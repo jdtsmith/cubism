@@ -1055,7 +1055,7 @@ pro CubeProj::WriteFits,file
   sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
               'For more information on SINGS see http://sings.stsci.edu', $
               'This file contains a spectral cube assembled from an IRS', $
-              'spectral mapping dataset.']
+              'spectral mapping dataset.'], $
              hdr,/COMMENT
   
   fxaddpar,hdr,'CUBE-DT',jul2date(self.CUBE_DATE),' Cube build date'
@@ -3445,7 +3445,7 @@ pro CubeProj::SaveMap,map,sf
   
   ;; Description
   sxaddhist, ['This file contains a 2D map created from an IRS', $
-              'spectral cube, assembled from a spectral mapping dataset.']
+              'spectral cube, assembled from a spectral mapping dataset.'], $
              hdr,/COMMENT
   fxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
   writefits,sf,map,hdr
