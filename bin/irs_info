@@ -1,0 +1,147 @@
+#!/usr/bin/perl
+#
+# irs_info -- Summarize info for IRS data in directories at and
+# beneath this one.
+#
+#  12/27/03 J.D. Smith
+#  5/18/04 (JDS): Added support for staring and fixed cluster data sets.
+#
+# Copyright (C) 2003,2004 J.D. Smith
+#
+use File::Find;
+
+@keywords=qw{AORKEY OBJECT FOVID AIRSCMDN AOT_TYPE OBJTYPE EXPID NCYCLES
+             EXPTOT_T RAMPTIME STEPSPAR STEPSPER COLUMN ROW};
+
+foreach (@keywords) {$keywords{pack("A8",$_)}++;};
+
+%fovs=(26=>'SL1_a  ', 27=>'SL1_b  ', 28=>'SL1_cen', 29=>'SL_cen ',
+       32=>'SL2_a  ', 33=>'SL2_b  ', 34=>'SL2_cen', 38=>'LL1_a  ',
+       39=>'LL1_b  ', 40=>'LL1_cen', 41=>'LL_cen ', 44=>'LL2_a  ',
+       45=>'LL2_b  ', 46=>'LL2_cen', 50=>'SH_a   ', 51=>'SH_b   ',
+       52=>'SH_cen ', 56=>'LH_a   ', 57=>'LH_b   ', 58=>'LH_cen ');
+
+find(sub{
+       return unless -f and /\.bcd_fp\.fits$/;
+       parsefile($File::Find::dir, $_);
+     }, '.');
+
+sub parsefile {
+  my ($dir,$file)=@_;
+  open FILE,"<$file" or die "Can't open $file: $!\n";
+  %keys=();
+
+  while (read FILE,$line,80) {
+    $key=substr($line,0,8);
+    last if $key eq "END     ";
+    next unless defined $keywords{$key};
+    $key=~s/ *$//;
+    ($keys{$key}=$1)=~s/ *$// if $line=~m|$key *= *'?([^/']+)'? */|;
+  }
+  my $aor=$keys{AORKEY};
+  my $obj=$keys{OBJECT};
+  my $sub=$fovs{$keys{FOVID}};
+  return unless $sub && $aor && $obj;
+
+  $sub=~s/_.*$//;
+  $sub=sprintf("%-3s",$sub);
+
+  $bcds{$aor}{$obj}{$sub}{cnt}++;
+  foreach (@keywords[2..$#keywords-2]) {
+    $bcds{$aor}{$obj}{$sub}{$_}=$keys{$_};
+  }
+  if(defined $dirs{$aor} && $dirs{$aor} ne $dir) {
+    $redefined_cnt{$aor}++;
+  }
+  $dirs{$aor}=$dir;
+  if ($keys{AOT_TYPE}=~/IrsMap/) {
+    push @{$bcds{$aor}{$obj}{$sub}{steps}}, [$keys{COLUMN},$keys{ROW}];
+    push @{$bcds{$aor}{$obj}{$sub}{files}},$file;
+  } else {
+    push @{$bcds{$aor}{$obj}{$sub}{nods}},
+      {map {$_=>$keys{$_}} qw{RAMPTIME OBJTYPE AIRSCMDN EXPID DCENUM}};
+  }
+  close FILE;
+}
+
+foreach $aor (sort keys %bcds) {
+  if (defined($redefined_cnt{$aor})) {
+    $redefined_cnt{$aor}++;
+    $warning=", warning: same AOR found in $redefined_cnt{$aor} dirs";
+  } else {$warning="";}
+  print "AOR: $aor (",$dirs{$aor},"$warning)\n";
+  foreach $obj (sort keys %{$bcds{$aor}}) {
+    %types=();
+    foreach $sub (sort keys %{$bcds{$aor}{$obj}}) {
+      $types{join(", ",@{$bcds{$aor}{$obj}{$sub}}{AOT_TYPE,OBJTYPE})}++;
+    }
+
+    print "  $obj (",join(";",sort keys(%types)),"):\n";
+    foreach $sub (sort keys %{$bcds{$aor}{$obj}}) {
+      %rec=%{$bcds{$aor}{$obj}{$sub}};
+      $mod=$fovs{$rec{FOVID}};
+
+      if($rec{AOT_TYPE}=~/IrsMap/) {
+
+	# Maps: check on steps for this subslit
+	@steps=@missing=();
+	foreach $step (@{$rec{steps}}) {
+	  $steps[$step->[0]][$step->[1]]++;
+	}
+	for ($i=1; $i<=$rec{STEPSPAR}; $i++) {
+	  for ($j=1; $j<=$rec{STEPSPER}; $j++) {
+	    push @missing,[$i,$j] unless $steps[$i][$j];
+	  }
+	}
+	$missing=@missing?("\n             Missing steps: ".
+			   join(";",map{"$_->[0],$_->[1]"} @missing)):"";
+	$tot=$rec{STEPSPAR}*$rec{STEPSPER}*$rec{EXPTOT_T};
+	$type=0;
+	while ($tot>60 && $type<=2) {
+	  $tot/=60;
+	  $type++;
+	}
+
+	$tot=sprintf("%6.2f%s",$tot,("s","m","h")[$type]);
+	printf
+	  "    $mod: %3d files %3dx%-3d\@%-2d -- step: %7.2fs, total: ".
+	    "$tot%s\n",
+	      @rec{cnt,STEPSPAR,STEPSPER,NCYCLES,EXPTOT_T},$missing;
+
+      } else {
+	# Staring modes: check for nods
+	$totp=0;
+	$tot=0.0;
+	$exps_at=0;
+	foreach $nod (@{$rec{nods}}) {
+	  if($nod->{EXPID} > $totp) {$totp=$nod->{EXPID}};
+	  if($exps_at && $exps_at!=$nod->{AIRSCMDN}) {
+	    print "Warning: mismatched exposure count\n";
+	  } else {
+	    $exps_at=$nod->{AIRSCMDN};
+	  }
+	  $tot+=$nod->{RAMPTIME};
+	}
+	# How many offsets
+	$positions=scalar @{$rec{nods}}/$exps_at;
+	$offs=$positions/2;
+
+	$type=0;
+	while ($tot>60 && $type<=2) {
+	  $tot/=60;
+	  $type++;
+	}
+	$tot=sprintf("%6.2f%s",$tot,("s","m","h")[$type]);
+	if ($rec{OBJTYPE}=~/TargetMulti/) {
+	  $offs=sprintf("$offs positions \@%-2d",$exps_at);
+	} else {$offs=sprintf("%2d",$exps_at);}
+	$plural=$exps_at>1?"s":" ";
+	printf
+	  "    $sub: %3d files $offs cycle$plural -- exp: %7.2fs ".
+	    "total: $tot\n",
+	  $rec{cnt},$rec{RAMPTIME};
+      }
+    }
+  }
+  print "\n";
+}
