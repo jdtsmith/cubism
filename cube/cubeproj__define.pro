@@ -220,9 +220,9 @@ end
 ;=============================================================================
 ;  Print - Print the cube's contents
 ;=============================================================================
-pro cubeProj::Print,entries
+pro cubeProj::Print,entries, NO_DATA=nd
   print,'IRS Spectral Cube: '+self.ProjectName,' Created: '+ $
-        (self.CUBE_DATE eq 0.0d?"(unknown)":jul2date(self.CUBE_DATE))
+        (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))
   print,self.MODULE,self.ORDER ne 0? $
         ' Order '+strtrim(self.ORDER,2): $
         ' all orders'
@@ -231,10 +231,13 @@ pro cubeProj::Print,entries
   print,FORMAT='(I0,"x",I0," steps = ",F6.3," x ",F6.3," arcsec",' + $
         '" (",F6.3," arcsec/pixel)")',self.NSTEP, $
         self.STEP_SIZE*3600*self.NSTEP,self.PLATE_SCALE*3600
+  print,FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")', $
+        self.PR_SIZE
+  if keyword_set(nd) then return
   if NOT ptr_valid(self.DR) then begin
      print,'No data'
      return
-  endif 
+  endif   
   print,' ===== DATA ====='
   if n_elements(entries) eq 0 then entries=lindgen(n_elements(*self.DR))
   for i=0,n_elements(entries)-1 do begin 
@@ -251,31 +254,90 @@ end
 
 ;=============================================================================
 ;  SetProperty - Set various cube properties.  Most of these should be
-;                automatically discovered from the BCD's.
+;                automatically discovered from the BCD's.  If any are
+;                actually changed, indicate that the account is no
+;                longer valid.
 ;=============================================================================
 pro cubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           MODULE=md,ORDER=ord,SLIT_SIZE=slitsz, $
-                          SLIT_LENGTH=slitl, SLIT_WIDTH=slitw, $
+                          SLIT_LENGTH=slitl, SLIT_WIDTH=slitw, PR_WIDTH=prw, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
                           APERTURE=aper
-  if n_elements(ps) ne 0 then self.PLATE_SCALE=ps
-  if n_elements(nstep) ne 0 then self.NSTEP=nstep
-  if n_elements(stepsz) ne 0 then self.STEP_SIZE=stepsz
-  if n_elements(md) ne 0 then self.MODULE=md
-  if n_elements(ord) ne 0 then self.ORDER=ord
-  if n_elements(slitsz) eq 2 then self.SLIT_SIZE=slitsz else begin 
-     if n_elements(slitl) ne 0 then self.SLIT_SIZE[0]=slitl
-     if n_elements(slitw) ne 0 then self.SLIT_SIZE[1]=slitw
-  endelse
-  if n_elements(prz) ne 0 then self.PR_SIZE=prz
-  if n_elements(cal_file) ne 0 then self.cal_file=cal_file
-  if n_elements(cal) ne 0 then begin 
-     if obj_isa(cal,'IRS_Calib') then self.cal=cal else $
-        message,'Calibration object not of correct type.'
+  if n_elements(ps) ne 0 then begin 
+     if self.PLATE_SCALE ne ps then begin 
+        self.PLATE_SCALE=ps
+        self.ACCOUNTS_VALID=0b
+     endif 
   endif 
+  if n_elements(nstep) ne 0 then self.NSTEP=nstep
+  if n_elements(stepsz) ne 0 then begin 
+     if NOT array_equal(self.STEP_SIZE,stepsz) then begin 
+        self.STEP_SIZE=stepsz
+        self.ACCOUNTS_VALID=0b
+     endif 
+  endif 
+  if n_elements(md) ne 0 then begin 
+     if md ne self.MODULE then begin
+        self.MODULE=md
+        self.ACCOUNTS_VALID=0b
+     endif 
+  endif 
+  if n_elements(ord) ne 0 then begin 
+     if ord ne self.ORDER then begin 
+        self.ORDER=ord
+        self.ACCOUNTS_VALID=0b
+     endif 
+  endif 
+  if n_elements(slitsz) eq 2 then begin 
+     if self.SLIT_SIZE ne slitsz then begin 
+        self.SLIT_SIZE=slitsz
+        self.ACCOUNTS_VALID=0b
+     endif 
+  endif else begin 
+     if n_elements(slitl) ne 0 then begin 
+        if self.SLIT_SIZE[0] ne slitl then begin 
+           self.SLIT_SIZE[0]=slitl
+           self.ACCOUNTS_VALID=0b
+        endif
+     endif
+     if n_elements(slitw) ne 0 then begin 
+        if self.SLIT_SIZE[1] ne slitw then begin 
+           self.SLIT_SIZE[1]=slitw
+           self.ACCOUNTS_VALID=0b
+        endif
+     endif
+  endelse
+  if n_elements(prw) ne 0 then begin 
+     prw=0.>prw 
+     if prw ne self.PR_SIZE[1] then begin 
+        self.PR_SIZE[1]=prw
+        self.ACCOUNTS_VALID=0b
+     endif
+  endif
+  if n_elements(prz) ne 0 then begin 
+     if NOT array_equal(self.PR_SIZE,prz) then begin 
+        self.PR_SIZE=prz
+        self.ACCOUNTS_VALID=0b
+     endif
+  endif
+  if n_elements(cal_file) ne 0 then begin 
+     if self.cal_file ne cal_file then begin 
+        if obj_valid(self.cal) then obj_destroy,self.cal
+        self.cal_file=cal_file
+     endif 
+  endif
+  if n_elements(cal) ne 0 then begin 
+     if obj_isa(cal,'IRS_Calib') then begin 
+        if self.cal ne cal then begin 
+           self.cal=cal 
+           self.ACCOUNTS_VALID=0b
+        endif 
+     endif else message,'Calibration object not of correct type.'
+  endif
   if n_elements(aper) ne 0 then begin 
      ptr_free,self.APERTURE
      self.APERTURE=ptr_new(aper)
+     self.ACCOUNTS_VALID=0b
   endif 
 end
 
@@ -283,7 +345,7 @@ end
 ;  GetProperty
 ;=============================================================================
 pro cubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
-                           ERROR=err, PR_SIZE=prz
+                           ERROR=err, PR_SIZE=prz, CALIB=calib
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -293,13 +355,25 @@ pro cubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   if arg_present(err) then $
      if ptr_valid(self.ERR) then err=*self.ERR
   if arg_present(prz) then prz=self.PR_SIZE
+  if arg_present(calib) then begin 
+     self->LoadCalib            ;ensure it's loaded
+     calib=self.cal
+  endif 
 end
 
 ;=============================================================================
 ;  Cube
 ;=============================================================================
 function cubeProj::Cube
-  return,*self.CUBE
+  if ptr_valid(self.CUBE) then return,*self.CUBE 
+  return,-1
+end
+
+;=============================================================================
+;  BCD
+;=============================================================================
+function cubeProj::BCD, which
+  return,(*self.DR)[which].BCD
 end
 
 ;=============================================================================
@@ -310,6 +384,7 @@ pro cubeProj::LoadCalib
   if self.cal_file eq '' then $
      message,'Error: no calibration object and no cal file specified.'
   self.cal=irs_restore_calib(self.cal_file)
+  self.ACCOUNTS_VALID=0b
 end
 
 ;=============================================================================
@@ -318,14 +393,13 @@ end
 pro cubeProj::CheckSteps
   if NOT ptr_valid(self.DR) then message, 'No BCD Data loaded.'
   got=bytarr(self.NSTEP)
-  got[(*self.DR).COLUMN-1,(*self.DR).ROW-1]=1b
+  got[(*self.DR).ROW-1,(*self.DR).COLUMN-1]=1b
   wh=where(got eq 0b, cnt)
   if cnt eq 0 then return
   message,'Missing Steps: '+ string(10b)+ $
           string(FORMAT='('+strtrim(cnt,2)+'("[",I0,", ",I0,"]"))', $
-                 [wh/self.NSTEP[0]+1,wh mod self.NSTEP[0]+1])
+                 [1#(wh mod self.NSTEP[0]+1),1#(wh/self.NSTEP[0]+1)])
 end
-
 
 ;=============================================================================
 ;  Normalize - Map header info in the BCD's to cube-specific data, and
@@ -383,23 +457,21 @@ pro cubeProj::Normalize
      message,"BCD's have unequal step size."
   self.STEP_SIZE=[stepszpar[0],stepszper[0]]/3600.D
   
-  ;; Normalize the slit width
-  if self.SLIT_SIZE[0] eq 0.0 then begin 
-     if self.ORDER gt 0 then begin 
-        self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
-        self.SLIT_SIZE[0]=sl*self.PLATE_SCALE
-        self.PR_SIZE[0]=sl
-     endif else begin ;; find the longest slit and use it
-        ords=self.cal->Orders(self.module)
-        slmax=0.
-        for i=0,n_elements(ords)-1 do begin 
-           self.cal->GetProperty,self.module,ords[i],SLIT_LENGTH=sl
-           slmax=sl>slmax
-        endfor 
-        self.SLIT_SIZE[0]=slmax*self.PLATE_SCALE
-        self.PR_SIZE[0]=slmax
-     endelse 
-  endif
+  ;; Normalize the slit length
+  if self.ORDER gt 0 then begin 
+     self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
+     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=sl*self.PLATE_SCALE
+     self.PR_SIZE[0]=sl
+  endif else begin ;; find the longest slit and use it
+     ords=self.cal->Orders(self.module)
+     slmax=0.
+     for i=0,n_elements(ords)-1 do begin 
+        self.cal->GetProperty,self.module,ords[i],SLIT_LENGTH=sl
+        slmax=sl>slmax
+     endfor 
+     if self.SLIT_SIZE[0] eq 0.0 then self.SLIT_SIZE[0]=slmax*self.PLATE_SCALE
+     self.PR_SIZE[0]=slmax
+  endelse 
   
   ;; Check to ensure all steps are present and accounted for
   self->CheckSteps
@@ -410,8 +482,14 @@ pro cubeProj::Normalize
         m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
         len=m>len
      endfor 
-     self.PR_SIZE[0]=self.SLIT_SIZE[0]/self.PLATE_SCALE*len
+     self.PR_SIZE[0]=self.PR_SIZE[0]*len
   endif   
+  
+  ;; The PR Width
+  if self.PR_SIZE[1] eq 0.0 then begin
+     self.ACCOUNTS_VALID=0b
+     self.PR_SIZE[1]=1.D        ;the default, 1xn XXX
+  endif 
   
   ;; Normalize the build aperture(s)
   if ptr_valid(self.APERTURE) then begin 
@@ -422,280 +500,447 @@ pro cubeProj::Normalize
            (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
      endfor 
   endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
-        
   
   ;; Find the average position angle over the course of the map
   pa=mean((*self.DR).PA)
   
+  ;; Establish the dimensions of the cube in the slit coordinate system
+  new_size=ceil((self.NSTEP-1L)*self.STEP_SIZE/self.PLATE_SCALE+ $
+                self.PR_SIZE)
+  if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
+     self.CUBE_SIZE[0:1]=new_size
+     self.ACCOUNTS_VALID=0b
+  endif
 end
 
 
 ;=============================================================================
-;  MergeAccounts - Merge a new account into the existing account.  If
-;                  they overlap in wavelength, combine by developing
-;                  an interpolated wavelength sampling in the region
-;                  of overlap, and splitting individual polygon area
-;                  overlaps between planes with linear interpolation.
-;                  If they don't overlap, just concatenate the
-;                  accounting cubes.
+;  AddMergeRec - Add a merge record for a given order, index and
+;                wavelength set.
 ;=============================================================================
-pro cubeProj::MergeAccounts,account,wavelength
-  
-  ;;; FIXME: Should a cube be merge-able with any other cube, e.g. SL, SH?
-  ;; Here we presume only one module is mergeable.
-  if self.ORDER ne 0 then begin ;; only one order, please
-     ptr_free,self.ACCOUNT
-     ptr_free,self.WAVELENGTH
-  endif 
-  if NOT ptr_valid(self.ACCOUNT) then begin 
-     self.ACCOUNT=ptr_new(account,/NO_COPY)
-     self.WAVELENGTH=ptr_new(wavelength)
-     return
-  endif 
-  
-  ;; Find the overlap of the two wavelength samples and construct
-  ;; and interpolating wavelength
-  min_wav1=min(*self.WAVELENGTH,max=max_wav1)
-  min_wav2=min(wavelength,max=max_wav2)
-  
-  ;; No overlap... just concatenate
-  if min_wav2 gt max_wav1 OR max_wav2 lt min_wav1 then begin 
-     if min_wav2 lt min_wav1 then begin ; prepend new
-        *self.WAVELENGTH=[wavelength,*self.WAVELENGTH]
-        *self.ACCOUNT=[ [[account]], [[*self.ACCOUNT]] ]
-     endif else begin           ; append new
-        *self.WAVELENGTH=[*self.WAVELENGTH,wavelength]
-        *self.ACCOUNT=[ [[*self.ACCOUNT]], [[account]] ]
-     endelse 
-     return
-  endif 
-  
-  ;; Locations of the overlap region in each
-  wh_over1=where(*self.WAVELENGTH gt min_wav2 AND $
-                 *self.WAVELENGTH lt max_wav2,cnt1,COMPLEMENT=wh_clear1)
-  wh_over2=where(wavelength gt min_wav1 AND $
-                 wavelength lt max_wav1,cnt2,COMPLEMENT=wh_clear2)
-  
-  ;; Expand the overlap regions by one bordering sample at each side
-  nw=n_elements(*self.WAVELENGTH)
-  if wh_over1[0] gt 0 then begin 
-     wh_over1=[wh_over1[0]-1,wh_over1]
-     wh=where(wh_clear1 ne wh_over1[0]-1,cnt)
-     if cnt gt 0 then wh_clear1=wh_clear1[wh] else wh_clear1=-1
-  endif 
-  if wh_over1[cnt1-1] lt nw-1 then begin 
-     wh_over1=[wh_over1,wh_over1[nw-1]+1]
-     wh=where(wh_clear1 ne wh_over1[nw-1]+1,cnt)
-     if cnt gt 0 then wh_clear1=wh_clear1[wh] else wh_clear1=-1
-  endif 
-  nw=n_elements(wavelength)
-  if wh_over2[0] gt 0 then begin 
-     wh_over2=[wh_over2[0]-1,wh_over2]
-     wh=where(wh_clear2 ne wh_over2[0]-1,cnt)
-     if cnt gt 0 then wh_clear2=wh_clear2[wh] else wh_clear2=-1
-  endif 
-  if wh_over2[cnt2] lt nw-1 then begin 
-     wh_over2=[wh_over2,wh_over2[nw-1]+1]
-     wh=where(wh_clear2 ne wh_over2[nw-1]+1,cnt)
-     if cnt gt 0 then wh_clear2=wh_clear2[wh] else wh_clear2=-1
+pro cubeProj::AddMergeRec,order,planes,wave,OFFSET=off
+  if n_elements(planes) ne 0 then begin 
+     if ptr_valid((*self.MERGE)[order].planes) then $
+        *(*self.MERGE)[order].planes=[*(*self.MERGE)[order].planes,planes] $
+     else (*self.MERGE)[order].planes=ptr_new(planes)
   endif
+  if n_elements(wave) ne 0 then begin 
+     if ptr_valid((*self.MERGE)[order].wave) then $
+        *(*self.MERGE)[order].wave=[*(*self.MERGE)[order].wave,wave] $
+     else (*self.MERGE)[order].wave=ptr_new(wave)
+  endif
+  if n_elements(off) ne 0 then (*self.MERGE)[order].offset=off
+end 
+
+;=============================================================================
+;  MergeSetup - Setup the merge by finding interpolating wavelengths,
+;               and recording which parts of the orders get
+;               interpolated, and where.
+;=============================================================================
+pro cubeProj::MergeSetup,ORDS=ords
+  if self.ORDER eq 0 then ords=self.cal->Orders(self.MODULE) else $
+     ords=self.ORDER
+  ptr_free,self.WAVELENGTH
+  heap_free,self.MERGE
+  wave1=(self.cal->GetWAVSAMP(self.MODULE,ords[0],/PIXEL_BASED, $
+                              APERTURE=(*self.APERTURE)[0])).lambda
+  if self.ORDER gt 0 then begin ;nothing to do
+     self.WAVELENGTH=ptr_new(wave1)
+     return
+  endif 
   
-  ;; Use as the primary wavelength set whichever has more samples in
-  ;; the overlap region
-  if cnt1 ge cnt2 then begin  
-     use_wav=(*self.WAVELENGTH)[wh_over1]
-     lose_wav=wavelength[wh_over2]
-     use_acct=(*self.ACCOUNT)[*,*,wh_over1]
-     lose_acct=account[*,*,wh_over2]
-     if max_wav1 gt max_wav2 then lead_in=1
-     if min_wav1 lt min_wav2 then lead_out=1
-  endif else begin
-     use_wav=wavelength[wh_over2]
-     lose_wav=(*self.WAVELENGTH)[wh_over1]
-     use_acct=account[*,*,wh_over2]
-     lose_acct=(*self.ACCOUNT)[*,*,wh_over1]
-     if max_wav2 gt max_wav1 then lead_in=1
-     if min_wav2 lt min_wav1 then lead_out=1
-  endelse
+  nord=n_elements(ords) 
   
-  ;; Remove the overlapping chunks from both
-  (*self.WAVELENGTH)=(*self.WAVELENGTH)[wh_clear1] ;leave the clear chunks
-  *self.ACCOUNT=(*self.ACCOUNT)[*,*,wh_clear1]
-  wavelength=wavelength[wh_clear2]
-  account=account[*,*,wh_clear2]
+  ;; The merge setup:
+  ;;     OFFSET: Plane offset into final cube (for unsplit portions)
+  ;;     PLANES: The planes in the order account to merge.
+  ;;     WAVE: The wavelength of said planes.
+  ;;     TO: The final cube-plane to merge them to
+  ;;     FRAC: The fraction to merge into the first plane
+  self.MERGE=ptr_new(replicate({offset:0L,planes:ptr_new(), $
+                                wave:ptr_new(), to:ptr_new(), $
+                                frac:ptr_new()},nord))
   
-  ;; Provide a few lead-in or lead-out transition samples
-;   nu=n_elements(use_wav)
-;   nl=n_elements(lose_wav)
-  
-;   if lead_in then begin         ;ease into the new sampling at the short end
-;      nlead=2>(nu-1)<3
-;      su=sort(use_wav)
-;      sl=sort(lose_wav)
-;      delta_use=mean(use_wav[su[1:nlead-1]]-use_wav[su[0:nlead-2]])
-;      delta_lose
+  nap=n_elements(*self.APERTURE)
+  wave_zero=lonarr(nord) & wh_clear_sav=-1
+  for ord=1L,nord-1L do begin
+     ;; Work with previous, overlap with current order
+     wave2=(self.cal->GetWAVSAMP(self.MODULE,ords[ord],/PIXEL_BASED, $
+                                 APERTURE=nap eq 1?(*self.APERTURE)[0]: $
+                                 (*self.APERTURE)[ord])).lambda
+     nw1=n_elements(wave1) & nw2=n_elements(wave2) 
+     min_wav1=min(wave1,max=max_wav1)
+     min_wav2=min(wave2,max=max_wav2)
      
-;   endif
-;   if lead_out then begin        ;ease into the new sampling at the long end
+     ;; Are we prepending or appending?
+     prepend=(min_wav2 lt min_wav1 AND wave2[0] lt wave2[1]) OR $
+             (min_wav1 lt min_wav2 AND wave1[0] gt wave1[1])
      
-;  endif 
+     ;; No overlap case... just concatenate
+     if min_wav2 gt max_wav1 OR max_wav2 lt min_wav1 then begin 
+        if prepend then begin   ; prepend new
+           if n_elements(wave) gt 0 then wave=[wave1,wave] else wave=wave1
+           wave_zero[0:ord-1]=wave_zero[0:ord-1]+n_elements(wave2) 
+        endif else begin        ; append new
+           if n_elements(wave) gt 0 then wave=[wave,wave1] else wave=wave1
+           wave_zero[ord]=wave_zero[ord-1]+n_elements(wave1) 
+        endelse
+        wh_clear_sav=-1
+        continue
+     endif
   
-  nu=n_elements(use_wav)
-  nl=n_elements(lose_wav)
+     ;; Locations of the overlap region in each wavelength vector.
+     wh_over1=where(wave1 gt min_wav2 AND $
+                    wave1 lt max_wav2,cnt1,COMPLEMENT=wh_clear1)
+     wh_over2=where(wave2 gt min_wav1 AND $
+                    wave2 lt max_wav1,cnt2,COMPLEMENT=wh_clear2)
+     
+     ;; Use as the primary wavelength set whichever had more samples in
+     ;; the original overlap region
+     if cnt1 ge cnt2 then begin  
+        use_wav=wave1[wh_over1]
+        lose_wav=wave2[wh_over2]
+        self->AddMergeRec,ord,wh_over2,lose_wav
+        ;;if max_wav1 gt max_wav2 then lead_in=1
+        ;;if min_wav1 lt min_wav2 then lead_out=1
+     endif else begin
+        use_wav=wave2[wh_over2]
+        lose_wav=wave1[wh_over1]
+        ;; The working segment may have been truncated on the last round
+        self->AddMergeRec,ord-1,wh_clear_sav[0] ne -1? $
+                          wh_clear_sav[wh_over1]:wh_over1,lose_wav
+        ;if max_wav2 gt max_wav1 then lead_in=1
+        ;if min_wav2 lt min_wav1 then lead_out=1
+     endelse
+     
+;     nu=n_elements(use_wav)
+;     nl=n_elements(lose_wav)
+;      if lead_in then begin      ;ease into the new sampling at the short end
+;         nlead=2>(nu-1)<3
+;         su=sort(use_wav)
+;         sl=sort(lose_wav)
+;         delta_use=mean(use_wav[su[1:nlead-1]]-use_wav[su[0:nlead-2]])
+;         delta_lose
+        
+;      endif
+;      if lead_out then begin     ;ease into the new sampling at the long end
+;     endif 
+
+     ;; Excise the overlapping chunks from both, leaving the clear chunks
+     if wh_clear1[0] ne -1 then wave1=wave1[wh_clear1] 
+     if wh_clear2[0] ne -1 then wave2=wave2[wh_clear2]
+     
+     ;; Concat wave1 and overlap onto wavelengths:
+     ;;  [wave1 use_wav wave2] or [wave2 use_wav wave1]
+     if prepend then begin
+        if n_elements(wave) gt 0 then wave=[use_wav,wave1,wave] $
+        else wave=[use_wav,wave1]
+        wave_zero[0:ord-1]=wave_zero[0:ord-1]+n_elements(wave2) 
+     endif else begin           
+        ;; appending new ones
+        if n_elements(wave) gt 0 then wave=[wave,wave1,use_wav] $
+        else wave=[wave1,use_wav]
+        wave_zero[ord]=wave_zero[ord-1]+n_elements(wave1)
+     endelse
+     wave1=wave2
+     wh_clear_sav=wh_clear2
+  endfor
+  ;; graft on the last remaining piece
+  if prepend then wave=[wave2,wave] else wave=[wave,wave2]
   
-  ;; Interpolate onto the new wavelength grid.  
-  map_loc=value_locate(use_wav,lose_wav)
-  if NOT array_equal(map_loc ne -1,1b) then $
-     message,'Non-bracketing overlap found.'
-  ;;  the fraction in the first bin
-  map_frac=(use_wav[map_loc+1]-lose_wav)/(use_wav[map_loc+1]-use_wav[map_loc]) 
+  (*self.MERGE).offset=wave_zero
   
-  ;; Merge or splice the losers in
-  for i=0,self.CUBE_SIZE[0]-1 do begin 
-     for j=0,self.CUBE_SIZE[1]-1 do begin 
-        for wl=0,n_elements(nl)-1 do begin 
-           if NOT ptr_valid(lose_act[i,j,wl]) then continue
-           high=(low=*lose_act[i,j,wl])
-           low.frac=low.frac*map_frac[wl]
-           high.frac=high.frac*(1.-map_frac[wl])
-           if NOT ptr_valid(use_act[i,j,map_loc[wl]]) then $ 
-              use_act[i,j,map_loc[wl]]=ptr_new(low,/NO_COPY) $
-           else *use_act[i,j,map_loc[wl]]=[*use_act[i,j,map_loc[wl]],low]
-           if NOT ptr_valid(use_act[i,j,map_loc[wl]+1]) then $ 
-              use_act[i,j,map_loc[wl]+1]=ptr_new(high,/NO_COPY) $
-           else *use_act[i,j,map_loc[wl]+1]=[*use_act[i,j,map_loc[wl]],high]
-           ptr_free,lose_act[i,j,wl]
-        endfor
-     endfor
+  ;; Finish the merge vector, computing split fractions and merge locations
+  for ord=0,nord-1 do begin 
+     ;; Interpolate those being merged onto the new wavelength grid.  
+     if NOT ptr_valid((*self.MERGE)[ord].wave) then continue
+     merge_wave=*(*self.MERGE)[ord].wave
+     map_loc=value_locate(wave,merge_wave)
+     if NOT array_equal(map_loc ne -1,1b) then $
+        message,'Cannot merge non-bracketed wavelengths.'
+     ;;  the fraction in the first bin (independent of up-going vs. down-going)
+     (*self.MERGE)[ord].frac=ptr_new((wave[map_loc+1]-merge_wave)/ $
+                                     (wave[map_loc+1]-wave[map_loc]))
+     (*self.MERGE)[ord].to=ptr_new(map_loc,/NO_COPY)
+  endfor 
+  self.WAVELENGTH=ptr_new(wave,/NO_COPY)
+end
+
+;=============================================================================
+;  MergeAccount - Merge a new account into the existing account, for
+;                 the given record.  If they overlap in wavelength,
+;                 combine by using the pre-computed interpolated
+;                 wavelength sampling in the region of overlap, and
+;                 splitting individual polygon area overlaps between
+;                 planes with with linear interpolation.  If they
+;                 don't overlap, just concatenate the accounting
+;                 cubes.  ORDER is the logical order number index in
+;                 sequence (as opposed to the optical order).
+;=============================================================================
+pro cubeProj::MergeAccount,dr,order,account
+  
+  if NOT ptr_valid(self.MERGE) then begin ; only one order
+     (*self.DR)[dr].ACCOUNT=ptr_new(account)
+     return
+  endif 
+     
+  mrec=(*self.MERGE)[order]
+  dr_acct=(*self.DR)[dr].ACCOUNT
+  if NOT ptr_valid(mrec.planes) then begin 
+     ;;no merging needed, just append account list, suitably offset
+     account.cube_plane=account.cube_plane+mrec.offset
+     if NOT ptr_valid(dr_acct) then begin 
+        (*self.DR)[dr].ACCOUNT=ptr_new(account)
+     endif else *dr_acct=[*dr_acct,account]
+     return
+  endif
+
+  planes=*mrec.planes           ;order account planes to be manipulated
+  to_planes=*mrec.to            ; ... and sent to these cube planes
+  fracs=*mrec.frac              ; ... with these fractions
+  
+  ;; Group the account records by the cube plane affected
+  minp=min(planes,MAX=maxp)
+  h=histogram(account.CUBE_PLANE,MIN=minp,MAX=maxp,REVERSE_INDICES=ri_cube)
+  
+  ;; Offset all to the correct cube plane (some we'll change soon)
+  account.cube_plane=account.cube_plane+mrec.offset
+  ;; which bins hold planes which must be interpolated?
+  wh=where(h gt 0 and histogram(planes,REVERSE_INDICES=ri_order) gt 0,cnt) 
+  for i=0,cnt-1 do begin 
+     if ri_cube[wh[i]+1] eq ri_cube[wh[i]] then continue
+     to_plane=to_planes[ri_order[ri_order[wh[i]]]]
+     frac=fracs[ri_order[ri_order[wh[i]]]]
+     
+     ;; Accounting elements on affected planes
+     changers=ri_cube[ri_cube[wh[i]]:ri_cube[wh[i]+1]-1]
+     split_acc=account[changers]
+     
+     ;; The first plane (gets frac worth)
+     account[changers].areas=account[changers].areas*frac
+     account[changers].CUBE_PLANE=to_plane
+     ;; The next plane (gets 1-frac worth)
+     split_acc.areas=split_acc.areas*(1.-frac)
+     split_acc.CUBE_PLANE=to_plane+1
+     
+     if n_elements(new_acc) eq 0 then new_acc=[split_acc] else $
+        new_acc=[new_acc,split_acc]
   endfor
   
-  ;; Put it all together
-  *self.ACCOUNT=[ [[*self.ACCOUNT]] , [[use_act]] , [[account]] ]
-  *self.WAVELENGTH=[ *self.WAVELENGTH , use_wav, wavelength ]
-end
+  ;; Append this newly modified account
+  if ptr_valid(dr_acct) then *dr_acct=[*dr_acct,account] else $
+     (*self.DR)[dr].ACCOUNT=ptr_new(account)     
+end 
 
 
 ;=============================================================================
-;  BuildAccount - Build the accounting cube, listing, for all pixels
-;                 in the cube, all overlapping data pixels, including
-;                 the BCD index #, the pixel in that BCD which
-;                 overlapped, and fraction which overlapped the
-;                 corresponding cube pixel.
+;  BuildAccount - Build the accounting lists, listing, for each
+;                 record, and for all pixels in the cube, all
+;                 overlapping data pixels, including the BCD index #,
+;                 the pixel in that BCD which overlapped, and fraction
+;                 which overlapped the corresponding cube pixel.
 ;=============================================================================
-pro cubeProj::BuildAccount,PR_WIDTH=prw,_EXTRA=e
+pro cubeProj::BuildAccount,_EXTRA=e
   self->Normalize
-  if n_elements(prw) ne 0 then self.PR_SIZE[1]=0.>prw 
-  if self.PR_SIZE[1] eq 0.0 then self.PR_SIZE[1]=1.D ;the default
+  self->MergeSetup
+  self.CUBE_SIZE[2]=n_elements(*self.WAVELENGTH) 
   
-  ;; Establish the dimensions of the cube in the slit coordinate system
-  self.CUBE_SIZE[0:1]=ceil((self.NSTEP-1L)*self.STEP_SIZE/self.PLATE_SCALE+ $
-                           self.PR_SIZE)+1
-
   stepsz=self.STEP_SIZE/self.PLATE_SCALE ; slit step size, in pixels
   
   ;; Are we treating one order, or all of them?
   if self.ORDER eq 0 then ords=self.cal->Orders(self.MODULE) else $
      ords=self.ORDER
   nap=n_elements(*self.APERTURE) 
-  for ord=0,n_elements(ords)-1 do begin
-     aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
-     prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
-                              /PIXEL_BASED, /SAVE_POLYGONS, $
-                              PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
+  
+    ;;Debugging plots
+  tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b],1
+  plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
+       yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
+  for i=0,self.cube_size[0] do plots,i,!Y.CRANGE
+  for i=0,self.cube_size[1] do plots,!X.CRANGE,i
+  wait,0
+  ;; End debugging plots
 
-     account=ptrarr([self.CUBE_SIZE[0:1],n_elements(prs)])
+  for i=0L,n_elements(*self.DR)-1 do begin 
+     ;; skip disabled records unconditionally
+     if (*self.DR)[i].DISABLED then continue 
      
-     for i=0L,n_elements(*self.DR)-1 do begin 
-        ;; Compute the pixel offset of the slit center for this BCD
-        offset=([(*self.DR)[i].COLUMN,(*self.DR)[i].ROW]-1)*stepsz+ $
-               self.PR_SIZE/2.
+     ;; if the accounts are still valid and an account exists for this
+     ;; DR, assume it's valid.
+     if self.ACCOUNTS_VALID AND ptr_valid((*self.DR)[i].ACCOUNT) then $
+        continue else ptr_free,(*self.DR)[i].ACCOUNT
+     
+     ;; Compute the pixel offset of the slit center for this BCD
+     ;; The slit is laid out differently in Spectral Maps and BCD's (ughh)
+     ;; so ROW<-->COLUMN.  
+     basic_offset=([(*self.DR)[i].ROW,(*self.DR)[i].COLUMN]-1)*stepsz+ $
+                  self.PR_SIZE/2.
+     
+     ;; (Small) difference between PA of this BCD and the mean map PA
+     pa_delta=((*self.DR)[i].PA-self.PA)
+     for ord=0,n_elements(ords)-1 do begin
+        aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
+        prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
+                                 /PIXEL_BASED, /SAVE_POLYGONS, $
+                                 PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
+        offset=basic_offset
         
-        ;; (Small) difference between PA of this observation and the mean PA
-        pa_delta=((*self.DR)[i].PA-self.PA)
+        ;;X-Offset for non-centered aperture
+        mlow=min(aper.low) & mhigh=max(aper.high)
+        if mlow+mhigh ne 1. then $
+           offset[0]=offset[0]-(.5*(mlow+mhigh)-.5)* $
+                     self.PR_SIZE[0]/(mhigh-mlow)
         
+        ;; Pre-allocate an account list 
+        nacc=4*n_elements(prs) 
+        account=replicate({CUBE_ACCOUNT_LIST, $
+                           cube_plane:0L,cube_pix:0L, bcd_pix:0L, areas:0.0}, $
+                          nacc)
+        
+        acc_ind=0L
         for j=0L,n_elements(prs)-1 do begin ; iterate over all the PRs
            ;; Setup the rotation matrix to rotate back to the +x direction
            angle=prs[j].angle+pa_delta
            if angle ne 0.0D then begin 
               ct=cos(angle/!radeg) & st=sin(angle/!radeg)
-              rot=transpose([[ct,-st], $
-                             [st, ct]])
+              rot=transpose([[ ct, st], $
+                             [-st, ct]])
            endif
+           ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
               bcdpixel=(*prs[j].PIXELS)[k] 
-           
+              
               ;; associated polygon (2xn list) this pixel got clipped to
-              ;; on detector
+              ;; by the PR on the detector grid
               poly=*(*prs[j].POLYGONS)[k]
            
-              ;; Offset to poly center
+              ;; Offset to poly's center
               poly=poly-rebin(prs[j].cen,size(poly,/DIMENSIONS))
            
               ;; Rotate this polygon to the cube sky grid, if necessary
               if angle ne 0.0 then poly=rot#poly
-           
-              ;; Offset the polygon correctly onto the sky grid
-              poly=poly+rebin(offset,size(poly,/DIMENSIONS))
 
-              ;; Clip it against the sky grid
-              cube_pixels=polyfillaa(reform(poly[0,*]),reform(poly[1,*]), $
-                                     self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
-                                     AREAS=areas)
-           
-              if cube_pixels[0] eq -1 then begin
-                 print,FORMAT='("not hitting cube for pixel: "' + $
-                       ',I0," [",I0,",",I0,"]")', bcdpixel, $
-                       (*self.DR)[i].COLUMN,(*self.DR)[i].ROW
-                 print, poly
-                 continue ;; why isn't our cube big enough?
+              ;; Offset the polygon correctly into the sky grid
+              poly=poly+rebin(offset,size(poly,/DIMENSIONS))
+              if j eq 1 then begin 
+                 plots,[reform(poly[0,*]),poly[0,0]], $
+                       [reform(poly[1,*]),poly[1,0]],COLOR=1+i mod 4
+                 plots,offset,PSYM=4,COLOR=1+i mod 4
+                 wait,0
               endif 
-              cube_ind=j*self.CUBE_SIZE[0]*self.CUBE_SIZE[1]+cube_pixels
+              
+              ;; Clip it against the sky grid
+              cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
+                                          self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
+                                          AREAS=areas)
            
-              for l=0,n_elements(cube_ind)-1 do begin 
-                 acc={CUBE_ACCOUNT,DR:i,PIXEL:bcdpixel,FRAC:areas[l]}
-                 if ptr_valid(account[cube_ind[l]]) then $
-                    *account[cube_ind[l]]=[*account[cube_ind[l]], $
-                                           temporary(acc)] $
-                 else account[cube_ind[l]]=ptr_new(acc,/NO_COPY)
-              endfor 
-           endfor 
-        endfor 
+              if cube_spatial_pix[0] eq -1 then continue
+;                  print,FORMAT='("Not hitting cube for pixel: "' + $
+;                        ',I0,",",I0," -- step [",I0,",",I0,"]")', $
+;                        bcdpixel mod 128, bcdpixel/128, $
+;                        (*self.DR)[i].COLUMN,(*self.DR)[i].ROW
+;                  print, poly
+;                  print,'  original:'
+;                  print,*(*prs[j].POLYGONS)[k]
+;                 continue ;; why isn't our cube big enough?
+;              endif
+              
+              ncp=n_elements(cube_spatial_pix)
+              ;; Add space to account list, large chunks at a time
+              if acc_ind+ncp ge nacc then begin 
+                 account=[account,replicate({CUBE_ACCOUNT_LIST},nacc)]
+                 nacc=2*nacc
+              endif
+              account[acc_ind:acc_ind+ncp-1].cube_pix=cube_spatial_pix
+              account[acc_ind:acc_ind+ncp-1].cube_plane=j ;just this order's
+              account[acc_ind:acc_ind+ncp-1].bcd_pix=bcdpixel
+              account[acc_ind:acc_ind+ncp-1].areas=areas
+              acc_ind=acc_ind+ncp
+           endfor
+        endfor
+        account=account[0:acc_ind-1] ; trim this order's account to size
+        
+        ;; Merge this account into the full cube account
+        self->MergeAccount,i,ord,account
      endfor
-     ;; Merge this account with any existing one
-     self->MergeAccounts,account,prs.lambda
-  endfor 
-  
-  ;; Set again in case we've merged any orders
-  self.CUBE_SIZE[2]=(size(*self.ACCOUNT,/DIMENSIONS))[2]
-  
-  self.ACCOUNT_VALID=1
+     ;; Compute the total reverse index of the full cube indices for
+     ;; this DR's accounting.  E.g. the account records from this BCD
+     ;; pertaining to cube pixel z are: ri[ri[z]:ri[z+1]-1].
+     h=histogram((*(*self.DR)[i].ACCOUNT).cube_pix+ $
+                 (*(*self.DR)[i].ACCOUNT).cube_plane* $
+                 self.CUBE_SIZE[0]*self.CUBE_SIZE[1], $
+                 OMIN=om,REVERSE_INDICES=ri)
+     (*self.DR)[i].REV_ACCOUNT=ptr_new(ri,/NO_COPY)
+     (*self.DR)[i].REV_CNT=n_elements(h) 
+     (*self.DR)[i].REV_MIN=om
+  endfor
+
+  self.ACCOUNTS_VALID=1b
 end
 
 ;=============================================================================
-;  BuildCube - Assemble the Cube from the accounting information, and
-;              the BCD data and uncertainties.
+;  BuildCube - Assemble the Cube from the accounting information, the
+;              BCD data and the uncertainties.
 ;=============================================================================
 pro cubeProj::BuildCube
   if NOT ptr_valid(self.DR) then return
-  if NOT ptr_valid(self.ACCOUNT) OR NOT self.ACCOUNT_VALID then $
-     self->BuildAccount
+  if NOT self.ACCOUNTS_VALID OR $
+     NOT array_equal(ptr_valid((*self.DR).ACCOUNT),1b) then self->BuildAccount
   
   cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
-  big_bcd=(*self.DR).BCD
-  areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=1.)
-  ncube=n_elements(*self.ACCOUNT)
-  bcd_size=128L*128L*2L         ;each BCD is two planes
+  big_bcd=(*self.DR).BCD        ;pre-cache all the BCDs.. big (128KB*n_bcd)!
+  areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
+
+  bcd_size=128L*128L*2L         ;each BCD is two planes XXX not for MIPSSED
   error_offset=128L*128L        ;the error plane is second
   
-  for i=0L,ncube-1L do begin 
-     if NOT ptr_valid((*self.ACCOUNT)[i]) then continue
-     als=*(*self.ACCOUNT)[i]    ;list of {CUBE_ACCOUNT} structures
-     cube[i]=total(big_bcd[als.dr*bcd_size+als.pixel]*als.frac)
-     areas[i]=total(als.frac)
-     ;; error cube computation
+  for dr=0,n_elements(*self.DR)-1 do begin 
+     if (*self.DR)[dr].DISABLED then continue
+     acct=*(*self.DR)[dr].ACCOUNT
+     rev_acc=*(*self.DR)[dr].REV_ACCOUNT
+     rev_min=(*self.DR)[dr].REV_MIN
+     ;; Use the reverse account to populate the cube
+     for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
+        if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
+        pix_acc=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
+        ;; XXX Error weighting, other alternatives
+        ;;  need all in one place? ... e.g trimmed mean?
+        cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
+           total(big_bcd[dr*bcd_size+pix_acc.BCD_PIX] * pix_acc.AREAS)
+        areas[rev_min+i]=areas[rev_min+i]+total(pix_acc.AREAS)
+     endfor
   endfor 
-  ptr_free,self.CUBE,self.ERR,self.ITIME ;just in case  
+  
+  areas=areas>1.e-7
+  ptr_free,self.CUBE,self.ERR
   self.CUBE=ptr_new(cube/areas,/NO_COPY)
+end
+
+;=============================================================================
+;  Stack - Extract a stack from the built cube between two wavelength
+;          intervals, optionally weighting the individual planes with
+;          WEIGHTS
+;=============================================================================
+function cubeProj::Stack,lam1,lam2,WEIGHTS=weights
+  if NOT ptr_valid(self.CUBE) then message,'No cube to stack'
+  p1=value_locate(*self.WAVELENGTH,lam1)+1 ;not less than lam1
+  p2=value_locate(*self.WAVELENGTH,lam2) ;not greater than lam2
+  nw=n_elements(weights) 
+  if nw ne 0 then begin 
+     if nw ne p2-p1+1 then message,'Incorrect number of weights passed'
+     return,total(*self.CUBE[*,*,p1:p2] * $
+                  rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw], $
+                        /SAMPLE), 3)
+  endif 
+  return,total(*self.CUBE[*,*,p1:p2],3)
+end
+
+
+;=============================================================================
+;  N_Records
+;=============================================================================
+function cubeProj::N_Records
+   if ptr_valid(self.DR) then return,n_elements(*self.DR) else return,0
 end
 
 ;=============================================================================
@@ -759,7 +1004,7 @@ pro cubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
   if n_elements(pa) ne 0 then rec.PA=pa else $
      rec.PA=sxpar(header,'PA')
   if array_equal(self.slit_size,0.0) then $
-     self.slit_size=sxpar(header,'SLIT_SZ*')     
+     self.slit_size=[sxpar(header,'SLITSZ2'),sxpar(header,'SLITSZ1')]
   rec.NCYCLES=sxpar(header,'NCYCLES')
   fovid=sxpar(header,'FOVID',COUNT=cnt)
   if cnt gt 0 then begin 
@@ -770,7 +1015,39 @@ pro cubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
   
   if ptr_valid(self.DR) then *self.DR=[*self.DR,rec] else $
      self.DR=ptr_new(rec,/NO_COPY)
-  self.ACCOUNT_VALID=0
+end
+
+;=============================================================================
+;  RemoveBCD - Remove one or more BCD's
+;=============================================================================
+pro cubeProj::RemoveBCD,recs
+  heap_free,(*self.DR)[recs]
+  keep=where(histogram(recs,MIN=0,MAX=self->N_Records()) eq 0,cnt)
+  if cnt ne 0 then begin
+     (*self.DR)=(*self.DR)[keep] 
+     wh=where(keep eq self.cur,cnt) ;see if current is kept... shift it
+     if cnt ne 0 then self.cur=wh[0] else self.cur=-1
+  endif else ptr_free,self.DR
+  self->UpdateList
+  self.Changed=1b               ;but accounts remain valid!
+end
+
+;=============================================================================
+;  Sort - Sort the Data records. 
+;=============================================================================
+pro scoreProj::Sort,sort
+  n=self->N_Records()
+  if n le 1 then return         ;no sort for one only
+  if n_elements(sort) ne 0 then sort=0>sort<5
+  
+  case sort of
+     0: s=sort((*self.DR).ID)
+     1: s=sort((*self.DR).Object)
+     2: s=sort((*self.DR).ITIME)
+     3: s=sort((*self.DR).DATE)
+     4: s=sort((*self.DR).Date)
+  endcase
+  *self.DR=(*self.DR)[s]        ;rearrange
 end
 
 ;=============================================================================
@@ -779,8 +1056,8 @@ end
 pro cubeProj::Cleanup
   ;; !!! Write a real cleanup.
   heap_free,self.DR
-  heap_free,self.ACCOUNT
-  ptr_free,self.APERTURE,self.CUBE,self.ERR,self.ITIME,self.wInfo
+  heap_free,self.MERGE
+  ptr_free,self.APERTURE,self.CUBE,self.ERR,self.wInfo
 end
 
 ;=============================================================================
@@ -811,25 +1088,24 @@ pro cubeProj__define
                                 ; for each order
      DR: ptr_new(), $           ;All the BCD's: pointer to list of
                                 ; data record structures of type CUBE_DR
-     ACCOUNT: ptr_new(),$       ;a cube of pointers to lists of CUBE_ACCOUNT
-                                ; accounting structures
-     ACCOUNT_VALID: 0, $        ;whether the account is valid
+     ACCOUNTS_VALID: 0b,$       ; are the account records valid?
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      ERR:  ptr_new(),$          ;a pointer to the nxmxl error cube
-     ITIME: ptr_new(),$         ;nxmxl integration time per pixel
+;     ITIME: ptr_new(),$         ;nxmxl integration time per pixel
      CUBE_SIZE: [0L,0L,0L],$    ;the size of the cube, (n,m,l)
      CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
-     NSTEP:[0L,0L], $           ;parallel (col), perpen. (row) number of steps
+     NSTEP:[0L,0L], $           ;parallel (col), perpendicular (row) steps
      STEP_SIZE: [0.0D,0.0D], $  ;parallel, perpendicular slit step sizes (deg)
      SLIT_SIZE:[0.0D,0.0D], $   ;the parallel, perpendicular slit size (deg)
      PLATE_SCALE:0.0D, $        ;the plate scale (degrees/pixel)
-     PR_SIZE:[0.0,0.0], $       ;the parallel (long axis), perpendicular (short
-                                ; axis) size of the PRs to use (pixels)
+     PR_SIZE:[0.0,0.0], $       ;the , parallel (long axis), perpendicular
+                                ; (short axis) size of the PRs to use (pixels)
      WAVELENGTH: ptr_new(), $   ;the cube's wavelength list
      POSITION:[0.0D,0.0D], $    ;optimized position of the cube center
      PA:0.0D, $                 ;optimized position angle of the cube
+     MERGE:ptr_new(),$          ;a set of records to aid merging the orders
+                                ;  {offset,inds,wave,to,frac}
      cur:0, $                   ;the current record.
-     sort:0, $                  ;which project field to sort on
      cal:obj_new(), $           ;the irs_calib object.
      cal_file:'', $             ;the calibration file used (if not a full
                                 ; directory, in the "calib/" subdir)
@@ -844,9 +1120,14 @@ pro cubeProj__define
        frac: 0.0}               ;the fraction of overlap
   
   ;; The data structure for each input BCD
-  rec={CUBE_DR, $                
+  rec={CUBE_DR, $
        ID:'',$                  ;A unique (hopefully) ID
        file:'', $               ;the original file read for this data
+       DISABLED: 0b, $          ;whether this DR is disabled
+       ACCOUNT: ptr_new(), $    ;list of {CUBE_PLANE,CUBE_PIX,BCD_PIX,AREAS}
+       REV_ACCOUNT: ptr_new(),$ ;reverse indices of the CUBE_INDEX histogram
+       REV_MIN:0L, $            ;minimum cube index affected
+       REV_CNT:0L, $            ;how many bins in the cube_index histogram?
        CMD_POS: [0.0D,0.0D], $  ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
        TARGET_ORDER: 0, $       ;which order was targetted by pointing
@@ -926,7 +1207,24 @@ end
 ;     area_i*time_i/sigma_i^2, and then apply a sparse array of 1.'s
 ;     to this quantity as the X vector to generate the normalizing sum
 ;     over weights.
-;    
+;
+;   Hmmm... well, just pre-caching the big_bcd was fast enough.  Now
+;   we need to concentrate on avoiding the need to rebuild the
+;   Accounting cube.  With no histogram, when you delete a BCD, you
+;   need to rebuild.  You could have an "ACTIVE" flag for each DR to
+;   multiply in to both the numerator and denominator of the total.
+;   This would allow you to temporarily disable a certain BCD or group
+;   of BCDs without rebuilding the account.  To *add* BCD's, you could
+;   do a partial accounting build, where you just add to the existing
+;   accounting information for those smaller number of pixels in the
+;   cube which are affected.  This will be especially useful for very
+;   large cubes.  It only works if the new BCD fits in the same cube
+;   as the before, and doesn't bump the map's size.  Hmm...
+;
+;   Also, with no histogram, we won't easily be able to de-overlap 2xn
+;   PRs by summing over fractions requested for a single pixel.  This
+;   is probably required.  
+;     
 ;   When deleting BCD's, you can use the reverse indices to find and
 ;   re-calculate only those account list entries which are affected!
 ;
@@ -934,4 +1232,4 @@ end
 ;   (presumably smaller) list for any extras to append.
 ;
 ;
-;   Could use a fast histogram to search the accounting list.  
+;   Could use a fast histogram method to search the accounting list.
