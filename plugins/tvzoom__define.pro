@@ -159,7 +159,13 @@ pro tvZoom::Pan,X,Y,modifier
      mn=min(abs(dist),pos)
      dist[pos]=0
   endif 
-  self.oDraw->SetProperty,OFFSET=0>(self.save-dist)<(size-ds),/DOUBLE_BUFFER
+  offset=0>(self.save-dist)<(size-ds)
+  ;; Update this zoom level
+  if ptr_valid(self.zoomlist) then begin 
+     n=n_elements(*self.zoomlist) 
+     (*self.zoomlist)[n-1].off=offset
+  endif 
+  self.oDraw->SetProperty,OFFSET=offset,/DOUBLE_BUFFER
 end
 
 ;=============================================================================
