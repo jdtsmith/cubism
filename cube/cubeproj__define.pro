@@ -1762,7 +1762,9 @@ pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm
      choice=keyword_set(rmm) 
   endelse
   bcds=self->BCD(recs)
-  back=imcombine(bcds,/AVERAGE,REJECT_MINMAX=choice eq 1)
+  if n le 2 && choice eq 1 then $
+     self->Warning,'Fewer than 3 BG records -- reverting to average.'
+  back=imcombine(bcds,/AVERAGE,REJECT_MINMAX=n gt 2 && choice eq 1)
   self.BACKGROUND=ptr_new(back,/NO_COPY)
   self.BACK_DATE=systime(/JULIAN)
   self.Changed=1b
@@ -2104,7 +2106,7 @@ end
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $ $
-                           SLIT_LENGTH=sl, CALIB=calib, CALIB_FILE=cf, $
+                           SLIT_LENGTH=sl, CALIB=calib, CAL_FILE=cf, $
                            MODULE=module, ORDER=order, APERTURE=ap, $
                            PROJECT_NAME=pn,DR=dr, FLUXCON=fc, SLCF=slcf, $
                            TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
