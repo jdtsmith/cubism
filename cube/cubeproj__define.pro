@@ -2784,7 +2784,7 @@ end
 function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
   RADEG = 180.0d/!DPI           ; preserve double
   angle=(270.0D - self.PA)/RADEG
-  ;;if self.module eq 'LH' then angle+=180./RADEG
+  if self.module eq 'LH' then angle+=180./RADEG
   c=cos(angle) & s=sin(angle)
   cd=self.PLATE_SCALE*[[-c,-s],[-s,c]]
   if keyword_set(zo) then crpix=[0.5,0.5] else $
