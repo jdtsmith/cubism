@@ -52,7 +52,7 @@
 ;
 ;##############################################################################
 function irs_recent_calib
-  @irs_dir
+  @cubism_dir
   files=findfile(filepath(ROOT=irs_calib_dir,SUBDIR="sets",'*.cal'))
   dates=lon64arr(2,n_elements(files))
   for i=0,n_elements(files)-1 do begin 
