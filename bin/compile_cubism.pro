@@ -1,5 +1,5 @@
 pro compile_cubism
-  FORWARD_FUNCTION TRNLOG,DELOG,SETLOG
+  FORWARD_FUNCTION TRNLOG
   @cubism_dir
   bindir=filepath(ROOT=cubism_dir,'bin')
   if file_test(filepath(ROOT=bindir,'cubism_vm.sav')) then $
