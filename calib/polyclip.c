@@ -195,3 +195,7 @@ void polyclip(int argc, void *argv[]) {
   }
   free(px_in); free(py_in);
 }
+
+char polyclip_test() {
+  return 1;
+}
