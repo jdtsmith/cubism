@@ -33,7 +33,7 @@ end
 ;============================================================================
 pro CubeRose::Off,RESET=reset,NO_REDRAW=nrd
   self.oDraw->MsgSignup,self,/NONE
-  if self->On() AND ~keyword_set(nrd) then self.oDraw->ReDraw,/SNAPSHOT
+  if self->On() AND ~keyword_set(nrd) then self.oDraw->ReDraw,/SNAPSHOT,/ERASE
   self->tvPlug::Off
 end
 ;;*************************End OverRiding methods******************************
@@ -45,21 +45,17 @@ end
 pro CubeRose::DrawRose
   if ~obj_valid(self.cube) then return
   x=!D.X_SIZE*4./5 & y=!D.Y_SIZE*4./5
-  s=sin(self.angle/!RADEG) & c=cos(self.angle/!radeg)
-  len=(!D.X_SIZE<!D.Y_SIZE)/6
+  s=sin(self.angle) & c=cos(self.angle)
+  len=(!D.X_SIZE<!D.Y_SIZE)/8
   deltaE=[-c,-s]*len
   deltaN=[-s, c]*len
   plots,[x,x+deltaE[0]],[y,y+deltaE[1]],THICK=2,COLOR=self.color,/DEVICE
   plots,[x,x+deltaN[0]],[y,y+deltaN[1]],THICK=2,COLOR=self.color,/DEVICE
-  charsz=[!D.X_CH_SIZE,!D.X_CH_SIZE]*1.25
-;  deltaE-=charsz[1]/2
-;  deltaN+=charsz[0]/2
-  
-  if self.angle
-  xyouts,x+deltaE[0],y+deltaE[1],/DEVICE,'E',ORIENTATION=self.angle*!radeg, $
-         COLOR=self.color,CHARSIZE=1.25,ALIGNMENT=0.5
-  xyouts,x+deltaN[0],y+deltaN[1],/DEVICE,'N',ORIENTATION=self.angle*!radeg, $
-         COLOR=self.color,CHARSIZE=1.25,ALIGNMENT=0.5
+  deltaE=[-c,-s]*(len+!D.X_CH_SIZE+4) & deltaN=[-s,c]*(len+4)
+  xyouts,x+deltaN[0],y+deltaN[1],/DEVICE,'N', $
+         ORIENTATION=self.angle*!radeg,COLOR=self.color,CHARSIZE=1.25
+  xyouts,x+deltaE[0],y+deltaE[1],/DEVICE,'E', $
+         ORIENTATION=self.angle*!radeg, COLOR=self.color,CHARSIZE=1.25
 end
 
 ;=============================================================================
