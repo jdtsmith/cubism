@@ -28,7 +28,7 @@ function popup, text, list, TITLE=ttl, PARENT_GROUP=parent, MODAL=md, $
    
    state={popup:0L, OK:0L, index:ptr_new(sel)}
    state.popup=widget_droplist(b1,value=list)
-   widget_control,state.popup,SET_LIST_SELECT=sel
+   widget_control,state.popup,SET_DROPLIST_SELECT=sel
    state.ok=widget_button(base,value='  OK  ')
    widget_control, base, /REALIZE, set_uvalue=state
    XManager, 'popup', base
