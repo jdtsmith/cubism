@@ -532,6 +532,18 @@ pro tvDraw::ReDraw,SNAPSHOT=snap
 end
 
 ;=============================================================================
+;  SetDrawMinMax - Set the min and max scaling values
+;=============================================================================
+pro tvDraw::SetDrawMinMax,MIN=min,MAX=max
+  if n_elements(min) ne 0 then begin 
+     self.min=min & self.scale_min=1
+  endif 
+  if n_elements(max) ne 0 then begin 
+     self.max=max & self.scale_max=1
+  endif 
+end
+
+;=============================================================================
 ;  Draw - Draw the relevant portion of the draw image, dispatching
 ;         messages before and afterwards.  If DOUBLE_BUFFER is set,
 ;         draw it all to an offscreen pixmap, and then copy it over
@@ -557,11 +569,13 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
      self->MsgSend,/PREDRAW     ;let the plug-ins go to it
   endif 
   
-  ;; Do the byte scaling from the modified, sized image
+  ;; Do the byte scaling from the modified, sized image, with min/max as set
   *self.imscl=self.bottom+ $
      bytscl((*self.immod)[self.offset[0]:self.offset[0]+self.dispsize[0]-1,$
                           self.offset[1]:self.offset[1]+self.dispsize[1]-1], $
-            TOP=self.top-self.bottom,/NAN)
+            TOP=self.top-self.bottom,/NAN,MIN=self.scale_min?self.min:void, $
+            MAX=self.scale_max?self.max:void)
+  self.scale_min=(self.scale_max=0)
   
   ;; Resize it
   self.zoom=min(float(self.winsize)/self.dispsize)
@@ -737,6 +751,10 @@ pro tvDraw__define
       winsize:[0,0], $          ;size of window (device pixels)
       size:[0,0], $             ;size of image in pixels
       zoom:0.0, $               ;(int or 1/int) amount draw image zoomed
+      scale_min: 0, $           ;whether to scale using min data value
+      min:0.0, $                ;min data value to scale to
+      scale_max: 0, $           ;whether to scale using max data value
+      max:0.0, $                ;max data value to scale to
       bottom:0, $               ;bottom color index to scale to
       top:0, $                  ;top color index to scale to
       pan:[0,0], $              ;device pixel offsets for lower left corner
