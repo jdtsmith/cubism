@@ -540,20 +540,21 @@ end
 ;  Draw - Draw the relevant portion of the draw image, dispatching
 ;         messages before and afterwards.  If DOUBLE_BUFFER is set,
 ;         draw it all to an offscreen pixmap, and then copy it over
-;         quickly.
+;         quickly in one pass.
 ;=============================================================================
 pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
   if NOT ptr_valid(self.imorig) then return ;gotta have something there.
   if n_elements(pre) eq 0 then pre=1
   
   if keyword_set(db) then begin 
-     ;;Direct everything to an offscreen pixmap
+     ;;Direct all drawing to an offscreen pixmap
      dw=self.drawwin
      self.drawwin=self.dbwin
   endif 
   
   ;; Set the window
   self->SetWin
+  if obj_valid(self.oColor) then self.oColor->SetColors,/NO_REDRAW
   
   ;; Set the original image
   if keyword_set(pre) then begin 
@@ -594,7 +595,7 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
   self->MsgSend,/POSTDRAW,/REDRAW
   
   if keyword_set(db) then begin 
-     self.drawwin=dw            ;put it all back
+     self.drawwin=dw            ;put it all back, and copy the image over
      wset,dw
      device,COPY=[0,0,self.winsize,0,0,self.dbwin]
   endif 
@@ -649,6 +650,10 @@ pro tvDraw::Start
   if nbad gt 0 then *self.plug_list=(*self.plug_list)[good]
   ;; Initialize all the plug-ins
   for i=0,cnt-1 do (*self.plug_list)[i]->Start
+  
+  ;; Get the Color object, if any
+  oCol=self->GetMsgObjs(CLASS='tvColor')
+  if obj_valid(oCol[0]) then self.oColor=oCol[0]
 end
 
 ;=============================================================================
@@ -730,6 +735,7 @@ pro tvDraw__define
       imdisp:ptr_new(), $       ;the byte-scaled, resized image actually
                                 ;  displayed (for quick redisplay)
       plug_list:ptr_new(),$     ;the list of plug-ins
+      oColor:obj_new(), $       ;the color object (if any)
       pixwin:0, $               ;pixmap window in which we background
                                 ; erase new image
       dbwin:0,$                 ;pixmap window for double buffering
