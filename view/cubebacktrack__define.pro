@@ -235,6 +235,11 @@ pro CubeBackTrack::wDestroy
   widget_control, self.wBase,/DESTROY
 end
 
+pro CubeBackTrack::Cleanup
+  ptr_free,self.list
+  self->tvPlug::Cleanup
+end
+
 ;=============================================================================
 ;  Init -  Initialize the CubeBackTrack object
 ;=============================================================================
