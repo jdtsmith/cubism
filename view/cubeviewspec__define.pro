@@ -159,8 +159,8 @@ pro CubeViewSpec::Event,ev
               endcase
               nl=n_elements(*self.lam) 
               del=range[1]-range[0]
-              range[0]=range[0] > 0 < (nl-1-del)
-              range[1]=range[1] < (nl-1) > del
+              range[0]= (nl-1-del) < range[0] > 0
+              range[1]=del > range[1] < (nl-1)
               if range[1]-range[0] lt 1 then self->Delete else $
                  (*self.reg[self.seltype])[*,self.selected]=range
               self->MergeRegs
@@ -1036,7 +1036,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
                                    string(10b)))
   self.wLine=widget_label(colbase,/FRAME,/DYNAMIC_RESIZE,VALUE='***')
   if keyword_set(rn) then self.renorm=round(rn)
-  ;; A key catching text widget with a draw widget overlain
+
   self.wDraw=widget_draw(self.wBase,XSIZE=600,YSIZE=400)
   window,/FREE,/PIXMAP,XSIZE=600,YSIZE=400 ;to cache the image in
   self.pixwin=!D.WINDOW
