@@ -830,7 +830,7 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    endif else fltlim=0
 
 
-   ;;--- Create struct for pulldown filter menu (cw_pdsep requires)
+   ;;--- Create struct for pulldown filter menu
    numfilts=nfl+fltlim          ;passed and recent filters
    filtstruct={flags:0,name:''}
    filtstruct=replicate(filtstruct,numfilts+1)
@@ -916,7 +916,7 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    nullid = widget_label(filtbase,VALUE='Filter:')
    state.filt_id=widget_text(filtbase,VALUE=fuval(sel),XS=10,ysize=1,/EDIT)
    
-   state.filtmenu_id=cw_pdsep(filtbase,filtstruct,/RETURN_NAME, $
+   state.filtmenu_id=cw_pdmenu(filtbase,filtstruct,/RETURN_NAME, $
                                uvalue=filtlist)
    filtbutbase = widget_base(filtbase,/NONEXCLUSIVE,/COLUMN,SPACE=0)
    state.allfilesbut_id=widget_button(filtbutbase,value='Show All')
