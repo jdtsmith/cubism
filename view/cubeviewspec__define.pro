@@ -274,8 +274,9 @@ pro CubeViewSpec::Event,ev
         return
      end 
      
-     self.wSaveBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0}
-     self.wSaveASCBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,1}
+     self.wSaveBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0,0}
+     self.wSaveASCBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0,1}
+     self.wExportBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,1,0}
      
      self.wToggles: self->Plot
 
@@ -989,6 +990,8 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   file=widget_button(mbar,value='File',/MENU)
   self.wSaveBut=widget_button(file,value='Save Spectrum as FITS...')
   self.wSaveASCBut=widget_button(file,value='Save Spectrum as ASCII...')
+  self.wExportBut=widget_button(file,SENSITIVE=~LMGR(/VM,/RUNTIME),  $
+                                value='Export Spectrum to Command Line...')
   self.wQuit=widget_button(file,value='Quit')
   maps=widget_button(mbar,value='Maps',/MENU)
   but=widget_button(maps, value='Save Current Map...', $
@@ -1129,6 +1132,7 @@ pro CubeViewSpec__define
       wParams:0L , $            ;widget where the fitted parameters are listed
       wSaveBut:0L, $            ;save to fits
       wSaveASCBut:0L,$          ;save to ascii
+      wExportBut:0L, $          ;export spectrum button
       colors_base:0L}           ;5 linear shades
   
   ;; The messages we send
@@ -1147,5 +1151,5 @@ pro CubeViewSpec__define
        wavelength:0.0}          ;the wavelength we're at
   
   msg={CUBEVIEWSPEC_SAVE, $     ;save the current extraction
-       ascii:0}
+       export:0, ascii:0}
 end
