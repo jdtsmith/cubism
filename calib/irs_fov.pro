@@ -109,13 +109,14 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos, $
      {IRS_FOV,57,'IRS_Long-Hi_2nd_Position',              'LH_b',   'LH',0,2},$
      {IRS_FOV,58,'IRS_Long-Hi_Center_Position',           'LH_cen', 'LH',0,0}]
   
+  if n_elements(md) ne 0 then md=irs_module(md,/TO_NAME)
   if keyword_set(lm) then begin 
      if n_elements(md) eq 0 OR n_elements(ord) eq 0 OR $
         n_elements(pos) eq 0 then $
         message,'Must specify Module,Order and Position'
      
-     if ord eq 3 and strmid(strupcase(md),1) eq 'L' then ord=2
-     wh=where(f.module eq strupcase(md) AND $
+     if ord eq 3 && (md eq 'SL' || md eq 'LL') then ord=2
+     wh=where(f.module eq md AND $
               (f.order eq long(ord) OR $
                (strmid(f.module,1) eq 'H' AND f.order eq 0)) AND $
               f.position eq long(pos),cnt)
