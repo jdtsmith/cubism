@@ -78,7 +78,7 @@ if n_elements(smart_calib_dir) eq 0 then begin
    if !VERSION.RELEASE le '5.4.1' then sep=":" else $
       sep=call_function('path_sep',/SEARCH_PATH)
    paths=strsplit(!PATH,sep,/EXTRACT)
-   wh=where(stregex(paths,filepath(ROOT="smart","calib")+'$') ne -1,cnt)
+   wh=where(stregex(paths,filepath('data',subdir=["~,smart,calib"])+'$') ne -1,cnt)
    if cnt eq 0 then message,'Cannot locate SMART calibration directory.'
    smart_calib_dir=paths[wh[0]]
 endif
