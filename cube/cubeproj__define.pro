@@ -282,7 +282,8 @@ end
 ;=============================================================================
 ;  GetProperty
 ;=============================================================================
-pro cubeProj::GetProperty, ACCOUNT=account,WAVELENGTH=wave,CUBE=cube,ERROR=err
+pro cubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
+                           ERROR=err, PR_SIZE=prz
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -291,6 +292,7 @@ pro cubeProj::GetProperty, ACCOUNT=account,WAVELENGTH=wave,CUBE=cube,ERROR=err
      if ptr_valid(self.CUBE) then cube=*self.CUBE
   if arg_present(err) then $
      if ptr_valid(self.ERR) then err=*self.ERR
+  if arg_present(prz) then prz=self.PR_SIZE
 end
 
 ;=============================================================================
@@ -314,11 +316,12 @@ end
 ;  CheckSteps - Ensure that all of the BCD's for this map are present.
 ;=============================================================================
 pro cubeProj::CheckSteps
+  if NOT ptr_valid(self.DR) then message, 'No BCD Data loaded.'
   got=bytarr(self.NSTEP)
   got[(*self.DR).COLUMN-1,(*self.DR).ROW-1]=1b
   wh=where(got eq 0b, cnt)
   if cnt eq 0 then return
-  message,'Missing Steps: '+ $
+  message,'Missing Steps: '+ string(10b)+ $
           string(FORMAT='('+strtrim(cnt,2)+'("[",I0,", ",I0,"]"))', $
                  [wh/self.NSTEP[0]+1,wh mod self.NSTEP[0]+1])
 end
@@ -330,21 +333,28 @@ end
 ;=============================================================================
 pro cubeProj::Normalize
   self->LoadCalib
+
   if NOT ptr_valid(self.DR) then $
      message,'No data records'
   
   ;; Normalize the module type
-  if self.module eq '' then message,'No module name specified.'
-;  modules=strarr(n_elements(*self.DR))
-;  for i=0,n_elements(*self.DR)-1 do begin 
-;     ;; FIXME
-;     modules[i]=sxpar(*(*self.DR)[i].HEADER,'APERNAME',COUNT=cnt) 
-;     if cnt eq 0 then message,"No APERNAME keyword present"
-;  endfor 
-;  u=uniq(modules,sort(modules))
-;  if n_elements(u) ne 1 then $
-;     message,string(FORMAT='("Too many module types: ",A0, : ",")',modules[u])
-;  self.module=modules[u[0]]
+  modules=strarr(n_elements(*self.DR))
+  for i=0,n_elements(*self.DR)-1 do begin 
+     fovid=sxpar(*(*self.DR)[i].HEADER,'FOVID',COUNT=cnt) 
+     if cnt eq 0 then message,"No FOVID keyword present"
+     fovname=irs_fov(fovid,MODULE=module)
+     modules[i]=module
+  endfor 
+  u=uniq(modules,sort(modules))
+  if n_elements(u) gt 1 then $
+     message,string(FORMAT='("Too many module types: ",A0, : ",")',modules[u])
+  self.module=modules[u[0]]
+  
+  ;; For low-res use the target order as the order, if they're all the same.
+  if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
+     self.ORDER eq 0 AND $
+     (self.module eq 'SL' OR self.module eq 'SH') $
+     then self.ORDER=(*self.DR)[0].TARGET_ORDER
   
   ;; Normalize the plate scale... they should all be the same!
   ps=dblarr(2*n_elements(*self.DR))
@@ -387,9 +397,21 @@ pro cubeProj::Normalize
            slmax=sl>slmax
         endfor 
         self.SLIT_SIZE[0]=slmax*self.PLATE_SCALE
-        self.PR_SIZE[0]=sl
+        self.PR_SIZE[0]=slmax
      endelse 
   endif
+  
+  ;; Check to ensure all steps are present and accounted for
+  self->CheckSteps
+  
+  len=0.                        ;adjust for a non-full aperture
+  if ptr_valid(self.APERTURE) then begin 
+     for i=0,n_elements(*self.APERTURE)-1 do begin 
+        m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
+        len=m>len
+     endfor 
+     self.PR_SIZE[0]=self.SLIT_SIZE[0]/self.PLATE_SCALE*len
+  endif   
   
   ;; Normalize the build aperture(s)
   if ptr_valid(self.APERTURE) then begin 
@@ -403,11 +425,7 @@ pro cubeProj::Normalize
         
   
   ;; Find the average position angle over the course of the map
-  pa=0.0D
-  for i=0L,n_elements(*self.DR)-1 do pa=pa+(*self.DR)[i].PA
-  self.PA=pa/n_elements(*self.DR)
-  
-  ;; Normalize sub-slit (if any)
+  pa=mean((*self.DR).PA)
   
 end
 
@@ -418,7 +436,7 @@ end
 ;                  an interpolated wavelength sampling in the region
 ;                  of overlap, and splitting individual polygon area
 ;                  overlaps between planes with linear interpolation.
-;                  If they don't overlap, just concatenat the
+;                  If they don't overlap, just concatenate the
 ;                  accounting cubes.
 ;=============================================================================
 pro cubeProj::MergeAccounts,account,wavelength
@@ -435,13 +453,14 @@ pro cubeProj::MergeAccounts,account,wavelength
      return
   endif 
   
-  ;; Merge in an existing account.
-  min_wav=min(*self.WAVELENGTH,max=max_wav)
-  min_new_wav=min(wavelength,max=max_new_wav)
+  ;; Find the overlap of the two wavelength samples and construct
+  ;; and interpolating wavelength
+  min_wav1=min(*self.WAVELENGTH,max=max_wav1)
+  min_wav2=min(wavelength,max=max_wav2)
   
   ;; No overlap... just concatenate
-  if min_new_wav gt max_wav OR max_new_wav lt min_wav then begin 
-     if min_new_wav lt min_wav then begin ; prepend new
+  if min_wav2 gt max_wav1 OR max_wav2 lt min_wav1 then begin 
+     if min_wav2 lt min_wav1 then begin ; prepend new
         *self.WAVELENGTH=[wavelength,*self.WAVELENGTH]
         *self.ACCOUNT=[ [[account]], [[*self.ACCOUNT]] ]
      endif else begin           ; append new
@@ -451,9 +470,110 @@ pro cubeProj::MergeAccounts,account,wavelength
      return
   endif 
   
-  ;; Find an interpolating set of wavelengths.  
+  ;; Locations of the overlap region in each
+  wh_over1=where(*self.WAVELENGTH gt min_wav2 AND $
+                 *self.WAVELENGTH lt max_wav2,cnt1,COMPLEMENT=wh_clear1)
+  wh_over2=where(wavelength gt min_wav1 AND $
+                 wavelength lt max_wav1,cnt2,COMPLEMENT=wh_clear2)
   
+  ;; Expand the overlap regions by one bordering sample at each side
+  nw=n_elements(*self.WAVELENGTH)
+  if wh_over1[0] gt 0 then begin 
+     wh_over1=[wh_over1[0]-1,wh_over1]
+     wh=where(wh_clear1 ne wh_over1[0]-1,cnt)
+     if cnt gt 0 then wh_clear1=wh_clear1[wh] else wh_clear1=-1
+  endif 
+  if wh_over1[cnt1-1] lt nw-1 then begin 
+     wh_over1=[wh_over1,wh_over1[nw-1]+1]
+     wh=where(wh_clear1 ne wh_over1[nw-1]+1,cnt)
+     if cnt gt 0 then wh_clear1=wh_clear1[wh] else wh_clear1=-1
+  endif 
+  nw=n_elements(wavelength)
+  if wh_over2[0] gt 0 then begin 
+     wh_over2=[wh_over2[0]-1,wh_over2]
+     wh=where(wh_clear2 ne wh_over2[0]-1,cnt)
+     if cnt gt 0 then wh_clear2=wh_clear2[wh] else wh_clear2=-1
+  endif 
+  if wh_over2[cnt2] lt nw-1 then begin 
+     wh_over2=[wh_over2,wh_over2[nw-1]+1]
+     wh=where(wh_clear2 ne wh_over2[nw-1]+1,cnt)
+     if cnt gt 0 then wh_clear2=wh_clear2[wh] else wh_clear2=-1
+  endif
+  
+  ;; Use as the primary wavelength set whichever has more samples in
+  ;; the overlap region
+  if cnt1 ge cnt2 then begin  
+     use_wav=(*self.WAVELENGTH)[wh_over1]
+     lose_wav=wavelength[wh_over2]
+     use_acct=(*self.ACCOUNT)[*,*,wh_over1]
+     lose_acct=account[*,*,wh_over2]
+     if max_wav1 gt max_wav2 then lead_in=1
+     if min_wav1 lt min_wav2 then lead_out=1
+  endif else begin
+     use_wav=wavelength[wh_over2]
+     lose_wav=(*self.WAVELENGTH)[wh_over1]
+     use_acct=account[*,*,wh_over2]
+     lose_acct=(*self.ACCOUNT)[*,*,wh_over1]
+     if max_wav2 gt max_wav1 then lead_in=1
+     if min_wav2 lt min_wav1 then lead_out=1
+  endelse
+  
+  ;; Remove the overlapping chunks from both
+  (*self.WAVELENGTH)=(*self.WAVELENGTH)[wh_clear1] ;leave the clear chunks
+  *self.ACCOUNT=(*self.ACCOUNT)[*,*,wh_clear1]
+  wavelength=wavelength[wh_clear2]
+  account=account[*,*,wh_clear2]
+  
+  ;; Provide a few lead-in or lead-out transition samples
+;   nu=n_elements(use_wav)
+;   nl=n_elements(lose_wav)
+  
+;   if lead_in then begin         ;ease into the new sampling at the short end
+;      nlead=2>(nu-1)<3
+;      su=sort(use_wav)
+;      sl=sort(lose_wav)
+;      delta_use=mean(use_wav[su[1:nlead-1]]-use_wav[su[0:nlead-2]])
+;      delta_lose
+     
+;   endif
+;   if lead_out then begin        ;ease into the new sampling at the long end
+     
+;  endif 
+  
+  nu=n_elements(use_wav)
+  nl=n_elements(lose_wav)
+  
+  ;; Interpolate onto the new wavelength grid.  
+  map_loc=value_locate(use_wav,lose_wav)
+  if NOT array_equal(map_loc ne -1,1b) then $
+     message,'Non-bracketing overlap found.'
+  ;;  the fraction in the first bin
+  map_frac=(use_wav[map_loc+1]-lose_wav)/(use_wav[map_loc+1]-use_wav[map_loc]) 
+  
+  ;; Merge or splice the losers in
+  for i=0,self.CUBE_SIZE[0]-1 do begin 
+     for j=0,self.CUBE_SIZE[1]-1 do begin 
+        for wl=0,n_elements(nl)-1 do begin 
+           if NOT ptr_valid(lose_act[i,j,wl]) then continue
+           high=(low=*lose_act[i,j,wl])
+           low.frac=low.frac*map_frac[wl]
+           high.frac=high.frac*(1.-map_frac[wl])
+           if NOT ptr_valid(use_act[i,j,map_loc[wl]]) then $ 
+              use_act[i,j,map_loc[wl]]=ptr_new(low,/NO_COPY) $
+           else *use_act[i,j,map_loc[wl]]=[*use_act[i,j,map_loc[wl]],low]
+           if NOT ptr_valid(use_act[i,j,map_loc[wl]+1]) then $ 
+              use_act[i,j,map_loc[wl]+1]=ptr_new(high,/NO_COPY) $
+           else *use_act[i,j,map_loc[wl]+1]=[*use_act[i,j,map_loc[wl]],high]
+           ptr_free,lose_act[i,j,wl]
+        endfor
+     endfor
+  endfor
+  
+  ;; Put it all together
+  *self.ACCOUNT=[ [[*self.ACCOUNT]] , [[use_act]] , [[account]] ]
+  *self.WAVELENGTH=[ *self.WAVELENGTH , use_wav, wavelength ]
 end
+
 
 ;=============================================================================
 ;  BuildAccount - Build the accounting cube, listing, for all pixels
@@ -464,8 +584,6 @@ end
 ;=============================================================================
 pro cubeProj::BuildAccount,PR_WIDTH=prw,_EXTRA=e
   self->Normalize
-  self->CheckSteps
-  self->LoadCalib               ;ensure the calibration object is available
   if n_elements(prw) ne 0 then self.PR_SIZE[1]=0.>prw 
   if self.PR_SIZE[1] eq 0.0 then self.PR_SIZE[1]=1.D ;the default
   
@@ -483,7 +601,7 @@ pro cubeProj::BuildAccount,PR_WIDTH=prw,_EXTRA=e
      aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
      prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
                               /PIXEL_BASED, /SAVE_POLYGONS, $
-                              PR_WIDTH=self.PR_SIZE[1], _EXTRA=e)
+                              PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
 
      account=ptrarr([self.CUBE_SIZE[0:1],n_elements(prs)])
      
@@ -547,53 +665,32 @@ pro cubeProj::BuildAccount,PR_WIDTH=prw,_EXTRA=e
      self->MergeAccounts,account,prs.lambda
   endfor 
   
-  ;; In case we've merged accounts together
+  ;; Set again in case we've merged any orders
   self.CUBE_SIZE[2]=(size(*self.ACCOUNT,/DIMENSIONS))[2]
-
+  
+  self.ACCOUNT_VALID=1
 end
 
 ;=============================================================================
 ;  BuildCube - Assemble the Cube from the accounting information, and
-;              the BCD data itself.
+;              the BCD data and uncertainties.
 ;=============================================================================
 pro cubeProj::BuildCube
   if NOT ptr_valid(self.DR) then return
-  if NOT ptr_valid(self.ACCOUNT) OR self.Changed then self->BuildAccount
+  if NOT ptr_valid(self.ACCOUNT) OR NOT self.ACCOUNT_VALID then $
+     self->BuildAccount
   
   cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
+  big_bcd=(*self.DR).BCD
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=1.)
   ncube=n_elements(*self.ACCOUNT)
+  bcd_size=128L*128L*2L         ;each BCD is two planes
+  error_offset=128L*128L        ;the error plane is second
+  
   for i=0L,ncube-1L do begin 
-     if i mod 1000 eq 0 then print, FORMAT='(F8.3,"%")',float(i)/ncube*100
-     if i/(64*10) eq 103 AND i mod 640 mod 64 eq 47 then stop
      if NOT ptr_valid((*self.ACCOUNT)[i]) then continue
      als=*(*self.ACCOUNT)[i]    ;list of {CUBE_ACCOUNT} structures
-     
-     if n_elements(als) eq 1 then begin 
-        cube[i]=((*self.DR)[als.dr].BCD)[als.pixel]*als.frac 
-     endif else begin 
-        cube[i]=0.0
-        h=histogram(als.dr,BINSIZE=1,REVERSE_INDICES=ri,OMIN=min)
-        for j=0,n_elements(h)-1 do begin 
-           if ri[j] eq ri[j+1] then continue ;empty bin
-           inds=ri[ri[j]:ri[j+1]-1]
-           cube[i]=cube[i]+ $
-                   total(((*self.DR)[min+j].BCD)[als[inds].pixel] * $
-                         als[inds].frac)
-        endfor
-     endelse 
-     ;; ===========> below takes around 63 seconds!!!
-;     endif else if array_equal(als.dr,als[0].dr) then begin  
-;        ;; all the same BCD.
-;        cube[i]=total(((*self.DR)[als[0].dr].BCD)[als.pixel] * als.frac) 
-;     endif else begin 
-;        stop
-        ;;different pixels from different BCDs
-;        cube[i]=total(((*self.DR)[als.dr].BCD)[als.pixel+ $
-;                                               lindgen(n_elements(als))* $
-;                                               128L*128L*2L] * als.frac)
-;     endelse 
-     ;; ===========> 
+     cube[i]=total(big_bcd[als.dr*bcd_size+als.pixel]*als.frac)
      areas[i]=total(als.frac)
      ;; error cube computation
   endfor 
@@ -618,7 +715,8 @@ pro cubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
 end
 
 ;=============================================================================
-;  AddBCD - Add a bcd image to the cube.  All optional input values aside from 
+;  AddBCD - Add a bcd image to the cube, optionally overriding the
+;           header derived values.
 ;=============================================================================
 pro cubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
                      COLUMN=col, ROW=row, CMD_POS=cpos, REC_POS=rpos, PA=pa
@@ -646,7 +744,6 @@ pro cubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
      rec.id=id
   endif 
   
-  ;; !!!!!! FIXME: These keywords are by no means finalized
   if n_elements(exp) ne 0 then rec.EXP=exp else $
      rec.EXP=sxpar(header,'EXPNUM')
   if n_elements(cycle) ne 0 then rec.cycle=cycle else $
@@ -664,14 +761,20 @@ pro cubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
   if array_equal(self.slit_size,0.0) then $
      self.slit_size=sxpar(header,'SLIT_SZ*')     
   rec.NCYCLES=sxpar(header,'NCYCLES')
+  fovid=sxpar(header,'FOVID',COUNT=cnt)
+  if cnt gt 0 then begin 
+     fovname=irs_fov(fovid,ORDER=target_order,POSITION=target_pos)
+     rec.TARGET_ORDER=target_order
+     rec.TARGET_POS=target_pos
+  endif 
   
-  ;; !!!!!! FIXME: These keywords are by no means finalized
   if ptr_valid(self.DR) then *self.DR=[*self.DR,rec] else $
      self.DR=ptr_new(rec,/NO_COPY)
+  self.ACCOUNT_VALID=0
 end
 
 ;=============================================================================
-; Cleanup 
+;  Cleanup 
 ;=============================================================================
 pro cubeProj::Cleanup
   ;; !!! Write a real cleanup.
@@ -681,7 +784,7 @@ pro cubeProj::Cleanup
 end
 
 ;=============================================================================
-; Init 
+;  Init 
 ;=============================================================================
 function cubeProj::Init, name, _EXTRA=e
   if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up (add msglist)
@@ -693,7 +796,7 @@ function cubeProj::Init, name, _EXTRA=e
 end
 
 ;=============================================================================
-; CubeProj - IRS Spectral (+MIPS SED) Cubes
+;  CubeProj - IRS Spectral (+MIPS SED) Cubes
 ;=============================================================================
 pro cubeProj__define
   c={cubeProj, $
@@ -705,11 +808,12 @@ pro cubeProj__define
                                 ; the cube (or 0 to build and splice all
                                 ; orders in the module)
      APERTURE:ptr_new(), $      ;The aperture of the clip, or one
-                                ; each order
+                                ; for each order
      DR: ptr_new(), $           ;All the BCD's: pointer to list of
                                 ; data record structures of type CUBE_DR
      ACCOUNT: ptr_new(),$       ;a cube of pointers to lists of CUBE_ACCOUNT
                                 ; accounting structures
+     ACCOUNT_VALID: 0, $        ;whether the account is valid
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      ERR:  ptr_new(),$          ;a pointer to the nxmxl error cube
      ITIME: ptr_new(),$         ;nxmxl integration time per pixel
@@ -745,6 +849,10 @@ pro cubeProj__define
        file:'', $               ;the original file read for this data
        CMD_POS: [0.0D,0.0D], $  ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
+       TARGET_ORDER: 0, $       ;which order was targetted by pointing
+                                ;  (or 0 for module center targetting)
+       TARGET_POS: 0, $         ;For low-res: 0, 1, or 2 for centered on
+                                ; module, slit position 1, or slit position 2
        PA: 0.0D, $              ;Position angle of slit E of N
        BCD: fltarr(128,128,2), $ ;the 2 plane BCD (error plane second).
        EXP: 0L, $               ;the exposure number in the mapping sequence
@@ -755,3 +863,75 @@ pro cubeProj__define
        Date:0.0D, $             ;the date this BCD was added
        HEADER: ptr_new()}       ;a pointer to a string array.
 end
+
+; NOTES:
+;
+; speedup possibilities:
+;
+;   Drop the ragged 4d array format for the accounting cubes.  Cube
+;   pixels can have 0 or more contributing pixels.  Code the index as
+;   a single integer master BCD index into the large 128x128x(2*n*bcd)
+;   array, e.g.:
+;
+;      DR: 4, PIXEL:5206 ====> INDEX:4*128*128*2+5206=136278L
+;   
+;   cache the 128x128x(2*n_bcd) *(self.DR).BCD array prior to building
+;   the cube.  Index it in parallel using the full index as developed
+;   above.  This index will change when you add or remove cubes (so
+;   will the cube number, so it's not such a big deal).  Do you always
+;   have to rebuild the ACCOUNT when you make a new cube?  What's the
+;   use of separating it then?  I guess you could *disable* cubes
+;   without rebuilding the account, but adding or removing any messes
+;   things up.  It seems account isn't as flexible as I had thought.
+;   If there are different options for weighting the various
+;   contributing data, at least *that* doesn't mess up the account.
+;
+;   Make a flat 4D hypercube of accounting info with up to 4 entries
+;   per pixel.  Additional entries (beyond 4) are stored as a big list
+;   of form:
+;
+;     [ {cube_pixel, master_bcd_index, fraction}, ..., ]
+;
+;   Too much of a pain.  What about using this type of list for the
+;   full accounting structure?  Building the cube then would be as
+;   simple then as:
+;
+;     cube[cube_pixel]=cube[cube_pixel]+big_bcd[master_bcd_index]*fraction
+;   
+;   except this doesn't work, thanks to repeated indices being ignored
+;   in assignment (thanks IDL).  Also, when you want the accounting
+;   information for a pixel, you have to search through the *long*
+;   list.  Oh for the want of hashes.... AHA... use the sparse array
+;   technique, with the slight difference that you compute:
+;
+;     val=big_bcd[master_bcd_index]*frac
+;
+;   it would go something like:
+;
+;     At cube build time:
+;     
+;     super_ind=acct.DR*128L*128L*2L+acct.PIXEL
+;     mx=max(super_ind)
+;     h1=histogram(super_ind,MIN=0,REVERSE_INDICES=ri1) 
+;     col=ri1[n_elements(h1)+1:*]
+;     h2=histogram(total(h1,/cumulative)-1,MIN=0,reverse_indices=ri2)
+;     row=ri2[0:n_elements(h2)-1]-ri2[0]+om ; chunk indices = row number
+;     sparse_array=sprsin(col,row,replicate(1.,n_ind),(mx+1)>n_ind)
+;     if mx ge n_ind then $
+;      vec4=sprsax(sparse_array,[val,replicate(0.,mx+1-n_ind)]) $
+;     else vec4=(sprsax(sparse_array,val))[0:mx]
+;
+;   Instead of using 1. as the value to multiply by, you could use:
+;
+;     area_i*time_i/sigma_i^2, and then apply a sparse array of 1.'s
+;     to this quantity as the X vector to generate the normalizing sum
+;     over weights.
+;    
+;   When deleting BCD's, you can use the reverse indices to find and
+;   re-calculate only those account list entries which are affected!
+;
+;   The 4D + extras is inconvenient too: you index and search a
+;   (presumably smaller) list for any extras to append.
+;
+;
+;   Could use a fast histogram to search the accounting list.  
