@@ -85,7 +85,7 @@ pro tvZoom::tvzoombox,X,Y
 end 
 
 pro tvZoom::tvzoomit, X, Y
-  self.oDraw->GetProperty,zoom=zoom,pan=pan,offset=offset,size=size
+  self.oDraw->GetProperty,zoom=zoom,pan=pan,offset=offset,size=size,dispsize=ds
   left=FIX(((self.orig[0] < X)- $
             pan[0])/zoom) > 0
   right=FIX(((self.orig[0] > X)- $
@@ -94,15 +94,30 @@ pro tvZoom::tvzoomit, X, Y
            pan[1])/zoom) < (size[1]-1-offset[1])
   bottom=FIX(((self.orig[1] < Y )- $
               pan[1])/zoom) > 0
+  
+  ;; point-click: zoom in a factor of two
   if (left ge right) or (bottom ge top) then begin 
-     self->tverasebox,X,Y       ;erase the current box
-     return
-  endif                         ; a valid zoom occured
+     pix=self.oDraw->Convert([X,Y],/SHOWING)
+     if pix[0] eq -1 then begin ; it wasn't showing
+        self->tverasebox,X,Y
+        return
+     endif 
+     halfsize=fix(ds/4)>1
+     left=pix[0]-halfsize[0]>0
+     right=pix[0]+halfsize[0]<(size[0]-1)
+     bottom=pix[1]-halfsize[1]>0
+     top=pix[1]+halfsize[1]<(size[1]-1)
+     offset=[left,bottom]
+  endif else offset=offset+[left,bottom]
+  
   ;; set the tvDraw parameters
-  offset=offset+[left,bottom]
   dispsize=[right-left+1, top-bottom+1]
+  
   ;; update the zoomlist
   if ptr_valid(self.zoomlist) then begin 
+     n=n_elements(*self.zoomlist) 
+     if array_equal((*self.zoomlist)[n-1].off, offset) AND $
+        array_equal((*self.zoomlist)[n-1].size,dispsize) then return
      *self.zoomlist=[*self.zoomlist, {ZoomBox,offset, dispsize}]
   endif else  $
      self.zoomlist=ptr_new({ZoomBox,offset,dispsize})
