@@ -118,6 +118,7 @@ function smart_module,module, TO_NAME=tn
   endif else ret=0>fix(module)<3
 
   if keyword_set(tn) then return,(['LH','LL','SH','SL'])[ret]
+  print,'Returned from smart_module'
   return,ret
 end
 
