@@ -861,8 +861,9 @@ pro IRS_Calib::Trim,x,y,APERTURE=aper,LAMBDA=lambda,SLIT_LENGTH=sl
   ;; preserving angle
   
   if aper.wavscl then begin 
-     ;; pos/wave/size scaling
-     width=aper.scale[0]*(lambda/aper.scale[1]) ;width, normalized to slit len
+     ;; size/wave/pos scaling
+     ;; width, normalized to slit len
+     width=aper.scale[0]*(lambda/aper.scale[1])
      
      pos=aper.scale[2]          ;center position, normalized to slit length
      delx=(x[0,*]-x[1,*]) & dely=(y[0,*]-y[1,*])
