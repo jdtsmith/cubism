@@ -515,9 +515,7 @@ end
 ;  Cleanup - Cleanup the object, destroy the message list.
 ;============================================================================= 
 pro ObjMsg::Cleanup
-  if self->MsgListClean() then begin
-     ptr_free,self.MsgList
-  endif    
+  ptr_free,self.MsgList
 end
 
 ;=============================================================================
