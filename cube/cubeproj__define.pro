@@ -964,15 +964,18 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset
         if only_set then return
         if nothers gt 0 then *list=(*list)[others] $
         else ptr_free,list
+        self.GLOBAL_BP_BYHAND=1b & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
      endif else begin 
         if only_clear then return
         *list=[*list,pix]
+        self.GLOBAL_BP_BYHAND=1b & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
      endelse 
   endif else begin
      if only_clear then return
      if n_elements(rec) ne 0 then $
         (*self.DR)[rec[0]].BAD_PIXEL_LIST=ptr_new([pix]) $
      else self.GLOBAL_BAD_PIXEL_LIST=ptr_new([pix])
+     self.GLOBAL_BP_BYHAND=1b & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
   endelse 
 end
 
@@ -1013,9 +1016,29 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
      endif 
   endif 
   
+  ;; Fork the two file lists
+  if ptr_valid(self.GLOBAL_BP_FILES) && $
+     self.GLOBAL_BP_FILES eq self.AS_BUILT.GLOBAL_BP_FILES $
+  then begin 
+     self.GLOBAL_BP_FILES=ptr_new(*self.AS_BUILT.GLOBAL_BP_FILES)
+  endif 
+  
+  if keyword_set(append) then begin 
+     ;; Append to list of files
+     if ptr_valid(self.GLOBAL_BP_FILES) then $
+        *self.GLOBAL_BP_FILES=[*self.GLOBAL_BP_FILES,file] $
+     else self.GLOBAL_BP_FILES=ptr_new([file])
+  endif else begin 
+     ;; All by-hand and other files' BP's have been replaced
+     ptr_free,self.GLOBAL_BP_FILES
+     self.GLOBAL_BP_FILES=ptr_new([file])
+     self.GLOBAL_BP_BYHAND=0b
+  endelse 
+  
   if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST then $
      ptr_free,self.GLOBAL_BAD_PIXEL_LIST
   self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bp,/NO_COPY)
+  self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
   self->UpdateButtons
   self->Send,/UPDATE
 end
@@ -1035,6 +1058,10 @@ pro CubeProj::SaveBadPixels,file
   if size(file,/TYPE) ne 7 then return ;cancelled
   openw,un,file,/GET_LUN
   printf,un,1#(*self.GLOBAL_BAD_PIXEL_LIST)
+  
+  ;; All of our BPs are now stored in this one file
+  self.GLOBAL_BP_SAVEFILE=file
+  self.GLOBAL_BP_SAVEFILE_UPTODATE=1b
   free_lun,un
 end
 
@@ -1043,9 +1070,18 @@ end
 ;  ClearBadPixels - Clear all bad pixels out
 ;=============================================================================
 pro CubeProj::ClearBadPixels, file
+  ;; Clear out the bad pixels
   if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST then $
      ptr_free,self.GLOBAL_BAD_PIXEL_LIST $
   else self.GLOBAL_BAD_PIXEL_LIST=ptr_new()
+  
+  ;; Clear the list of files which contributed
+  if self.GLOBAL_BP_FILES ne self.AS_BUILT.GLOBAL_BP_FILES then $
+     ptr_free,self.GLOBAL_BP_FILES else self.GLOBAL_BP_FILES=ptr_new()
+  
+  ;; None by hand either
+  self.GLOBAL_BP_BYHAND=0b
+  self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
   self->UpdateButtons
   self->Send,/UPDATE
 end
@@ -1800,7 +1836,7 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
         ' all orders') + (self->N_Records() gt 0? $
                           (' -- '+strtrim(self->N_Records(),2)+' BCDs '):"")]
   
-  str=[str,' Using IRS Calib object '+(this.CAL_FILE?this.cal_file:"(none)")+ $
+  str=[str,' Using IRS Calib object: '+(this.CAL_FILE?this.cal_file:"(none)")+ $
        " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
   
   str=[str,' Background: '+ $
@@ -1813,9 +1849,24 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
   str=[str,' FLUXCON: '+(this.FLUXCON?"Yes":"No")]
   str=[str,'    SLCF: '+(this.SLCF?"Yes":"No")]
   str=[str,' Positions: '+(this.RECONSTRUCTED_POS?"Reconstructed":"Requested")]
-  str=[str,' Bad Pixels: '+(ptr_valid(this.GLOBAL_BAD_PIXEL_LIST)? $
-                            strtrim(n_elements(*this.GLOBAL_BAD_PIXEL_LIST), $
-                                    2): "none")]
+  
+  nbadpix=ptr_valid(this.GLOBAL_BAD_PIXEL_LIST)? $
+          n_elements(*this.GLOBAL_BAD_PIXEL_LIST):0
+  str=[str,' Bad Pixels: '+(nbadpix gt 0?strtrim(nbadpix,2):"none")]
+  
+  if nbadpix gt 0 && $
+     (this.GLOBAL_BP_BYHAND || ptr_valid(this.GLOBAL_BP_FILES)) then begin 
+     str=[str,' Bad Pixel Sources:']
+     if this.GLOBAL_BP_BYHAND then str=[str,'   <By Hand>']
+     if ptr_valid(this.GLOBAL_BP_FILES) then $
+        str=[str,'   '+*this.GLOBAL_BP_FILES]
+  endif 
+  
+  if this.GLOBAL_BP_SAVEFILE then $
+     str=[str,' Bad Pixels Saved To'+ $
+          (this.GLOBAL_BP_SAVEFILE_UPTODATE?':':' (outdated):'), $
+          '   '+this.GLOBAL_BP_SAVEFILE]
+  
   aps=' Apertures:'
   if NOT ptr_valid(this.APERTURE) OR this.MODULE eq '' then begin 
      aps=aps+' (default)' 
@@ -3315,17 +3366,18 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      ;; Regular "four corners" integral pixel extraction
      sp=total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
               1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
-     if arg_present(op) then $
-        op=[[low[0],low[1]], $
-            [low[0],high[1]], $
-            [high[0],high[1]], $
-            [high[0],low[1]]]
+     h=high+1
+     op=[[low[0],low[1]], $
+         [low[0],h[1]], $
+         [h[0],h[1]], $
+         [h[0],low[1]]]
   endelse 
   
-  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP  
+  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP,REGION=op
 
   if keyword_set(exp) then $
      self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
+  if n_elements(oSP) ne 0 then obj_destroy,oSP
   return,sp
 end
 
@@ -3333,11 +3385,17 @@ end
 ;=============================================================================
 ;  SaveSpectrum - Save a Spectrum using a spectrum object
 ;=============================================================================
-pro CubeProj::SaveSpectrum,file,sp,oSP
+pro CubeProj::SaveSpectrum,file,sp,oSP,REGION=op
   if ~obj_valid(oSP) then begin 
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
                  self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
                  PARENT_GROUP=self->TopBase())
+     ;; If the region was created by hand, create a region object for it
+     if n_elements(op) ne 0 then begin 
+        oReg=obj_new('IRS_Region')
+        oReg->SetRegion,op,ASTROMETRY=self->CubeAstrometryRecord()
+        oSP->SetProperty,REGION=oReg
+     endif 
      destroy=1
   endif else begin 
      ;; Re-use the region, since it must have been extracted from that.
@@ -3359,6 +3417,7 @@ pro CubeProj::SaveSpectrum,file,sp,oSP
   
   ;; Add the first header as inheritance
   m=min((*self.DR).DCEID,pos)
+  self->RestoreData,pos
   h1=*(*self.DR)[pos].HEADER
   oSP->InheritHeader,h1,'KEYWORDS FROM FIRST BCD'
   
@@ -3502,6 +3561,7 @@ pro CubeProj::SaveMap,map,sf
   
   catch, err
   if err ne 0 then begin 
+     catch,/CANCEL
      self->Error,['Error saving map to file '+sf,!ERROR_STATE.MSG]
   endif 
   widget_control,/HOURGLASS  
@@ -3985,6 +4045,10 @@ pro CubeProj__define
       BACK_EXP_LIST: ptr_new(),$ ;list of expids used for the background
       BG_SP_FILE:'', $          ;file used for 1D BG subtraction
       GLOBAL_BAD_PIXEL_LIST: ptr_new(),$ ;a user list of bad pixels to exclude
+      GLOBAL_BP_FILES: ptr_new(), $ ;files which contribed to the BPs
+      GLOBAL_BP_BYHAND: 0b, $   ;whether we've added more BPs by hand
+      GLOBAL_BP_SAVEFILE: '', $ ;file, if any, BPs saved to
+      GLOBAL_BP_SAVEFILE_UPTODATE:0b, $ ;whether the BP file is up to date
       BACK_SP_FILE: '', $       ;Background 1D spectrum file
       fluxcon:0b, $             ;whether to build with FLUXCON fluxes
       slcf: 0b, $               ;whether to build with the SLCF
