@@ -93,6 +93,10 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   ;; a pixel table tool (non-exclusive)
   pixtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
   
+  ;; a WavSamp masker (non exclusive)
+  wsmask=obj_new('WSMask',oDraw,_EXTRA=e)
+  cuberec->MsgSignup,wsmask,/CUBEREC_UPDATE
+  
   ;;**********************************************************************
   
   ;; Mutually exclusive list, to the left in toolbar
@@ -108,7 +112,8 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
             {Obj:aper,       keys:'', Exclusive:1b}]
   
   ;; Toggle-able, non-exclusive list, to the right in toolbar
-  tog_list=[{Obj:pixtbl,     keys:'',Exclusive:0b}]
+  tog_list=[{Obj:pixtbl,     keys:'',Exclusive:0b}, $
+            {Obj:wsmask,     keys:'w',Exclusive:0b}]
 
   ;; a switcher for switching among the tools using icons or keypresses
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
