@@ -97,7 +97,7 @@
 ;	DESCRIPTION:
 ;
 ;          Quickly redraw the scaled image and optionally take a
-;          Snaphot (sending out SnapShot messages).
+;          Snapshot (sending out SnapShot messages).
 ;          
 ;       CALLING SEQUENCE:
 ;
