@@ -54,9 +54,10 @@ pro tvHotKey::Button, obj
    ;; It's up to the object whether he's on or off...
    if obj->Status() then begin 
       ;; turn *on* the newly clicked one, and others off
-      for i=0,n_elements(*self.Wlist)-1 do begin 
-         ic=*((*self.pix)[i])
-         if i eq self.cur then begin ;turned on
+      all=self->GetMsgObjs()
+      for i=0,n_elements(all)-1 do begin 
+         ic=all[i]->Icon()
+         if all[i] eq obj then begin ;turned on
             if size(ic,/N_DIMEN) eq 2 then val=ic else val='*'+ic+'*'
          endif else begin       ;turned off
             if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic
@@ -66,10 +67,10 @@ pro tvHotKey::Button, obj
    endif else begin
       ;; turn *off* the current button, Status is down (inactive)
       if self.cur ne -1 then begin 
-         ic=*((*self.pix)[self.cur])
+         ic=obj->Icon()
          if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic
          widget_control,(*self.wList)[self.cur],set_value=val
-      endif 
+      endif
    endelse 
 end
 
@@ -118,15 +119,11 @@ function tvHotKey::Init,oDraw, USECASE=uc, SELECT_BASE=sb, _EXTRA=e
                 set_uvalue=self, /TRACKING_EVENTS
                no=n_elements(objs) 
                self.wList=ptr_new(lonarr(no,/NOZERO))            
-               self.pix=ptr_new(ptrarr(no))
                for i=0,no-1 do begin
                   ic=objs[i]->Icon()
-                  ;; If no icon, use the class name instead
-                  if ic[0] eq -1 then ic=obj_class(objs[i])
                   if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic   
                   (*self.wList)[i]= $
                    widget_button(sb, /NO_RELEASE, value=val,/DYNAMIC_RESIZE)
-                  (*self.pix)[i]=ptr_new(ic,/NO_COPY)
                endfor 
             endif 
             self.cur=-1         ;none yet active
@@ -149,7 +146,6 @@ pro tvHotKey__define
            Key:obj_new(), $     ;our key plug-in
            UseCase:0b, $        ;whether to consider case
            wList: ptr_new(), $  ;a list of buttons
-           cur:0, $             ;which is currently the active one  
-           pix:ptr_new()}       ;a list of bitmaps on the buttons
+           cur:0}             ;which is currently the active one  
    return
 end
