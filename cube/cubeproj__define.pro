@@ -2565,9 +2565,9 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
   for i=0,n_elements(files)-1 do begin 
      hdr=headfits(files[i])
      rec={FILE:files[i],OBJECT:strtrim(sxpar(hdr,'OBJECT'),2), $
-          FOV:sxpar(hdr,'FOVID'), NCYCLES:sxpar(hdr,'NCYCLES'), $
+          FOV:sxpar(hdr,'FOVID'), NCYCLES:long(sxpar(hdr,'NCYCLES')), $
           TIME:sxpar(hdr,'EXPTOT_T'), $
-          STEPS:[sxpar(hdr,'STEPSPAR'),sxpar(hdr,'STEPSPER')]}
+          STEPS:long([sxpar(hdr,'STEPSPAR'),sxpar(hdr,'STEPSPER')])}
      if n_elements(all) eq 0 then all=[rec] else all=[all,rec]
   endfor 
   
@@ -2687,7 +2687,8 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
      id=filestrip(rec.file)
      if stregex(id,'IRSX.*\.fits',/BOOLEAN) then begin ;Sandbox style names
-        id=strmid(id,42,11,/REVERSE_OFFSET)+strmid(id,29,9,/REVERSE_OFFSET)
+        parts=strsplit(id,'.',/EXTRACT)
+        id=parts[3]+'.'+parts[5]+'.'+parts[6]
      endif else begin ; XXX also treat long archive names specially
         suffix=strpos(id,".fits",/REVERSE_SEARCH)
         if suffix[0] ne -1 then id=strmid(id,0,suffix)
