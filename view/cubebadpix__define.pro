@@ -5,41 +5,68 @@
 pro CubeBadPix::Message, msg
   self->tvPlug::Message,msg,TYPE=type
   case type of
-     'DRAW_BUTTON': begin 
-        if msg.type ne 0 then return ;presses only
+     'DRAW_MOTION': begin 
         pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING,/SINGLE_INDEX)
-        if pt[0] eq -1 then return
-        ;; Non-first button only: cycle through group
-        if msg.press eq 4b then begin $
-           self.showing=(self.showing+1) mod (ptr_valid(self.bp_list)?4:3)
+        pt=pt[0]
+        if pt eq -1 then return
+        if pt eq self.last_pt then return
+        self.last_pt=pt
+        if self.press eq 2b then begin ;middle click: this bcd only
+           if ptr_valid(self.rec_set) then begin 
+              if n_elements(*self.rec_set) gt 1 then return
+              this_rec=(*self.rec_set)[0]
+           endif else return
+        endif 
+        do_set=self.setting
+        self.cube->ToggleBadPixel,pt,SET=do_set,RECORD_SET=this_rec
+        if do_set ne self.setting then return
+        self->DrawMark,pt,ERASE=~do_set,SINGLE_REC=n_elements(this_rec) gt 0
+     end 
+        
+     'DRAW_BUTTON': begin 
+        if msg.release eq 4b then return
+
+        ;; Last button: cycle through group
+        if msg.press eq 4b then begin 
+           self.showing=(self.showing+1) mod 4
            self.oDraw->Redraw,/SNAPSHOT
            return
-        endif else if msg.press ne 1b then return
-        ;; Add or remove bp from list
-        if ptr_valid(self.bp_list) then begin 
-           got=where(*self.bp_list eq pt,ngot, $
-                     COMPLEMENT=others,NCOMPLEMENT=nothers)
-           if ngot gt 0 then begin ;already on list
-              self->DrawMark,pt,/ERASE
-              if nothers gt 0 then *self.bp_list=(*self.bp_list)[others] $
-              else ptr_free,self.bp_list
-           endif  else begin 
-              self->DrawMark,pt
-              *self.bp_list=[*self.bp_list,pt]
-           endelse 
-        endif else begin 
-           self->DrawMark,pt
-           self.bp_list=ptr_new([pt])
-        endelse 
-        self.cube->SetProperty,BAD_PIXEL_LIST=ptr_valid(self.bp_list)? $
-                               *self.bp_list:-1
+        endif
+        
+        ;; Other buttons, set/clear breakpoints
+        if msg.type eq 1 then begin ;release
+           self.oDraw->MsgSignup,self,DRAW_MOTION=0
+           self.press=-1b
+           self.last_pt=-1
+           self.setting=-1
+           return
+        endif 
+        
+        pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING,/SINGLE_INDEX)
+        pt=pt[0]
+        if pt eq -1 then return
+  
+        
+        if msg.press eq 2b then begin ;middle click: this bcd only
+           if ptr_valid(self.rec_set) then begin 
+              if n_elements(*self.rec_set) gt 1 then return
+              this_rec=(*self.rec_set)[0]
+           endif else return
+        endif 
+        
+        self.press=msg.press
+        self.last_pt=pt
+        self.oDraw->MsgSignup,self,/DRAW_MOTION
+        self.cube->ToggleBadPixel,pt,SET=set,RECORD_SET=this_rec
+        self.setting=set
+        self->DrawMark,pt,ERASE=~set,SINGLE_REC=n_elements(this_rec) gt 0
      end
      
      'TVDRAW_SNAPSHOT': begin 
         self.oDraw->GetProperty,ZOOM=zm
         self.zoom=zm
-        if self.showing ne 3 then self->MarkStatic,/ALL
-        ;; Only put bpl in background when On
+        if self.showing lt 3 then self->MarkStatic,/ALL
+        ;; Only put bpl in background when ~On: in foreground otherwise
         if ~self->On() then self->MarkAll
      end
           
@@ -50,14 +77,8 @@ pro CubeBadPix::Message, msg
            self.bmask=msg.BMASK
            self.cube=msg.CUBE
            self.cube->GetProperty,PMASK=pm,/POINTER
+           self.rec_set=msg.record_set
            self.pmask=pm
-           self.cube->GetProperty,BAD_PIXEL_LIST=bpl
-;           ptr_free,self.non_finite
-;           wh=where(~finite(*msg.bcd),cnt)
-;           if cnt gt 0 then self.non_finite=ptr_new(wh,/NO_COPY)
-           ptr_free,self.bp_list
-           if n_elements(bpl) gt 0 then self.bp_list=ptr_new(bpl,/NO_COPY)
-           ;;if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
            self->Enable
         endif else self->Reset,/DISABLE,/NO_REDRAW ;cube mode
         ;; Cuberec will redraw for us.
@@ -139,8 +160,8 @@ end
 pro CubeBadPix::MarkStatic,ind,ALL=all
   ;; We leave bit 8 of BMASK off, since it's just all the areas
   ;; outside the slit
-  fatal_mask=28672U             ;bits 12 13 14
-  ok_mask=36607U                ; all others beside bit 8
+  fatal_mask=28672U             ; bits 12 13 14
+  ok_mask=36607U                ; all others (except bit 8, off-flat)
   
   if keyword_set(all) then begin 
      if ptr_valid(self.bmask) then begin 
@@ -168,28 +189,31 @@ pro CubeBadPix::MarkStatic,ind,ALL=all
         if pcnt gt 0 then pind=ind[pind]
      endif else pcnt=0
   endif else self->Error,'Must pass index, or display All'
-
-  if self.showing eq 0 then begin ; draw non-fatal marks
+  
+  ;; Draw non-fatal bmask marks: red diamonds
+  if self.showing eq 0 then begin 
      for i=0,bcnt-1 do begin 
         pt=self.oDraw->Convert(bind[i],/DEVICE,/SHOWING)
         if pt[0] eq -1 then continue
-        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=4, $
+        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[0],PSYM=4, $
               SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
      endfor 
   endif 
+  ;; Draw pmask marks: blue +'s
   if self.showing le 1 then begin 
      for i=0,pcnt-1 do begin    ;draw permanent marks
         pt=self.oDraw->Convert(pind[i],/DEVICE,/SHOWING)
         if pt[0] eq -1 then continue
-        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[2],PSYM=1, $
+        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=1, $
               SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
      endfor 
   endif 
+  ;; Draw fatal bmask marks: red X's
   if self.showing le 2 then begin 
      for i=0,fbcnt-1 do begin   ;draw fatal marks
         pt=self.oDraw->Convert(fbind[i],/DEVICE,/SHOWING)
         if pt[0] eq -1 then continue
-        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[1],PSYM=7, $
+        plots,pt[0],pt[1],/DEVICE,COLOR=self.color[0],PSYM=7, $
               SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
      endfor
   endif 
@@ -208,22 +232,30 @@ end
 ;  MarkAll - Mark all bad pixels
 ;=============================================================================
 pro CubeBadPix::MarkAll
-  if ~ptr_valid(self.bp_list) then return
-  for i=0,n_elements(*self.bp_list)-1 do self->DrawMark,(*self.bp_list)[i]
+  self.cube->GetProperty,GLOBAL_BAD_PIXEL_LIST=bpl,/POINTER
+  if ptr_valid(bpl) then $
+     for i=0,n_elements(*bpl)-1 do self->DrawMark,(*bpl)[i]
+  if ptr_valid(self.rec_set) then begin 
+     if n_elements(*self.rec_set) gt 1 then return
+     self.cube->GetProperty,BAD_PIXEL_LIST=rbpl,RECORD_SET=(*self.rec_set)[0],$
+                            /POINTER
+     if n_elements(rbpl) gt 0 && ptr_valid(rbpl) then $
+        for i=0,n_elements(*rbpl)-1 do self->DrawMark,(*rbpl)[i],/SINGLE_REC
+  endif 
 end
 
 ;=============================================================================
 ;  DrawMark - Mark or erase a single index
 ;=============================================================================
-pro CubeBadPix::DrawMark,ind,ERASE=erase
+pro CubeBadPix::DrawMark,ind,ERASE=erase,SINGLE_REC=sr
   pt=self.oDraw->Convert(ind,/DEVICE,/SHOWING)
   if pt[0] eq -1 then return
   if keyword_set(erase) then begin 
      self.oDraw->Erase,pt-self.zoom/2,[self.zoom,self.zoom]+2
      ;; put the static mark back if necessary
-     if self.showing ne 2 then self->MarkStatic,ind       
+     if self.showing lt 3 then self->MarkStatic,ind       
   endif else $
-     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[0],PSYM=7, $
+     plots,pt[0],pt[1],/DEVICE,COLOR=self.color[keyword_set(sr)?3:2],PSYM=7, $
            SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
 end
 
@@ -231,7 +263,7 @@ end
 ;  EnsureCube - Make sure the cube we have is still valid
 ;=============================================================================
 pro CubeBadPix::EnsureCube
-  if NOT obj_valid(self.cube) then begin 
+  if ~obj_valid(self.cube) then begin 
      self->Off
      self->Error,'Cube no longer valid.'
   endif 
@@ -248,15 +280,7 @@ pro CubeBadPix::Start
      self.color=!D.TABLE_SIZE-1
      return
   endif 
-  self.color=col->GetColor(['cyan','red','blue','magenta'])
-end
-
-;=============================================================================
-;  Cleanup
-;=============================================================================
-pro CubeBadPix::Cleanup
-  ptr_free,self.bp_list;,self.non_finite ;masks are not ours to free
-  self->tvPlug::Cleanup
+  self.color=col->GetColor(['red','blue','cyan','green'])
 end
 
 ;=============================================================================
@@ -277,9 +301,12 @@ pro CubeBadPix__define
       cube:obj_new(), $         ;the cube project we're servicing
       color:intarr(4), $        ;the three colors
       zoom:1.0, $               ;the zoom factor
-      bp_list:ptr_new(), $      ;the bad pixel list
+      last_pt:0L, $             ;last point
+      press:0b, $               ;which was pressed
+      setting:0b, $             ;are we setting or clearing multiple pixels?
       bmask:ptr_new(), $        ;the per-BCD mask plane
       pmask:ptr_new(), $        ;the static mask plane
+      rec_set:ptr_new(), $      ;which records we're viewing (from cuberec)
 ;      non_finite:ptr_new(), $   ;where it's non-finite
       showing:0, $              ;showing 0)all 1) all but non-fatal
                                 ;        2)only fatal 3) only user
