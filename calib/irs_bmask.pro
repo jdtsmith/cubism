@@ -8,12 +8,13 @@ pro irs_bmask,mask,PMASK=pm,SATURATED=sat,NO_FLAT=nf,NO_PLANES=np, $
   nf=flags[8] ne 0b             ;No flat
   op=flags[12] ne 0b            ;One plane
   np=flags[13] ne 0b            ;No planes
-
+  rh=flags[3] ne 0b             ;Radiation Hit
+  
   if arg_present(cs) then begin 
-     cs=(pm?'*':'.')+(sat?'S':'.')+(nf?'F':'.')+ $
+     cs=(pm?'*':'.')+(sat?'S':'.')+(nf?'F':'.')+(rh?'R':'.')+ $
         (op?'1':(np?'0':'.'))
-     if (mask AND 35583U) gt 0 then begin 
-        flags[[14,10,8,13,12]]=0b
+     if (mask AND 35575U) gt 0 then begin 
+        flags[[14,10,8,13,12,3]]=0b
         cs+="["+strjoin(strtrim(where(flags),2),",")+"]"
      endif 
   endif
