@@ -63,8 +63,8 @@
 ;    Mapping Mode data sets (see
 ;    http://sirtf.caltech.edu/SSC/irs/aotintro.html).  In addition, it
 ;    can perform various manipulations on the resulting cubes.  It
-;    exists both as a GUI interface, and a script-compatible back-end
-;    to the cube construction and extraction algorithms.
+;    exists both as a GUI interface, and a scriptable back-end to the
+;    cube construction and spectral extraction algorithms.
 ;
 ; INHERITANCE TREE:
 ;
@@ -79,7 +79,7 @@
 ;    
 ; MODIFICATION HISTORY:
 ;
-;    2003-12-05 (J.D. Smith): Position based-offsets and realisted
+;    2003-12-05 (J.D. Smith): Position based-offsets and realistic
 ;      header parsing.
 ;
 ;    2002-12-06 (J.D. Smith): Communication with CubeView, per-BCD
@@ -128,11 +128,6 @@ end
 ;=============================================================================
 pro CubeProj::ShowEvent, ev
   if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_BASE' then begin ;size
-;     diff=ev.Y-(*self.wInfo).original_height[0]
-;     line_diff=(diff lt 0?-1:1)*fix(abs(diff/(*self.wInfo).list_row))
-;     new_lines=2>((*self.wInfo).original_height[1]+line_diff)
-;     if new_lines eq (*self.wInfo).lines then return
-;     (*self.wInfo).lines=new_lines
      widget_control, (*self.wInfo).SList, $
                      SCR_YSIZE=ev.Y+(*self.wInfo).list_size_diff
      return
@@ -1234,9 +1229,10 @@ end
 ;  GetProperty
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
-                           ERROR=err, PR_SIZE=prz, CALIB=calib,MODULE=module, $
-                           APERTURE=ap,PROJECT_NAME=pn,DR=dr,TLB_OFFSET=tboff,$
-                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz,VERSION=version
+                           ERROR=err, PR_SIZE=prz, PR_WIDTH=prw, CALIB=calib, $
+                           MODULE=module, APERTURE=ap,PROJECT_NAME=pn,DR=dr, $
+                           TLB_OFFSET=tboff,TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
+                           VERSION=version,ASTROMETRY=astr
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -1246,6 +1242,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   if arg_present(err) then $
      if ptr_valid(self.ERR) then err=*self.ERR
   if arg_present(prz) then prz=self.PR_SIZE
+  if arg_present(prw) then prw=self.PR_SIZE[1]
   if arg_present(calib) then begin 
      self->LoadCalib            ;ensure it's loaded
      calib=self.cal
@@ -1281,6 +1278,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
         bcdsz=size(*(*self.DR)[0].BCD,/DIMENSIONS)
   endif 
   if arg_present(version) then version=self.version
+  if arg_present(astr) then astr=self->CubeAstrometryRecord()
 end
 
 ;=============================================================================
@@ -1619,7 +1617,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
   
   ords=self->BuildOrders()
   nap=n_elements(*self.APERTURE) 
-  
+  RADEG = 180.0d/!DPI           ; preserve double
   ;;Feedback plots
   if self.feedback then begin 
      aspect=float(self.CUBE_SIZE[0])/self.CUBE_SIZE[1] ;x=y*aspect
@@ -1632,7 +1630,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      endif else begin 
         ysize=800
         xsize=ysize*aspect
-     endelse 
+     endelse
      xsize=xsize+30 & ysize=ysize+19
      
      tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b],!D.TABLE_SIZE-5
@@ -1658,28 +1656,16 @@ pro CubeProj::BuildAccount,_EXTRA=e
   endif 
   ;; End debugging plots
   
-  ;; Time saver: If the cube size was changed, we might need to shift
-  ;; existing accounts by one or more pixels ... only relevant with
-  ;; POSITION-based (not GRID-based) cube layout.  E.g. making a cube
-  ;; with overlapping maps taken at different epochs.
+  ;; XXX Possible Time saver: If the cube size was changed, we might
+  ;; need to shift existing accounts by one or more pixels ... only
+  ;; relevant with POSITION-based (not GRID-based) cube layout.
+  ;; E.g. making a cube with overlapping maps taken at different
+  ;; epochs.
   
   ;; if self.ACCOUNTS_VALID eq 2b then begin 
   ;;    new=where(NOT ptr_valid((*self.DR).ACCOUNT)) ;newly added BCD's
   
-  
-  ;; For shifting each sample based on the actual apertures chosen, to
-  ;; conserve space on the sky grid (XXX vestigial for pos-based
-  ;; offsets).
-;   mlow=1. & mhigh=0.
-;   for ap=0,n_elements(*self.APERTURE)-1 do begin 
-;      mlow=mlow<min((*self.APERTURE)[ap].low)
-;      mhigh=mhigh>max((*self.APERTURE)[ap].high)
-;   endfor
-;   if mlow+mhigh ne 1. then  $
-;      ap_offset=(.5-.5*(mlow+mhigh))*self.PR_SIZE[0]/(mhigh-mlow) $
-;   else ap_offset=0.
-  
-  rot_pa=self->RotFlipMatrix()
+  astr=self->CubeAstrometryRecord()
   exp_off=-1
   for i=0L,n_elements(*self.DR)-1 do begin 
      ;; skip disabled records unconditionally
@@ -1706,11 +1692,14 @@ pro CubeProj::BuildAccount,_EXTRA=e
 ;      basic_offset=[((*self.DR)[i].ROW-1)*stepsz[0], $
 ;                    self.cube_size[1]-((*self.DR)[i].COLUMN-1)*stepsz[1]-1] + $
 ;                   self.PR_SIZE/2.
-     offset=float(self.CUBE_SIZE[0:1])/2 + $
-            rot_pa ## ((*self.DR)[i].RQST_POS  - self.POSITION)/ $
-            self.PLATE_SCALE
+     ad2xy,(*self.DR)[i].RQST_POS[0],(*self.DR)[i].RQST_POS[1],astr,x,y
+     offset=[x,y]+.5
+     ;offset=float(self.CUBE_SIZE[0:1])/2 + $
+     ;       rot_pa ## ((*self.DR)[i].RQST_POS  - self.POSITION)/ $
+     ;       self.PLATE_SCALE
      
-     ;; (Small) difference between PA of this BCD and the mean map PA
+     ;; (Probably small) difference between PA of this BCD and the
+     ;; mean map PA
      delta_PA=(*self.DR)[i].PA_RQST-self.PA
      
      for ord=0,n_elements(ords)-1 do begin
@@ -1733,19 +1722,27 @@ pro CubeProj::BuildAccount,_EXTRA=e
            ;; direction
            ;;
            ;; XXX pa_delta should remain, yes?  I.e. we should take
-           ;; out "false" rotation via optical distortion (slit
+           ;; out the "false" rotation of optical distortion (slit
            ;; rotation), but *put in* the correct delta(PA) between
            ;; BCD and PA_0 as chosen for the cube.  Ensure this works
            ;; correctly, i.e. in the correct sense.
+           
+           ;; Another option: de-rotate the collection of clipped
+           ;; polygons to take out optical slit rotation, setup a
+           ;; slit-centered gnomic coordinate system, convert each
+           ;; vertex of each polygon into ra,dec, and then project
+           ;; this ra,dec onto the gnomic cube coordinate system.
+           ;; Test for perceivable difference first?
+           
            angle=-prs[j].angle+delta_PA
            if angle ne 0.0D then begin 
-              ct=cos(angle/!radeg) & st=sin(angle/!radeg)
+              ct=cos(angle/RADEG) & st=sin(angle/RADEG)
               rot=transpose([[ ct,-st], $
                              [ st, ct]])
            endif
            ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
-              bcdpixel=(*prs[j].PIXELS)[k] 
+              bcdpixel=(*prs[j].PIXELS)[k]
               ;; associated polygon (2xn list) this pixel got clipped to
               ;; by the PR on the detector grid
               poly=*(*prs[j].POLYGONS)[k]
@@ -1940,30 +1937,63 @@ end
 function CubeProj::RotFlipMatrix
   ;; CW rotation + flip of coordinates (for left-handed sky map)
   ;; orthogonal,symmetric rotation: rot^-1=rot
-  c=cos((90.0D + self.PA)/!RADEG) & s=sin((90.0D + self.PA)/!RADEG)
+  RADEG = 180.0d/!DPI           ; preserve double
+  c=cos((90.0D + self.PA)/RADEG) & s=sin((90.0D + self.PA)/RADEG)
   return,[[-c, s], $
           [ s, c]]
 end
 
 ;=============================================================================
-;  LayoutBCDs - Determine the BCD layout on the sky grid based on
-;               positions and PA's.
+;  CubeAstrometryRecord - Compute an astrometry structure for use with
+;                         the NASA WCS routines.
+;                         N.B.:
+;
+;                         Pixel indexing conventions:
+;                          FITS HEADERS/FORTRAN : 1st centered on [1.0,1.0]
+;                          NASALIB WCS PROGRAMS : 1st centered on [0.0,0.0]
+;                          CUBISM aka God-Given : 1st centered on [0.5,0.5]
+;
+;                         CROTA vs PA:
+;                          FITS standard (CROTA,CD,PC) measure CCW
+;                            from +Y to N
+;                          SIRTF PA's measure CCW from N to SIRTF +Z
+;                            (or slit +w)
+;                          +w and +x correspond, EXCEPT FOR LH, where +w=-x
+;=============================================================================
+function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
+  RADEG = 180.0d/!DPI           ; preserve double
+  c=cos((270.0D - self.PA)/RADEG) & s=sin((270.D - self.PA)/RADEG)
+  cd=self.PLATE_SCALE*[[-c,-s],[-s,c]]
+  if keyword_set(zo) then crpix=[0.5,0.5] else $
+     crpix=self.CUBE_SIZE[0:1]/2.+.5 ;[1,1] => pixel center FITS silliness
+  return,{cd: cd,cdelt:[1.D,1.D],crpix:crpix,CRVAL:self.POSITION, $
+          ctype:['RA---TAN','DEC--TAN']}
+end
+
+;=============================================================================
+;  LayoutBCDs - Define the cube astrometry and determine the BCD
+;               layout on the sky grid based on positions and PA's.
 ;=============================================================================
 pro CubeProj::LayoutBCDs
+  self->LoadCalib
+  
   ;; Find the PA of the most populated AOR
   aorids=(*self.DR).AORKEY
   uniqids=aorids[uniq(aorids,sort(aorids))]
   cnt=0
+  RADEG = 180.0d/!DPI           ; preserve double
   
   for i=0,n_elements(uniqids)-1 do begin 
      wh=where(aorids eq uniqids[i],thiscnt)
-     if thiscnt gt cnt then begin 
+     if thiscnt gt cnt then begin
         cnt=thiscnt
         use=wh
      endif
-  endfor 
+  endfor
   self.PA=mean((*self.DR)[use].PA_RQST) ;match our PA to the most numerous
-  rot_pa=self->RotFlipMatrix()
+  ;; Approximate cube center (pos average), for now
+  self.POSITION=total((*self.DR).RQST_POS,2)/self->N_Records()
+  cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
   
   ords=self->BuildOrders()
   nap=n_elements(*self.APERTURE)
@@ -1973,76 +2003,108 @@ pro CubeProj::LayoutBCDs
      left=min(ap.low)           ;The bounding aperture for this order
      right=max(ap.high)
      ;; Celestial (degree) left/right offsets from slit center
-     off=([left,right]-.5)*self.PR_SIZE[0]*self.PLATE_SCALE 
+     off=([left,right]-.5)*self.PR_SIZE[0]
      if n_elements(final_off) eq 0 then final_off=off else begin 
         final_off[0]=final_off[0]<off[0] ;Bounding aperture assumes same 
         final_off[1]=final_off[1]>off[1] ;slit length for all build orders
      endelse 
   endfor 
   
-  skyc=dblarr(2,n_elements(*self.DR))
-  prs=dblarr(8,n_elements(*self.DR))
+;  skyc=dblarr(2,n_elements(*self.DR))
+;  prsAD=(prs=dblarr(8,n_elements(*self.DR)))
+  
   ;; Rotate and offset final bounding polygon for each DR.
-  prw=self.PR_SIZE[1]*self.PLATE_SCALE ;pr width
+  pr_half=self.PR_SIZE[1]/2 ;pr width
+  pr_rect=[[final_off[0],-pr_half], $
+           [final_off[0], pr_half], $
+           [final_off[1], pr_half], $
+           [final_off[1],-pr_half]]-.5 ;nasalib standard: 0,0: center of pix
+
   for i=0,n_elements(*self.DR)-1 do begin 
-     pr_rect=[[final_off[0],-prw/2], $
-              [final_off[0], prw/2], $
-              [final_off[1], prw/2], $
-              [final_off[1],-prw/2]]
+     c_pa=cos((270.0D - (*self.DR)[i].PA_RQST)/RADEG) 
+     s_pa=sin((270.0D - (*self.DR)[i].PA_RQST)/RADEG)
+     cd_pa=self.PLATE_SCALE*[[-c_pa,-s_pa],[-s_pa,c_pa]]
+     
+     ;; Compute the RA/DEC of the 4 corners.
+     astr={cd:cd_pa,cdelt:[1.D,1.D],crpix:[0.5,0.5], $
+           CRVAL:(*self.DR)[i].RQST_POS,$
+           ctype:['RA---TAN','DEC--TAN']}
+     xy2ad,pr_rect[0,*],pr_rect[1,*],astr,a_rect,d_rect
+;     prs[*,i]=[a_rect,d_rect]
+     
+     ;; Compute corner positions in cube frame
+     ad2xy,a_rect,d_rect,cubeastr,x,y ;x,y in 0,0 pixel-centered
+     x+=0.5 & y+=0.5            ;back to normal pixel convention (.5-centered)
+;     prs[*,i]=[x,y]
+     
      ;; Account for any differential rotation of this DR to sky coordinates
-     delta_PA=(*self.DR)[i].PA_RQST-self.PA
-     if delta_PA ne 0.0D then begin 
-        ct=cos(delta_PA/!radeg) & st=sin(delta_PA/!radeg)
-        ;; positive delta_PA ==> CCW rotation on sky grid
-        rot=[[ ct, -st], $
-             [ st,  ct]]
-        pr_rect=transpose(rot ## transpose(pr_rect))
-     endif
+;      delta_PA=(*self.DR)[i].PA_RQST-self.PA
+;      if delta_PA ne 0.0D then begin 
+;         ct=cos(delta_PA/RADEG) & st=sin(delta_PA/RADEG)
+;         ;; positive delta_PA ==> CCW rotation on sky grid
+;         rot=[[ ct, -st], $
+;              [ st,  ct]]
+;         pr_rect=transpose(rot ## transpose(pr_rect))
+;      endif
      
      ;; Rotate celestial coordinates into this left-handed <+w> -> +x system
      ;; If PA=0, <+w>=+x=North, <+v>=+y=East
-     sky_coords=reform(rot_pa ## (*self.DR)[i].RQST_POS)
-     skyc[*,i]=sky_coords
+;     sky_coords=reform(rot_pa ## (*self.DR)[i].RQST_POS)
+;     skyc[*,i]=[x,y]            ;sky_coords
      
-     pr_rect=pr_rect+rebin(sky_coords,2,4,/SAMPLE)
-     prs[*,i]=pr_rect
-     if n_elements(pos_min) eq 0 then pos_min=min(pr_rect,DIMENSION=2) else $
-        pos_min=pos_min<min(pr_rect,DIMENSION=2)
-     if n_elements(pos_max) eq 0 then pos_max=max(pr_rect,DIMENSION=2) else $
-        pos_max=pos_max>max(pr_rect,DIMENSION=2)
+;     pr_rect=pr_rect+rebin(sky_coords,2,4,/SAMPLE)
+     
+     ;; Accumulate pixel bounding rectangle
+     if n_elements(x_min) ne 0 then begin 
+        x_min=x_min<min(x) & y_min=y_min<min(y)
+     endif else begin 
+        x_min=min(x) & y_min=min(y)
+     endelse 
+     if n_elements(x_max) ne 0 then begin 
+        x_max=x_max>max(x) & y_max=y_max>max(y)
+     endif else begin 
+        x_max=max(x) & y_max=max(y)
+     endelse 
   endfor
   
-  
   ;; Establish the dimensions of the cube in the sky coordinate system
-  exact_size=(pos_max-pos_min)/self.PLATE_SCALE
+  exact_size=[x_max-x_min,y_max-y_min]
   new_size=ceil(exact_size)
   if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
      self.CUBE_SIZE[0:1]=new_size
      self.ACCOUNTS_VALID=2b
   endif
+
+  ;; Find the cube center in the sky coordinate system
+  xy2ad,x_min+float(new_size[0])/2.-.5,y_min+float(new_size[1])/2.-.5, $
+        cubeastr,a,d
+  self.POSITION=[a,d]
     
 ;  skyc=3600.D*(skyc-rebin(total(skyc,2)/(n_elements(skyc)/2), $
 ;                          size(skyc,/DIMENSIONS)))
 ;  plot,skyc[0,*],skyc[1,*],PSYM=4
     
-  ;; Find the center in celestial coordinate system, left align it
-  cen_xy=pos_min+float(new_size)/2.*self.PLATE_SCALE
-  self.POSITION=rot_pa ## cen_xy ;rot_pa^-1=rot_pa
+
+;  cen_xy=pos_min+float(new_size)/2.*self.PLATE_SCALE
+;  self.POSITION=rot_pa ## cen_xy ;rot_pa^-1=rot_pa
   
   ;; Debug stuff!!!
+;   pos_max=[x_max,y_max] & pos_min=[x_min,y_min]  
+;   ;;pos_max=[max(prs[indgen(4)*2,*],MIN=minx),max(prs[indgen(4)*2+1,*],MIN=miny)]
+;   ;;pos_min=[minx,miny]
 ;   del=(pos_max-pos_min)
 ;   plot,[0],/NODATA, /XSTYLE, /YSTYLE, $
 ;        XRANGE=[pos_min[0]-.1*del[0],pos_max[0]+.1*del[0]], $
 ;        YRANGE=[pos_min[1]-.1*del[1],pos_max[1]+.1*del[1]]
   
 ;   for i=0,new_size[0] do $
-;      plots,pos_min[0]+i*self.PLATE_SCALE, $
-;            [pos_min[1],pos_min[1]+new_size[1]*self.PLATE_SCALE], $
+;      plots,pos_min[0]+i, $
+;            [pos_min[1],pos_min[1]+new_size[1]], $
 ;            COLOR=!D.TABLE_SIZE/2
   
 ;   for i=0,new_size[1] do $
-;      plots,[pos_min[0],pos_min[0]+new_size[0]*self.PLATE_SCALE], $
-;            pos_min[1]+i*self.PLATE_SCALE, $
+;      plots,[pos_min[0],pos_min[0]+new_size[0]], $
+;            pos_min[1]+i, $
 ;            COLOR=!D.TABLE_SIZE/2
   
 ;   for i=0,n_elements(prs)/8-1 do begin 
@@ -2632,10 +2694,22 @@ end
 ;  Init 
 ;=============================================================================
 function CubeProj::Init, name, _EXTRA=e
-  if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up (add msglist)
+  if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up
+  if self->IDLitComponent::Init() ne 1 then return,0
+
   self.Changed=0b               ;coming into existence doesn't count
   if n_elements(e) ne 0 then self->SetProperty,_EXTRA=e
   self->ObjReport::SetProperty,TITLE_BASE='CUBISM Project'
+  
+  ;; Properties:
+;   self->SetPropertyAttribute,['Name','Description'],/HIDE
+;   self->RegisterProperty,'BUILD_ORDER',NAME='Cube Build Order(s)',ENUMLIST=''
+;   self->RegisterProperty,'REQUESTED_POSITIONS',NAME='Build Positions', $
+;                          ENUMLIST=['Requested','Reconstructed']
+;   self->RegisterProperty,'FEEDBACK',NAME='Show Build Feedback',/BOOLEAN
+;   self->RegisterProperty,'PR_WIDTH',NAME='Slit PR Width (pix)',/FLOAT, $
+;                          VALID_RANGE=[1.,3.]
+  
   return,1
 end
 
@@ -2644,6 +2718,7 @@ end
 ;=============================================================================
 pro CubeProj__define
   c={CubeProj, $
+     INHERITS IDLitComponent, $ ;Use Property stuff
      INHERITS ObjMsg, $         ;make it an object messanger
      INHERITS ObjReport, $      ;for error, etc. reporting
      ProjectName:'', $          ;the name of the current project 
@@ -2744,7 +2819,6 @@ pro CubeProj__define
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4)}   ;SW button requires valid cube created.
 
-  ;; XXX WCS STUFF SHOULD GO TOO
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),BCD:ptr_new(),ERROR:ptr_new()}
