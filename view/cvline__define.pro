@@ -150,7 +150,7 @@ end
 function cvLine::PRString, lambda,order
   if order eq 0 then $
      return,string(FORMAT='(%"%6sum (ord %2s)")','___','__')  else $
-     return,string(FORMAT='(%"%6.3fum (ord %d)")',lambda,order)
+     return,string(FORMAT='(%"%6.3fum (ord %2d)")',lambda,order)
 end
 
 ;=============================================================================
