@@ -64,6 +64,7 @@ pro CubeRec::On
   if self.mode gt 1 then return ;don't enable it for Rec mode
   if self->On() then begin      ;if turned on *again* .. reset
      self->Reset                ;reset to "no box drawn"
+     return
   end
   self->tvPlug::On
   self.Box->On
@@ -82,7 +83,6 @@ pro CubeRec::Off,_EXTRA=e
 end
 
 pro CubeRec::Reset,_EXTRA=e
-  self->tvPlug::Off
   self.Box->Reset
   self->Off,_EXTRA=e
 end
@@ -230,6 +230,8 @@ end
 ;  Extract -  Extract a spectrum from box
 ;=============================================================================
 pro CubeRec::Extract
+  if NOT obj_valid(self.cube) then $
+     self->Error,'Cube no longer valid (perhaps it was destroyed?).'
   self.Box->Getlrtb,l,r,t,b
   spec=self.cube->Extract([l,b],[r,t])
   info=string(FORMAT='(%"Extracted from %s, [%d,%d]->[%d,%d]")', $
