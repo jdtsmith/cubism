@@ -169,10 +169,13 @@ pro tvHist::Histo,im
      
      1: 
      2: begin                   ;99%,95% linear
-        if ~self.all_finite then begin 
+        if self.non_finite then begin 
            wh=where(finite,nt)
            s=take[wh[sort(take[wh])]]
-        endif else s=take[sort(take)]
+        endif else begin 
+           s=take[sort(take)]
+           nt=n_elements(take) 
+        endelse 
         mx=s[((nt-1)*([99,95])[self.scale_mode-1]/100)<(nt-2)]
         mn=s[((nt-1)*([1,5])[self.scale_mode-1]/100)>1]
         if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
