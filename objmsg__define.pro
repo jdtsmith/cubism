@@ -103,6 +103,25 @@
 ;          MSGLIST: The objects internal message recipient list,
 ;             unmodified.
 ;
+;    GetRecord:
+;       
+;       DESCRIPTION:
+;
+;	   Return a record from the message recipient list.
+;  
+;       CALLING SEQUENCE:
+;
+;          obj->GetRecord,obj
+;
+;       INPUT PARAMETERS:
+;
+;          obj: Which object you'd like the record for.
+;
+;       OUTPUT PARAMETERS:
+;
+;          The message list element corresponding to that object, if
+;             it exists, or -1 if not.
+;
 ;    Message: (override)
 ;       
 ;       DESCRIPTION:
@@ -257,6 +276,9 @@
 ;
 ; MODIFICATION HISTORY:
 ;    $Log$
+;    Revision 1.5  2001/08/02 17:34:40  jdsmith
+;    	Added GetRecord.
+;
 ;    Revision 1.4  2001/07/31 20:30:26  jdsmith
 ;    	Minor Doc Change
 ;
@@ -333,6 +355,16 @@ end
 ;=============================================================================
 pro ObjMsg::GetProperty,MsgList=msglist
    if arg_present(msglist) then msglist=self.MsgList 
+end
+
+;=============================================================================
+;      GetRecord - Return Message Recipient record for obj, if exists.
+;      Otherwise return -1.
+;=============================================================================
+pro ObjMsg::GetRecord,obj
+  wh=where(self->GetMsgObjs() eq obj,cnt)
+  if cnt eq 0 then return,-1
+  return,(*self.MsgList)[wh[0]]
 end
 
 ;=============================================================================
