@@ -23,7 +23,7 @@ pro CubeRec::Message, msg
         ptr_free,self.stack
         if ptr_valid(msg.background) then begin
            type=size(*msg.background,/TYPE)
-           if type eq 4 OR type eq 5 then begin ;floating pt bg vals
+           if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
               self.stack=ptr_new(self.cube->Stack(*msg.foreground, $
                                                   BG_VALS=*msg.background))
            endif else $
@@ -45,8 +45,13 @@ pro CubeRec::Message, msg
         widget_control, self.wInfoLine,set_value='Cube: '+msg.INFO
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
         self.cube=msg.CUBE
+        if ptr_valid(self.wavelength) then $
+           cur_wav=(*self.wavelength)[self.cur_wav]
         self.wavelength=msg.WAVELENGTH
-        self.cur_wav=value_locate(*self.wavelength,self.cur_wav)>0
+        if n_elements(cur_wav) gt 0 then begin 
+           mn=min(abs(*self.wavelength-cur_wav),pos)
+           self.cur_wav=pos
+        endif
         widget_control, self.wLambda,SET_VALUE= $
                         string(*msg.wavelength,FORMAT='(F7.4)')
         ;; we don't want BCD mode, but either cube mode will do
@@ -104,8 +109,11 @@ function CubeRec::Description
   return,'Extract Spectra and Stack Cubes'
 end
 
-function CubeRec::TestWidget
-  return,widget_info(self.wBase[0],/PARENT)
+;=============================================================================
+;  ReportWidget - Where to position our error and other messages
+;=============================================================================
+function CubeRec::ReportWidget
+  return,self.wBase[0]
 end
 ;;*************************End OverRiding methods******************************
 
@@ -299,7 +307,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,_EXTRA=e
                             UVALUE={self:self,method:'StackEvent'}, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
   self.wStackInfo=widget_label(self.wBase[1],VALUE=string(FORMAT='(A,T40)',''))
-  self.wFull=widget_button(self.wBase[1],value='Full Cube')
+  ;self.wFull=widget_button(self.wBase[1],value='Full Cube')
   
   ;; Populate the third base: for the BCD's
   self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
@@ -315,7 +323,6 @@ end
 pro CubeRec__define
   st={CubeRec, $
       INHERITS tvPlug,$         ;it's a tvDraw plugin
-      INHERITS objReport, $     ;for reporting messages
       cube:obj_new(), $         ;the cube project we're servicing
       mode:0, $                 ;full (=0),stacked (=1), bcd (=2)
       wavelength:ptr_new(), $   ;the wavelength planes of our cube
