@@ -1,5 +1,102 @@
-
-;; Polyfillaa, using either built-in or auto-compiled code.
+;+
+; NAME:
+;
+;    POLYFILLAA
+;
+; DESCRIPTION:
+;
+;    Finds the fractional area of all pixels at least partially inside
+;    a specified polygon.
+;
+; CATEGORY:
+;
+;    GRAPHICS, REGION OF INTEREST
+;
+; CALLING SEQUENCE:
+;
+;    inds=polyfillaa(px,py,sx,sy,[AREAS=,POLYGONS=,/NO_COMPILED,/RECOMPILE])
+;
+; INPUT PARAMETERS:
+;
+;    px,py: The vectors containing the x and y subscripts of the
+;       polygon.  May be in fractional units.
+;
+;    sx,sy: The size of the pixel grid on which the polygon is
+;       superposed.  
+;
+; INPUT KEYWORD PARAMETERS:
+;
+;    NO_COMPILED: If set, the IDL-native method will be used to
+;       compute the clipped polygons, regardless of whether
+;       compilation of the external C version succeeded.  Otherwise,
+;       POLYFILLAA will attempt to compile a C version of the
+;       Sutherland Hodgemand algorithm found in the file "polyclip.c".
+;
+;    RECOMPILE: If set, recompile the C version, even if it has
+;      already been compiled.  Note: if compilation has already
+;      succeeded once, to actually link to the recompiled version you
+;      must unload the old version.
+;
+; OUTPUT KEYWORD PARAMETERS:
+;
+;    AREAS: For each pixel index returned, the fractional area of that
+;       pixel contained inside the polygon, between 0 and 1.
+;
+;    POLYGONS: A list of pointers to 2xn arrays containing the polygon
+;       vertex information (as columns x,y).
+;
+; OUTPUTS:
+;
+;    inds: The indices of all pixels at least partially inside the
+;       polygon.
+;
+; PROCEDURES:
+;
+;    polyclip
+;
+; NOTES:
+;
+;    POLYFILLAA attempts to auto-compile a C-language version of the
+;    clipping algorithm, found in polyclip.c.  In order for this
+;    compilation to succeed, a compiler which IDL recognizes must be
+;    installed.  See MAKE_DLL and the !MAKE_DLL system variable for
+;    more information.
+;
+; EXAMPLE:
+;
+;    inds=polyfillaa([1.2,3,5.3,3.2],[1.3,6.4,4.3,2.2],10,10,AREAS=areas)
+;
+; MODIFICATION HISTORY:
+;
+;       2003-01-03 (J.D. Smith): Substantial rewrite to use external C
+;          code (if possible) for a significant performance
+;          improvement.
+;
+;       2001-09-26 (J.D. Smith): Written.  Initial documentation.
+;-
+;   $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2001,2002,2003 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;  
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
+;
+;##############################################################################
 
 function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
                      RECOMPILE=rc
