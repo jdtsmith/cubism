@@ -37,19 +37,17 @@ pro CubeBadPix::Message, msg
         self->MarkStatic,/ALL
         self->MarkAll           ;put them back on
      end
-     
+          
      'CUBEREC_UPDATE': begin 
         if msg.BCD_MODE then begin ; We only work in BCD mode
            self.bmask=msg.BMASK
-           if self.cube ne msg.CUBE then begin ;; a new cube
-              self.cube=msg.CUBE
-              self.cube->GetProperty,PMASK=pm,/POINTER
-              self.cube->GetProperty,BAD_PIXEL_LIST=bpl
-              ptr_free,self.bp_list
-              if n_elements(bpl) gt 0 then self.bp_list=ptr_new(bpl,/NO_COPY)
-              self.pmask=pm
-              if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
-           endif 
+           self.cube=msg.CUBE
+           self.cube->GetProperty,PMASK=pm,/POINTER
+           self.pmask=pm
+           self.cube->GetProperty,BAD_PIXEL_LIST=bpl
+           ptr_free,self.bp_list
+           if n_elements(bpl) gt 0 then self.bp_list=ptr_new(bpl,/NO_COPY)
+           if self->On() then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
            self->Enable
         endif else self->Reset,/DISABLE ;cube mode
      end
