@@ -60,6 +60,7 @@ pro CubeViewSpec::Event,ev
                  widget_control, self.wDo, SET_VALUE=2
                  widget_control, self.wRType, SET_DROPLIST_SELECT=0,/SENSITIVE
               end
+              'U': self->SwitchMode,0
               'P': begin
                  if self.mode eq 0 then self->SwitchMode
                  widget_control, self.wDo, SET_VALUE=2
@@ -68,9 +69,8 @@ pro CubeViewSpec::Event,ev
               'R': self->Reset
               'L': if self.mode eq 0 then widget_control, self.wDo,SET_VALUE=2
               'D': self->Delete
-              'S': self->SwitchMode,0
+              'M': self->SwitchMode,1
               'F': self->Fit
-              'U': if self.mode eq 1 then self->SwitchMode
               'V': begin        ;value line
                  widget_control, self.wToggles, GET_VALUE=tog
                  tog[1]=1-tog[1]
@@ -87,10 +87,6 @@ pro CubeViewSpec::Event,ev
               end
               'Q': widget_control, ev.top, /DESTROY
               
-              ' ': begin        ;Region Define
-                 widget_control, self.wDo, SET_VALUE=2
-                 widget_control, self.wRType, SENSITIVE=1
-              end
               '	':  begin       ;Tab character, switch outlines...
                  if self.selected eq -1 then return
                  if NOT ptr_valid(self.reg[self.seltype]) then return
@@ -454,7 +450,7 @@ pro CubeViewSpec::UpdateParams
      string(FORMAT='(7A)',$
             string(FORMAT='(A13,":",F8.4)',$
                    "Avg. Cont",self.avgcont, $
-                   "Width",self.ew, $
+                   "Equiv. Width",self.ew, $
                    "Max Flux",self.max, $
                    "Max Wave",self.maxlam, $
                    "Median Flux",self.medpeak, $
@@ -494,25 +490,29 @@ pro CubeViewSpec::ShowFit
      endif 
   endfor
   
-  spfit=poly((*self.lam)[mn:mx],*self.fit)
-  oplot,(*self.lam)[mn:mx],spfit
+  lam=(*self.lam)[mn:mx]
+  lam=lam[sort(lam)]
+  spfit=poly(lam,*self.fit)
+  oplot,lam,spfit
   
   if NOT ptr_valid(self.reg[1]) then return
   ;; show the equivalent width.
-  plots, self.medlam-self.ew/2., $
-         [0,poly(self.medlam-self.ew/2.,*self.fit)],COLOR=self.colors_base+3
-  plots, self.medlam+self.ew/2., $
-         [0,poly(self.medlam+self.ew/2.,*self.fit)],COLOR=self.colors_base+3
-  plots, [self.medlam-self.ew/2.,self.medlam+self.ew/2.],[0.,0.], $
-         COLOR=self.colors_base+3
-;   low=value_locate((*self.lam)[mn:mx],self.medlam-self.ew/2.)
-;   high=value_locate((*self.lam)[mn:mx],self.medlam+self.ew/2.)
-;   if low ge high then return
-;   fillx=[self.medlam-self.ew/2.,(*self.lam)[mn+low:mn+high], $
-;          self.medlam+self.ew/2.]
-;   print,low,high
-;   filly=[0.,spfit[low:high],0.]
-;   polyfill,fillx,filly,/LINE_FILL
+  ew_left=self.medlam-self.ew/2.  & c_left= poly(ew_left,*self.fit)
+  ew_right=self.medlam+self.ew/2. & c_right=poly(ew_right,*self.fit)
+  plots,ew_left, [0,c_left], COLOR=self.colors_base+3
+  plots,ew_right,[0,c_right],COLOR=self.colors_base+3
+  plots,[ew_left,ew_right],[0.,0.],COLOR=self.colors_base+3
+  
+  low=value_locate(lam,ew_left)+1
+  high=value_locate(lam,ew_right)
+  if low gt high then begin 
+     fillx=[ew_left,ew_left,ew_right,ew_right]
+     filly=[0.,c_left,c_right,0.]
+  endif else begin 
+     fillx=[ew_left,ew_left,lam[low:high],ew_right,ew_right]
+     filly=[0.,c_left,spfit[low:high],c_right,0.]
+  endelse 
+  polyfill,fillx,filly,/LINE_FILL,ORIENTATION=45
 end
 
 ;=============================================================================
@@ -893,6 +893,7 @@ pro CubeViewSpec__define
   st={CubeViewSpec, $
       INHERITS OMArray, $       ;Helper class for ObjMsg
       INHERITS ObjMsg, $        ;We can send and receive messages
+      INHERITS ObjReport, $     ;For warning and errors
       ;; The spectrum/fit and regions
       lam:ptr_new(), $          ;The spectral data
       sp:ptr_new(), $
