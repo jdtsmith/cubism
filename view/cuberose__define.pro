@@ -14,7 +14,7 @@ pro CubeRose::Message, msg
         self.cube=msg.cube
         self.cube->GetProperty,ASTROMETRY=astr
         self.angle=atan(-astr.cd[1,0],-astr.cd[0,0])
-        if self->On() then self.oDraw->ReDraw,/SNAPSHOT
+        ;if self->On() then self.oDraw->ReDraw,/SNAPSHOT
      end
   endcase 
 end
