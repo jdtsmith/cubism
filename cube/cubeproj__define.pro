@@ -166,6 +166,7 @@ pro CubeProj::ShowEvent, ev
      'remove-bg-sp': begin 
         ptr_free,self.BG_SP
         self.BG_SP_FILE=''
+        self->UpdateButtons
      end 
      'loadcalib': self->LoadCalib,/SELECT
      'load-append-badpixels': self->LoadBadPixels,/APPEND
@@ -1801,6 +1802,7 @@ pro CubeProj::ReadBackgroundFromFile,file
   ptr_free,self.BG_SP
   self.BG_SP=ptr_new(transpose([[wav],[sp]]))
   self.BG_SP_FILE=file
+  self->UpdateButtons
 end
 
 ;=============================================================================
