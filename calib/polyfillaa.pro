@@ -56,11 +56,10 @@ function polyfillaa, x,y,sx,sy, AREAS=areas
   right=ceil(maxx)<(sx-1)
   bottom=floor(min(y,max=maxy))>0
   top=ceil(maxy)<(sy-1)
-  bb=[left,bottom,right,top]
   plist=[transpose(x),transpose(y)] ;the vertex list
   for j=bottom,top do begin 
      for i=left,right do begin
-        pc=polyclip(i,j,x,y,BOUNDING_BOX=bb)
+        pc=polyclip(i,j,x,y)
         if pc[0] ne -1 then begin
            px=reform(pc[0,*]) & py=reform(pc[1,*])
            a=abs(total(px*shift(py,-1) - py*shift(px,-1))/2.)

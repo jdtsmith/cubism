@@ -63,17 +63,12 @@ function clip_intersection,i,j,s,p,t
   endcase
 end
 
-function polyclip,i,j,px,py,BOUNDING_BOX=bb
+function polyclip,i,j,px,py
   ;; Sutherland-Hodgman's polygon-clipping algorithm for a square unit pixel
   ;;       A polygon side looks like:
   ;;                 s-------->p
   plist=[transpose(px),transpose(py)] ;the vertex list
   for ctype=0b,3b do begin      ;clip left, right, top, bottom
-     ;; First check the entire bounding box w.r.t the edge
-     if n_elements(bb) eq 4 then if $
-        clip_inside(i,j,bb[0:1],ctype) AND clip_inside(i,j,bb[2:3],ctype) $
-        then continue
-        
      np=(size(plist,/DIMENSIONS))[1]
      ;; start with the final->first vertex segment
      s=plist[*,np-1] & in_s=clip_inside(i,j,s,ctype) 
