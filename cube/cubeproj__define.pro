@@ -94,7 +94,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002,2003 J.D. Smith
+;  Copyright (C) 2002-2004 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -2640,14 +2640,15 @@ function CubeProj::Extract,low,high, EXPORT=exp, SAVE=sf, ASCII=ascii
            1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
   if keyword_set(exp) then self->ExportToMain, $
      SPECTRUM=transpose([[*self.WAVELENGTH],[sp]]) else $
-        if keyword_set(sf) then self->SaveSpectrum,sp,sf,ASCII=ascii
+        if keyword_set(sf) then self->SaveSpectrum,sp,sf,ASCII=ascii, $
+                                                   COORDS=[[low],[high]]
   return,sp
 end
 
 ;=============================================================================
 ;  SaveSpectrum - Save a Spectrum to FITS (the default) or ASCII
 ;=============================================================================
-pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii
+pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii,COORDS=coords
   fits=NOT keyword_set(ascii)
   if size(sf,/TYPE) ne 7 then begin 
      xf,sf,/SAVEFILE, /RECENT, $
@@ -2695,6 +2696,17 @@ pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii
      fxbfinish,unit
   endif else begin 
      openw,un,/get_lun,sf
+     printf,un,'# Written '+systime(0)
+     printf,un,'# Cube: '+self->ProjectName()
+     if n_elements(coords) gt 0 then begin 
+        delta=coords[*,1]-coords[*,0]+1
+        xy2ad,coords[0,*]+[-.5,.5],coords[1,*]+[-.5,.5], $
+              self->CubeAstrometryRecord(),ra,dec
+        printf,un,FORMAT='("# Extracted ",I0,"x",I0,' + $
+               '" [",A,",",A," to ",A,",",A,"]")', delta, $
+               radecstring(ra[0],/RA),radecstring(dec[0]), $
+               radecstring(ra[1],/RA),radecstring(dec[1])
+     endif 
      printf,un,FORMAT='(2G18.10)',transpose([[*self.WAVELENGTH],[sp]])
      free_lun,un
   endelse 
