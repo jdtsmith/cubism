@@ -245,36 +245,7 @@ pro CubeProj::ShowEvent, ev
         self->SetListSelect,/INVERT
         self->UpdateButtons
      end 
-        
-     'replace-string': $
-        begin 
-        if sel[0] eq -1 then return
-        f=(*self.DR)[sel].FILE
-        cnt=0
-        nf=n_elements(f) 
-        if nf gt 1 then begin 
-           lab='Replacing text of '+strtrim(nf,2)+' files:'
-           wh=where(total(byte(f) eq shift(byte(f),0,1),2) ne nf,cnt)
-           def=strmid(f[0],0,wh[0])
-           t=twoin(from,to,def,def,LABEL=lab, $
-                   TEXT1='Replace Substring (regexp):', $
-                   TEXT2='With:',PARENT_GROUP=self->TopBase(),/SCROLL, $
-                   TITLE='Replace File Substring',TEXT_LAB=f,YSIZE=nf<6)
-        endif else begin
-           t=twoin(from,to,f[0],f[0],TEXT1='Replace Substring (regexp):', $
-                   TEXT2='With:',PARENT_GROUP=self->TopBase(), $
-                   TITLE='Replace File Substring')
-        endelse 
-        if t then begin 
-           for i=0,n_sel-1 do begin
-              file=(*self.DR)[sel[i]].FILE
-              pos=stregex(file,from,length=len)
-              (*self.DR)[sel[i]].FILE= $
-                 strmid(file,0,pos)+to+strmid(file,pos+len)
-           endfor
-        endif
-     end 
-     
+             
      'filenames': begin 
         if sel[0] eq -1 then return
         if n_elements(sel) gt 1 then $
@@ -494,7 +465,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   
   wMustSel=widget_button(edit,VALUE='Replace File Substring...', $
-                         UVALUE='replace-string',/SEPARATOR)
+                         UVALUE='replacefilenamesubstring',/SEPARATOR)
   
   ;;*** Data Record menu
   rec=widget_button(mbar,VALUE='Record',/MENU)
@@ -603,11 +574,12 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                ['ID                 ', $
                 'RA     ', $
                 'Dec   ', $
-                'UNC', $
-                'BM',$
                 'DATA',$
-                'ACC'], $
-               BUTTON_UVALUE=[0,6,7,8,9,10,11],UVALUE='sort',/ROW,MAP=0)
+                'UNC', $
+                'BMSK',$
+                'ACCT', $
+                'BPL'], $
+               BUTTON_UVALUE=[0,6,7,8,9,10,11,12],UVALUE='sort',/ROW,MAP=0)
   
   b1=widget_button(headbase,VALUE='>',UVALUE='switchlist')
   
@@ -754,14 +726,27 @@ pro CubeProj::Initialize
   self->ObjReport::SetProperty,TITLE_BASE='CUBISM Project'
   self->MsgSetup,['CUBEPROJ_CUBE','CUBEPROJ_RECORD','CUBEPROJ_UPDATE']
   self->SetProperty,FEEDBACK=0  ;Show will change this
+  
   ;; Look for old-style saved Reverse Accounts: rebuild if necessary.
   if ptr_valid(self.DR) && self.ACCOUNTS_VALID then begin 
      wh=where(ptr_valid((*self.DR).REV_ACCOUNT),cnt)
      if cnt gt 0 && array_equal((*self.DR)[wh].REV_WIDTH,0L) then begin 
         self->BuildRevAcct
-        self->Message,"Old reverse accounts found: rebuilt."
+        self->Warning,"Old reverse accounts found: rebuilt."
      endif 
   endif
+  
+  ;; Look for missing DCEIDs
+  if ptr_valid(self.DR) then begin 
+     wh=where((*self.DR).DCEID eq 0L,cnt)
+     if cnt gt 0 then begin 
+        self->RestoreData,wh
+        for i=0,n_elements(*self.DR)-1 do $
+           if (*self.DR)[i].DCEID eq 0L then $
+              (*self.DR)[i].DCEID=sxpar(*(*self.DR)[i].HEADER,'DCEID')
+        self->Warning,"Missing DCEIDs: restored"
+     endif 
+  endif 
 end
 
 ;=============================================================================
@@ -850,8 +835,8 @@ end
 ;=============================================================================
 ;  RestoreData - Restore selected data from file
 ;=============================================================================
-pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt
-  if n_elements(sel) eq 0 then sel=self->CurrentSelect()
+pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,_EXTRA=e
+  self->RecOrSelect,sel,_EXTRA=e
   wh=where(~ptr_valid((*self.DR)[sel].BCD),cnt)
   if cnt eq 0 then return
   widget_control, /HOURGLASS
@@ -866,15 +851,16 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt
      
      ;; Optional BMASK, UNCERTAINTY
      ptr_free,(*self.DR)[which].BMASK,(*self.DR)[which].UNC
-     unc_file=irs_associated_file(file,/UNCERTAINTY)
+     ;unc_file=irs_associated_file(file,/UNCERTAINTY)
      bmask_file=irs_associated_file(file,/BMASK)
      
      if size(bmask_file,/TYPE) eq 7 && file_test(bmask_file) then $
         (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
      
-     if size(unc_file,/TYPE) eq 7 && file_test(unc_file) then $
-        (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
+     ;if size(unc_file,/TYPE) eq 7 && file_test(unc_file) then $
+     ;   (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
   endfor
+  self->UpdateList
 end
 
 ;=============================================================================
@@ -884,6 +870,81 @@ pro CubeProj::RestoreAll
   self->RestoreData,lindgen(self->N_Records()),RESTORE_CNT=cnt
   if cnt gt 0 then self->Info, $
      string(FORMAT='("Restored ",I0," record",A)',cnt,cnt gt 1?"s":"")
+end
+
+
+;=============================================================================
+;  ReplaceFilenameSubstring - Replace common substring in selected
+;                             filenames
+;=============================================================================
+pro CubeProj::ReplaceFilenameSubstring,from,to,recs,_EXTRA=e
+  self->RecOrSelect,recs,_EXTRA=e
+  if recs[0] eq -1 then return
+  
+  if n_elements(from) eq 0 then begin 
+     f=(*self.DR)[recs].FILE
+     cnt=0
+     nf=n_elements(f) 
+     if nf gt 1 then begin 
+        lab='Replacing text of '+strtrim(nf,2)+' files:'
+        wh=where(total(byte(f) eq shift(byte(f),0,1),2) ne nf,cnt)
+        def=strmid(f[0],0,wh[0])
+        t=twoin(from,to,def,def,LABEL=lab, $
+                TEXT1='Replace Substring (regexp):', $
+                TEXT2='With:',PARENT_GROUP=self->TopBase(),/SCROLL, $
+                TITLE='Replace File Substring',TEXT_LAB=f,YSIZE=nf<6)
+     endif else begin
+        t=twoin(from,to,f[0],f[0],TEXT1='Replace Substring (regexp):', $
+                TEXT2='With:',PARENT_GROUP=self->TopBase(), $
+                TITLE='Replace File Substring')
+     endelse 
+  endif 
+  if n_elements(t) gt 0 && t then begin 
+     for i=0,n_elements(recs)-1 do begin
+        file=(*self.DR)[recs[i]].FILE
+        pos=stregex(file,from,length=len)
+        (*self.DR)[recs[i]].FILE= $
+           strmid(file,0,pos)+to+strmid(file,pos+len)
+     endfor
+  endif
+end
+
+
+;=============================================================================
+;  ToggleBadPixel - Toggle the given bad pixel
+;=============================================================================
+pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset
+  if n_elements(rset) ne 0 then rec=self->DCEIDtoRec(rset)
+  if n_elements(rec) ne 0 then $
+     list=(*self.DR)[rec[0]].BAD_PIXEL_LIST $
+  else list=self.GLOBAL_BAD_PIXEL_LIST
+     
+  ;; Add or remove bp from appropriate list
+  if n_elements(set) ne 0 then begin 
+     only_set=keyword_set(set)
+     only_clear=set eq 0
+  endif else begin 
+     only_set=0 & only_clear=0
+  endelse
+  
+  set=1
+  if ptr_valid(list) then begin 
+     got=where(*list eq pix,ngot,COMPLEMENT=others,NCOMPLEMENT=nothers)
+     if ngot gt 0 then begin    ;already on list, clear it
+        set=0
+        if only_set then return
+        if nothers gt 0 then *list=(*list)[others] $
+        else ptr_free,list
+     endif else begin 
+        if only_clear then return
+        *list=[*list,pix]
+     endelse 
+  endif else begin
+     if only_clear then return
+     if n_elements(rec) ne 0 then $
+        (*self.DR)[rec[0]].BAD_PIXEL_LIST=ptr_new([pix]) $
+     else self.GLOBAL_BAD_PIXEL_LIST=ptr_new([pix])
+  endelse 
 end
 
 ;=============================================================================
@@ -907,9 +968,9 @@ pro CubeProj::LoadBadPixels,file,ERROR=err
   bp=lonarr(file_lines(file),/NOZERO)
   readf,un,bp
   free_lun,un
-  if self.BAD_PIXEL_LIST ne self.AS_BUILT.BAD_PIXEL_LIST then $
-     ptr_free,self.bad_pixel_list
-  self.bad_pixel_list=ptr_new(bp,/NO_COPY)
+  if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST then $
+     ptr_free,self.GLOBAL_BAD_PIXEL_LIST
+  self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bp,/NO_COPY)
   self->UpdateButtons
   self->Send,/UPDATE
 end
@@ -919,7 +980,7 @@ end
 ;  SaveBadPixels - Save bad pixels to file
 ;=============================================================================
 pro CubeProj::SaveBadPixels,file
-  if ~ptr_valid(self.bad_pixel_list) then return
+  if ~ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then return
   if size(file,/TYPE) ne 7 then begin 
      start=self->FileBaseName()+".bpl"
      xf,file,/RECENT,FILTERLIST=['*.bpl','*.*','*'],/SAVEFILE, $
@@ -928,7 +989,7 @@ pro CubeProj::SaveBadPixels,file
   endif 
   if size(file,/TYPE) ne 7 then return ;cancelled
   openw,un,file,/GET_LUN
-  printf,un,1#(*self.bad_pixel_list)
+  printf,un,1#(*self.GLOBAL_BAD_PIXEL_LIST)
   free_lun,un
 end
 
@@ -937,9 +998,9 @@ end
 ;  ClearBadPixels - Clear all bad pixels out
 ;=============================================================================
 pro CubeProj::ClearBadPixels, file
-  if self.BAD_PIXEL_LIST ne self.AS_BUILT.BAD_PIXEL_LIST then $
-     ptr_free,self.bad_pixel_list $
-  else self.bad_pixel_list=ptr_new()
+  if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST then $
+     ptr_free,self.GLOBAL_BAD_PIXEL_LIST $
+  else self.GLOBAL_BAD_PIXEL_LIST=ptr_new()
   self->UpdateButtons
   self->Send,/UPDATE
 end
@@ -1243,13 +1304,14 @@ function CubeProj::List
          endif else acct="N"
          pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR)[i].RQST_POS
          s=string(FORMAT= $
-                  '(" ",A20,T23,A11,T34,A12,T49,A1,T56,A1,T63,A1,T69,A5)', $
+                  '(" ",A20,T23,A11,T34,A12,T50,3(A1,7X),A,T83,A1)', $
                   (*self.DR)[i].ID, $
                   radecstring(pos[0],/RA),radecstring(pos[1]), $
+                  ptr_valid((*self.DR)[i].BCD)?'Y':'N', $
                   ptr_valid((*self.DR)[i].UNC)?'Y':'N', $
                   ptr_valid((*self.DR)[i].BMASK)?'Y':'N', $
-                  ptr_valid((*self.DR)[i].BCD)?'Y':'N', $
-                  acct)
+                  acct, $ 
+                  ptr_valid((*self.DR)[i].BAD_PIXEL_LIST)?'Y':'N')
       endelse       
       if (*self.DR)[i].DISABLED then begin 
          b=byte(s)
@@ -1308,7 +1370,7 @@ pro CubeProj::UpdateButtons
   
   for i=0,n_elements((*self.wInfo).MUST_BPL-1)-1 do $
      widget_control, ((*self.wInfo).MUST_BPL)[i], $
-                     SENSITIVE=ptr_valid(self.BAD_PIXEL_LIST)
+                     SENSITIVE=ptr_valid(self.GLOBAL_BAD_PIXEL_LIST)
   
   widget_control, (*self.wInfo).MUST_SAVE_CHANGED,SENSITIVE= $
                   strlen(self.SaveFile) ne 0 AND keyword_set(self.Changed)
@@ -1323,7 +1385,7 @@ end
 ;=============================================================================
 pro CubeProj::UpdateColumnHeads
   if NOT self->IsWidget() then return
-  flags=bytarr(12)
+  flags=bytarr(13)
   flags[self.sort]=1b
   if (*self.wInfo).which_list eq 0 then flags=flags[0:5] else $
      flags=[flags[0],flags[6:*]]
@@ -1524,7 +1586,7 @@ pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm
   self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
   if self.BACK_EXP_LIST ne self.AS_BUILT.BACK_EXP_LIST then $
      ptr_free,self.BACK_EXP_LIST
-  self.BACK_EXP_LIST=ptr_new((*self.DR)[recs].EXP)
+  self.BACK_EXP_LIST=ptr_new((*self.DR)[recs].DCEID)
   self->UpdateButtons
 end
 
@@ -1550,6 +1612,16 @@ pro CubeProj::RecOrSelect,recs,ALL=all
   endif   
 end
 
+
+;=============================================================================
+;  DCEIDtoRec - Convert a list of DCEIDs back to a record
+;                 selection list.
+;=============================================================================
+function CubeProj::DCEIDtoRec,dceid
+  if ~ptr_valid(self.DR) then return,-1
+  return,where_array([dceid],(*self.DR).DCEID)
+end
+
 ;=============================================================================
 ;  Sort - Sort the Data records. 
 ;=============================================================================
@@ -1557,20 +1629,21 @@ pro CubeProj::Sort,sort
   n=self->N_Records()
   if n le 1 then return         ;no sort for one only
   case self.sort of
-     0: s=sort((*self.DR).ID)
-     1: s=sort((*self.DR).TIME)
-     2: s=sort((*self.DR).DATE_OBS)
-     3: s=sort((*self.DR).DATE)
-     4: s=sort(long((*self.DR).FOVID)+ishft(long((*self.DR).TYPE),16))
-     5: s=sort((*self.DR).EXP)
-     6: s=sort(self.reconstructed_pos?(*self.DR).REC_POS[0]: $
-               (*self.DR).RQST_POS[0])
-     7: s=sort(self.reconstructed_pos?(*self.DR).REC_POS[1]: $
-               (*self.DR).RQST_POS[1])
-     8: s=sort(ptr_valid((*self.DR).UNC))
-     9: s=sort(ptr_valid((*self.DR).BMASK))
-     10: s=sort(ptr_valid((*self.DR).BCD))
+     0:  s=sort((*self.DR).ID)
+     1:  s=sort((*self.DR).TIME)
+     2:  s=sort((*self.DR).DATE_OBS)
+     3:  s=sort((*self.DR).DATE)
+     4:  s=sort(long((*self.DR).FOVID)+ishft(long((*self.DR).TYPE),16))
+     5:  s=sort((*self.DR).EXP)
+     6:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[0]: $
+                (*self.DR).RQST_POS[0])
+     7:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[1]: $
+                (*self.DR).RQST_POS[1])
+     8:  s=sort(ptr_valid((*self.DR).BCD))
+     9:  s=sort(ptr_valid((*self.DR).UNC))
+     10: s=sort(ptr_valid((*self.DR).BMASK))
      11: s=sort(ptr_valid((*self.DR).ACCOUNT))
+     12: s=sort(ptr_valid((*self.DR).BAD_PIXEL_LIST))
   endcase
   *self.DR=(*self.DR)[s]        ;rearrange
   if self->IsWidget() then begin 
@@ -1618,9 +1691,9 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
   
   str=[str,' FLUXCON: '+(this.FLUXCON?"Yes":"No")]
   str=[str,' Positions: '+(this.RECONSTRUCTED_POS?"Reconstructed":"Requested")]
-  str=[str,' Bad Pixels: '+(ptr_valid(this.BAD_PIXEL_LIST)? $
-                            strtrim(n_elements(*this.BAD_PIXEL_LIST),2): $
-                            "none")]
+  str=[str,' Bad Pixels: '+(ptr_valid(this.GLOBAL_BAD_PIXEL_LIST)? $
+                            strtrim(n_elements(*this.GLOBAL_BAD_PIXEL_LIST), $
+                                    2): "none")]
   aps=' Apertures:'
   if NOT ptr_valid(this.APERTURE) OR this.MODULE eq '' then begin 
      aps=aps+' (default)' 
@@ -1679,7 +1752,8 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
                           APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
-                          BAD_PIXEL_LIST=bpl,RECONSTRUCTED_POSITIONS=rcp, $
+                          GLOBAL_BAD_PIXEL_LIST=gbpl, $
+                          RECONSTRUCTED_POSITIONS=rcp, $
                           FLUXCON=fc,SAVE_ACCOUNTS=sa,SAVE_DATA=sd
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
@@ -1747,9 +1821,9 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
   if n_elements(chngd) ne 0 then self.Changed=chngd
   if n_elements(spn) ne 0 then self.Spawned=spn
   if n_elements(fb) ne 0 then self.feedback=fb
-  if n_elements(bpl) ne 0 then begin 
-     ptr_free,self.bad_pixel_list
-     if bpl[0] ne -1 then self.bad_pixel_list=ptr_new(bpl)
+  if n_elements(gbpl) ne 0 then begin 
+     ptr_free,self.GLOBAL_BAD_PIXEL_LIST
+     if bpl[0] ne -1 then self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bpl)
      self.Changed=1b
   endif 
   if n_elements(rcp) ne 0 then begin 
@@ -1768,6 +1842,9 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
 end
 
 
+
+
+
 ;=============================================================================
 ;  GetProperty - Get properties, as a pointer to the original data if
 ;                appropriate and keyword POINTER is set.
@@ -1779,9 +1856,11 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            FLUXCON=fc, TLB_OFFSET=tboff, TLB_SIZE=tbsize, $
                            BCD_SIZE=bcdsz, VERSION=version, ASTROMETRY=astr, $
                            POSITION=pos,POSITION_ANGLE=pa,BACKGROUND=bg, $
-                           BAD_PIXEL_LIST=bpl, PMASK=pmask,DATE_OBS=dobs, $
+                           GLOBAL_BAD_PIXEL_LIST=gbpl, PMASK=pmask, $
                            RECONSTRUCTED_POSITIONS=rp, SAVE_DATA=sd, $
-                           SAVE_ACCOUNT=sa, POINTER=ptr
+                           SAVE_ACCOUNT=sa, DATE_OBS=dobs, BAD_PIXEL_LIST=bpl,$
+                           ALL_RECORDS=all_recs,RECORDS=recs, $
+                           RECORD_SET=rec_set, POINTER=ptr
   ptr=keyword_set(ptr) 
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
      account=ptr?self.account:*self.account
@@ -1831,6 +1910,24 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
         if widget_info((*self.wInfo).Base,/VALID_ID) then $
         widget_control, (*self.wInfo).Base,TLB_GET_SIZE=tbsize else tbsize=-1
   endif
+  if arg_present(version) then version=self.version
+  if arg_present(astr) then astr=self->CubeAstrometryRecord()
+  if arg_present(pos) then pos=self.POSITION
+  if arg_present(pa) then pa=self.PA
+  if arg_present(bg) && ptr_valid(self.BACKGROUND) then $
+     bg=ptr?self.BACKGROUND:*self.BACKGROUND
+  if arg_present(gbpl) && ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then $
+     gbpl=ptr?self.GLOBAL_BAD_PIXEL_LIST:*self.GLOBAL_BAD_PIXEL_LIST 
+  if arg_present(pmask) then begin 
+     self->LoadCalib
+     self.cal->GetProperty,self.module,PMASK=pmask
+     if ~ptr && ptr_valid(pmask) then pmask=*pmask
+  endif
+  if arg_present(sd) then sd=(self.SaveMethod AND 1b) ne 0b
+  if arg_present(sa) then sd=(self.SaveMethod AND 2b) ne 0b
+  if arg_present(rp) then rp=self.reconstructed_pos
+  
+  
   if arg_present(bcdsz) then begin 
      ;; Assume all the same BCD sizes
      if ~ptr_valid(self.DR) || $
@@ -1841,23 +1938,25 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
            bcdsz=size(*(*self.DR)[wh[0]].BCD,/DIMENSIONS)
      endelse 
   endif 
-  if arg_present(version) then version=self.version
-  if arg_present(astr) then astr=self->CubeAstrometryRecord()
-  if arg_present(pos) then pos=self.POSITION
-  if arg_present(pa) then pa=self.PA
-  if arg_present(bg) && ptr_valid(self.BACKGROUND) then $
-     bg=ptr?self.BACKGROUND:*self.BACKGROUND
-  if arg_present(bpl) && ptr_valid(self.bad_pixel_list) then $
-     bpl=ptr?self.bad_pixel_list:*self.bad_pixel_list 
-  if arg_present(pmask) then begin 
-     self->LoadCalib
-     self.cal->GetProperty,self.module,PMASK=pmask
-     if ~ptr && ptr_valid(pmask) then pmask=*pmask
-  endif
-  if arg_present(dobs) && ptr_valid(self.DR) then dobs=(*self.DR).DATE_OBS
-  if arg_present(sd) then sd=(self.SaveMethod AND 1b) ne 0b
-  if arg_present(sa) then sd=(self.SaveMethod AND 2b) ne 0b
-  if arg_present(rp) then rp=self.reconstructed_pos
+  
+  ;;--- Record based properties
+  if ~ptr_valid(self.DR) then return
+  if n_elements(recs) eq 0 then begin 
+     if keyword_set(all_recs) then recs=lindgen(self->N_Records()) $
+     else if keyword_set(rec_set) then begin 
+        recs=self->DCEIDtoRec(rec_set)
+        if recs[0] eq -1 then self->Error,'No matching record found'
+     endif 
+  endif 
+  ;; Default to all of them
+  if n_elements(recs) eq 0 then recs=lindgen(self->N_Records())
+  if arg_present(dobs) then dobs=(*self.DR)[recs].DATE_OBS
+  
+  if arg_present(bpl) then begin 
+     bpl=(*self.DR)[recs[0]].BAD_PIXEL_LIST
+     if ~ptr && ptr_valid(bpl) then bpl=*bpl
+  endif 
+  
 end
 
 
@@ -2358,7 +2457,8 @@ pro CubeProj::BuildAccount,_EXTRA=e
            prmin=1L & prmax=1L
         endelse 
         acc_ind=0L
-        ;; iterate over all the adjacent PRs (different cube planes)
+        ;; iterate over all the adjacent PRs in the order 
+        
         for j=prmin,prmax do begin 
            ;; Setup the rotation matrix to rotate back to the +x
            ;; direction
@@ -2806,10 +2906,10 @@ pro CubeProj::BuildCube
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
   
   ;; Bad pixels
-  if ptr_valid(self.BAD_PIXEL_LIST) then begin 
-     bpmask=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=1b)
-     bpmask[*self.BAD_PIXEL_LIST]=0b
+  if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then begin 
      use_bpmask=1
+     bpmask=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=1b)
+     bpmask[*self.GLOBAL_BAD_PIXEL_LIST]=0b
   endif else use_bpmask=0
   
   if self.feedback then begin 
@@ -2824,44 +2924,54 @@ pro CubeProj::BuildCube
   cube_wh=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
   
   for dr=0,n_elements(*self.DR)-1 do begin 
-     if (*self.DR)[dr].DISABLED then continue
-     acct=*(*self.DR)[dr].ACCOUNT
-     rev_acc=*(*self.DR)[dr].REV_ACCOUNT
-     rev_min=(*self.DR)[dr].REV_MIN
-     rev_width=(*self.DR)[dr].REV_WIDTH
-     rev_height=(*self.DR)[dr].REV_HEIGHT
+     this_dr=(*self.DR)[dr]
+     if this_dr.DISABLED then continue
+     acct=*this_dr.ACCOUNT
+     rev_acc=*this_dr.REV_ACCOUNT
+     rev_min=this_dr.REV_MIN
+     rev_width=this_dr.REV_WIDTH
+     rev_height=this_dr.REV_HEIGHT
      rev_wh=rev_width*rev_height
-     rev_off=(*self.DR)[dr].REV_OFFSET
+     rev_off=this_dr.REV_OFFSET
      
-     bcd=*(*self.DR)[dr].BCD
+     bcd=*this_dr.BCD
      if ptr_valid(self.BACKGROUND) then bcd-=*self.BACKGROUND
      if self.fluxcon then bcd/=fluxcon
-     use_unc=ptr_valid((*self.DR)[dr].UNC)
+     use_unc=ptr_valid(this_dr.UNC)
      if use_unc then begin 
-        unc=*(*self.DR)[dr].UNC
+        unc=*this_dr.UNC
         if self.fluxcon then unc/=fluxcon ;XXX should include background error 
      endif
      
      ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
-     ;; entering the cube
-     if ptr_valid((*self.DR)[dr].BMASK) then begin 
+     ;; entering the cube, and add any global bad pixels
+     if ptr_valid(this_dr.BMASK) then begin 
         use_bmask=1
-        bmask=(*(*self.DR)[dr].BMASK AND 28928U) eq 0L 
+        bmask=(*this_dr.BMASK AND 28928U) eq 0L 
         if use_bpmask then bmask AND= bpmask
      endif else if use_bpmask then begin 
         use_bmask=1
         bmask=bpmask
      endif else use_bmask=0
-        
+     
+     ;; Add any per-BCD bad pixels
+     if ptr_valid(this_dr.BAD_PIXEL_LIST) then begin 
+        if ~use_bmask then begin 
+           use_bmask=1
+           bmask=make_array(size(bcd,/DIMENSIONS),VALUE=1b)
+        endif 
+        bmask[*this_dr.BAD_PIXEL_LIST]=0b
+     endif 
+     
      ;; Use the reverse account to populate the cube -- slow
-     for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
+     for i=0L,this_dr.REV_CNT-1 do begin 
         if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
         
-        ;; Accounts appropriate to this pixel:
+        ;; Accounts affecting this pixel
         these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
         
         ;; XXX Error weighting, BMASK, other alternatives
-        ;;  need all in one place? ... e.g trimmed mean?
+        ;;  need data from all records in one place? ... e.g trimmed mean?
         ;if array_equal(finite(bcd[these_accts.BCD_PIX]),0b) then $
         ;   print,rev_acc[rev_acc[i]:rev_acc[i+1]-1],these_accts.BCD_PIX, $
                                 ;         bcd[these_accts.BCD_PIX]
@@ -3552,8 +3662,8 @@ end
 ;           header derived values.
 ;=============================================================================
 pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
-                     EXP=exp,COLUMN=col, ROW=row, RQST_POS=rqpos, $
-                     REC_POS=rpos, PA=pa,ERR=err
+                     DCEID=dceid,EXP=exp,COLUMN=col, ROW=row, $
+                     RQST_POS=rqpos, REC_POS=rpos, PA=pa,ERR=err
   self->LoadCalib
   ;; Don't add same file twice
   if n_elements(file) ne 0 AND ptr_valid(self.DR) then $
@@ -3610,6 +3720,8 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   rec.AORKEY=sxpar(header,'AORKEY')
   
   ;; Logical map sequencing
+  if n_elements(dceid) ne 0 then rec.DCEID=dceid else $
+     rec.DCEID=sxpar(header,'DCEID')
   if n_elements(exp) ne 0 then rec.EXP=exp else $
      rec.EXP=sxpar(header,'EXPID')
   if n_elements(cycle) ne 0 then rec.cycle=cycle else $
@@ -3677,11 +3789,12 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
   endif else if keyword_set(back) then begin 
      self->MsgSend,{CUBEPROJ_RECORD, $
                     self,self->ProjectName()+' Background',self.MODULE, $
-                    self.ORDER,self.CAL,self.BACKGROUND,self.BACKGROUND_UNC, $
-                    ptr_new(),ptr_new()}
+                    self.ORDER,self.CAL,ptr_new(),self.BACKGROUND, $
+                    self.BACKGROUND_UNC, ptr_new(),ptr_new()}
      return
   endif else if keyword_set(update) then begin 
-     self->MsgSend,{CUBEPROJ_UPDATE,self,self.BAD_PIXEL_LIST,keyword_set(nc)}
+     self->MsgSend,{CUBEPROJ_UPDATE,self,self.GLOBAL_BAD_PIXEL_LIST, $
+                    keyword_set(nc)}
      return
   endif 
   
@@ -3720,10 +3833,12 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
                 self->ProjectName(),rec.ID, $
                 irs_fov(rec.FOVID,/SHORT_NAME))
   endelse 
+  rec_set=ptr_new(rec.DCEID)
   self->MsgSend,{CUBEPROJ_RECORD, $
                  self,str,self.MODULE,self.ORDER,self.CAL, $
-                 bcd_p,unc_p,mask_p, $
+                 rec_set,bcd_p,unc_p,mask_p, $
                  stackQ?self.SCALED_BACK:self.BACKGROUND}
+  ptr_free,rec_set
 end
 
 ;=============================================================================
@@ -3798,7 +3913,7 @@ pro CubeProj__define
       BACK_DATE: 0.0D, $        ;date background created
       BACK_CNT:0, $             ;count of records used to create background
       BACK_EXP_LIST: ptr_new(),$ ;list of expids used for the background
-      BAD_PIXEL_LIST: ptr_new(),$ ;a user list of bad pixels to exclude
+      GLOBAL_BAD_PIXEL_LIST: ptr_new(),$ ;a user list of bad pixels to exclude
       fluxcon:0b, $             ;whether to build with FLUXCON fluxes
       reconstructed_pos:0b, $   ;whether to build with reconstructed positions
       cal_file:'', $            ;the calibration file used (if not a full
@@ -3854,6 +3969,7 @@ pro CubeProj__define
   rec={CUBE_DR, $
        ID:'',$                  ;A unique (hopefully) ID
        file:'', $               ;the original file read for this BCD dataset
+       DCEID: 0L, $             ;unique exposure id
        TIME:0.0, $              ;The integration time
        DISABLED: 0b, $          ;whether this DR is disabled
        ACCOUNT: ptr_new(), $    ;list of {CUBE_PLANE,CUBE_PIX,BCD_PIX,AREAS}
@@ -3877,6 +3993,7 @@ pro CubeProj__define
        BCD: ptr_new(), $        ;the BCD
        UNC:ptr_new(), $         ;the BCD's uncertainty image
        BMASK:ptr_new(), $       ;the BCD's BMASK image
+       BAD_PIXEL_LIST: ptr_new(),$ ;this BCD's specific bad pixel list (if any)
        EXP: 0L, $               ;the exposure number in the mapping sequence
        CYCLE:0L, $              ;the cycle number at this position
        NCYCLES:0L,$             ;the number of cycles at this position
@@ -3913,8 +4030,8 @@ pro CubeProj__define
   ;; Messages: send a cube, record, etc.
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
-       CAL:obj_new(),BCD:ptr_new(),UNC:ptr_new(),BMASK:ptr_new(), $
-       BACKGROUND:ptr_new()}    ;XXX UNC
+       CAL:obj_new(),RECORD_SET:ptr_new(), BCD:ptr_new(),UNC:ptr_new(), $
+       BMASK:ptr_new(), BACKGROUND:ptr_new()}    ;XXX UNC
   msg={CUBEPROJ_UPDATE, CUBE:obj_new(), BAD_PIXEL_LIST:ptr_new(), NEW_CUBE:0b}
 end
 
