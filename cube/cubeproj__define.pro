@@ -504,6 +504,8 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   widget_control, b1, /SET_BUTTON
   b1=widget_button(cube,VALUE='Build Cube with FLUXCON',UVALUE='fluxcon', $ $
                    /CHECKED_MENU)
+  widget_control, b1,SET_BUTTON=self.fluxcon
+  
   ;;-------------
   (*self.wInfo).MUST_MODULE= $
      widget_button(cube,value='Set Cube Build Order...',UVALUE='setorder', $
