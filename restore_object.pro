@@ -113,7 +113,7 @@ pro restore_object_resolve,class, routine_info
         call_procedure,defpro
      endif 
      supers=obj_class(class[i],/SUPERCLASS,COUNT=cnt)
-     if cnt gt 0 then resolve_object_resolve,supers,routine_info
+     if cnt gt 0 then restore_object_resolve,supers,routine_info
   endfor 
 end
 
