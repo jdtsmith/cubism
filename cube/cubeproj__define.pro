@@ -2455,7 +2455,8 @@ pro CubeProj::CheckSteps
 end
 
 ;=============================================================================
-;  CheckModules - Make sure only data from one module is present.
+;  CheckModules - Make sure only data from one module is present, and
+;                 select default build order.
 ;=============================================================================
 pro CubeProj::CheckModules,id,ERROR=err
   ;; Check the data's module type
@@ -2487,7 +2488,13 @@ pro CubeProj::CheckModules,id,ERROR=err
      self->Error,["Data from only one module is permitted: ", $
                   "   "+strjoin(modules[u],",")],/RETURN_ONLY
   self.module=modules[u[0]]
-  if array_equal(orders,orders[0]) then self.ORDER=orders[0] else begin 
+  
+  if array_equal(orders,0) && (self.module eq 'LL' || self.module eq 'SL') $
+  then begin 
+     self.ORDER=(self.cal->Orders(self.module))[0]
+  endif else if array_equal(orders,orders[0]) then $
+     self.ORDER=orders[0] $
+  else begin 
      h=histogram(BINSIZE=1,orders,OMIN=om)
      mx=max(h,mpos)
      self.ORDER=om+mpos
@@ -2532,7 +2539,6 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
   if n_elements(dir) eq 0 then $
      xf,dir,/DIRECTORY,/RECENT,TITLE='Select AOR Directory'
   
-  widget_control, /HOURGLASS
   if ~file_test(dir,/DIRECTORY) || $
      ~stregex(dir,'[0-9]{10}'+path_sep()+'?$',/BOOLEAN) then $
      self->Error,'Must select AOR directory of form 0123456789'
@@ -2597,6 +2603,8 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
   
   choice=multchoice('Choose Data:',list,TITLE='Load AOR', $
                     PARENT_GROUP=self->TopBase(),/MODAL)
+  
+  widget_control, /HOURGLASS
   if choice[0] ne -1 then self->AddData,*choices[choice[0]].FILES
   ptr_free,choices.FILES
 end
@@ -2757,16 +2765,20 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
   rec=(*self.DR)[record]
   if stackQ then begin 
      bcd=*rec[0].BCD
-     unc=*rec[0].UNC^2          ;add in quadrature
-     mask=*rec[0].BMASK
+     if ptr_valid(rec[0].UNC) then unc=*rec[0].UNC^2 ;add in quadrature
+     if ptr_valid(rec[0].BMASK) then mask=*rec[0].BMASK
      for i=1,nrec-1 do begin 
         bcd+=*rec[i].BCD
-        unc+=*rec[i].UNC^2
-        mask AND=*rec[0].BMASK  ;accumulate mask flags
+        if ptr_valid(rec[i].UNC) then $
+           if n_elements(unc) gt 0 then unc+=*rec[i].UNC^2 else $
+              unc=*rec[i].UNC^2
+        if ptr_valid(rec[i].BMASK) then $
+           if n_elements(mask) gt 0 then mask AND=*rec[i].BMASK^2 else $
+              mask=*rec[i].BMASK ;accumulate mask flags
      endfor 
      bcd_p=ptr_new(bcd,/NO_COPY)
-     unc_p=ptr_new(sqrt(unc))
-     mask_p=ptr_new(mask,/NO_COPY)
+     unc_p=n_elements(unc) gt 0?ptr_new(sqrt(unc)):ptr_new()
+     mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
      str=string(FORMAT='(%"%s <Stack of %d recs>")', $
                 self->ProjectName(),nrec)
   endif else begin 
