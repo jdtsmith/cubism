@@ -247,10 +247,10 @@ pro tvHist::PlotHist
   
   ;; show the maximum histogram value
   xyouts,2,!D.Y_SIZE-12,string(FORMAT='("Max: ",I0)',self.imhist_max), $
-         COLOR=self.color,CHARSIZE=1.2,/DEVICE
+         COLOR=self.color,CHARSIZE=1.2,/DEVICE,FONT=-1
   xyouts,!D.X_SIZE-20,!D.Y_SIZE-12,ALIGNMENT=1.0, $
          string(FORMAT='(G0.4,"!96!X",G0.4)',self.min,self.max),/DEVICE, $
-         COLOR=self.color,CHARSIZE=1.2
+         COLOR=self.color,CHARSIZE=1.2,FONT=-1
   if self.freeze then self->PlotFreezeLock,/NO_SET_WIN 
   wset,oldwin  
 end
