@@ -356,8 +356,10 @@ end
 ;       Erase - Erase a section of the screen by copying over the pixmap
 ;=============================================================================
 pro tvDraw::Erase,ll,dist
+  oldwin=!D.WINDOW
   self->SetWin
   device,copy=[ll,dist,ll,self.pixwin]
+  wset,oldwin
 end
 
 ;=============================================================================
