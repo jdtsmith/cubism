@@ -88,7 +88,11 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
                   LOOKUP_MODULE=lm, RETURN_NAME=nm
   
   void={IRS_FOV,ID:0,NAME:'',SHORT_NAME:'',MODULE:'',ORDER:0,POSITION:0}
-  f=[{IRS_FOV,26,'IRS_Short-Lo_1st_Order_1st_Position',   'SL1_a',  'SL',1,1},$
+  f=[{IRS_FOV,18,'IRS_Red_Peak-Up_FOV_Center',           'PU_R_cen','SL',0,0},$
+     {IRS_FOV,19,'IRS_Red_Peak-Up_FOV_Sweet_Spot',     'PU_R_sweet','SL',0,0},$
+     {IRS_FOV,22,'IRS_Blue_Peak-Up_FOV_Center',          'PU_B_cen','SL',0,0},$
+     {IRS_FOV,23,'IRS_Blue_Peak-Up_FOV_Sweet_Spot',    'PU_B_sweet','SL',0,0},$
+     {IRS_FOV,26,'IRS_Short-Lo_1st_Order_1st_Position',   'SL1_a',  'SL',1,1},$
      {IRS_FOV,27,'IRS_Short-Lo_1st_Order_2nd_Position',   'SL1_b',  'SL',1,2},$
      {IRS_FOV,28,'IRS_Short-Lo_1st_Order_Center_Position','SL1_cen','SL',1,0},$
      {IRS_FOV,29,'IRS_Short-Lo_Module_Center',            'SL_cen', 'SL',0,0},$
