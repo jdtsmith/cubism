@@ -376,7 +376,7 @@ end
 ;  Send - Send the currently selected set of regions as a stack, or
 ;         just the wavelength if in full mode.
 ;=============================================================================
-pro CubeViewSpec::Send,MAP_NAME=mn
+pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
   free_back=0
   if self.mode eq 0L then begin ;full mode
      if self.wavelength eq 0.0 then return
@@ -406,7 +406,7 @@ pro CubeViewSpec::Send,MAP_NAME=mn
      endelse 
   endelse 
   self->MsgSend,msg
-  self->SetWin                  ;in case it was taken away
+  if keyword_set(js) eq 0 then self->SetWin ;in case it was taken away
   if free_back then ptr_free,msg.bg_fit
 end
 
@@ -947,6 +947,7 @@ end
 ;  Cleanup
 ;=============================================================================
 pro CubeViewSpec::Cleanup
+  self.mode=0 & self->Send,/JUST_SEND ;make sure everybody is in Full mode
   wdelete,self.pixwin
   ptr_free,self.lam,self.sp,self.fit,self.reg,self.weights,self.wMapSets
   self->ObjMsg::Cleanup
