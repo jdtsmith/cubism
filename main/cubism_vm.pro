@@ -48,5 +48,6 @@
 ;##############################################################################
 pro cubism_vm
   @cubism_dir                   ; to freeze the relative cubism directory
-  cubism
+  device,DECOMPOSED=0,RETAIN=2
+  cubism,MODAL=0
 end
