@@ -309,7 +309,6 @@ pro CubeViewSpec::MapEvent,ev
      if n_elements(fr)/2 gt 0 then self.reg[1]=ptr_new(fr,/NO_COPY)
      if n_elements(weights)/2 gt 0 then $
         self.weights=ptr_new(weights,/NO_COPY)
-     widget_control, self.wReplace,/SENSITIVE ;we have one
      self.selected=-1
      self->Plot
      self->Send,MAP_NAME=name
@@ -319,14 +318,8 @@ pro CubeViewSpec::MapEvent,ev
   ;; Load & Save
   case uval of 
      'save': begin              ;save the current
-        oMap->SaveMap,name,CANCELED=cncld,WEIGHTS=self.weights, $
-                      FORERANGES=self.reg[1], $
-                      BACKRANGES=self.reg[0],WAVELENGTH_CONVERT=*self.lam
-        if cncld then return
-        if name then self->Send,MAP_NAME=name ;it's now this name
-     end
-     'load': oMap->LoadSets
-     'replace': begin 
+        if NOT (ptr_valid(self.reg[1]) OR ptr_valid(self.weights)) then $
+           self->Error,'No valid region specified.'
         replid=0L
         for i=0,n_elements(*self.wMapSets)-1 do begin 
            if widget_info((*self.wMapSets)[i],/BUTTON_SET) then begin 
@@ -334,39 +327,49 @@ pro CubeViewSpec::MapEvent,ev
               break
            endif 
         endfor 
-        if NOT widget_info(replid,/VALID_ID) then return
-        widget_control, replid, get_value=name
-        oMap->SaveMap,name,CANCELED=cncld,/FORCE,WEIGHTS=self.weights, $
+        if widget_info(replid,/VALID_ID) then $
+           widget_control, replid, get_value=name
+        oMap->SaveMap,name,CANCELED=cncld,WEIGHTS=self.weights, $
                       FORERANGES=self.reg[1], $
                       BACKRANGES=self.reg[0],WAVELENGTH_CONVERT=*self.lam
         if cncld then return
+        if name then self->Send,MAP_NAME=name ;it's now this name
      end
+     'load': oMap->LoadSets
+     'reset': oMap->LoadDefaultSets
   endcase 
-  
+
   ;; Rebuild the menu
   menu=widget_info((*self.wMapSets)[0],/PARENT)
-  for i=0,n_elements(*self.wMapSets)-1 do $
+  for i=0,n_elements(*self.wMapSets)-1 do begin 
+     if n_elements(name) eq 0 then $
+        if widget_info((*self.wMapSets)[i],/BUTTON_SET) then $
+        widget_control, (*self.wMapSets)[i],GET_VALUE=name
      widget_control, (*self.wMapSets)[i],/DESTROY
-  self->BuildMapMenu,menu
+  endfor 
+  self->BuildMapMenu,menu,ACTIVATE=name
 end
 
 ;=============================================================================
 ;  BuildMapMenu - Build the menu with all current maps
 ;=============================================================================
-pro CubeViewSpec::BuildMapMenu,menu
+pro CubeViewSpec::BuildMapMenu,menu,ACTIVATE=act
   oMap=IRSMapSet(self)
   ptr_free,self.wMapSets
   names=oMap->Names()
   nn=n_elements(names) 
   if nn gt 0 then begin 
      buts=lonarr(nn)
-     for i=0,nn-1 do $
+     for i=0,nn-1 do begin 
         buts[i]=widget_button(menu,value=names[i],/CHECKED_MENU, $
                               EVENT_PRO='CubeViewSpec_map_event', $
                               SEPARATOR=i eq 0)
+        if n_elements(act) ne 0 then $
+           if strlowcase(act) eq strlowcase(names[i]) then $
+           widget_control, buts[i], /SET_BUTTON
+     endfor 
      self.wMapSets=ptr_new(buts,/NO_COPY)
   endif
-  widget_control, self.wReplace,SENSITIVE=0
 end
 
 ;=============================================================================
@@ -662,6 +665,7 @@ pro CubeViewSpec::Reset,KEEP=k
   self.yr=self.yr_def
   if NOT keyword_set(k) then begin
      ptr_free,self.reg 
+     ptr_free,self.weights
      self.selected=-1
   endif                         ;Sets up axes for region drawing
   self.medlam=0                 ;This signals no fit.
@@ -978,13 +982,12 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='save')
   self.wGray[0]=but
   
-
-  self.wReplace=widget_button(maps, value='Replace Current Map...', $
-                              EVENT_PRO='CubeViewSpec_map_event', $
-                              UVALUE='replace', SENSITIVE=0)
   
   but=widget_button(maps, value='Load Maps...', $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='load')
+  but=widget_button(maps,value='Reset to Default Maps', $
+                    EVENT_PRO='CubeViewSpec_map_event',UVALUE='reset')
+
  ;;sets=widget_button(maps,value='Map Sets',/MENU)
   
   self->BuildMapMenu,maps
@@ -1100,7 +1103,6 @@ pro CubeViewSpec__define
       wBase:0L, $               ;the window base
       wMapSets:ptr_new(), $     ;point to map set buttons
       wQuit:0L, $               ;quit button
-      wReplace:0L, $            ;the replace button
       wFit:0L, $                ;reset,remove fit, fit
       wDo:0L, $                 ;Exclusive action... region_select,xclip,yclip
       wReg_or_Wav:0L, $         ;button with either Regions: or Wave
