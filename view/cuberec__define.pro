@@ -129,6 +129,10 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
   if keyword_set(full) then mode=0
   if keyword_set(stack) then mode=1
   if keyword_set(bcd) then mode=2
+  ;; BCD=0 was passed
+  if n_elements(mode) eq 0 AND n_elements(bcd) ne 0 then begin 
+     if self.mode eq 2 then self.mode=0 ;go to full by default
+  endif                         ; otherwise, just leave it the same
   
   if n_elements(mode) ne 0 then begin
      if mode eq self.mode then begin ;could have been de-sensitized before
@@ -136,23 +140,20 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
         return
      endif
      self.mode=mode
-  endif else begin
-     if n_elements(bcd) ne 0 then begin ; BCD=0 was passed
-        if self.mode eq 2 then self.mode=0 ;go to full by default
-     endif                      ; otherwise, just leave it the same
-  endelse
-
+  endif
+  
   if self.mode eq 2 then begin  ;bcd mode
      self->Reset,/DISABLE       ;no need for our extraction tool.
      if obj_valid(self.oView) then $
         self.oView->MsgSignup,self,/NONE ;not listening to the view tool
-     self.oAper->On
+     self.oRose->Off,/NO_REDRAW & self.oAper->On 
   endif else begin              ; A cube mode
      if NOT self->Enabled() then self->Enable
      if obj_valid(self.oView) then $
         self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL, $
                               /CUBEVIEWSPEC_SAVE
-     self.oAper->Off,/RESET
+     self.oAper->Off,/RESET,/NO_REDRAW 
+     if widget_info(self.wCompass,/BUTTON_SET) then self.oRose->On
   endelse 
   
   ;; The menu button
@@ -215,7 +216,12 @@ pro CubeRec::FullEvent,ev
         self.delay=(10.-ev.value)/4.+.1
         return
      end
-
+     
+     self.wCompass: begin
+        sel=widget_info(self.wCompass,/BUTTON_SET)
+        if sel then self.oRose->On else self.oRose->Off
+     end
+     
      self.wBrowse: begin 
         if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_TIMER' then begin 
            if self.playing then widget_control, ev.id,TIMER=self.delay
@@ -309,6 +315,8 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
 
   if n_elements(color) eq 0 then color=!D.TABLE_SIZE-1
 
+  self->MsgSetup,['CUBEREC_SPEC','CUBEREC_FULL','CUBEREC_UPDATE']
+  
   ;; Get a tvrbox object, signing ourselves up for box messages from it.
   self.Box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,COLOR=color,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
@@ -344,18 +352,22 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
   self.wSlider=widget_slider(b2,MINIMUM=0,MAXIMUM=10, $
                              TITLE="Play Speed",/SUPPRESS_VALUE,VALUE=6)
   self.delay=1.1
+  b3=widget_base(base,/NONEXCLUSIVE,/ROW) 
+  self.wCompass=widget_button(b3,VALUE='Compass')
+  widget_control, self.wCompass,/SET_BUTTON
   
   ;; Populate the second base: the stacked cube
   self.wBase[1]=widget_base(mapbase,/ROW,MAP=0, $
                             UVALUE={self:self,method:'StackEvent'}, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
+  self.oRose=obj_new('CubeRose',oDraw,_EXTRA=e)
+  self->MsgSignup,self.oRose,/CUBEREC_UPDATE ;give them our message
   self.wStackInfo=widget_label(self.wBase[1], $
                                VALUE=string(FORMAT='(A,T40)',''))
 
   ;; Populate the third base: for the BCD's
   self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
   self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
-  self->MsgSetup,['CUBEREC_SPEC','CUBEREC_FULL','CUBEREC_UPDATE']
   self->MsgSignup,self.oAper,/CUBEREC_UPDATE ;give them our message
   
   ;; Add a menu element if allowed
@@ -382,6 +394,7 @@ pro CubeRec__define
       box:obj_new(), $          ;our extraction box object
       oAper: obj_new(), $       ;our aperture viewing/editing tool
       oView: obj_new(), $       ;our ViewSpec tool
+      oRose: obj_new(), $       ;our compass rose drawing tool
       STACK:ptr_new(), $        ;the stacked image
       BCD:ptr_new(), $          ;the BCD data
       BCD_ERR:ptr_new(), $      ;the BCD error
@@ -394,6 +407,7 @@ pro CubeRec__define
       wBrowse:0L, $             ;wavelength browser buttons
       wPlayStop:0L,$            ;the play/stop button
       wSlider:0L, $             ;play speed slider
+      wCompass:0L, $            ;compass
       wStackInfo:0L, $          ;The stack information
       wFull:0L,$                ;The "Switch to Full mode" button
       wMapSaveBut:0L}           ;The Save Map as FITS button
