@@ -60,7 +60,10 @@ pro CubeViewSpec::Event,ev
                  /INPUT_FOCUS
   type=tag_names(ev,/STRUCTURE_NAME)
   if type eq 'WIDGET_TRACKING' then begin 
-     if ev.enter then self->SetColors
+     if ev.enter then begin 
+        self->SetColors
+        self->SetWin
+     endif 
      return
   endif 
   case ev.id of 
@@ -161,7 +164,6 @@ pro CubeViewSpec::Event,ev
      self.wToggles: self->Plot
      
      self.wDraw: begin 
-        wset,self.win
         c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
         case ev.type of
            0b: case ev.press of ;press events
@@ -190,6 +192,7 @@ pro CubeViewSpec::Event,ev
                           r=[value_locate(*self.lam,self.pressloc[0]), $
                              value_locate(*self.lam,c[0])]
                           r=[r[0]<r[1],r[1]>r[0]]
+                          if NOT array_equal(r ne -1,1b) then return
                           ;; append the new region
                           if ptr_valid(self.reg[sel]) then begin 
                              *self.reg[sel]=[[*self.reg[sel]],[r]]
@@ -197,6 +200,10 @@ pro CubeViewSpec::Event,ev
                           self.selected=n_elements(*self.reg[sel])/2-1
                           self.seltype=sel
                           self->MergeRegs
+                          ;; XXX regs and weights presently incompatible
+                          ptr_free,self.weights 
+                          for i=0,n_elements(*self.wMapSets)-1 do $
+                             widget_control, (*self.wMapSets)[i], SET_BUTTON=0
                        end
                        
                        0:  begin ;XClip
@@ -392,7 +399,7 @@ pro CubeViewSpec::Send,MAP_NAME=mn
      endelse 
   endelse 
   self->MsgSend,msg
-  
+  self->SetWin                  ;in case it was taken away
   if free_back then ptr_free,msg.bg_fit
 end
 
@@ -717,6 +724,7 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   self->ShowRegions
   plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,/NOERASE, $
        CHARSIZE=1.3,POSITION=[.06,.06,.99,.95]
+  self.x_s=!X.S & self.y_s=!Y.S
   if self.Info then xyouts,.2,.97,/NORMAL,self.Info,CHARSIZE=1.2
   if self.renorm ne 0 then $
      xyouts,.05,.96,/NORMAL,'!MX!X10!U'+strtrim(self.renorm,2),CHARSIZE=1.25
@@ -921,6 +929,13 @@ pro CubeViewSpec::SetColors
 end
 
 ;=============================================================================
+;  SetWin - Set the window and restore plot scalings
+;=============================================================================
+pro CubeViewSpec::SetWin
+  wset,self.win & !X.S=self.x_s & !Y.S=self.y_s
+end
+
+;=============================================================================
 ;  Cleanup
 ;=============================================================================
 pro CubeViewSpec::Cleanup
@@ -1060,6 +1075,8 @@ pro CubeViewSpec__define
       yr:[0.,0.], $             ;yrange to display
       yr_def:[0.,0.], $         ;default (largest) yrange to display
       ;; Widget State Data      
+      x_s:[0.0d,0.0d], $        ;the saved !X.S after a plot
+      y_s:[0.0d,0.0d], $        ;the saved !Y.S after a plot
       mode:0, $                 ;full (0) /  stack (1) mode
       file:'', $                ;file read 
       ofile:'', $               ;file written
