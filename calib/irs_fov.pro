@@ -41,6 +41,11 @@
 ;    RETURN_NAME: Return the fovname.  Usually, the return type is
 ;       defined by the type of the input.
 ;
+;    SHORT_NAME: Return the abbreviated name.
+;
+;    SLIT_NAME_ONLY: Return the abbreviated name, without the position
+;       information.
+;
 ; OUTPUTS:
 ;
 ;    fovid|fovname: The integer id or string name of the IRS fov
@@ -55,7 +60,8 @@
 ;    fovid=irs_fov('IRS_Short-Lo_1st_Order_1st_Position')
 ;
 ; MODIFICATION HISTORY:
-;    
+;
+;    2004-09-19 (J.D. Smith): Restructure, and accomodate slit only names.
 ;    2002-09-30 (J.D. Smith): Written.
 ;-
 ;    $Id$
@@ -63,7 +69,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002,2003 J.D. Smith
+;  Copyright (C) 2002,2003,2004 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -85,7 +91,7 @@
 ;##############################################################################
 
 function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
-                  LOOKUP_MODULE=lm, RETURN_NAME=nm
+                  LOOKUP_MODULE=lm, RETURN_NAME=nm, SLIT_NAME_ONLY=sno
   
   void={IRS_FOV,ID:0,NAME:'',SHORT_NAME:'',MODULE:'',ORDER:0,POSITION:0}
   f=[{IRS_FOV,18,'IRS_Red_Peak-Up_FOV_Center',           'PU_R_cen','SL',0,0},$
@@ -113,8 +119,8 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
      {IRS_FOV,57,'IRS_Long-Hi_2nd_Position',              'LH_b',   'LH',0,2},$
      {IRS_FOV,58,'IRS_Long-Hi_Center_Position',           'LH_cen', 'LH',0,0}]
   
-  if n_elements(md_in) ne 0 then md=irs_module(md_in,/TO_NAME)
   if keyword_set(lm) then begin 
+     if n_elements(md_in) ne 0 then md=irs_module(md_in,/TO_NAME)
      if n_elements(md) eq 0 OR n_elements(ord) eq 0 OR $
         n_elements(pos) eq 0 then $
         message,'Must specify Module,Order and Position'
@@ -124,26 +130,29 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
               (f.order eq long(ord) OR $
                (strmid(f.module,1) eq 'H' AND f.order eq 0)) AND $
               f.position eq long(pos),cnt)
-     if cnt eq 0 then return,-1
-     return,keyword_set(nm)? $
-            (keyword_set(sn)?f[wh[0]].SHORT_NAME:f[wh[0]].NAME): $
-            f[wh[0]].ID
-  endif 
-  
-  if size(fov,/type) eq 7 AND keyword_set(nm) eq 0 then begin
-     wh=where(strupcase(f.NAME) eq strupcase(fov),cnt)
-     if cnt eq 0 then return,-1
-     ret=f[wh[0]].ID
   endif else begin 
-     wh=where(f.ID eq long(fov),cnt)
-     if cnt eq 0 then return,-1
-     if keyword_set(sn) then ret=f[wh[0]].SHORT_NAME else ret=f[wh[0]].NAME
+     if size(fov,/type) eq 7 then $
+        wh=where(strupcase(f.NAME) eq strupcase(fov),cnt) $
+     else wh=where(f.ID eq long(fov),cnt)
   endelse 
+  if cnt eq 0 then return,-1
   
+  ;; Return 
   if ~keyword_set(lm) then begin 
      if arg_present(md_in) then md_in= f[wh[0]].MODULE
      if arg_present(ord)   then ord=f[wh[0]].ORDER
      if arg_present(pos)   then pos=f[wh[0]].POSITION
   endif 
-  return,ret
+  
+  case 1 of
+     keyword_set(sno): begin 
+        short=f[wh[0]].SHORT_NAME
+        pos=strpos(short,'_',/REVERSE_SEARCH)
+        if pos ne -1 then short=strmid(short,0,pos)
+        return,short
+     end 
+     keyword_set(sn): return,f[wh[0]].SHORT_NAME
+     keyword_set(nm): return,f[wh[0]].NAME
+     else: return,f[wh[0]].ID
+  endcase
 end
