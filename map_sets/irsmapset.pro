@@ -67,7 +67,8 @@ end
 ;  GetMap - Get map data by name.  Ouput are WEIGHTS, FORERANGES, and
 ;           BACKRANGES, if any (-1 otherwise).  If WAVELENGTH_CONVERT
 ;           is set, convert ranges and weights from lambda to
-;           index-based using the passed wavelength.
+;           index-based using the passed wavelength, checking to make
+;           sure the regions fall in the given wavelength domain.
 ;=============================================================================
 pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
                       WAVELENGTH_CONVERT=wc,NO_WEIGHT_CONVERT=nwc
