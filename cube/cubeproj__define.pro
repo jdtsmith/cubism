@@ -2773,7 +2773,7 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
            if n_elements(unc) gt 0 then unc+=*rec[i].UNC^2 else $
               unc=*rec[i].UNC^2
         if ptr_valid(rec[i].BMASK) then $
-           if n_elements(mask) gt 0 then mask AND=*rec[i].BMASK^2 else $
+           if n_elements(mask) gt 0 then mask AND=*rec[i].BMASK else $
               mask=*rec[i].BMASK ;accumulate mask flags
      endfor 
      bcd_p=ptr_new(bcd,/NO_COPY)
