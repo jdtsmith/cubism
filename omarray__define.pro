@@ -231,7 +231,8 @@ function OMArray::MsgSendWhich, msg
   type=tag_names(msg,/STRUCTURE_NAME)
   wh=where(*self.MsgNames eq type,cnt)
   if cnt eq 0 then $
-     message,string('Attempted to send unknown message for ',self,': ',type)
+     message,strjoin(string('Attempted to send unknown message for ', $
+                            self,': ',type),"")
   wh=where((*self.MsgList).recip[wh[0],*],cnt)
   if cnt eq 0 then return,-1 else return,(*self.MsgList)[wh].Obj
 end
