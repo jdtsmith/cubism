@@ -116,7 +116,7 @@ pro tvHist::Start
      test=self.oDraw->GetMsgObjs(CLASS='tvColor')
      if NOT obj_valid(test[0]) then begin
         self.oDraw->GetProperty,DRAWWIDGET=dw
-        wmessage, PARENT_GROUP=dw,'No Color plug-in registered.'
+        message,'No Color plug-in registered.'
         return
      endif 
      self.ColObj=test[0]
