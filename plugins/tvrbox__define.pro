@@ -225,22 +225,24 @@ pro tvRBox::MoveBox,X,Y
   X=0>X<(self.winsize[0]-1)
   Y=0>Y<(self.winsize[1]-1)
   if self.snap_mode then begin 
-     new_coord=self.oDraw->Convert([X,Y])
+     new_coord=self.oDraw->Convert([X,Y],/FRACTIONAL)
      self.oDraw->GetProperty,OFFSET=off, DISPSIZE=ds,SIZE=sz
      
      case self.boxflag of
         1b: begin               ;inside of box, performing move     
-           if array_equal(new_coord,self.save_coords) then return
+           nc=floor(new_coord)
+           if array_equal(nc,self.save_coords) then return
            self->Erasebox
            self.coords=[off[0],off[1]+self.size[1]-1] > $
-                       (self.coords+(new_coord-self.save_coords)) < $
+                       (self.coords+(nc-self.save_coords)) < $
                        [off[0]+ds[0]-self.size[0],off[1]+ds[1]-1]
-           self.save_coords=new_coord
+           self.save_coords=nc
         end
         
         0b: begin               ;on knob, or new box being drawn
+           nc=round(new_coord)
            new_size=[off[0]+ds[0]-self.coords[0],self.coords[1]-off[1]+1] < $
-                    [new_coord[0]-self.coords[0],self.coords[1]-new_coord[1]] $
+                    [nc[0]-self.coords[0],self.coords[1]-nc[1]+1] $
                     > 1
            if array_equal(new_size,self.size) then return
            self->EraseBox
