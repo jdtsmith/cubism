@@ -36,12 +36,34 @@
 ;
 ; MODIFICATION HISTORY:
 ;
-;       Wed Sep 26 12:18:35 2001, JD Smith <jdsmith@astro.cornell.edu>
-;
-;		Written and documented.
+;       2002-08-27 (J.D. Smith): Migrated from SMART codebase
+;       2001-09-26 (J.D. Smith): Written and documented
 ;
 ;-
 ;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2001 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;  
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
+;
+;##############################################################################
+
 ;; Compute whether a given point is "inside" the specified edge.
 function clip_inside,i,j,p,t
   case t of
