@@ -39,6 +39,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   ;;  "Print..." tool in file menu (uses David Fanning's excellent
   ;; `FSC_PSConfig' to configure the print job)
   tmp=obj_new('tvPrint',oDraw,file_menu,_EXTRA=e)
+  tmp=obj_new('tvExportImage',oDraw,file_menu,_EXTRA=e)
 ;  tmp=obj_new('tvExportImage',oDraw,file_menu,_EXTRA=e)
   
   option_menu=widget_button(mbar,value="Options",/MENU) 
