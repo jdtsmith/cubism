@@ -17,6 +17,15 @@
 ;      2: SH
 ;      3: SL
 ;    
+;sjuh
+; our definition is 
+;      0: SL1
+;      1: SL2
+;      2: LL1
+;      3: LL2
+;      4: SH
+;      5: LH  
+;
 ; CATEGORY:
 ;
 ;    SMART IRS Spectral Reduction, Analysis and Processing.
@@ -41,7 +50,7 @@
 ;
 ; OUTPUTS:
 ;
-;    mod_num_or_name: The module number, an integer from 0-3, or an
+;    mod_num_or_name: The module number, an integer from 0-5, or an
 ;       array of module number of the same dimensions as the module
 ;       argument, OR, if TO_NAME is set, the module name.
 ;
@@ -53,6 +62,7 @@
 ; MODIFICATION HISTORY:
 ;
 ;    2001-12-08 (J.D. Smith): Written
+;    2002-22-05 SJUH need additional modules as SL and LL have two apertures
 ;-
 ;    $Id$
 ;##############################################################################
@@ -86,9 +96,15 @@ function smart_module,module, TO_NAME=tn
         long='^L(o|on|ong)?'
         short='^S(h|ho|hor|hort)?'
         high='H(i|ig|igh)?$'
-        low='L(o|ow)?$'
+        low='L(o|ow|1|2)?$'
         sep='[ -/=+~]*'
         mod_match=[long+sep+high,long+sep+low,short+sep+high,short+sep+low]
+
+;need to updat the integers and see if used in smart_calib????
+
+;  if strmid(low,0,1,/reverse_offset) eq '1' then
+
+
         for j=0,3 do begin 
            if stregex(module[i],mod_match[j],/FOLD_CASE,/BOOLEAN) then begin 
               match=1
@@ -100,7 +116,12 @@ function smart_module,module, TO_NAME=tn
            message,'Module name not recognized: '+strtrim(module[i],2)
      endfor  
   endif else ret=0>fix(module)<3
-  
+
   if keyword_set(tn) then return,(['LH','LL','SH','SL'])[ret]
   return,ret
 end
+
+
+
+
+
