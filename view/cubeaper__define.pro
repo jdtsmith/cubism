@@ -167,7 +167,8 @@ pro CubeAper::Message, msg
         endif 
         self.cube=msg.cube
         self.cube->GetProperty,APERTURE=aps,CALIB=cal,PR_SIZE=prs
-        if ptr_valid(self.prs) then ptr_free,*self.prs,self.prs,self.orders
+        if ptr_valid(self.prs) then $
+           ptr_free,*self.prs,self.prs,self.orders
         self.slit_length=prs[0]
         nords_old=self->NOrds()
         self.prs=ptr_new(self.cube->PRs(ORDERS=ords,/FULL))
@@ -189,7 +190,7 @@ pro CubeAper::Message, msg
         
         self->UpdateApDrop
         self.cal=cal
-        if self.mode AND 1b then self.oDraw->ReDraw,/SNAPSHOT
+        ;if self.mode AND 1b then self.oDraw->ReDraw,/SNAPSHOT
      end
   endcase 
 end
@@ -434,7 +435,7 @@ end
 pro CubeAper::Cleanup
   ;; The prs themselves 
   if ptr_valid(self.prs) then ptr_free,*self.prs,self.prs
-  ptr_free,self.aps,self.top_corners,self.bottom_corners,self.sides
+  ptr_free,self.aps,self.top_corners,self.bottom_corners,self.sides,self.orders
   self->tvPlug::Cleanup
 end
 
