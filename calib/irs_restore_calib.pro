@@ -31,7 +31,7 @@
 ;
 ; COMMON BLOCKS:
 ;
-;    IRS_DIR: For locating the IRS calibration file directories.
+;    CUBISM_DIR: For locating the IRS calibration file directories.
 ;
 ; MODIFICATION HISTORY:
 ;
@@ -62,7 +62,7 @@
 ;
 ;##############################################################################
 function irs_restore_calib, cfile
-  @irs_dir
+  @cubism_dir
   if file_test(cfile,/READ,/REGULAR) then file=cfile else begin 
      file=filepath(ROOT=irs_calib_dir,SUBDIR="sets",cfile)
      if file_test(file,/READ,/REGULAR) eq 0 then $
