@@ -76,11 +76,7 @@ pro tvRBox::Message, msg
      'TVDRAW_POSTDRAW': begin
         ;;  a change of original image, or zoom, etc. occurred
         if self.boxflag eq -1 then return ; only if a box is here
-        self.oDraw->GetProperty,ZOOM=zoom,WINSIZE=winsize
-        self.boxoff=self.oDraw->Convert(self.coords,/DEVICE)
-        self.boxsize=fix(self.boxsize*(zoom/self.zoom))
-        ;; Update our internal mirror of tvDraw data
-        self.zoom=zoom & self.winsize=winsize
+        self->SetUpDisplay
      end 
      
      'TVKEY_ARROW': begin 
@@ -105,13 +101,12 @@ end
 pro tvRBox::On
   self->tvPlug::On
   key=self.oDraw->GetMsgObjs(CLASS='tvKey')
-  self.oDraw->GetProperty,ZOOM=zoom,WINSIZE=ws
-  self.zoom=zoom & self.winsize=ws
   if obj_valid(key[0]) then key[0]->MsgSignup,self,/TVKEY_ARROW
   if self->IsDrawn() then begin 
      self->EraseBox             ;removes any drawn corners
      self->DrawBox              ;just turned on
   endif 
+  self->SetUpDisplay
   ;; Button and redraw events
   self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW
 end
@@ -168,15 +163,34 @@ pro tvRBox::Reset
   endif 
 end
 
+;; Set the high and low limits (device pixels) for boxoff, to keep the
+;; box on the array.  Also mirror the zoom and winsize. 
+;; Boxoff is the upper left of the box.
+pro tvRBox::SetUpDisplay
+  self.oDraw->GetProperty,ZOOM=zoom,WINSIZE=winsize,SIZE=sz
+  ;; Convert the saved pixel coordinate to device
+  self.boxoff=self.oDraw->Convert(self.coords,/DEVICE)
+  ;; Scale the box size, if necessary.
+  self.boxsize=fix(self.boxsize*(zoom/self.zoom))
+  ;; Update our internal mirror of tvDraw data
+  self.zoom=zoom & self.winsize=winsize
+  ;; Setup the box limits, which can be negative or greater than
+  ;; winsize (i.e. offscreen).
+  self.low_limit=self.oDraw->Convert([0,0],/DEVICE,/FRACTIONAL)
+  self.high_limit=self.oDraw->Convert(sz,/DEVICE,/FRACTIONAL)
+end
+
 pro tvRBox::MoveBox,X,Y
   X=0>X<(self.winsize[0]-1)
   Y=0>Y<(self.winsize[1]-1)
   self->erasebox 
   case self.boxflag of
-     1b: $                      ;inside of box, perform move
-        self.boxoff=[0,self.boxsize[1]] > $
-        (self.boxoff+([X,Y]-self.save)) < $
-        [self.winsize[0]-self.boxsize[0]-1,self.winsize[1]-1]
+     1b: begin                  ;inside of box, perform move
+        ;; we keep the box inside of the *array* not inside the window.
+        self.boxoff=[self.low_limit[0],self.low_limit[1]+self.boxsize[1]] > $
+           (self.boxoff+([X,Y]-self.save)) < $
+           [self.high_limit[0]-self.boxsize[0],self.high_limit[1]]
+     end
      
      0b: $                      ;on knob, or new box being drawn               
         self.boxsize=[X-self.boxoff[0],self.boxoff[1]-Y]>1
@@ -215,8 +229,6 @@ end
 
 pro tvRBox::EraseBox
   lr=self.boxoff+(self.boxsize)*[1,-1]
-  if array_equal(self.boxoff lt 0 or self.boxoff ge self.winsize or $
-                 lr lt 0 or lr ge self.winsize,0b) eq 0b then return
   ll=(self.boxoff<lr)-(self.thick+2.*self.hsize) > 0
   ur=(self.boxoff>lr)+(self.thick+2.*self.hsize) > 0
   dist=fix(ur-ll+1) < (self.winsize-ll) > 0 
@@ -324,6 +336,8 @@ pro tvrbox__define
           corlen:0, $           ;length of corner brackets.
           boxsize:[0,0], $      ;size of box (device units)
           boxoff:[0,0], $       ;offset of top-left of box (device units)
+          low_limit:[0,0], $    ;the lower limit for box
+          high_limit:[0,0], $   ;the upper limit for box
           coords:[0,0], $       ;the saved upper left coord (data pixel units)
           size:[0,0], $         ;the saved box size (data pixel units)
           save:[0,0], $         ;a saved device coordinate box       
