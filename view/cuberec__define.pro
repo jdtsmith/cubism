@@ -17,7 +17,8 @@ pro CubeRec::Message, msg
      end
      'CUBEVIEWSPEC_FULL': begin 
         if ~ptr_valid(self.wavelength) then return
-        self.cur_wav=value_locate(*self.wavelength,msg.wavelength)>0
+        mn=min(abs(*self.wavelength-msg.wavelength),mpos)
+        self.cur_wav=mpos
         self->SwitchMode,/FULL
      end
      'CUBEVIEWSPEC_STACK': begin
@@ -122,7 +123,17 @@ end
 function CubeRec::ReportWidget
   return,self.wBase[0]
 end
+
+
 ;;*************************End OverRiding methods******************************
+
+;=============================================================================
+;  GetProperty
+;=============================================================================
+pro CubeRec::GetProperty,BCD_MODE=bcd_mode,CUBE=cube
+  if arg_present(bcd_mode) then bcd_mode=self.mode eq 2
+  if arg_present(cube) then cube=self.cube
+end
 
 ;=============================================================================
 ;  SwitchMode - Switch among full, stacked and record mode.  To switch
