@@ -322,7 +322,7 @@ pro CubeProj::ShowEvent, ev
                     title,                               $
                     thiscube,                            $
                     '                                 ', $
-                    '       JD Smith -- 2002,2003     ', $
+                    '       JD Smith -- 2002-2004     ', $
                     '  http://sings.stsci.edu/cubism  ', $
                     '*********************************']
      end
@@ -489,7 +489,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                 'Observed      ', $
                 'Added      ', $
                 'Type ',$
-                'Step'],UVALUE='sort',/ROW)
+                'Step '],UVALUE='sort',/ROW)
   (*self.wInfo).wHead[1]= $  
      cw_bgroup(/NONEXCLUSIVE,headmap, $
                ['ID               ', $
@@ -504,7 +504,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   (*self.wInfo).SList= $
      widget_list(b,/MULTIPLE,/ALIGN_LEFT, $
-                 YSIZE=6>self->N_Records()<15,XSIZE=85,/FRAME)
+                 YSIZE=6>self->N_Records()<15,XSIZE=86,/FRAME)
   
   bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup', $
                 ['Enable','Disable','Delete','Header', $
@@ -531,9 +531,9 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   if keyword_set(spn) then $
      self->SetProjectName,TITLE='New Project Name'
   self->UpdateAll
+  (*self.wInfo).showing=1
   XManager,name, base,/NO_BLOCK,EVENT_HANDLER='CubeProj_show_event', $
            CLEANUP='CubeProj_show_kill'
-  (*self.wInfo).showing=1
 end
 
 ;=============================================================================
@@ -581,6 +581,7 @@ pro CubeProj::Open,pname,PROJECT=proj,_EXTRA=e
         TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0, $
         /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
   endif 
+  widget_control, /HOURGLASS
   if size(pname,/TYPE) ne 7 then return ;cancelled
   proj=self->Load(pname)
   if NOT obj_valid(proj) then return
@@ -600,7 +601,7 @@ function CubeProj::Load,file,ERROR=err
      return,-1
   endif
   widget_control,/HOURGLASS
-  obj=restore_object(file,obj_class(self))
+  obj=restore_object(file,obj_class(self),OTHER_CLASSES='irs_aperture')
   if obj_valid(obj) then begin 
      if NOT obj_isa(obj,obj_class(self)) then $
         self->Error,'Invalid Cube Project'
@@ -730,6 +731,39 @@ pro CubeProj::WriteFits,file
      if size(file,/TYPE) ne 7 then return
   endif
   fxhmake,hdr,*self.CUBE,/extend,/date
+  
+  ;; Celestial coordinates
+  putast,hdr,self->CubeAstrometryRecord()
+  ; RADEG = 180.0d/!DPI           ; preserve double
+;   fxaddpar,hdr,'EQUINOX', 2000.0,   ' Equinox of reference coordinate'
+;   fxaddpar,hdr,'CTYPE1','RA---TAN', ' RA in tangent plane projection'
+;   fxaddpar,hdr,'CTYPE2','DEC--TAN', ' DEC in tangent plane projection'
+;   fxaddpar,hdr,'CRPIX1',(self.CUBE_SIZE[0]+1.)/2, $
+;            ' Pixel x coordinate at reference point'
+;   fxaddpar,hdr,'CRPIX2',(self.CUBE_SIZE[1]+1.)/2, $
+;            ' Pixel y coordinate at reference point'
+;   fxaddpar,hdr,'CRVAL1',self.POSITION[0],' [deg] RA at reference point'
+;   fxaddpar,hdr,'CRVAL2',self.POSITION[1],' [deg] DEC at reference point'
+  
+;   ;; Old style angle, for older FITS readers
+;   fxaddpar,hdr,'CROTA2',self.PA,' [deg] Rotation angle'
+  
+;   ;; New style coordinate transform
+;   fxaddpar,hdr,'CDELT1',self.PLATE_SCALE, $
+;            ' [deg/pix] Plate scale, coordinate 1'
+;   fxaddpar,hdr,'CDELT2',self.PLATE_SCALE, $
+;            ' [deg/pix] Plate scale, coordinate 2'
+;   fxaddpar,hdr,'PC1_1' ,-cos(self.PA/RADEG),' Transformation matrix element'
+;   fxaddpar,hdr,'PC1_2' ,-sin(self.PA/RADEG),' Transformation matrix element'
+;   fxaddpar,hdr,'PC2_1' ,-sin(self.PA/RADEG),' Transformation matrix element'
+;  fxaddpar,hdr,'PC2_2' , cos(self.PA/RADEG),' Transformation matrix element'
+  
+  ;; Wavelength coordinates and wavelength LUT binary table extension.
+  fxaddpar,hdr,'CTYPE3','WAVE-TAB','Wavelength'
+  fxaddpar,hdr,'CUNIT3','um','Wavelength units'
+  fxaddpar,hdr,'PS3_0','WCS-TAB','Coordinate table extension name'
+  fxaddpar,hdr,'PS3_1','WAVELENGTH','Coordinate table column name'
+  
   ;; Description
   sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
               'This file contains a spectral cube assembled from an IRS', $
@@ -750,36 +784,7 @@ pro CubeProj::WriteFits,file
   self->LoadCalib
   fxaddpar,hdr,'CAL_SET',self.cal->Name(),' IRS Calibration set used'
   
-  ;; Celestial coordinates
-  RADEG = 180.0d/!DPI           ; preserve double
-  fxaddpar,hdr,'EQUINOX', 2000.0,   ' Equinox of reference coordinate'
-  fxaddpar,hdr,'CTYPE1','RA---TAN', ' RA in tangent plane projection'
-  fxaddpar,hdr,'CTYPE2','DEC--TAN', ' DEC in tangent plane projection'
-  fxaddpar,hdr,'CRPIX1',(self.CUBE_SIZE[0]+1.)/2, $
-           ' Pixel x coordinate at reference point'
-  fxaddpar,hdr,'CRPIX2',(self.CUBE_SIZE[1]+1.)/2, $
-           ' Pixel y coordinate at reference point'
-  fxaddpar,hdr,'CRVAL1',self.POSITION[0],' [deg] RA at reference point'
-  fxaddpar,hdr,'CRVAL2',self.POSITION[1],' [deg] DEC at reference point'
-  
-  ;; Old style angle, for older FITS readers
-  fxaddpar,hdr,'CROTA2',self.PA,' [deg] Rotation angle'
-  
-  ;; New style coordinate transform
-  fxaddpar,hdr,'CDELT1',self.PLATE_SCALE, $
-           ' [deg/pix] Plate scale, coordinate 1'
-  fxaddpar,hdr,'CDELT2',self.PLATE_SCALE, $
-           ' [deg/pix] Plate scale, coordinate 2'
-  fxaddpar,hdr,'PC1_1' ,-cos(self.PA/RADEG),' Transformation matrix element'
-  fxaddpar,hdr,'PC1_2' ,-sin(self.PA/RADEG),' Transformation matrix element'
-  fxaddpar,hdr,'PC2_1' ,-sin(self.PA/RADEG),' Transformation matrix element'
-  fxaddpar,hdr,'PC2_2' , cos(self.PA/RADEG),' Transformation matrix element'
-  
-  ;; Wavelength coordinates and wavelength LUT binary table extension.
-  fxaddpar,hdr,'CTYPE3','WAVE-TAB','Wavelength'
-  fxaddpar,hdr,'CUNIT3','um','Wavelength units'
-  fxaddpar,hdr,'PS3_0','WCS-TAB','Coordinate table extension name'
-  fxaddpar,hdr,'PS3_1','WAVELENGTH','Coordinate table column name'
+
   
   ;; Write the primary header and data
   fxwrite,file,hdr,*self.CUBE
@@ -967,7 +972,7 @@ function CubeProj::List
    for i=0,n-1 do begin 
       if which_list eq 0 then begin ;the standard list
          s=string(FORMAT='(" ",A,T23,F7.2,T31,A,T50,A,T69,A7,T78,' + $
-                  'I2,"[",I0,",",I0,"]")', $
+                  'I3,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
                   (*self.DR)[i].TIME, $
                   jul2date((*self.DR)[i].DATE_OBS,FORM='D*T'), $
@@ -1121,7 +1126,7 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
   endfor 
   
   ;; Didn't find one with the right mode... just take the first one
-  if recs[0] ne (*self.cuberecs)[0] then begin 
+  if size(recs[0],/TYPE) ne 11 || recs[0] ne (*self.cuberecs)[0] then begin 
      self->MsgListRemove,recs
      self->MsgSignup,(*self.cuberecs)[0]
   endif 
@@ -2123,7 +2128,7 @@ pro CubeProj::Normalize
      stepszper[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'SIZEPER')
   endfor 
   
-  ;; XXX No longer necessary with pos-based layout
+  ;; XXX No longer necessary with pos-based layout: can have arbitrary steps
   if (NOT array_equal(stepsper,stepsper[0])) or $
      (NOT array_equal(stepspar,stepspar[0])) then $
      self->Error,"BCD's have unequal map size"
@@ -2182,9 +2187,9 @@ pro CubeProj::NormalizeApertures
         ap=(*self.APERTURE)[i]
         ;; default to the full aperture
         if array_equal(ap.low,0.) AND array_equal(ap.high,0.) then $
-           (*self.APERTURE)[i]={IRS_APERTURE,[0.,0.],[1.,1.]}
+           (*self.APERTURE)[i]=irs_aperture(0.,1.)
      endfor 
-  endif else self.APERTURE=ptr_new({IRS_APERTURE,[0.,0.],[1.,1.]})
+  endif else self.APERTURE=ptr_new(irs_aperture(0.,1.))
 end
 
 ;=============================================================================
@@ -2223,8 +2228,10 @@ function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
   cd=self.PLATE_SCALE*[[-c,-s],[-s,c]]
   if keyword_set(zo) then crpix=[0.5,0.5] else $
      crpix=self.CUBE_SIZE[0:1]/2.+.5 ;[1,1] => pixel center FITS silliness
-  return,{cd: cd,cdelt:[1.D,1.D],crpix:crpix,CRVAL:self.POSITION, $
-          ctype:['RA---TAN','DEC--TAN']}
+  
+  make_astr,astr,CD=cd,DELTA=[1.D,1.D],CRPIX=crpix,CRVAL=self.POSITION, $
+            CTYPE=['RA---TAN','DEC--TAN']
+  return,astr
 end
 
 ;=============================================================================
@@ -2287,9 +2294,9 @@ pro CubeProj::LayoutBCDs
      cd_pa=self.PLATE_SCALE*[[-c_pa,-s_pa],[-s_pa,c_pa]]
      
      ;; Compute the RA/DEC of the 4 corners.
-     astr={cd:cd_pa,cdelt:[1.D,1.D],crpix:[0.5,0.5], $
-           CRVAL:(*self.DR)[i].RQST_POS,$
-           ctype:['RA---TAN','DEC--TAN']}
+     make_astr,astr,CD=cd_pa,DELTA=[1.D,1.D],CRPIX=[0.5,0.5], $
+               CRVAL=(*self.DR)[i].RQST_POS,CTYPE=['RA---TAN','DEC--TAN']
+
      xy2ad,pr_rect[0,*],pr_rect[1,*],astr,a_rect,d_rect
 ;     prs[*,i]=[a_rect,d_rect]
      
@@ -2394,6 +2401,11 @@ pro CubeProj::BuildCube
      use_bpmask=1
   endif else use_bpmask=0
   
+  if self.feedback then begin 
+     csz=self.cube_size[0]*self.cube_size[1]
+     ctarg=self.cube_size[2]/2
+  endif 
+
   for dr=0,n_elements(*self.DR)-1 do begin 
      if (*self.DR)[dr].DISABLED then continue
      acct=*(*self.DR)[dr].ACCOUNT
@@ -2404,18 +2416,18 @@ pro CubeProj::BuildCube
      use_unc=ptr_valid((*self.DR)[dr].UNC)
      if use_unc then unc=*(*self.DR)[dr].UNC
      
-     ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
+     ;; Exclude BCD pix with any of BMASK bits 8,10,12,13,& 14 set from
      ;; entering the cube
      if ptr_valid((*self.DR)[dr].BMASK) then begin 
         use_bmask=1
-        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) eq 0L 
+        bmask=(*(*self.DR)[dr].BMASK AND 29952UL) eq 0L 
         if use_bpmask then bmask AND= bpmask
      endif else if use_bpmask then begin 
         use_bmask=1
         bmask=bpmask
      endif else use_bmask=0
         
-     ;; Use the reverse account to populate the cube
+     ;; Use the reverse account to populate the cube -- slow
      for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
         if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
         these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
@@ -2426,23 +2438,30 @@ pro CubeProj::BuildCube
                                 ;         bcd[these_accts.BCD_PIX]
         
         ;; Default pixel value is non-finite (NaN)
+        pix=rev_min+i
         if use_bmask then begin 
-           cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
-                           total(bcd[these_accts.BCD_PIX] * $
-                                 these_accts.AREA * $
-                                 bmask[these_accts.BCD_PIX],/NAN)
-           areas[rev_min+i]=areas[rev_min+i]+ $
-                            total(these_accts.AREA * $
-                                  bmask[these_accts.BCD_PIX] * $
-                                  finite(bcd[these_accts.BCD_PIX]))
+           cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
+                     total(bcd[these_accts.BCD_PIX] * $
+                           these_accts.AREA * $
+                           bmask[these_accts.BCD_PIX],/NAN)
+           areas[pix]+=total(these_accts.AREA * $
+                             bmask[these_accts.BCD_PIX] * $
+                             finite(bcd[these_accts.BCD_PIX]))
         endif else begin 
-           cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
-                           total(bcd[these_accts.BCD_PIX] * $
-                                 these_accts.AREA,/NAN)
-           areas[rev_min+i]=areas[rev_min+i]+ $
-                            total(these_accts.AREA * $
-                                  finite(bcd[these_accts.BCD_PIX]))
+           cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
+                     total(bcd[these_accts.BCD_PIX] * $
+                           these_accts.AREA,/NAN)
+           areas[pix]+=total(these_accts.AREA * $
+                             finite(bcd[these_accts.BCD_PIX]))
         endelse 
+        if self.feedback then begin 
+           if pix/csz eq ctarg then begin 
+              pix=pix mod csz
+              x=pix mod self.cube_size[0]
+              y=pix/self.cube_size[0]
+              plots,[x,x,x+1,x+1,x],[y,y+1,y+1,y,y],THICK=2
+           endif 
+        endif 
      endfor
   endfor 
   
@@ -2612,6 +2631,8 @@ pro CubeProj::SaveMap,map,sf
   widget_control,/HOURGLASS  
 
   fxhmake,hdr,/date
+  putast,hdr,self->CubeAstrometryRecord()
+  
   ;; Description
   sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
               'This file contains a 2D map created from an IRS', $
@@ -2706,8 +2727,9 @@ pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii,COORDS=coords
         ul=[coords[0,0],coords[1,1]]+[-.5,.5]
         all=[ [ll], [lr], [ur], [ul] ]
         xy2ad,all[0,*],all[1,*],self->CubeAstrometryRecord(),ra,dec
-        printf,un,FORMAT='("# Extracted ",I0,"x",I0)',delta
-        printf,un,FORMAT='("# Box: ",2(A,",",A,:," ; "),"]")', $
+        printf,un,FORMAT='(%"# Extracted %dx%d [%d,%d] -> [%d,%d]")',delta, $
+               coords
+        printf,un,FORMAT= '("# Box: ",2(A,",",A,:," ; "),"]")', $
                radecstring(ra[0],/RA),radecstring(dec[0]), $
                radecstring(ra[1],/RA),radecstring(dec[1])
         printf,un,FORMAT='("#      ",2(A,",",A,:," ; "),"]")', $
@@ -2819,6 +2841,7 @@ end
 pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
   if n_elements(dir) eq 0 then $
      xf,dir,/DIRECTORY,/RECENT,TITLE='Select AOR Directory'
+  if size(dir,/TYPE) ne 7 then return
   
   if ~file_test(dir,/DIRECTORY) || $
      ~stregex(dir,'[0-9]{10}'+path_sep()+'?$',/BOOLEAN) then $
