@@ -122,13 +122,13 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   endif
   
   ;; Clip grid to the nearest enclosing region
-  left=floor(min(px,max=maxx))>0
-  right=floor(maxx)<(sx-1)
-  bottom=floor(min(py,max=maxy))>0
-  top=floor(maxy)<(sy-1)
-  nx=right-left+1 & ny=top-bottom+1
+  left=floor(min(px,max=maxx))>0L
+  right=floor(maxx)<(sx-1L)
+  bottom=floor(min(py,max=maxy))>0L
+  top=floor(maxy)<(sy-1L)
+  nx=right-left+1L & ny=top-bottom+1L
   npol=long(n_elements(px)) & npix=long(nx*ny)
-  if npix eq 0L then return,-1
+  if npix eq 0L then return,-1L
   ret=lonarr(npix,/NOZERO)
   apa=arg_present(areas)
   areas=fltarr(npix,/NOZERO)
