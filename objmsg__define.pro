@@ -89,7 +89,7 @@
 ;             elements from which to extract the associated object
 ;             reference.
 ;
-;       OUTPUT PARAMETERS:
+;       OUTPUTS:
 ;
 ;          The associated object reference for each passed list element.
 ;
@@ -116,16 +116,21 @@
 ;  
 ;       CALLING SEQUENCE:
 ;
-;          obj->GetRecord,obj
+;          obj->GetRecord,obj,[POSITION=]
 ;
 ;       INPUT PARAMETERS:
 ;
 ;          obj: Which object you'd like the record for.
 ;
-;       OUTPUT PARAMETERS:
+;       OUTPUTS:
 ;
 ;          The message list element corresponding to that object, if
 ;             it exists, or -1 if not.
+;             
+; 	OUTPUT KEYWORD PARAMETERS:
+;
+;          POSITION: The position in the MsgList for this objects
+;             record.
 ;
 ;    Message: (override)
 ;       
@@ -240,7 +245,7 @@
 ;
 ;          msg: The message being sent.
 ;
-;       OUTPUT PARAMETERS:
+;       OUTPUTS:
 ;
 ;          A list of one or more object who wish to recieve the given
 ;          message.  Defaults to all on the Message Recipient List.
@@ -355,12 +360,13 @@ end
 
 ;=============================================================================
 ;      GetRecord - Return Message Recipient record for obj, if exists.
-;                  Otherwise return -1.
+;                  Otherwise return -1.  Optionally return the position.
 ;=============================================================================
-function ObjMsg::GetRecord,obj
+function ObjMsg::GetRecord,obj,POSITION=pos
   if self->MsgListLen() eq 0 then return,-1
   wh=where(self->GetObj(*self.MsgList) eq obj,cnt)
-  if cnt eq 0 then return,-1 else return,(*self.MsgList)[wh[0]]
+  pos=wh[0]
+  if cnt eq 0 then return,-1 else return,(*self.MsgList)[pos]
 end
 
 ;=============================================================================
