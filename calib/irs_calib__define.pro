@@ -484,7 +484,7 @@ pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                            TILT_VERSION=tv
   @smart_dir                    ;get smart_calib_dir
   cals=['WAVSAMP','ORDFIND','LINETILT']
-  
+
   version=[n_elements(wv)  gt 0?fix(wv)>0:0, $
            n_elements(orv) gt 0?fix(orv)>0:0, $
            n_elements(tv)  gt 0?fix(tv)>0:0]
@@ -510,6 +510,9 @@ pro SMART_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
         
         ;; Find all versions for this module
         if version[j] eq 0 then begin 
+           if !VERSION.RELEASE le '5.4' then $
+              message,"Must specify versions directly with IDL <= v5.4"
+           FORWARD_FUNCTION file_search
            cal_files=file_search(filepath(ROOT=smart_calib_dir, $
                                           SUBDIR=["data","ssc"],base+"*.tbl"),$
                                  /TEST_REGULAR,/TEST_READ,COUNT=fcnt)
