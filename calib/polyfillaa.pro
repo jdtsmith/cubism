@@ -105,7 +105,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      catch, err
      if err ne 0 then begin   ; any failure in compiling, just use the IDL vers
         message, /CONTINUE, $
-           'Failed compiling clip function... reverting to internal version.'
+           'Failed compiling DLM clipper -- reverting to internal version.'
         polyclip_compiled=0
      endif else begin 
         resolve_routine,'polyclip'
@@ -115,8 +115,8 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
                  DLL_PATH=polyclip_path,/REUSE_EXISTING
         ;; Test for a correctly compiled library
         tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE,/UNLOAD)
-        print,'Got: ',tmp
-        if tmp[0] ne 42b then message,'Testing DLM: Incorrect value returned.'
+        if tmp[0] ne 42b then $
+           message,'Testing clipper DLM: Incorrect value returned.'
         polyclip_compiled=1
      endelse 
      catch,/cancel
