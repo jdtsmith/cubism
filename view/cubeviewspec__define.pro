@@ -239,6 +239,7 @@ pro CubeViewSpec::Event,ev
                     self->Plot  
                  endif else self->Reset,/KEEP
               end
+              else:
            endcase 
            
            1b: self.press=0b    ;release
@@ -371,6 +372,7 @@ pro CubeViewSpec::BuildMapMenu,menu,ACTIVATE=act
   oMap=IRSMapSet(self)
   ptr_free,self.wMapSets
   names=oMap->Names()
+  if size(names,/TYPE) ne 7 then return
   nn=n_elements(names) 
   if nn gt 0 then begin 
      buts=lonarr(nn)
