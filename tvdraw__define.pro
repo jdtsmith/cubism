@@ -244,7 +244,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002 J.D. Smith
+;  Copyright (C) 2001,2002,2003,2004 J.D. Smith
 ;
 ;  This file is part of tvTools.
 ;
@@ -266,6 +266,18 @@
 ;##############################################################################
 
 ;;**************************OverRiding methods********************************
+
+pro tvDraw::Message,msg
+  ;; Only Resize messages
+  old=self.TLBsize
+  self->TLBComputeSize  
+  diff=self.TLBsize-old
+  if array_equal(diff,0) then return
+  
+  self->Resize,self.winsize+diff
+  self->Draw
+  widget_control, msg.id,/CLEAR_EVENTS ;get rid of accumulated events
+end
 
 ;=============================================================================
 ;  MsgSignup - Reset the widget events when Signup changes.
@@ -296,8 +308,12 @@ pro tvDraw::ResetWidgetEvents
                   DRAW_MOTION_EVENTS=self->IsSet('DRAW_MOTION'), $
                   DRAW_VIEWPORT_EVENTS=self->IsSet('DRAW_VIEWPORT'),$
                   DRAW_EXPOSE_EVENTS=self->IsSet('DRAW_EXPOSE'), $
-                  TRACKING_EVENTS=self->IsSet('WIDGET_TRACKING'), $
-                  DRAW_KEYBOARD_EVENTS=self->IsSet('DRAW_KEY')
+                  DRAW_KEYBOARD_EVENTS=self->IsSet('DRAW_KEY'), $
+                  TRACKING_EVENTS=self->IsSet('WIDGET_TRACKING')
+
+  widget_control, self->TLBID(), $
+                  TLB_SIZE_EVENTS=self->IsSet('TLB_WIDGET_BASE'), $
+                  TRACKING_EVENTS=self->IsSet('TLB_WIDGET_TRACKING')
 end
 
 function tvDraw::GetMsgListObj,list
@@ -309,11 +325,11 @@ end
 ;=============================================================================
 function tvDraw::MsgSendWhich, msg
   type=tag_names(msg,/STRUCTURE_NAME)
-  if type eq 'WIDGET_DRAW' then begin 
+  if type eq 'WIDGET_DRAW' then begin ;break out widget_draw types
      type=(['DRAW_BUTTON','DRAW_MOTION','DRAW_VIEWPORT','DRAW_EXPOSE', $
             'DRAW_KEY'])[0>(msg.type-1)<4]
      msg=create_struct(NAME=type,msg)
-  endif 
+  endif    
   return,self->OMArray::MsgSendWhich(msg)
 end
 
@@ -324,7 +340,7 @@ end
 ;=============================================================================
 pro tvDraw::SetProperty, IMORIG=io,DISPSIZE=ds,OFFSET=off, $
                          TOP=top,BOTTOM=bottom,NO_RESIZE=nrs,NO_DRAW=nd, $
-                         _EXTRA=e
+                         WINSIZE=ws, _EXTRA=e
   if n_elements(top) ne 0 then self.top=top
   if n_elements(bottom) ne 0 then self.bottom=bottom
   
@@ -361,7 +377,14 @@ pro tvDraw::SetProperty, IMORIG=io,DISPSIZE=ds,OFFSET=off, $
         self.dispsize=(self.size=s)
      endif
   endif
-  if draw and keyword_set(nd) eq 0 then self->Draw,PREDRAW=pre,_EXTRA=e
+  
+  if n_elements(ws) ne 0 then begin 
+     draw=1
+     self->Resize,ws
+     self->TLBComputeSize
+  endif 
+  
+  if draw and ~keyword_set(nd) then self->Draw,PREDRAW=pre,_EXTRA=e
 end
 
 ;=============================================================================
@@ -425,7 +448,8 @@ function tvDraw::Convert, coord, DEVICE=dev, FRACTIONAL=frd,SHOWING=sh, $
      if keyword_set(si) then return,pix[0]+pix[1]*self.size[0] else return,pix
   endif else begin 
      ;; Return pixel coordinates of a given device coordinate
-     if keyword_set(di) then return,floor(coord/self.zoom) ;really a distance
+     if keyword_set(di) then $  ;really a distance
+        return,keyword_set(frd)?float(coord)/self.zoom:floor(coord/self.zoom) 
      pix=self.offset+float(co-self.pan)/self.zoom
      if NOT keyword_set(frd) then pix=floor(pix)
      if keyword_set(sh) then begin ;only those showing
@@ -444,25 +468,59 @@ pro tvDraw::SetWin, OLD=old,DOUBLE=dbl
   wset,dw
 end
 
+pro tvDraw::CreatePixmaps
+  if self.pixwin gt 0 then wdelete,self.pixwin
+  window,/Free,XSIZE=self.winsize[0],YSIZE=self.winsize[1],/PIXMAP 
+  self.pixwin=!D.Window
+  if self.dbwin gt 0 then wdelete,self.dbwin
+  window,/Free,XSIZE=self.winsize[0],YSIZE=self.winsize[1],/PIXMAP 
+  self.dbwin=!D.Window          ;for double buffering
+end
+
 pro tvDraw::Focus
   widget_control, self.wDraw,/INPUT_FOCUS
 end
 
-;; A bit rude, but set the TLB title in which our tvDraw is embedded.
-pro tvDraw::SetTitle,title
+function tvDraw::TLBID
+  if widget_info(self.wTLB,/VALID_ID) then return,self.wTLB
   wi=self.wDraw
+  tlb=0
   while wi gt 0 do begin 
      tlb=wi
      wi=widget_info(wi,/PARENT) 
   endwhile 
+  self.wTLB=tlb
+  return,tlb
+end
+
+pro tvDraw::TLBComputeSize,sz
+  ;; Store the TLB size
+  widget_control, self->TLBID(),TLB_GET_SIZE=sz
+  self.TLBsize=sz
+end
+
+pro tvDraw::Resize,x,y
+  if n_elements(x) eq 2 then begin 
+     y=x[1]
+     x=x[0]
+  endif 
+  self.winsize=[x,y]
+  ;;Keep central pixel and zoom the same if possible
+  self.dispsize=0>fix(self.winsize/self.zoom)<(self.size-self.offset)
+  widget_control, self.wDraw,SCR_XSIZE=x, SCR_YSIZE=y
+  self->CreatePixmaps
+  self->MsgSend,/RESIZE
+end
+
+;; A bit rude, but set the TLB title in which our tvDraw is embedded.
+pro tvDraw::SetTitle,title
   self.TLBTitle=title
-  widget_control, tlb, TLB_SET_TITLE=title
+  widget_control, self->TLBID(), TLB_SET_TITLE=title
 end
 
 function tvDraw::Title
   return,self.TLBTitle
 end
-
 
 pro tvdraw_event,ev
   widget_control, ev.handler,get_uvalue=self
@@ -470,11 +528,11 @@ pro tvdraw_event,ev
 end
 
 ;=============================================================================
-;  BackGround - Set the smooth background color
+;  EraseBackGround - Set the smooth background color
 ;=============================================================================
-;pro tvDraw::Background
-;  erase,COLOR=self.bottom+(self.top-self.bottom)/2
-;end
+pro tvDraw::EraseBackground
+  erase,COLOR=self.bottom+(self.top-self.bottom)/2
+end
   
 ;=============================================================================
 ;  Erase - Erase a section of the screen by copying over the pixmap.
@@ -493,7 +551,7 @@ pro tvDraw::Erase,ll,dist,FULL=full,DOUBLE=dbl
 end
 
 ;=============================================================================
-;  DBRefresh - Put the contents of the Double Buffer into the Win
+;  DBRefresh - Put the contents of the Win into the Double Buffer
 ;=============================================================================
 pro tvDraw::DBRefresh,ll,dist,FULL=full
   self->SetWin
@@ -524,7 +582,7 @@ pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era
   snap=keyword_set(snap) 
   if snap then begin 
      self->SetWin
-     if keyword_set(era) then erase
+     if keyword_set(era) then self->EraseBackground
   endif 
   tv, *self.imdisp, self.pan[0], self.pan[1] 
   if snap then self->Snapshot
@@ -596,7 +654,7 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
   self.pan=(self.winsize-self.zoom*self.dispsize)/2>0
 
   ;; Actually draw it
-  erase & tv, *self.imdisp, self.pan[0], self.pan[1]
+  self->EraseBackground & tv, *self.imdisp, self.pan[0], self.pan[1]
   
   ;; Grab a copy of it with a device copy
   self->Snapshot
@@ -630,8 +688,11 @@ end
 ;  SendMessage - Send a specific message of the specified type (either
 ;                pre or post-draw) to the interested recipients.
 ;=============================================================================
-pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,SNAPSHOT=snap
+pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,SNAPSHOT=snap, $
+                    RESIZE=rs
   if size(msg,/TYPE) eq 8 then begin ; A specific message
+     if msg.handler ne self.wDraw then $ ;handle TLB messages as well.
+        msg=create_struct(NAME='TLB_'+tag_names(msg,/STRUCTURE_NAME),msg)
      self->ObjMsg::MsgSend,msg
      return
   endif 
@@ -639,6 +700,8 @@ pro tvDraw::MsgSend,msg,PREDRAW=pre,POSTDRAW=post,REDRAW=redr,SNAPSHOT=snap
   if keyword_set(post) then self->ObjMsg::MsgSend,{TVDRAW_POSTDRAW,self.imscl}
   if keyword_set(redr) then self->ObjMsg::MsgSend,{TVDRAW_REDRAW,self.imscl}
   if keyword_set(snap) then self->ObjMsg::MsgSend,{TVDRAW_SNAPSHOT,self.imscl}
+  if keyword_set(rs) then $
+     self->ObjMsg::MsgSend,{TVDRAW_RESIZE,self.winsize[0],self.winsize[1]}
 end
 
 ;=============================================================================
@@ -664,6 +727,8 @@ pro tvDraw::Start
   ;; Get the Color object, if any
   oCol=self->GetMsgObjs(CLASS='tvColor')
   if obj_valid(oCol[0]) then self.oColor=oCol[0]
+  
+  self->TLBComputeSize  
 end
 
 ;=============================================================================
@@ -706,10 +771,7 @@ function tvDraw::Init,parent,IMORIG=imdata,TVD_XSIZE=xs,TVD_YSIZE=ys, $
   self.wDraw=widget_draw(base,/FRAME,EVENT_PRO='tvdraw_event',  $
                          UVALUE=self,XSIZE=self.winsize[0], $
                          YSIZE=self.winsize[1],_EXTRA=e)
-  window,/Free,XSIZE=self.winsize[0],YSIZE=self.winsize[1],/PIXMAP 
-  self.pixwin=!D.Window
-  window,/Free,XSIZE=self.winsize[0],YSIZE=self.winsize[1],/PIXMAP 
-  self.dbwin=!D.Window          ;for double buffering
+  self->CreatePixmaps
   self.immod=ptr_new(/ALLOCATE_HEAP)
   self.imscl=ptr_new(/ALLOCATE_HEAP)
   self.imdisp=ptr_new(/ALLOCATE_HEAP)
@@ -719,8 +781,13 @@ function tvDraw::Init,parent,IMORIG=imdata,TVD_XSIZE=xs,TVD_YSIZE=ys, $
   
   ;; Set-up all the messages we can send
   self->MsgSetup,['DRAW_BUTTON','DRAW_MOTION','DRAW_VIEWPORT','DRAW_EXPOSE', $
-                  'DRAW_KEY','WIDGET_TRACKING','TVDRAW_PREDRAW', $
-                  'TVDRAW_POSTDRAW','TVDRAW_REDRAW','TVDRAW_SNAPSHOT']
+                  'DRAW_KEY','WIDGET_TRACKING','TLB_WIDGET_TRACKING', $
+                  'TLB_WIDGET_BASE','TVDRAW_PREDRAW','TVDRAW_POSTDRAW', $
+                  'TVDRAW_REDRAW','TVDRAW_SNAPSHOT','TVDRAW_RESIZE']
+  
+  ;; Sign us up for resize events
+  self->MsgSignup,self,/TLB_WIDGET_BASE
+  
   ;; we don't draw it here since our widget is as of yet unrealized.
   return,1
 end
@@ -737,6 +804,8 @@ pro tvDraw__define
       wDraw:0L, $               ;the draw widget id
       drawwin: 0L, $            ;the window id of the draw canvas
       TLBTitle:'', $            ;the title we've given the TLB, if any
+      TLBsize: [0,0],$          ;size of our TLB
+      wTLB: 0L, $               ;the TLB widget ID
       oldwin:0, $               ;the old window which was set.
       psconf:obj_new(), $       ;the FSC_PSConfig object
       imorig:ptr_new(), $       ;saved original image, unmodified
@@ -768,4 +837,5 @@ pro tvDraw__define
   msg={TVDRAW_POSTDRAW,im:ptr_new()} ; sent after draw, for interpretation
   msg={TVDRAW_REDRAW,im:ptr_new()} ; sent when screen gets clobbered
   msg={TVDRAW_SNAPSHOT,im:ptr_new()} ; when we fill the erase pixwin
+  msg={TVDRAW_RESIZE,x:0,y:0}   ;the draw window has been resized
 end
