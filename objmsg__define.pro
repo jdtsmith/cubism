@@ -326,11 +326,11 @@ pro ObjMsg::MsgSend,msg
   if size(sendlist,/TYPE) ne 11 then return ;an object list *not* returned
   
   ;; Compile something in here like this to debug...
-;   if tag_names(msg,/STRUCTURE_NAME) eq 'TVDRAW_REDRAW' then begin 
+;   if tag_names(msg,/STRUCTURE_NAME) eq 'TLB_WIDGET_TRACKING' then begin 
 ;      print,obj_class(self),': sending to: ',sendlist, ' message'
 ;      help,/st,msg
 ;      help, /TRACEBAC
-;   endif 
+;  endif 
                                 ;send all the messages
   for i=0,n_elements(sendlist)-1 do if obj_valid(sendlist[i]) then $
      sendlist[i]->Message,msg  
