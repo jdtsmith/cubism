@@ -4,12 +4,14 @@ pro cubeview_cleanup,id
 end
 
 pro cubeview_event,ev
-  if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_TRACKING' then begin 
-     if ev.enter then begin 
-        widget_control, ev.id, get_uvalue=oDraw
-        oDraw->Focus
-     endif 
-  endif else widget_control, ev.top, /DESTROY ;quit
+  widget_control, ev.id,GET_UVALUE=uv
+  if size(uv,/TYPE) eq 7 && uv eq "quit" then begin 
+     widget_control, ev.top, /DESTROY ;quit
+     return
+  endif 
+  
+  ;; Just hand off the rest of our events to tvDraw
+  tvDraw_Event,ev
 end
 
 pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
@@ -111,7 +113,10 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
                    TOOL_MENU=tool_menu,_EXTRA=e)
   
-  bquit=widget_button(file_menu,value="Quit") 
+  ;; Various other buttons
+  resize=obj_new('tvResize',oDraw,SIZE_MENU=option_menu)
+  
+  bquit=widget_button(file_menu,value="Quit",UVALUE='quit') 
   
   ;; put the tvD into the uvalue, to destroy on cleanup.
   widget_control,base,SET_UVALUE=oDraw,/REALIZE
