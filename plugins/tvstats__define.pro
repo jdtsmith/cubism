@@ -5,6 +5,7 @@
 ;=============================================================================
 pro tvStats::Message, msg
   self->tvPlug::Message,msg,TYPE=type
+  if type eq 'BOX' then self->wShow
   switch type of
      'BOX': self->wShow
      'TVDRAW_POSTDRAW':self->Stats ;for both types, we redo the stats
@@ -17,7 +18,36 @@ function tvStats::Icon
           [134b, 65b],[194b, 96b],[102b, 64b],[ 50b,104b], $
           [246b, 79b],[  2b, 96b],[254b,127b],[  0b,  0b]]
 end
+
+;=============================================================================
+;	On:  Get all our messages.
+;=============================================================================
+pro tvStats::On
+  if self.active then begin     ;if turned on *again* .. means Reset
+     self.Box->Reset
+     self->Off
+     return
+  endif
+  self->tvPlug::On
+  self.Box->On
+  self.oDraw->MsgSignup,self,/TVDRAW_EXCLUSIVE,/TVDRAW_POSTDRAW
+  if self.box->IsDrawn() then begin 
+     self->wShow
+     self->Stats
+  endif
+end
+
+;=============================================================================
+;       Off - If we have a box drawn, keep processing.
+;=============================================================================
+pro tvStats::Off
+  self->tvPlug::Off
+  self.Box->Off
+  self.oDraw->MsgSignup,self,/NONE,/TVDRAW_EXCLUSIVE
+  if widget_info(self.wBase,/VALID_ID) then self->wDestroy
+end
 ;;************************End OverRiding methods*******************************
+
 ;=============================================================================
 ;	Stats.  Compute the stats in the box.
 ;=============================================================================
@@ -36,7 +66,7 @@ pro tvStats::Stats
 end
 
 ;=============================================================================
-;	wShow: Show the widgets.
+;	wShow - Show the widgets.
 ;=============================================================================
 pro tvStats::wShow
   if widget_info(self.wBase,/VALID) then return
@@ -52,55 +82,28 @@ pro tvStats::wShow
 end
 
 ;=============================================================================
-;	wDestroy: Destroy the Widget
+;	wDestroy - Destroy the Widget
 ;=============================================================================
 pro tvStats::wDestroy
   widget_control, self.wBase,/DESTROY
 end
 
 ;=============================================================================
-;	On:  Get all our messages.
+;       Init - Initialize the Stats object.  All tvRBox keywords are
+;              relevant (see tvrbox).
 ;=============================================================================
-pro tvStats::On
-  if self.active then begin     ;if turned on *again* .. means Reset
-     self.Box->Reset
-     self->Off
-     return
-  endif
-  self->tvPlug::On
-  self.Box->On
-  self->Update,/EXCLUSIVE,/POSTDRAW
-  if self.box->IsDrawn() then begin 
-     self->wShow
-     self->Stats
-  endif
-end
-
-;=============================================================================
-;       Off - If we have a box drawn, keep processing.
-;=============================================================================
-pro tvStats::Off
-  self->tvPlug::Off
-  self.Box->Off
-  self->Update,/ALL_OFF,/EXCLUSIVE
-  if widget_info(self.wBase,/VALID_ID) then self->wDestroy
-end
-
-;=============================================================================
-;   Init - Initialize the Stats object.  All tvRBox keywords are
-;          relevant (see tvrbox). 
-;=============================================================================
-function tvStats::Init,parent,oDraw,FORMAT=form,EXCLUSIVE=exc, $
-                       _EXTRA=e
+function tvStats::Init,parent,oDraw,FORMAT=form, _EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   self.parent=parent
   if n_elements(form) eq 0 then $
      self.form='("[",I3,",",I3,"]","(",I3," x",I3,")"," MAX:",G11.5,' + $
-     '" MIN:",G11.5,/,"AVG:",G11.5,"  MEDIAN:",G11.5, "  STDEV:",G10.5)'  $
+     '"  MIN:",G11.5,/,"AVG:",G11.5,"  MEDIAN:",G11.5, "  STDEV:",G10.5)'  $
   else self.form=form
   
   ;; Get a tvrbox object, signing *ourself* up for box messages.
-  self.box=obj_new('tvrbox', oDraw, MsgList=[self],_EXTRA=e)
+  self.box=obj_new('tvRBox', oDraw,/ON_MOTION,_EXTRA=e)
+  self.Box->MsgSignup,self,/ALL
+  self->Off
   return,1
 end
 
