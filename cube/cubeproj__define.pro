@@ -3326,7 +3326,12 @@ pro CubeProj::BuildCube
   
   if ptr_valid(self.BG_SP) && ~ptr_valid(self.BACKGROUND) then begin 
      ;; Assume they are in correct non-fluxed units (e/s/pix)
-     bg=interpol((*self.BG_SP)[1,*],(*self.BG_SP)[0,*],*self.wavelength)
+     if array_equal((*self.BG_SP)[0,*],*self.wavelength) then begin 
+        bg=(*self.BG_SP)[1,*]
+     endif else begin 
+        bg=interpol((*self.BG_SP)[1,*],(*self.BG_SP)[0,*], $
+                    *self.wavelength,/LSQUADRATIC)
+     endelse 
      if self.fluxcon then self->Flux,*self.wavelength,bg,SLCF=self.slcf
      bg=rebin(reform(bg,1,1,n_elements(*self.wavelength)), $
               size(*self.CUBE,/DIMENSIONS),/SAMPLE)
@@ -3374,37 +3379,71 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   show=keyword_set(follow) && self->Showing()
   if show then show_vec=bytarr(nrec)
   for i=0,nrec-1 do begin 
-     if ~ptr_valid((*self.DR)[i].REV_ACCOUNT) then continue
-     if x lt (*self.DR)[i].REV_OFFSET[0] || $
-        x ge (*self.DR)[i].REV_OFFSET[0]+(*self.DR)[i].REV_WIDTH || $
-        y lt (*self.DR)[i].REV_OFFSET[1] || $
-        y ge (*self.DR)[i].REV_OFFSET[1]+(*self.DR)[i].REV_HEIGHT $
+     rec=(*self.DR)[i]
+     if ~ptr_valid(rec.REV_ACCOUNT) then continue
+     if x lt rec.REV_OFFSET[0] || $
+        x ge rec.REV_OFFSET[0]+rec.REV_WIDTH || $
+        y lt rec.REV_OFFSET[1] || $
+        y ge rec.REV_OFFSET[1]+rec.REV_HEIGHT $
      then continue
      
      ;; offset into the bounding-box coordinates
-     w=(*self.DR)[i].REV_WIDTH
-     w_h=w*(*self.DR)[i].REV_HEIGHT
-     ind=(x-(*self.DR)[i].REV_OFFSET[0]) + $
-         w*(y-(*self.DR)[i].REV_OFFSET[1]) + $
-         w_h*z
+     w=rec.REV_WIDTH
+     w_h=w*rec.REV_HEIGHT
+     ind=(x-rec.REV_OFFSET[0]) + w*(y-rec.REV_OFFSET[1]) + w_h*z
      
-     if ind lt (*self.DR)[i].REV_MIN then continue
-     ind-=(*self.DR)[i].REV_MIN
+     if ind lt rec.REV_MIN then continue
+     ind-=rec.REV_MIN
      
-     ri=*(*self.DR)[i].REV_ACCOUNT
+     ri=*rec.REV_ACCOUNT
      if ri[ind] ge ri[ind+1] then continue ;nothing in there
      
      self->RestoreData,i
      
      ;; We've got a match
      if show then show_vec[i]=1b
-     accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[ind]:ri[ind+1]-1]]
-     ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,BCD_VAL:0.0, $
-                    BACK_VAL:0.0,AREA:0.0},n_elements(accs))
+     accs=(*rec.ACCOUNT)[ri[ri[ind]:ri[ind+1]-1]]
+     naccs=n_elements(accs) 
+     ret=replicate({DR:i,ID:rec.ID,BCD_PIX:0,BCD_VAL:0.0, $
+                    BACK_VAL:0.0,AREA:0.0,FLAGS:' '},naccs)
      ret.BCD_PIX=accs.BCD_PIX 
-     ret.BCD_VAL=(*(*self.DR)[i].BCD)[accs.BCD_PIX]
+     ret.BCD_VAL=(*rec.BCD)[accs.BCD_PIX]
      if ptr_valid(self.BACKGROUND) then $
         ret.BACK_VAL=(*self.BACKGROUND)[accs.BCD_PIX]
+     
+     ;; Add badpix
+     if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then begin 
+        if naccs gt 1 then $
+           wh=where_array(*self.GLOBAL_BAD_PIXEL_LIST,ret.BCD_PIX,cnt) $
+        else begin 
+           wh=where(*self.GLOBAL_BAD_PIXEL_LIST eq ret[0].BCD_PIX,cnt)
+           if cnt gt 0 then wh=0
+        endelse 
+        if cnt gt 0 then begin 
+           ret[wh].FLAGS='BP'
+        endif else begin 
+           if ptr_valid(rec.BAD_PIXEL_LIST) then begin 
+              if naccs gt 1 then $
+                 wh=where_array(*rec.BAD_PIXEL_LIST,ret.BCD_PIX,cnt) $
+              else begin 
+                 wh=where(*rec.BAD_PIXEL_LIST eq ret[0].BCD_PIX,cnt)
+                 if cnt gt 0 then wh=0
+              endelse 
+              if cnt gt 0 then ret[wh].FLAGS='BP'
+           endif 
+        endelse 
+     endif 
+     
+     ;; And BMASK Flags
+     if ptr_valid(rec.BMASK) then begin 
+        wh=where((*rec.BMASK)[ret.BCD_PIX] ne 0,cnt)
+        for j=0,cnt-1 do begin 
+           irs_bmask,(*rec.BMASK)[ret[wh[j]].BCD_PIX],CODE_STRING=cs
+           ret[wh[j]].FLAGS+=' '+cs
+        endfor 
+     endif 
+   
+     
      ret.AREA=accs.AREA
      if n_elements(all) eq 0 then all=[ret] else all=[all,ret]
   endfor 
