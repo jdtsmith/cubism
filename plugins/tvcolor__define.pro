@@ -283,8 +283,8 @@ end
 ;=============================================================================
 function tvColor::GetColor, colname
   if NOT ptr_valid(self.colnames) then return,-1
-  wh=where(*self.colnames eq strtrim(strlowcase(colname),2),cnt)
-  if cnt ne 0 then return,self.topval+1-self.nreserve+wh[0]>0  $
+  wh=where_array([strtrim(strlowcase(colname),2)],*self.colnames,cnt)
+  if cnt ne 0 then return,(self.topval+1-self.nreserve+wh) >0  $
   else return,(self.bottom+self.topval-self.nreserve)
 end
 
