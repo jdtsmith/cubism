@@ -84,7 +84,7 @@
 ;
 ;##############################################################################
 
-function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos, $
+function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
                   LOOKUP_MODULE=lm, RETURN_NAME=nm
   
   void={IRS_FOV,ID:0,NAME:'',SHORT_NAME:'',MODULE:'',ORDER:0,POSITION:0}
@@ -109,7 +109,7 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos, $
      {IRS_FOV,57,'IRS_Long-Hi_2nd_Position',              'LH_b',   'LH',0,2},$
      {IRS_FOV,58,'IRS_Long-Hi_Center_Position',           'LH_cen', 'LH',0,0}]
   
-  if n_elements(md) ne 0 then md=irs_module(md,/TO_NAME)
+  if n_elements(md_in) ne 0 then md=irs_module(md_in,/TO_NAME)
   if keyword_set(lm) then begin 
      if n_elements(md) eq 0 OR n_elements(ord) eq 0 OR $
         n_elements(pos) eq 0 then $
@@ -136,8 +136,10 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos, $
      if keyword_set(sn) then ret=f[wh[0]].SHORT_NAME else ret=f[wh[0]].NAME
   endelse 
   
-  if arg_present(md)  then md= f[wh[0]].MODULE
-  if arg_present(ord) then ord=f[wh[0]].ORDER
-  if arg_present(pos) then pos=f[wh[0]].POSITION
+  if ~keyword_set(lm) then begin 
+     if arg_present(md_in) then md_in= f[wh[0]].MODULE
+     if arg_present(ord)   then ord=f[wh[0]].ORDER
+     if arg_present(pos)   then pos=f[wh[0]].POSITION
+  endif 
   return,ret
 end
