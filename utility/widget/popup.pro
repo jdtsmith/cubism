@@ -7,7 +7,7 @@ pro popup_event,ev
 end
 
 function popup, text, list, TITLE=ttl, PARENT_GROUP=parent, MODAL=md, $
-                SELECT=sel,_EXTRA=e
+                SELECT=sel,COMBOBOX=cb,_EXTRA=e
    if n_elements(ttl) eq 0 then ttl='Choose One'
    if n_elements(md) eq 0 then md=0
    if n_elements(sel) ne 0 then begin 
@@ -27,7 +27,10 @@ function popup, text, list, TITLE=ttl, PARENT_GROUP=parent, MODAL=md, $
    nul=widget_label(b1,value=text)
    
    state={popup:0L, OK:0L, index:ptr_new(sel)}
-   state.popup=widget_droplist(b1,value=list)
+   if n_elements(cb) ne 0 then $
+      state.popup=widget_combobox(b1,value=list) $
+   else state.popup=widget_droplist(b1,value=list)
+   
    widget_control,state.popup,SET_DROPLIST_SELECT=sel
    state.ok=widget_button(base,value='  OK  ')
    widget_control, base, /REALIZE, set_uvalue=state
