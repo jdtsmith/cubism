@@ -119,6 +119,11 @@
 
 pro CubeProj_show_event, ev
    widget_control, ev.top, get_uvalue=self
+   catch, err
+   if err ne 0 then begin 
+      catch,/CANCEL
+      self->Error,!ERROR_STATE.MSG
+   endif 
    self->ShowEvent,ev
 end
 
@@ -779,7 +784,8 @@ end
 ;=============================================================================
 pro CubeProj::Initialize
   self->ObjReport::SetProperty,TITLE_BASE='CUBISM Project'
-  self->MsgSetup,['CUBEPROJ_CUBE','CUBEPROJ_RECORD','CUBEPROJ_UPDATE']
+  self->MsgSetup,['CUBEPROJ_CUBE','CUBEPROJ_RECORD','CUBEPROJ_UPDATE', $
+                  'CUBEPROJ_CALIB_UPDATE']
   self->SetProperty,FEEDBACK=0  ;Show will change this
   
   ;; Look for old-style saved Reverse Accounts: rebuild if necessary.
@@ -1989,6 +1995,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           GLOBAL_BAD_PIXEL_LIST=gbpl, $
                           RECONSTRUCTED_POSITIONS=rcp, $
                           FLUXCON=fc,SLCF=slcf,SAVE_ACCOUNTS=sa,SAVE_DATA=sd
+  update_cal=0b
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
         self.PLATE_SCALE=ps
@@ -2012,6 +2019,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      if ord ne self.ORDER then begin 
         self.ORDER=ord
         self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        update_cal=1b
      endif 
   endif 
   if n_elements(prw) ne 0 then begin 
@@ -2019,18 +2027,21 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      if prw ne self.PR_SIZE[1] then begin 
         self.PR_SIZE[1]=prw
         self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        update_cal=1b
      endif
   endif
   if n_elements(prz) ne 0 then begin 
      if NOT array_equal(self.PR_SIZE,prz) then begin 
         self.PR_SIZE=prz
         self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        update_cal=1b
      endif
   endif
   if n_elements(cal_file) ne 0 then begin 
      if self.cal_file ne cal_file then begin 
         self.cal_file=cal_file
         self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        update_cal=1b
      endif 
   endif
   if n_elements(cal) ne 0 then begin 
@@ -2038,6 +2049,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
         if self.cal ne cal then begin 
            self.cal=cal 
            self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+           update_cal=1b
         endif 
      endif else self->Error,'Calibration object not of correct type.'
   endif
@@ -2045,6 +2057,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      if self.APERTURE ne self.AS_BUILT.APERTURE then ptr_free,self.APERTURE
      self.APERTURE=ptr_new(aper)
      self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+     update_cal=1b
   endif 
   if n_elements(sf) ne 0 then self.SaveFile=sf
   if n_elements(pn) ne 0 then begin 
@@ -2055,11 +2068,11 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
   if n_elements(chngd) ne 0 then self.Changed=chngd
   if n_elements(spn) ne 0 then self.Spawned=spn
   if n_elements(fb) ne 0 then self.feedback=fb
-  if n_elements(gbpl) ne 0 then begin 
+  if n_elements(gbpl) ne 0 then begin
      ptr_free,self.GLOBAL_BAD_PIXEL_LIST
      if bpl[0] ne -1 then self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bpl)
      self.Changed=1b
-  endif 
+  endif
   if n_elements(rcp) ne 0 then begin 
      self.reconstructed_pos=keyword_set(rcp) 
      self->ResetAccounts,/NO_UPDATE & self.Changed=1b
@@ -2076,6 +2089,9 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      self.SaveMethod=(self.SaveMethod AND NOT 2b) OR ishft(keyword_set(sa),1)
   if n_elements(sd) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 1b) OR keyword_set(sd)
+  
+  
+  if update_cal then self->Send,/CALIB_UPDATE
   self->UpdateAll,/NO_LIST
 end
 
@@ -2085,16 +2101,17 @@ end
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $ $
-                           SLIT_LENGTH=sl, CALIB=calib, MODULE=module, $
-                           ORDER=order, APERTURE=ap, PROJECT_NAME=pn,DR=dr, $
-                           FLUXCON=fc, SLCF=slcf,TLB_OFFSET=tboff, $
-                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
-                           ASTROMETRY=astr,POSITION=pos,POSITION_ANGLE=pa, $
-                           BACKGROUND=bg, GLOBAL_BAD_PIXEL_LIST=gbpl, $
-                           PMASK=pmask, RECONSTRUCTED_POSITIONS=rp, $
-                           SAVE_DATA=sd, SAVE_ACCOUNT=sa, DATE_OBS=dobs, $
-                           BAD_PIXEL_LIST=bpl, ALL_RECORDS=all_recs, $
-                           RECORDS=recs, RECORD_SET=rec_set, POINTER=ptr
+                           SLIT_LENGTH=sl, CALIB=calib, CAL_FILE=cf, $
+                           MODULE=module, ORDER=order, APERTURE=ap, $
+                           PROJECT_NAME=pn,DR=dr, FLUXCON=fc, SLCF=slcf, $
+                           TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
+                           VERSION=version, ASTROMETRY=astr,POSITION=pos, $
+                           POSITION_ANGLE=pa, BACKGROUND=bg, $
+                           GLOBAL_BAD_PIXEL_LIST=gbpl, PMASK=pmask, $
+                           RECONSTRUCTED_POSITIONS=rp, SAVE_DATA=sd, $
+                           SAVE_ACCOUNT=sa, DATE_OBS=dobs, BAD_PIXEL_LIST=bpl,$
+                           ALL_RECORDS=all_recs, RECORDS=recs, $
+                           RECORD_SET=rec_set, POINTER=ptr,WAVECUT=wavecut
   ptr=keyword_set(ptr)
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
      account=ptr?self.account:*self.account
@@ -2113,9 +2130,10 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      self->LoadCalib            ;ensure it's loaded
      calib=self.cal
   endif 
+  if arg_present(cf) then cf=self.cal_file
   if arg_present(module) then module=self.MODULE
   if arg_present(order) then order=self.order
-  if arg_present(ap) then begin 
+  if arg_present(ap) then begin
      self->NormalizeApertures
      ap=ptr?self.APERTURE:*self.APERTURE
   endif 
@@ -2174,6 +2192,8 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      endelse 
   endif 
   
+  if arg_present(wavecut) then wavecut=self.wavecut
+  
   ;;--- Record based properties
   if ~ptr_valid(self.DR) then return
   if n_elements(recs) eq 0 then begin 
@@ -2219,7 +2239,7 @@ end
 ;        must be freed by the caller (but their contents must be left
 ;        alone).
 ;=============================================================================
-function CubeProj::PRs,ORDERS=ords,ALL_ORDERS=all,FULL=full,WAVE_CUT=wc
+function CubeProj::PRs,ORDERS=ords,ALL_ORDERS=all,FULL=full,WAVECUT=wc
   self->LoadCalib               ;ensure we have a loaded calibration object
   self->NormalizeApertures
   if n_elements(ords) eq 0 or keyword_set(all) then begin 
@@ -2422,6 +2442,7 @@ pro CubeProj::MergeSetup,ORDS=ords
   ptr_free,self.WAVELENGTH
   heap_free,self.MERGE
   wave1=(self.cal->GetWAVSAMP(self.MODULE,ords[0],/PIXEL_BASED, $
+                              WAVECUT=self.wavecut, $
                               PR_WIDTH=self.PR_SIZE[1], /SAVE_POLYGONS, $
                               APERTURE=(*self.APERTURE)[0])).lambda
   if self.ORDER gt 0 then begin ;single order, nothing to do
@@ -2448,6 +2469,7 @@ pro CubeProj::MergeSetup,ORDS=ords
   for ord=1L,nord-1L do begin
      ;; Work with previous, overlap with current order
      wave2=(self.cal->GetWAVSAMP(self.MODULE,ords[ord],/PIXEL_BASED, $
+                                 WAVECUT=self.wavecut, $
                                  PR_WIDTH=self.PR_SIZE[1], $
                                  APERTURE=(nap eq 1?(*self.APERTURE)[0]: $
                                            (*self.APERTURE)[ord]))).lambda
@@ -2714,6 +2736,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      for ord=0,n_elements(ords)-1 do begin
         aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
         prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
+                                 WAVECUT=self.wavecut, $
                                  /PIXEL_BASED, /SAVE_POLYGONS, $
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
         
@@ -3975,7 +3998,7 @@ end
 ;  Send - Send One of our messages
 ;=============================================================================
 pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
-                   NEW_CUBE=nc
+                   NEW_CUBE=ncm,CALIB_UPDATE=cal_update
   if keyword_set(cube) then begin 
      self->MsgSend,{CUBEPROJ_CUBE, $
                     self,$
@@ -3993,8 +4016,12 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
      self->MsgSend,{CUBEPROJ_UPDATE,self,self.GLOBAL_BAD_PIXEL_LIST, $
                     keyword_set(nc)}
      return
+  endif else if keyword_set(cal_update) then begin 
+     self->MsgSend,{CUBEPROJ_CALIB_UPDATE,self}
+     return
   endif 
   
+  ;; Otherwise send the record or stacked record set
   nrec=n_elements(record) 
   if nrec eq 0 then return
   
@@ -4240,6 +4267,7 @@ pro CubeProj__define
        CAL:obj_new(),RECORD_SET:ptr_new(), BCD:ptr_new(),UNC:ptr_new(), $
        BMASK:ptr_new(), BACKGROUND:ptr_new()}    ;XXX UNC
   msg={CUBEPROJ_UPDATE, CUBE:obj_new(), BAD_PIXEL_LIST:ptr_new(), NEW_CUBE:0b}
+  msg={CUBEPROJ_CALIB_UPDATE, CUBE:obj_new()}
 end
 
 ;; Switch to properties-based config using IDLitComponent
