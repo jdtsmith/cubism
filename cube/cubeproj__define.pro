@@ -1557,7 +1557,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      if bpl[0] ne -1 then self.bad_pixel_list=ptr_new(bpl)
      self.Changed=1b
   endif 
-  if n_elements(rcp) eq 0 then begin 
+  if n_elements(rcp) ne 0 then begin 
      self.reconstructed_pos=keyword_set(rcp) 
      self.ACCOUNTS_VALID=0b & self.Changed=1b
   endif
@@ -2359,7 +2359,9 @@ end
 ;=============================================================================
 function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
   RADEG = 180.0d/!DPI           ; preserve double
-  c=cos((270.0D - self.PA)/RADEG) & s=sin((270.D - self.PA)/RADEG)
+  angle=(270.0D - self.PA)/RADEG
+  ;;if self.module eq 'LH' then angle+=180./RADEG
+  c=cos(angle) & s=sin(angle)
   cd=self.PLATE_SCALE*[[-c,-s],[-s,c]]
   if keyword_set(zo) then crpix=[0.5,0.5] else $
      crpix=self.CUBE_SIZE[0:1]/2.+.5 ;[1,1] => pixel center FITS silliness
@@ -2558,7 +2560,7 @@ pro CubeProj::BuildCube
      if ptr_valid((*self.DR)[dr].BMASK) then begin 
         use_bmask=1
         bmask=(*(*self.DR)[dr].BMASK AND 29952UL) eq 0L 
-        if use_bpmask then bmask OR= bpmask
+        if use_bpmask then bmask AND= bpmask
      endif else if use_bpmask then begin 
         use_bmask=1
         bmask=bpmask
