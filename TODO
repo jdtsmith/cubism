@@ -1,0 +1,127 @@
+
+
+- Export stacked maps from CubeView (with headers intact).
+- Ratio maps possible with CubeView?
+
+
+=================================================================
+
+
+- Project interface.
+
+- WCS stuff (and refined cube positions)
+
+- Positional (instead of logical grid) cube sample placement (for
+  mixed targetting constituent BCDs)
+
+- Line record showing wavelength/WCS.
+
+w/ IDLv5.6: Combo-Box lambda.  Context menus for choice plug-ins.
+Tabbed Project views?  Check-boxes in menus.  Replace keypress event
+hack with *real* key events on draw widget.  Tooltips on view buttons.
+
+Medium Term:
+
+Build polyfillaa as a DLM and auto-make/link it in using MAKE_DLL.  Or
+could we use call_external?  Not for returning polygons, I guess.  Ali
+suggests: two related functions to accomplish this.  The first
+computes all the polygons, sticking them in some dynamic C array.  A
+pointer to the array is returned, along with vector lengths, etc., and
+then passed on to the second function, along with a pre-fabricated
+pile of IDL arrays, which disentangles the C-heap and populates the
+IDL arrays.
+
+Long Term:
+
+Re-do xf as object.  
+Trap errors via ObjReport.  Add all popups/choices/etc. in there too.  
+
+
+; OLDER NOTES ON CubeProj:
+;
+; speedup possibilities:
+;
+;   Drop the ragged 4d array format for the accounting cubes.  Cube
+;   pixels can have 0 or more contributing pixels.  Code the index as
+;   a single integer master BCD index into the large 128x128x(2*n*bcd)
+;   array, e.g.:
+;
+;      DR: 4, PIXEL:5206 ====> INDEX:4*128*128*2+5206=136278L
+;   
+;   cache the 128x128x(2*n_bcd) *(self.DR).BCD array prior to building
+;   the cube.  Index it in parallel using the full index as developed
+;   above.  This index will change when you add or remove cubes (so
+;   will the cube number, so it's not such a big deal).  Do you always
+;   have to rebuild the ACCOUNT when you make a new cube?  What's the
+;   use of separating it then?  I guess you could *disable* cubes
+;   without rebuilding the account, but adding or removing any messes
+;   things up.  It seems account isn't as flexible as I had thought.
+;   If there are different options for weighting the various
+;   contributing data, at least *that* doesn't mess up the account.
+;
+;   Make a flat 4D hypercube of accounting info with up to 4 entries
+;   per pixel.  Additional entries (beyond 4) are stored as a big list
+;   of form:
+;
+;     [ {cube_pixel, master_bcd_index, fraction}, ..., ]
+;
+;   Too much of a pain.  What about using this type of list for the
+;   full accounting structure?  Building the cube then would be as
+;   simple then as:
+;
+;     cube[cube_pixel]=cube[cube_pixel]+big_bcd[master_bcd_index]*fraction
+;   
+;   except this doesn't work, thanks to repeated indices being ignored
+;   in assignment (thanks IDL).  Also, when you want the accounting
+;   information for a pixel, you have to search through the *long*
+;   list.  Oh for the want of hashes.... AHA... use the sparse array
+;   technique, with the slight difference that you compute:
+;
+;     val=big_bcd[master_bcd_index]*frac
+;
+;   it would go something like:
+;
+;     At cube build time:
+;     
+;     super_ind=acct.DR*128L*128L*2L+acct.PIXEL
+;     mx=max(super_ind)
+;     h1=histogram(super_ind,MIN=0,REVERSE_INDICES=ri1) 
+;     col=ri1[n_elements(h1)+1:*]
+;     h2=histogram(total(h1,/cumulative)-1,MIN=0,reverse_indices=ri2)
+;     row=ri2[0:n_elements(h2)-1]-ri2[0]+om ; chunk indices = row number
+;     sparse_array=sprsin(col,row,replicate(1.,n_ind),(mx+1)>n_ind)
+;     if mx ge n_ind then $
+;      vec4=sprsax(sparse_array,[val,replicate(0.,mx+1-n_ind)]) $
+;     else vec4=(sprsax(sparse_array,val))[0:mx]
+;
+;   Instead of using 1. as the value to multiply by, you could use:
+;
+;     area_i*time_i/sigma_i^2, and then apply a sparse array of 1.'s
+;     to this quantity as the X vector to generate the normalizing sum
+;     over weights.
+;
+;   Hmmm... well, just pre-caching the big_bcd was fast enough.  Now
+;   we need to concentrate on avoiding the need to rebuild the
+;   Accounting cube.  With no histogram, when you delete a BCD, you
+;   need to rebuild.  You could have an "ACTIVE" flag for each DR to
+;   multiply in to both the numerator and denominator of the total.
+;   This would allow you to temporarily disable a certain BCD or group
+;   of BCDs without rebuilding the account.  To *add* BCD's, you could
+;   do a partial accounting build, where you just add to the existing
+;   accounting information for those smaller number of pixels in the
+;   cube which are affected.  This will be especially useful for very
+;   large cubes.  It only works if the new BCD fits in the same cube
+;   as the before, and doesn't bump the map's size.  Hmm...
+;
+;   Also, with no histogram, we won't easily be able to de-overlap 2xn
+;   PRs by summing over fractions requested for a single pixel.  This
+;   is probably required.  
+;     
+;   When deleting BCD's, you can use the reverse indices to find and
+;   re-calculate only those account list entries which are affected!
+;
+;   The 4D + extras is inconvenient too: you index and search a
+;   (presumably smaller) list for any extras to append.
+;
+;
+;   Could use a fast histogram method to search the accounting list.
