@@ -5,15 +5,10 @@
 ;=============================================================================
 pro tvPhot::Message, msg
   self->tvPlug::Message,msg,TYPE=type
-  print,type
   ;; Whenever we get a POST, or a BOX, a redraw will let us change up
   switch type of
      'BOX':
-     'TVDRAW_POSTDRAW': begin 
-        self->Erase             ;Erase in case the centroid is gone
-        self->Phot              
-        break
-     end
+     'TVDRAW_POSTDRAW': self->Phot              
      'TVDRAW_SNAPSHOT': self->Draw ;Make sure our circles are visible
   endswitch
 end 
@@ -31,6 +26,7 @@ pro tvPhot::On
   self.box->On
   self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT
   if widget_info(self.wBase,/VALID_ID) eq 0 then self->wShow
+  if self.Box->IsDrawn() then self->Phot
 end
 
 ;=============================================================================
@@ -63,28 +59,15 @@ pro tvPhot::GetProperty, Phot=phot, Rad=rad, SkyWidth=sw, SKY=sky
   if arg_present(sky) then sky=self.Sky
 end
 
-pro tvPhot::Erase
-  if self.rad eq 0. then return
-  ;; get the clean pixwin and the size of the window
-  self.oDraw->GetProperty,PIXWIN=pw,WINSIZE=ws
-  rad=self.Rad+self.SkyWidth
-  low=fix(self.cntrd-rad-3)
-  low=(ws-1)<self.oDraw->Convert(low,/DEVICE)>0
-  high=fix(self.cntrd+rad+3)
-  high=0>self.oDraw->Convert(high,/DEVICE)<(ws-1)
-  if (where((high-low) eq 0))[0] ne -1 then return
-  device,copy=[low,high-low,low,pw]
-end
-
 pro tvPhot::Draw
-  if self.cntrd[0] ne -1. then begin 
+  if self.Box->IsDrawn() AND self.cntrd[0] ne -1. then begin 
      ;; draw a small circle on the centroid center.
      cendev=round(self.oDraw->Convert(self.cntrd,/FRAC,/DEVICE))
      self.oDraw->GetProperty,Zoom=zm
      self.Box->GetProperty,COLOR=cl
      x=findgen(250)/249.*2*!PI & y=sin(x) & x=cos(temporary(x))
      plots,2*x+cendev[0],2*y+cendev[1], COLOR=cl,THICK=1.5,/DEVICE
-     if (self.photgood and 2b) ne 0 then begin ;a standard only centroid
+     if (self.photgood and 2b) ne 0b then begin ;a standard only centroid
         xtmp=[-3,3] & ytmp=[3,-3] ;put an "x" through the circle
         plots,xtmp+cendev[0],ytmp+cendev[1], COLOR=cl,THICK=1.5,/DEVICE
         ytmp=[-3,3]
@@ -106,7 +89,12 @@ function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
   if n_elements(tr) eq 0 then tr=.2 else tr=0.>tr<1.
   err=0b
   
-  s=size(im,/DIMENSION)
+  if size(im,/N_DIMENSIONS) ne 2 then begin 
+     err=1b
+     return,[-1.,-1.]
+  endif 
+  
+  s=size(im,/DIMENSIONS)
   
   ;; regular centroid
   tm=total(im,2) & x=total(tm*(findgen(s[0])+.5))/total(tm)
@@ -205,6 +193,7 @@ pro tvPhot::ApPhot, image, cntrd,SILENT=silent,ERROR=err
 end
 
 pro tvPhot::Phot
+  if NOT self.Box->IsDrawn() then return
   self.Box->Getlrtb,l,r,t,b
   self.oDraw->GetProperty,imorig=io,SIZE=sz ;get the image pointer
   if NOT ((l le r) and (b le t)) then return
@@ -214,11 +203,17 @@ pro tvPhot::Phot
   endif
   take=(*io)[l:r,b:t]
   
-  ;;take as fwhm either half the geometric mean of box sides or the 
-  ;;radius of the circle, whichever is smaller, or 4 if both smaller
-  fw=self.rad<sqrt((r-l+1.)*(t-b+1.))/2.> 4.
-  ;; the image centroid
-  self.cntrd=self->Centroid(take,ERROR=cerr,FWHM=fw,TRUST=0.,/SILENT)
+  if self.do_cntrd then begin 
+     ;;take as fwhm either half the geometric mean of box sides or the 
+     ;;radius of the circle, whichever is smaller, or 4 if both smaller
+     fw=self.rad<sqrt((r-l+1.)*(t-b+1.))/2.> 4.
+     ;; the image centroid
+     self.cntrd=self->Centroid(take,ERROR=cerr,FWHM=fw,TRUST=0.,/SILENT)
+  endif else begin 
+     cerr=0b
+     self.cntrd=[float(r-l+1)/2.,float(t-b+1)/2.]
+  endelse 
+  
   if cerr eq 1b then begin      ;no good centroid found
      str=string(FORMAT='("CEN:  [",2A6,"] PHOT:",A12," SKY:",A12)', $
                 '***','***', '***','***')
@@ -239,7 +234,6 @@ pro tvPhot::Phot
                    self.cntrd,'***','***') 
   endelse 
   widget_control, self.wSlab, set_value=str
-  erase
   self.oDraw->ReDraw,/SNAPSHOT
 end
 
@@ -249,50 +243,60 @@ pro tvphot_event, ev
 end
 
 pro tvPhot::Event,ev
-  widget_control, ev.handler, get_value=tmp
   new=0
-  if ev.handler eq self.wRad then begin 
-     catch, converr
-     if converr ne 0 then begin 
+  case ev.id of
+     self.wRad: begin 
+        catch, converr
+        if converr ne 0 then begin 
+           catch,/CANCEL
+           widget_control, ev.handler, set_value=string(self.rad, $
+                                                        FORMAT='(F5.2)')
+           return
+        endif 
+        widget_control, ev.id, get_value=tmp
+        newrad=float(tmp[0])
         catch,/CANCEL
-        widget_control, ev.handler, set_value=string(self.rad,FORMAT='(F5.2)')
-        return
-     endif 
-     newrad=float(tmp[0])
-     catch,/CANCEL
-     if newrad le 1.5 then begin
-        widget_control, ev.handler, set_value=string(self.rad,FORMAT='(F5.2)')
-        return
-     endif else  $
-        widget_control, ev.handler, set_value=string(newrad,FORMAT='(F5.2)')
-     if newrad ne self.rad then new=1   
-  endif else begin              ;the width
-     catch, converr
-     if converr ne 0 then begin 
+        if newrad le 1.5 then begin
+           widget_control, ev.handler, set_value=string(self.rad, $
+                                                        FORMAT='(F5.2)')
+           return
+        endif else  $
+           widget_control, ev.handler, set_value=string(newrad,FORMAT='(F5.2)')
+        if newrad ne self.rad then new=1   
+     end
+     
+     self.wSW:  begin           ;the width
+        catch, converr
+        if converr ne 0 then begin 
+           catch,/CANCEL
+           widget_control, ev.handler, set_value=string(self.SkyWidth, $
+                                                        FORMAT='(F5.2)')
+           return
+        endif 
+        widget_control, ev.id, get_value=tmp
+        newwidth=float(tmp[0])
         catch,/CANCEL
-        widget_control, ev.handler, set_value=string(self.SkyWidth, $
-                                                     FORMAT='(F5.2)')
-        return
-     endif 
-     newwidth=float(tmp[0])
-     catch,/CANCEL
-     if newwidth lt 1.0 then begin 
-        widget_control, ev.handler, set_value=string(self.SkyWidth, $
-                                                     FORMAT='(F5.2)')
-        return
-     endif else $
-        widget_control, ev.handler, set_value=string(newwidth,FORMAT='(F5.2)')
-     if newwidth ne self.SkyWidth then new=2
-  endelse 
+        if newwidth lt 1.0 then begin 
+           widget_control, ev.handler, set_value=string(self.SkyWidth, $
+                                                        FORMAT='(F5.2)')
+           return
+        endif else $
+           widget_control, ev.handler, $
+                           set_value=string(newwidth,FORMAT='(F5.2)')
+        if newwidth ne self.SkyWidth then new=2
+     end
+     
+     else: begin                ;centroid toggled
+        new=3                   
+        self.do_cntrd=ev.select
+     endelse
+  endcase 
   
   ;; do it again if changed
   if new ne 0 then begin 
-     self->Erase                ;Erase the *old* Circles
-     self.Box->EraseBox         ;Erase the Box
-     self.Box->DrawBox          ;Draw the Box
-     if new eq 2 then self.SkyWidth=newwidth else self.Rad=newrad           
+     if new eq 2 then self.SkyWidth=newwidth else $
+        if new eq 1 then self.Rad=newrad           
      self->Phot
-     self->Draw                 ;Draw the Circles
   endif 
 end
 
@@ -312,15 +316,15 @@ pro tvPhot::wShow
   ;; A cosmetic line...
   self.oDraw->GetProperty, WINSIZE=ws
   ln=widget_base(self.wBase,FRAME=2,ysize=0,xsize=ws[0]-5)
-  rbase=widget_base(self.wBase,/ROW,/ALIGN_CENTER)
-  lab=widget_label(rbase,value='Photometry Radius:')
-  self.wRad=widget_text(rbase, uvalue=self, EVENT_PRO='tvphot_event', $
-                        /EDITABLE, value=string(FORMAT='(F5.2)',self.rad), $
-                        XSIZE=5)
-  lab=widget_label(rbase,value='Sky Radius Width:')
-  self.wSW=widget_text(rbase,uvalue=self, $
-                       EVENT_PRO='tvphot_event',/EDITABLE,XSIZE=5, $
+  rbase=widget_base(self.wBase,/ROW,/ALIGN_CENTER, $
+                    EVENT_PRO='tvphot_event',uvalue=self)
+  lab=widget_label(rbase,value='Radius:')
+  self.wRad=widget_text(rbase,/EDITABLE, XSIZE=5, $
+                        value=string(FORMAT='(F5.2)',self.rad))
+  lab=widget_label(rbase,value='Sky Width:')
+  self.wSW=widget_text(rbase,/EDITABLE,XSIZE=5, $
                        value=string(FORMAT='(F5.2)',self.SkyWidth))
+  self.wCen=cw_bgroup(rbase,/NONEXCLUSIVE,'Centroid',SET_VALUE=[self.do_cntrd])
   b2=widget_base(self.wBase,/ROW,/ALIGN_CENTER)
   self.wSlab=widget_label(b2,_EXTRA=e,value=string(FORMAT='(T58,A)'," "))
   widget_control, self.parent,UPDATE=1
@@ -339,6 +343,7 @@ function tvPhot::Init,parent,oDraw,HIDE=hide,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
   if n_elements(rad) eq 0 then self.rad=12.0 else self.rad=rad
   if n_elements(sw) ne 0 then self.SkyWidth=sw else self.SkyWidth=2.5
   self.cntrd=[-1.,-1.]          ;no centroid yet!
+  self.do_cntrd=1               ;default to doing it
   ;; Get a tvrbox object, signing *ourself* up for box messages.
   self.Box=obj_new('tvrbox', oDraw,/CORNERS,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
@@ -357,11 +362,13 @@ pro tvPhot__define
           parent:0L, $          ;the parent base         
           photgood:0b, $        ;whether a good phot has been obtained
           hide:0b, $            ;whether to hide the phot line when off
+          do_cntrd:0b, $        ;Do the centroid
           wBase:0L, $           ;a base to put the text widget in
           Rad:0.0, $            ;the radius of the phot aperture
           SkyWidth:0.0, $       ;the delta radius of the sky from phot aperture
           wRad:0L, $            ;the radius selector
           wSW:0L, $             ;the sky width
+          wCen:0L, $            ;choice of whether to compute centroid or not
           phot:0.0, $           ;the measured phot
           sky:0.0, $            ;the sky flux
           wSlab:0L}             ;a text widget for the stats
