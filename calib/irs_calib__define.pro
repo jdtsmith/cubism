@@ -317,7 +317,7 @@
 ;##############################################################################
 
 ;=============================================================================
-;       GetProperty - Get object properties
+;  GetProperty - Get object properties
 ;=============================================================================
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx
@@ -332,58 +332,73 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
 end
 
 ;=============================================================================
-;       SetProperty - Set object properties
+;  SetProperty - Set object properties
 ;=============================================================================
 pro IRS_Calib::SetProperty,NAME=name
   if n_elements(name) eq 0 then self.name=name
 end
 
 ;=============================================================================
-;       Print - Print a listing of what this cal object contains.
+;  Save - Save this cal set
 ;=============================================================================
-pro IRS_Calib::Print, modules, orders
+pro IRS_Calib::Save,file
+  if self.Name eq '' then self.Name=filestrip(file)
+  save,self,FILENAME=file
+end
+
+;=============================================================================
+;  Print - Print a listing of what this cal object contains.
+;=============================================================================
+pro IRS_Calib::Print,modules,orders
+  print,transpose(self->Info(modules,orders))
+end
+
+function IRS_Calib::Info, modules, orders
   if n_elements(modules) eq 0 then modules=indgen(4)
-  print,' == IRS Calibration Object: '+self.Name+' =='
+  str=' == IRS Calibration Object: '+self.Name+' =='
   for i=0,n_elements(modules)-1 do begin 
      md=irs_module(modules[i])
      module=irs_module(md,/TO_NAME)
      no=ptr_valid(self.cal[md])?n_elements(*self.cal[md]):0
-     print,FORMAT='(%"\n ==> Module %s: %s")',module, $
-           (no gt 0?strtrim(n_elements(*self.cal[md]),2)+ $
-            " orders.":" not loaded.")
+     str=[str,string(FORMAT='(%"\n ==> Module %s: %s")',module, $
+                     (no gt 0?strtrim(n_elements(*self.cal[md]),2)+ $
+                      " orders.":" not loaded."))]
      if no eq 0 then continue
      if n_elements(orders) eq 0 then ords=indgen(no) else $
         ords=where_array((*self.cal[md]).order,[orders],no,/SWITCHAB)
      if no eq 0 then continue
-     print,''
+     str=[str,'']
      wsf=self.WAVSAMP_FILE[md]
-     if wsf ne '' then print,FORMAT='(A12,": ",A)', 'WAVSAMP',wsf
+     if wsf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'WAVSAMP',wsf)]
      orf=self.ORDER_FILE[md]
-     if orf ne '' then print,FORMAT='(A12,": ",A)', 'ORDER',orf
+     if orf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'ORDER',orf)]
      tif=self.TILT_FILE[md]
-     if tif ne '' then print,FORMAT='(A12,": ",A)', 'TILT',tif
-     print,''
+     if tif ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'TILT',tif)]
+     str=[str,'']
      for j=0,no-1 do begin 
         rec=(*self.cal[md])[ords[j]]
-        print,FORMAT='(%"    ==> Order %2s%d  (%s): ")', $
-              module,rec.order,rec.Date eq 0.0D?"--":jul2date(rec.Date)
+        str=[str,string(FORMAT='(%"    ==> Order %2s%d  (%s): ")', $
+                        module,rec.order, $
+                        rec.Date eq 0.0D?"--":jul2date(rec.Date))]
         nw=ptr_valid(rec.WAVSAMPS)?n_elements(*rec.WAVSAMPS):0
-        print,"          A:"+strjoin(string(FORMAT='(G10.3)',rec.A))
-        print,"          B:"+strjoin(string(FORMAT='(G10.3)',rec.B))
-        print,"          C:"+strjoin(string(FORMAT='(G10.3)',rec.C))
-        print,"          SLIT_LENGTH:"+string(FORMAT='(G10.3)',rec.SLIT_LENGTH)
-        print,"          WAVELENGTH(min,center,max):"+ $
-              string(FORMAT='(3F10.4)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX)
+        str=[str, $
+             "          A:"+strjoin(string(FORMAT='(G10.3)',rec.A)), $
+             "          B:"+strjoin(string(FORMAT='(G10.3)',rec.B)), $
+             "          C:"+strjoin(string(FORMAT='(G10.3)',rec.C)), $
+             "          SLIT_LENGTH:"+string(FORMAT='(G10.3)', $
+                                             rec.SLIT_LENGTH),$
+             "          WAVELENGTH(min,center,max):" + $
+             string(FORMAT='(3F10.4)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX)]
         if nw gt 0 then $
-           print,"          Apertures:" else $
-           print,"       No Apertures"
+           str=[str,"          Apertures:"] else $
+           str=[str,"       No Apertures"]
         for k=0,nw-1 do begin 
            flags=""
            ws=(*rec.WAVSAMPS)[k]
-           str=string(FORMAT='(%"            %4.2f->%4.2f : %4.2f->%4.2f' + $
-                      ' -- %03d samples")', $
-                      ws.Aperture.low,ws.Aperture.high, $
-                      n_elements(*(*rec.WAVSAMPS)[k].PR))
+           apstr=string(FORMAT='(%"            %4.2f->%4.2f : %4.2f->%4.2f' + $
+                        ' -- %03d samples")', $
+                        ws.Aperture.low,ws.Aperture.high, $
+                        n_elements(*(*rec.WAVSAMPS)[k].PR))
            if ws.PIXEL_BASED ne 0.0 then $
               flags=[string(FORMAT='("pixel-based, width=",F5.3)', $
                             ws.PR_WIDTH)]
@@ -392,17 +407,18 @@ pro IRS_Calib::Print, modules, orders
               flags=[flags,"with polygons"]
            nf=n_elements(flags) 
            if flags[0] ne "" and nf gt 0 then $
-              str=str+" ("+string(FORMAT='('+strtrim(n_elements(flags),2)+ $
-                                  '(A,:,", "))',flags)+")"
-           print,str
+              apstr=apstr+" ("+string(FORMAT='('+ $
+                                      strtrim(n_elements(flags),2)+ $
+                                      '(A,:,", "))',flags)+")"
+           str=[str,apstr]
         endfor
-        print,""
      endfor
   endfor
+  return,str
 end
 
 ;=============================================================================
-;       Orders - Return the list of orders for a given module
+;  Orders - Return the list of orders for a given module
 ;=============================================================================
 function IRS_Calib::Orders,module
   m=irs_module(module)
@@ -411,14 +427,12 @@ function IRS_Calib::Orders,module
 end
 
 ;=============================================================================
-;       FindWAVSAMP - Find and return the indices of WAVSAMPs matching
-;                     the criteria passed. The module and order
-;                     arguments are required, but if APERTURE is
-;                     omitted, and FULL isn't set, matching WAVSAMPs
-;                     of any aperture in that record will be returned.
-;                     The default is non-pixelbased, or, when
-;                     PIXEL_BASED is set, a PR_WIDTH of 1 (unless
-;                     specifically overriden).
+;  FindWAVSAMP - Find and return the indices of WAVSAMPs matching the
+;                criteria passed. The module and order arguments are
+;                required, but if APERTURE is omitted, and FULL isn't
+;                set, matching WAVSAMPs of any aperture in that record
+;                will be returned.  The default is non-pixelbased, or,
+;                when PIXEL_BASED is set, a PR_WIDTH of 1.
 ;=============================================================================
 function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
                                  COUNT=nsamp, PIXEL_BASED=pb, PR_WIDTH=width, $
@@ -464,14 +478,13 @@ end
 
 
 ;=============================================================================
-;       GetWAVSAMP - Generate a list of IRS_WAVSAMP_PSEUDORECT
-;                    structures for a given module, order, and
-;                    APERTURE (or the FULL aperture), with the option
-;                    for PIXEL_BASED WAVSAMPs.  If a PIXEL_BASED clip
-;                    is requested, and the FULL PIXEL_BASED WAVSAMP
-;                    does not exist, it is created and cached.  The
-;                    newly created WAVSAMP is cached for fast
-;                    recovery, unless NO_CACHE is set.
+;  GetWAVSAMP - Generate a list of IRS_WAVSAMP_PSEUDORECT structures
+;               for a given module, order, and APERTURE (or the FULL
+;               aperture), with the option for PIXEL_BASED WAVSAMPs.
+;               If a PIXEL_BASED clip is requested, and the FULL
+;               PIXEL_BASED WAVSAMP does not exist, it is created and
+;               cached.  The newly created WAVSAMP is cached for fast
+;               recovery, unless NO_CACHE is set.
 ;=============================================================================
 function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
                                 PIXEL_BASED=pb, PR_WIDTH=width, $
@@ -516,10 +529,9 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
 end
 
 ;=============================================================================
-;       FreeWAVSAMP - Remove one or more WAVSAMPS from a record,
-;                     optionally removing ALL of them, or those
-;                     specified with indices provided by optional
-;                     keyword INDEX.
+;  FreeWAVSAMP - Remove one or more WAVSAMPS from a record, optionally
+;                removing ALL of them, or those specified with indices
+;                provided by optional keyword INDEX.
 ;=============================================================================
 pro IRS_Calib::FreeWAVSAMP, module, order, APERTURE=aperture,RECORD=rec, $
                             INDEX=inds, ALL=all,_EXTRA=e
@@ -553,15 +565,14 @@ pro IRS_Calib::FreeWAVSAMP, module, order, APERTURE=aperture,RECORD=rec, $
 end 
 
 ;=============================================================================
-;       PixelWAVSAMP - Generate a list of pixel-based
-;                      IRS_WAVSAMP_PSEUDORECT structures for a given
-;                      module and order, for the FULL aperture, and
-;                      the PR_WIDTH indicated (defaults to 1).  In
-;                      contrast to the SSC-supplied WAVSAMP, these
-;                      have fixed sample widths, and align as closely
-;                      as possible to the pixel boundaries.  Set this
-;                      new WAVSAMP into the record, and clip the full
-;                      version.
+;  PixelWAVSAMP - Generate a list of pixel-based
+;                 IRS_WAVSAMP_PSEUDORECT structures for a given module
+;                 and order, for the FULL aperture, and the PR_WIDTH
+;                 indicated (defaults to 1).  In contrast to the
+;                 SSC-supplied WAVSAMP, these have fixed sample
+;                 widths, and align as closely as possible to the
+;                 pixel boundaries.  Set this new WAVSAMP into the
+;                 record, and clip the full version.
 ;=============================================================================
 pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   rec=self->GetRecord(module,order,/MUST_EXIST)
@@ -639,6 +650,8 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
         prs=[pr] 
      endif else begin 
         if width le 1. then begin 
+           ;; XXX- should we really do this?  It avoids gaps for 1xn
+           ;;      PRs, but with 2xn we should leave it alone.
            ;; Connect bottom edge to previous top edge so as to smoothly tile.
            npr=n_elements(prs) 
            pr.x[2:3]=prs[npr-1].x[[1,0]]
@@ -661,7 +674,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   self->SetRecord,rec           ; we may have made a new WAVSAMPS pointer
   
   ;; Clip this new, full, pixel-based WAVSAMP we just added, which also
-  ;; takes care of overlapping areas in adjacent PRs.
+  ;; takes care of overlapping areas in adjacent PRs (XXX not yet)
   ws=self->Clip(module,order,/FULL,/PIXEL_BASED,_EXTRA=e)
 end
 
@@ -670,26 +683,26 @@ function IRS_Calib::IsFullAperture,aps
 end
 
 ;=============================================================================
-;       Clip - Clip a WAVSAMP with specified aperture against the
-;              pixels, and add it to the records WAVSAMP list,
-;              returning the new IRS_WAVSAMP struture.
+;  Clip - Clip a WAVSAMP with specified aperture against the pixels,
+;         and add it to the records WAVSAMP list, returning the new
+;         IRS_WAVSAMP struture.
 ;
-;              If SAVE_POLYGONS is set, populate the POLYGONS field of
-;              each WAVSAMP with the resultant clipped polygons.
+;         If SAVE_POLYGONS is set, populate the POLYGONS field of each
+;         WAVSAMP with the resultant clipped polygons.
 ;
-;              APERTUREs are specified in normalized coordinates, with
-;              0.0 at the "bottom" of the slit (at left), and 1.0 at
-;              right in the "top" of the slit:
+;         APERTUREs are specified in normalized coordinates, with 0.0
+;         at the "bottom" of the slit (at left), and 1.0 at right in
+;         the "top" of the slit:
 ;
-;                           0.0                       1.0 
-;                            |=========================|
-;                   
-;                              <--low                   
-;                            1-------------    high-->  
-;                            |             \-----------0 
-;                            2-------------            |
-;                                          \-----------3
-;                                          
+;                     0.0                       1.0 
+;                      |=========================|
+;             
+;                        <--low                   
+;                      1-------------    high-->  
+;                      |             \-----------0 
+;                      2-------------            |
+;                                    \-----------3
+;                                    
 ;=============================================================================
 function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
                           PIXEL_BASED=pb, PR_WIDTH=width, SAVE_POLYGONS=sp, $
@@ -785,11 +798,11 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
 end
 
 ;=============================================================================
-;       DeOverlap - Renormalize fractional areas for any areas of
-;                   overlap between two PRs, given a list of PRs.
-;                   This assumes at most 2 PRs can overlap in any
-;                   given location.  For unit width, unit spaced PRs,
-;                   this is valid up to tilt angles of 60 degrees.
+;  DeOverlap - Renormalize fractional areas for any areas of overlap
+;              between two PRs, given a list of PRs.  This assumes at
+;              most 2 PRs can overlap in any given location.  For unit
+;              width, unit spaced PRs, this is valid up to tilt angles
+;              of 60 degrees.
 ;=============================================================================
 pro IRS_Calib::DeOverlap, prs
   thisx=prs[0].X & thisy=prs[0].Y
@@ -820,8 +833,8 @@ end
 
 
 ;=============================================================================
-;       GetRecord - Get the calibration record for a given module and
-;                   order, or make one, if none yet exists.
+;  GetRecord - Get the calibration record for a given module and
+;              order, or make one, if none yet exists.
 ;=============================================================================
 function IRS_Calib::GetRecord, module, order, MUST_EXIST=me
   m=irs_module(module)
@@ -841,10 +854,9 @@ function IRS_Calib::GetRecord, module, order, MUST_EXIST=me
 end
 
 ;=============================================================================
-;       SetRecord - Set a calibration record for a given module and
-;                   order.  If such a record already exists,
-;                   overwrite, otherwise append to the end of the
-;                   list.  
+;  SetRecord - Set a calibration record for a given module and order.
+;              If such a record already exists, overwrite, otherwise
+;              append to the end of the list.
 ;=============================================================================
 pro IRS_Calib::SetRecord, record
   if tag_names(record,/STRUCTURE_NAME) ne 'IRS_CALIBREC' then $
@@ -867,8 +879,8 @@ pro IRS_Calib::SetRecord, record
 end
 
 ;=============================================================================
-;       ReadCalib - Read (up to) all three calibration files for a
-;                   given module or modules, and record in the object.
+;  ReadCalib - Read (up to) all three calibration files for a given
+;              module or modules, and record in the object.
 ;=============================================================================
 pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                            TILT_VERSION=tv,ONLY=only
@@ -929,9 +941,9 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
 end
 
 ;=============================================================================
-;       ParseWAVSAMP - Read and parse the specified WAVSAMP file,
-;                      clipping and caching the PSUEDO-RECT full-slit
-;                      polygons for fast access.
+;  ParseWAVSAMP - Read and parse the specified WAVSAMP file, clipping
+;                 and caching the PSUEDO-RECT full-slit polygons for
+;                 fast access.
 ;=============================================================================
 pro IRS_Calib::ParseWAVSAMP,file,module
   m=irs_module(module)
@@ -971,8 +983,8 @@ pro IRS_Calib::ParseWAVSAMP,file,module
 end
 
 ;=============================================================================
-;       ParseOrdFind - Read and parse the specified ORDFIND file,
-;                      saving the polynomial fit data in the object.
+;  ParseOrdFind - Read and parse the specified ORDFIND file, saving
+;                 the polynomial fit data in the object.
 ;=============================================================================
 pro IRS_Calib::ParseOrdFind,file,module
   m=irs_module(module)
@@ -991,8 +1003,8 @@ pro IRS_Calib::ParseOrdFind,file,module
 end
 
 ;=============================================================================
-;       ParseLineTilt - Read and parse the specified LINETILT file,
-;                       saving the polynomial fit data in the object.
+;  ParseLineTilt - Read and parse the specified LINETILT file, saving
+;                  the polynomial fit data in the object.
 ;=============================================================================
 pro IRS_Calib::ParseLineTilt,file,module
   m=irs_module(module)
@@ -1015,10 +1027,10 @@ pro IRS_Calib::ParseLineTilt,file,module
 end
 
 ;=============================================================================
-;       CleanupWAVSAMP - Delete the contents of one or more WAVSAMP
-;                        records by freeing the internal pointers, or
-;                        just clear the PIXELS and AREAS (and
-;                        optionally POLYGONS) if PA_ONLY set.
+;  CleanupWAVSAMP - Delete the contents of one or more WAVSAMP records
+;                   by freeing the internal pointers, or just clear
+;                   the PIXELS and AREAS (and optionally POLYGONS) if
+;                   PA_ONLY set.
 ;=============================================================================
 pro IRS_Calib::CleanWAVSAMP, ws,PA_ONLY=pao
   for i=0,n_elements(ws)-1 do begin
@@ -1035,7 +1047,7 @@ pro IRS_Calib::CleanWAVSAMP, ws,PA_ONLY=pao
 end
 
 ;=============================================================================
-;       Cleanup - Free all resources.
+;  Cleanup - Free all resources.
 ;=============================================================================
 pro IRS_Calib::Cleanup
   for i=0,3 do begin 
@@ -1049,7 +1061,7 @@ pro IRS_Calib::Cleanup
 end
 
 ;=============================================================================
-;       Init - Create a new IRS_Calib object
+;  Init - Create a new IRS_Calib object
 ;=============================================================================
 function IRS_Calib::Init,name
   if n_elements(name) ne 0 then self.Name=name
@@ -1057,7 +1069,7 @@ function IRS_Calib::Init,name
 end
 
 ;=============================================================================
-;       IRS_Calib__define - Define the IRS_Calib class
+;  IRS_Calib__define - Define the IRS_Calib class
 ;=============================================================================
 pro IRS_Calib__define
   class={IRS_Calib, $         
@@ -1066,7 +1078,7 @@ pro IRS_Calib__define
          TILT_FILE:strarr(5),$  ;the name of the tilt file (c)
          ORDER_FILE:strarr(5), $ ;the name of the ordfind output file (a & b)
          cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
-                                ;for each module: 0:LH, 1:LL, 2:SH, 3:SL
+                                ;for each module: 0:LH, 1:LL, 2:SH, 3:SL 4:MSED
   
   ;; The complete calibration set for a single order in one module.
   ;; Note that the bonus 1st order segment in the low-res modules is
