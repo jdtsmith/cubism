@@ -3691,7 +3691,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      
      background=fltarr(self.CUBE_SIZE[0:1])
      for i=0,fore_cnt-1 do begin 
-        print,1./(1.+abs(fore_wav[i]-back_wav))
+        ;;print,1./(1.+abs(fore_wav[i]-back_wav))
         back_weights=rebin(reform(1./(1.+abs(fore_wav[i]-back_wav)), $
                                   [1,1,back_cnt]), $
                            [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
