@@ -67,7 +67,6 @@ pro CubeViewSpec::Event,ev
      return
   endif 
   case ev.id of 
-     self.wQuit: widget_control, ev.top,/DESTROY
      self.wHotKey: begin 
         case type of
            ;; Key Presses
@@ -160,9 +159,7 @@ pro CubeViewSpec::Event,ev
            'WIDGET_TEXT_DEL': self->Delete            
         endcase 
      end 
-     
-     self.wToggles: self->Plot
-     
+          
      self.wDraw: begin 
         c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
         case ev.type of
@@ -266,6 +263,13 @@ pro CubeViewSpec::Event,ev
         endcase 
      end 
      
+     self.wQuit: widget_control, ev.top,/DESTROY
+     
+     self.wSaveBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0}
+     self.wSaveASCBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,1}
+     
+     self.wToggles: self->Plot
+
      self.wFit: $
         case ev.value of 
         0: self->Reset
@@ -966,6 +970,8 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
                        SET_VALUE=0,/NO_RELEASE)
   
   file=widget_button(mbar,value='File',/MENU)
+  self.wSaveBut=widget_button(file,value='Save Spectrum as FITS...')
+  self.wSaveASCBut=widget_button(file,value='Save Spectrum as ASCII...')
   self.wQuit=widget_button(file,value='Quit')
   maps=widget_button(mbar,value='Maps',/MENU)
   but=widget_button(maps, value='Save Current Map...', $
@@ -1041,7 +1047,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   ;if n_elements(lam) ne 0 AND n_elements(sp) ne 0 then self->Load,lam,sp
 
   widget_control,self.wHotKey,SET_TEXT_SELECT=4,/INPUT_FOCUS
-  self->MsgSetup,['CUBEVIEWSPEC_STACK','CUBEVIEWSPEC_FULL']
+  self->MsgSetup,['CUBEVIEWSPEC_STACK','CUBEVIEWSPEC_FULL','CUBEVIEWSPEC_SAVE']
   return,1
 end
 
@@ -1110,6 +1116,8 @@ pro CubeViewSpec__define
       wToggles:0L, $            ;the renorm/value-line check box  
       wFull:0L, $               ;widget id for selecting full mode
       wParams:0L , $            ;widget where the fitted parameters are listed
+      wSaveBut:0L, $            ;save to fits
+      wSaveASCBut:0L,$          ;save to ascii
       colors_base:0L}           ;5 linear shades
   
   ;; The messages we send
@@ -1126,4 +1134,7 @@ pro CubeViewSpec__define
                                 ; background over wavelength.
   msg={CUBEVIEWSPEC_FULL, $     ;switch to full mode
        wavelength:0.0}          ;the wavelength we're at
+  
+  msg={CUBEVIEWSPEC_SAVE, $     ;save the current extraction
+       ascii:0}
 end
