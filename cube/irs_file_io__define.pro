@@ -63,9 +63,9 @@ pro IRS_File_IO::InheritHeader,hdr,comment
   endif 
   
   if ~ptr_valid(self.hdr) then $
-     self.hdr=ptr_new(self.fits?hdr:'\char '+hdr) $
+     self.hdr=ptr_new(self.fits?hdr:'\'+hdr) $
   else $
-     *self.hdr=[*self.hdr,self.fits?hdr:'\char '+hdr]
+     *self.hdr=[*self.hdr,self.fits?hdr:'\'+hdr]
 end
 
 
@@ -84,7 +84,6 @@ function IRS_File_IO::SaveFile,sf
   if size(sf,/TYPE) eq 7 then self.fits=stregex(sf,'\.fits\$',/BOOLEAN)
   return,sf
 end 
-
 
 
 ;=============================================================================
