@@ -71,7 +71,7 @@ pro polyclip,i,j,pol_x,pol_y
   ;;       A polygon edge looks like:
   ;;                 s-------->p
   np=n_elements(pol_x) 
-  py_out=(px_out=fltarr(2*(np>4),/nozero));room for full clipped polygon
+  py_out=(px_out=fltarr(np+4,/nozero)) ;room for full clipped (convex) polygon
   clip_vals=[i,i+1,j+1,j]
   
   for ctype=0b,3b do begin      ;clip left, right, top, bottom
