@@ -9,7 +9,8 @@ pro tvHist::Message, msg
      'BOX': if self.freeze eq 0 then self.oDraw->Draw    ; box moved!
      'TVDRAW_PREDRAW':  begin
         ptr_free,self.finite
-        self.finite=ptr_new(where(finite(*msg.im)))
+        self.finite=ptr_new(finite(*msg.im))
+        self.non_finite=~array_equal(*self.finite,1b)
         self->Histo,msg.im
      end 
      'TVDRAW_POSTDRAW': begin 
@@ -150,28 +151,28 @@ pro tvHist::Histo,im
   endif   
   
   ;; Non-frozen modes
-  if boxon then take=(*im)[l:r,b:t] else begin 
-     ;; linear with no hist box: do nothing, except record range
-     if self.scale_mode eq 0 then begin 
-        self.min=min(*im,MAX=mx,/NAN)
-        self.max=mx
-        return 	
-     endif
+  if boxon then begin 
+     take=(*im)[l:r,b:t] 
+     if self.non_finite then finite=(*self.finite)[l:r,b:t]
+  endif else begin 
      boxon=0
      take=*im
+     if self.non_finite then finite=*self.finite
   endelse
   
   switch self.scale_mode of 
      0: begin                   ; linear
-        mx=max(take,min=mn,/NAN)
+        mx=max(take,min=mn,NAN=self.non_finite)
         if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
         break
      end
      
      1: 
      2: begin                   ;99%,95% linear
-        nt=n_elements(take)
-        s=take[sort(take)]
+        if ~self.all_finite then begin 
+           wh=where(finite,nt)
+           s=take[wh[sort(take[wh])]]
+        endif else s=take[sort(take)]
         mx=s[((nt-1)*([99,95])[self.scale_mode-1]/100)<(nt-2)]
         mn=s[((nt-1)*([1,5])[self.scale_mode-1]/100)>1]
         if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
@@ -179,14 +180,14 @@ pro tvHist::Histo,im
      end
      
      3: begin                   ;sqrt
-        mx=max(take,min=mn,/NAN)
+        mx=max(take,min=mn,NAN=self.non_finite)
         *im=sqrt((mn>*im)-mn)
         self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(mx-mn)
         break
      end
      
      4: begin                   ;logarithm
-        mx=max(take,min=mn,/NAN)
+        mx=max(take,min=mn,NAN=self.non_finite)
         *im=alog10((mn>*im)-mn+(mx-mn)*1.e-6)
         self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*1.e-6), $
                                   MAX=alog10((mx-mn)*(1.+1.e-6))
@@ -194,14 +195,17 @@ pro tvHist::Histo,im
      end
      
      5: begin                   ;histeq
-        mx=max(take,min=mn,/NAN)
+        mx=max(take,min=mn,NAN=self.non_finite)
         if mx eq mn then return
         bs=(mx-mn)/500
-        h=histogram(*im,BINSIZE=bs,MIN=mn,MAX=mx,/NAN)
+        h=histogram(*im,BINSIZE=bs,MIN=mn,MAX=mx,NAN=self.non_finite)
         h[0]=0.                 ;don't elevate the background
         h=total(temporary(h),/CUMULATIVE,/DOUBLE)
         self.oDraw->SetDrawMinMax,MIN=0,MAX=max(h)
-        (*im)[*self.finite]=h[((mn>(*im)[*self.finite]<mx)-mn)/bs]
+        if self.non_finite then begin 
+           good=where(*self.finite)
+           (*im)[good]=h[((mn>(*im)[good]<mx)-mn)/bs]
+        endif else *im=h[((mn>*im<mx)-mn)/bs]
         break
      end
   endswitch
@@ -329,7 +333,8 @@ pro tvHist__define
           imhist_max:0L, $      ;the maximum histogram value
           min:0.0, $            ;the minimum scaling value
           max:0.0, $            ;the maximum scaling value
-          finite:ptr_new(), $   ;where finite
+          finite:ptr_new(), $   ;finite map
+          non_finite:0, $       ;efficiency flag if any non-finite
           nbins:0, $            ;number of bins, defaults to 100
           scale_mode: 0, $      ;0:linear 1:99% 2:95% 3:sqrt 4:log 5:histeq
           wScalButs:lonarr(6), $ ;the scaling widget buttons
