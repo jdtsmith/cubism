@@ -37,10 +37,13 @@ end
 ;=============================================================================
 ;  GetProperty
 ;=============================================================================
-pro IRS_Spectrum::GetProperty,REGION=region,FLUX_UNITS=fu,WAVE_UNITS=wu
+pro IRS_Spectrum::GetProperty,REGION=region,FLUX_UNITS=fu,WAVE_UNITS=wu, $
+                              WAVELENGTH=wl, SPECTRUM=flux
   if arg_present(wu) then wu=self.wave_units
   if arg_present(fu) then fu=self.flux_units
   if arg_present(region) then region=self.region
+  if arg_present(wl) && ptr_valid(self.wavelength) then wl=*self.wavelength
+  if arg_present(flux) then && ptr_valid(self.flux) then flux=*self.flux
 end
 
 
