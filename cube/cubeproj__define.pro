@@ -167,6 +167,12 @@ pro CubeProj::ShowEvent, ev
         widget_control, ev.id, SET_BUTTON=self.fluxcon
         self.changed=1b
      end
+     'reconstructed': begin 
+        self.reconstructed_pos=1b-self.reconstructed_pos
+        widget_control, ev.id, SET_BUTTON=self.reconstructed_pos
+        self->ResetAccounts
+        self.changed=1b
+     end
      'save-with-data': begin 
         self.SaveMethod XOR=1b
         widget_control, ev.id, SET_BUTTON=self.SaveMethod AND 1b
@@ -540,12 +546,16 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).MUST_ACCT= $
      widget_button(cube,VALUE='Reset Accounts',UVALUE='resetaccounts')
   ;;-------------
-  b1=widget_button(cube,VALUE='Use Cube Build Feedback',UVALUE='feedback', $
+  b1=widget_button(cube,VALUE='Show Cube Build Feedback',UVALUE='feedback', $
                    /CHECKED_MENU,/SEPARATOR) 
   widget_control, b1, /SET_BUTTON
   b1=widget_button(cube,VALUE='Build Cube with FLUXCON',UVALUE='fluxcon', $ $
                    /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.fluxcon
+  b1=widget_button(cube,VALUE='Use Reconstructed Positions', $
+                   UVALUE='reconstructed', /CHECKED_MENU)
+  widget_control, b1,SET_BUTTON=self.reconstructed_pos
+
   
   ;;-------------
   (*self.wInfo).MUST_MODULE= $
@@ -716,8 +726,21 @@ function CubeProj::Load,file,ERROR=err
      if NOT obj_isa(obj,obj_class(self)) then $
         self->Error,'Invalid Cube Project'
      obj->SetProperty,CHANGED=0b,SAVE_FILE=file
+     obj->CheckVersion
   endif      
   return,obj
+end
+
+
+pro CubeProj::CheckVersion
+  ;; Look for old-style saved Reverse Accounts: rebuild if necessary.
+  if ptr_valid(self.DR) && self.ACCOUNTS_VALID then begin 
+     wh=where(ptr_valid((*self.DR).REV_ACCOUNT),cnt)
+     if cnt gt 0 && array_equal((*self.DR)[wh].REV_WIDTH,0L) then begin 
+        self->BuildRevAcct
+        self->Message,"Old reverse accounts found: rebuilt."
+     endif 
+  endif
 end
 
 ;=============================================================================
@@ -753,7 +776,7 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
      if n_elements(nodata) eq 0 then nodata=~(self.SaveMethod AND 1b)
      if n_elements(noacc) eq 0 then noacc=~(self.SaveMethod AND 2b)
      stub=ptrarr(nr)
-     detRevAccts=(*self.DR).REV_ACCOUNT 
+     detRevAccts=(*self.DR).REV_ACCOUNT ;never save reverse accounts
      (*self.DR).REV_ACCOUNT=stub
      if keyword_set(nodata) then begin 
         detBCD=(*self.DR).BCD
@@ -1170,8 +1193,7 @@ function CubeProj::List
                else acct="Y"
             endif else acct="INV"
          endif else acct="N"
-         if self.reconstructed_pos then pos=(*self.DR).REC_POS else $
-            pos=(*self.DR)[i].RQST_POS
+         pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR)[i].RQST_POS
          s=string(FORMAT= $
                   '(" ",A20,T23,A11,T34,A12,T49,A1,T56,A1,T63,A1,T69,A5)', $
                   (*self.DR)[i].ID, $
@@ -1673,12 +1695,13 @@ end
 ;                POINTER set.
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
-                           UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $
-                           CALIB=calib, MODULE=module, APERTURE=ap, $
-                           PROJECT_NAME=pn,DR=dr, TLB_OFFSET=tboff, $
-                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
-                           ASTROMETRY=astr,POSITION_ANGLE=pa,BACKGROUND=bg, $
-                           BAD_PIXEL_LIST=bpl,PMASK=pmask,POINTER=ptr
+                           UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $ $
+                           SLIT_LENGTH=sl, CALIB=calib, MODULE=module, $
+                           APERTURE=ap, PROJECT_NAME=pn,DR=dr, $
+                           TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
+                           VERSION=version, ASTROMETRY=astr,POSITION_ANGLE=pa,$
+                           BACKGROUND=bg,BAD_PIXEL_LIST=bpl,PMASK=pmask, $
+                           POINTER=ptr
   ptr=keyword_set(ptr) 
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
      account=ptr?self.account:*self.account
@@ -1689,6 +1712,10 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   if arg_present(unc) && ptr_valid(self.CUBE_UNC) then unc=*self.CUBE_UNC
   if arg_present(prz) then prz=self.PR_SIZE
   if arg_present(prw) then prw=self.PR_SIZE[1]
+  if arg_present(sl) then begin 
+     self->LoadCalib
+     self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
+  endif 
   if arg_present(calib) then begin 
      self->LoadCalib            ;ensure it's loaded
      calib=self.cal
@@ -1781,7 +1808,9 @@ end
 ;=============================================================================
 ;  BCD
 ;=============================================================================
-function CubeProj::BCD, which,UNCERTAINTY=unc,BMASK=bmask
+function CubeProj::BCD, which,UNCERTAINTY=unc,BMASK=bmask,ALL=all
+  if ~ptr_valid(self.DR) then return,-1
+  if keyword_set(all) then which=indgen(self->N_Records())
   if ~array_equal(which lt 0 or which ge self->N_Records(),0b) then $
      self->Error,"Invalid record number: "+strjoin(strtrim(which,2),",")
   nw=n_elements(which) 
@@ -1842,6 +1871,8 @@ pro CubeProj::LoadCalib,SELECT=sel
                  '  '+self.cal_file]
   endif
   obj_destroy,self.cal
+;  if ~file_test(self.cal_file,/READ) then begin 
+;     self->Warn,"Can't locate calibration file: 
   self.cal=irs_restore_calib(self.cal_file)
   self->UpdateButtons & self->UpdateTitle
 end
@@ -2342,13 +2373,23 @@ pro CubeProj::BuildRevAcct
         then continue else ptr_free,(*self.DR)[i].REV_ACCOUNT
      if (*self.DR)[i].DISABLED then continue
      
-     ;; Compute the total reverse index of the full cube index
-     ;; histogram for this DR's accounting.  E.g. the account records
-     ;; from this BCD pertaining to cube pixel z are:
-     ;; ri[ri[z-rev_min]:ri[z+1-rev_min]-1].
-     h=histogram((*(*self.DR)[i].ACCOUNT).cube_pix+ $
-                 (*(*self.DR)[i].ACCOUNT).cube_plane* $
-                 self.CUBE_SIZE[0]*self.CUBE_SIZE[1], $
+     ;; Find the x/y bounding box of this DRs footprint in the cube:
+     pix=(*(*self.DR)[i].ACCOUNT).cube_pix
+     y=pix/self.CUBE_SIZE[0]
+     x=pix-y*self.CUBE_SIZE[0]
+     mn_x=min(x,MAX=mx_x)
+     mn_y=min(y,MAX=mx_y)
+     width=mx_x-mn_x+1 & height=mx_y-mn_y+1
+     (*self.DR)[i].REV_WIDTH=width
+     (*self.DR)[i].REV_HEIGHT=height
+     (*self.DR)[i].REV_OFFSET=[mn_x,mn_y]
+     x-=mn_x & y-=mn_y          ;offset into BB
+     
+     ;; Compute the reverse indices of the smaller bounding box of the
+     ;; full cube index histogram for this DR's accounting.  E.g. the
+     ;; account records from this BCD pertaining to bounding box pixel
+     ;; z are: ri[ri[z-rev_min]:ri[z+1-rev_min]-1].
+     h=histogram(x+width*(y + height * (*(*self.DR)[i].ACCOUNT).cube_plane), $
                  OMIN=om,REVERSE_INDICES=ri)
      (*self.DR)[i].REV_ACCOUNT=ptr_new(ri,/NO_COPY)
      (*self.DR)[i].REV_CNT=n_elements(h) 
@@ -2530,7 +2571,8 @@ pro CubeProj::LayoutBCDs
   endfor
   self.PA=mean((*self.DR)[use].PA_RQST) ;match our PA to the most numerous
   ;; Approximate cube center (pos average), for now (not critical)
-  self.POSITION=total((*self.DR).RQST_POS,2)/self->N_Records()
+  pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR).RQST_POS
+  self.POSITION=total(pos,2)/self->N_Records()
   cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
   
   ords=self->BuildOrders()
@@ -2569,7 +2611,7 @@ pro CubeProj::LayoutBCDs
      
      ;; Compute the RA/DEC of the 4 corners.
      make_astr,astr,CD=cd_pa,DELTA=[1.D,1.D],CRPIX=[0.5,0.5], $
-               CRVAL=(*self.DR)[i].RQST_POS,CTYPE=['RA---TAN','DEC--TAN']
+               CRVAL=pos[*,i],CTYPE=['RA---TAN','DEC--TAN']
 
      xy2ad,pr_rect[0,*],pr_rect[1,*],astr,a_rect,d_rect
 ;     prs[*,i]=[a_rect,d_rect]
@@ -2685,11 +2727,19 @@ pro CubeProj::BuildCube
   
   if self.fluxcon then fluxcon=self->FluxConImage()
   
+  cube_width=self.CUBE_SIZE[0]
+  cube_wh=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
+  
   for dr=0,n_elements(*self.DR)-1 do begin 
      if (*self.DR)[dr].DISABLED then continue
      acct=*(*self.DR)[dr].ACCOUNT
      rev_acc=*(*self.DR)[dr].REV_ACCOUNT
      rev_min=(*self.DR)[dr].REV_MIN
+     rev_width=(*self.DR)[dr].REV_WIDTH
+     rev_height=(*self.DR)[dr].REV_HEIGHT
+     rev_wh=rev_width*rev_height
+     rev_off=(*self.DR)[dr].REV_OFFSET
+     
      bcd=*(*self.DR)[dr].BCD
      if ptr_valid(self.BACKGROUND) then bcd-=*self.BACKGROUND
      if self.fluxcon then bcd/=fluxcon
@@ -2713,7 +2763,10 @@ pro CubeProj::BuildCube
      ;; Use the reverse account to populate the cube -- slow
      for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
         if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
+        
+        ;; Accounts appropriate to this pixel:
         these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
+        
         ;; XXX Error weighting, BMASK, other alternatives
         ;;  need all in one place? ... e.g trimmed mean?
         ;if array_equal(finite(bcd[these_accts.BCD_PIX]),0b) then $
@@ -2721,7 +2774,16 @@ pro CubeProj::BuildCube
                                 ;         bcd[these_accts.BCD_PIX]
         
         ;; Default pixel value is non-finite (NaN)
-        pix=rev_min+i
+        ;; Translate pix in the smaller bounding-box holding this DRs data
+        pix=rev_min+i           ;pixel inside the bounding box
+        z=pix/rev_wh
+        pix-=z*rev_wh
+        y=pix/rev_width
+        pix-=y*rev_width
+        y+=rev_off[1]
+        x=rev_off[0]+pix
+        pix=z*cube_wh+y*cube_width+x
+        
         if use_bmask then begin 
            cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
                      total(bcd[these_accts.BCD_PIX] * $
@@ -2877,20 +2939,46 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   
   ;; At least one reverse account required
   if array_equal(ptr_valid((*self.DR).REV_ACCOUNT),0b) then self->BuildRevAcct
-  if n_elements(pix) eq 2 then pix=pix[0]+pix[1]*self.CUBE_SIZE[0]
-  if n_elements(plane) ne 0 then $
-     z=pix+plane*self.CUBE_SIZE[0]*self.CUBE_SIZE[1] $
-  else z=pix
+  
+  if n_elements(plane) ne 0 then z=plane $
+  else begin 
+     sz=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
+     z=pix/sz
+     pix-=z*sz
+  endelse 
+  if n_elements(pix) eq 2 then begin 
+     x=pix[0] & y=pix[1]
+  endif else begin 
+     y=pix/self.CUBE_SIZE[0]
+     x=pix-y*self.CUBE_SIZE[0]
+  endelse 
+  
   show=keyword_set(follow) && self->Showing()
   if show then show_vec=bytarr(nrec)
   for i=0,nrec-1 do begin 
      if ~ptr_valid((*self.DR)[i].REV_ACCOUNT) then continue
-     if z lt (*self.DR)[i].REV_MIN then continue
-     thisz=z-(*self.DR)[i].REV_MIN
+     if x lt (*self.DR)[i].REV_OFFSET[0] || $
+        x ge (*self.DR)[i].REV_OFFSET[0]+(*self.DR)[i].REV_WIDTH || $
+        y lt (*self.DR)[i].REV_OFFSET[1] || $
+        y ge (*self.DR)[i].REV_OFFSET[1]+(*self.DR)[i].REV_HEIGHT $
+     then continue
+     
+     ;; offset into the bounding-box coordinates
+     w=(*self.DR)[i].REV_WIDTH
+     w_h=w*(*self.DR)[i].REV_HEIGHT
+     ind=(x-(*self.DR)[i].REV_OFFSET[0]) + $
+         w*(y-(*self.DR)[i].REV_OFFSET[1]) + $
+         w_h*z
+     
+     if ind lt (*self.DR)[i].REV_MIN then continue
+     ind-=(*self.DR)[i].REV_MIN
+     
      ri=*(*self.DR)[i].REV_ACCOUNT
-     if ri[thisz] ge ri[thisz+1] then continue
+     if ri[ind] ge ri[ind+1] then continue ;nothing in there
+     
+     ;; We've got a match
      if show then show_vec[i]=1b
-     accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[thisz]:ri[thisz+1]-1]]
+     accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[ind]:ri[ind+1]-1]]
      ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,BCD_VAL:0.0, $
                     BACK_VAL:0.0,AREA:0.0},n_elements(accs))
      ret.BCD_PIX=accs.BCD_PIX 
@@ -2900,6 +2988,7 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
      ret.AREA=accs.AREA
      if n_elements(all) eq 0 then all=[ret] else all=[all,ret]
   endfor 
+  
   if show then begin 
      widget_control, (*self.wInfo).SList, SET_LIST_SELECT=where(show_vec)
      self->UpdateButtons
@@ -3406,6 +3495,7 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   rec.NCYCLES=sxpar(header,'NCYCLES')
   
   ;; Requested Positions/PA
+  ;; PA_RQST is SIRTF-field-centric, not FOV-centric.
   if n_elements(rqpos) eq 2 then rec.RQST_POS=rqpos else $
      rec.RQST_POS=[sxpar(header,'RA_RQST'),sxpar(header,'DEC_RQST')]
   if n_elements(pa_rqst) ne 0 then rec.PA_RQST=pa_rqst else begin 
@@ -3415,7 +3505,6 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
      rec.PA_RQST=new_pa          ; transform requested PA to the slit
   endelse
   
-  ;; PA_RQST is SIRTF-field-centric, not FOV-centric.
 
   ;; Achieved (reconstructed) positions/PA
   if n_elements(rpos) eq 3 then rec.REC_POS=rpos else $
@@ -3634,6 +3723,9 @@ pro CubeProj__define
        REV_ACCOUNT: ptr_new(),$ ;reverse indices of the CUBE_INDEX histogram
        REV_MIN:0L, $            ;minimum cube index affected
        REV_CNT:0L, $            ;how many bins in the cube_index histogram?
+       REV_WIDTH:0L, $          ;width of the DR bounding-box on the cube
+       REV_HEIGHT:0L, $         ;height of the DR bounding-box on the cube
+       REV_OFFSET:[0L,0L], $    ;offset of the DR bounding-box into the cube
        RQST_POS: [0.0D,0.0D], $ ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
        FOVID: 0, $              ;The IRS Field of View ID
@@ -3643,7 +3735,7 @@ pro CubeProj__define
        TARGET_POS: 0, $         ;For low-res: 0, 1, or 2 for centered on
                                 ; module, slit position 1, or slit position 2
        PA: 0.0D, $              ;Position angle of slit (+w?) E of N
-       PA_RQST: 0.0D, $         ;Requestion PA of slit (+w?)
+       PA_RQST: 0.0D, $         ;Requested PA of slit (+w?)
        AORKEY: 0L, $            ;the AOR ID KEY
        BCD: ptr_new(), $        ;the BCD
        UNC:ptr_new(), $         ;the BCD's uncertainty image
