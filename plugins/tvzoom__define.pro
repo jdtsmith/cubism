@@ -76,6 +76,11 @@ end
 function tvZoom::Description
   return,'Zoom/Pan Image'
 end
+
+function tvZoom::MouseHelp
+  return,['Zoom In','Pan','Zoom Out']
+end
+
 ;;************************End OverRiding methods*******************************
 
 pro tvZoom::UpdateDrawSize

@@ -283,6 +283,10 @@ end
 function tvColor::Description
   return,'Scale Colormap'
 end
+
+function tvColor::MouseHelp
+  return,['Adjust','','Reset']
+end
 ;;*************************End OverRiding methods******************************
 
 ;=============================================================================

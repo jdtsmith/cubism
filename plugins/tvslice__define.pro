@@ -112,6 +112,9 @@ function tvSlice::Description
   return,'Line Slicing'
 end
 
+function tvSlice::MouseHelp
+  return,['Slice','','XYConstrained']
+end
 ;;************************End OverRiding methods*******************************
 
 pro tvslice_plot_event,ev

@@ -140,6 +140,9 @@ pro tvSwitcher::Start
      if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic   
      desc=objs[i]->Description()
      if (*self.MsgList)[i].keys then desc+=" ("+(*self.MsgList)[i].keys+")"
+     mh=objs[i]->MouseHelp()
+     if mh[0] then $
+        desc+=' - [ '+mh[0]+' | '+mh[1]+' | '+mh[2]+' ]'
      (*self.wList)[i]= $
         widget_button(self.sBase[1b-(*self.MsgList)[i].Exclusive], $
                       /NO_RELEASE,value=val,UVALUE=i,/ALIGN_CENTER, $

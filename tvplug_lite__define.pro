@@ -55,6 +55,15 @@ function tvPlug_lite::Description
 end
 
 ;=============================================================================
+;  MouseHelp - A short help on the mouse: three strings, for left,
+;              middle, right mouse buttons.
+;=============================================================================
+function tvPlug_lite::MouseHelp
+  return,['','','']
+end
+
+
+;=============================================================================
 ;  Start - Just a dummy in case a plug-in needs no Startup.
 ;=============================================================================
 pro tvPlug_lite::Start
