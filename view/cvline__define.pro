@@ -10,7 +10,7 @@ pro cvLine::Message,msg
         self.bcd_mode=msg.bcd_mode
         self.module=msg.module
         self.cube=msg.cube
-        if self.bcd_mode then self->UpdateWAVSAMP ;possibly a new one
+        if self.bcd_mode then self->UpdateWAVSAMP else self->UpdateAstrometry
      end
      
      'DRAW_MOTION': begin 
@@ -35,9 +35,15 @@ pro cvLine::Message,msg
            widget_control, self.wLine,SET_VALUE= $
                            self->String(imorig,pt,LAMBDA=lambda,ORDER=order)
            self.savlambda=lambda & self.savorder=order & self.savpoint=pt
-        endif else begin        ; wcs mode
-           ;; ra/dec always get updated.
-           widget_control, self.wLine,set_value=self->ValString(imorig,pt)
+        endif else begin        ; cube wcs mode
+           if ptr_valid(self.astrometry) then begin 
+              ;; ra/dec always get updated.
+              xy2ad,pt[0]-.5,pt[1]-.5,*self.astrometry,a,d
+              widget_control, self.wLine,set_value= $
+                              self->String(imorig,pt,RA=a,DEC=d)
+           endif else begin 
+              widget_control, self.wLine,set_value=self->ValString(imorig,pt)
+           endelse 
         endelse 
      end
      
@@ -123,6 +129,14 @@ pro cvLine::UpdateWAVSAMP
   endfor
 end
 
+;=============================================================================
+;  UpdateAstrometry - Get the cube astrometry record
+;=============================================================================
+pro cvLine::UpdateAstrometry
+  ptr_free,self.astrometry
+  self.cube->GetProperty,ASTROMETRY=astr
+  self.astrometry=ptr_new(astr,/NO_COPY)
+end
 
 ;=============================================================================
 ;  String - The total string
@@ -131,8 +145,7 @@ function cvLine::String, im,point,LAMBDA=lambda,ORDER=order,RA=ra,DEC=dec
   if NOT array_equal(point,self.savpoint) then $
      self.valstring=self->ValString(im,point)
   return,self.valstring+' | '+(self.bcd_mode?self->PRString(lambda,order):$
-                             self->WCSString(ra,dec))
-  
+                               self->WCSString(ra,dec))
 end
 
 ;=============================================================================
@@ -165,6 +178,7 @@ end
 ;=============================================================================
 pro cvLine::Cleanup
   heap_free,self.PRs
+  ptr_free,self.astrometry
   self->tvPlug_lite::Cleanup
 end
 
@@ -192,6 +206,7 @@ pro cvLine__define
           bcd_mode:0, $         ;whether bcd or cube mode
           PRs:ptr_new(), $      ;all the pseudo-rectangles
           cube:obj_new(), $     ;
+          astrometry:ptr_new(),$ ;cube astrometry record
           module:'', $          ;the module that came with the latest bcd/cube
           wLine:0L}             ;widget id of text line
   return
