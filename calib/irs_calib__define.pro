@@ -849,8 +849,10 @@ pro IRS_Calib::TransformBoreSightCoords,module,coords,pa, $
   RADEG = 180.0d/!DPI           ; preserve double
   ang=pa/RADEG
   c=cos(ang) & s=sin(ang)
-  outcoords=coords + rebin(reform([[c,s],[-s,c]] ## [rec.TPF_Y,rec.TPF_Z]), $
-                           size(coords,/DIMENSIONS),/SAMPLE)
+  delta=rebin(reform([[c,s],[-s,c]] ## [rec.TPF_Y,rec.TPF_Z]), $
+              size(coords,/DIMENSIONS),/SAMPLE)
+  delta[0,*]/=cos(coords[1]/RADEG)
+  outcoords=coords + delta
   outpa=pa+(360.0D - rec.TPF_ANGLE)
 end
 
@@ -866,10 +868,11 @@ pro IRS_Calib::TransformCoords,module1,coords1,pa1, $
   RADEG = 180.0d/!DPI           ; preserve double
   ang=pa_bs/RADEG
   c=cos(ang) & s=sin(ang)
-  coords2=coords1 + $
-          rebin(reform([[c,s],[-s,c]] ## $
-                       ([rec2.TPF_Y,rec2.TPF_Z]-[rec1.TPF_Y,rec1.TPF_Z])), $
-                size(coords1,/DIMENSIONS),/SAMPLE)
+  delta=rebin(reform([[c,s],[-s,c]] ## $
+                     ([rec2.TPF_Y,rec2.TPF_Z]-[rec1.TPF_Y,rec1.TPF_Z])), $
+              size(coords1,/DIMENSIONS),/SAMPLE)
+  delta[0,*]/=cos(coords1[1]/RADEG) ;small-angle law-of-cosines approx.
+  coords2=coords1 + delta
 end
 
 ;=============================================================================
