@@ -2954,7 +2954,9 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
      ~stregex(dir,'r?[0-9]{7,10}'+path_sep()+'?$',/BOOLEAN) then $
      self->Error,'Must select AOR directory of form [r]0123456[789]'
   if keyword_set(cd) then filt='*coa*2d.fits' else filt='*bcd{,_fp}.fits'
-  files=file_search(dir,filt,/TEST_REGULAR)
+  files=file_search(dir,filt,/TEST_REGULAR,COUNT=cnt)
+  if cnt eq 0 then $
+     self->Error,['No data found in:',dir],TITLE='AOR Import Error'
   for i=0,n_elements(files)-1 do begin 
      hdr=headfits(files[i])
      rec={FILE:files[i],OBJECT:strtrim(sxpar(hdr,'OBJECT'),2), $
