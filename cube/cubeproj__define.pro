@@ -178,6 +178,12 @@ pro CubeProj::ShowEvent, ev
         widget_control, ev.id, SET_BUTTON=self.slcf
         self.changed=1b
      end
+     'wavecut': begin 
+        self.wavecut=1b-self.wavecut
+        widget_control, ev.id, SET_BUTTON=self.wavecut
+        self->ResetAccounts
+        self.changed=1b
+     end
      'reconstructed': begin 
         self.reconstructed_pos=1b-self.reconstructed_pos
         widget_control, ev.id, SET_BUTTON=self.reconstructed_pos
@@ -495,17 +501,19 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                                               VALUE='Restore All Record Data')
   wMustSel=[wMustSel, $
             ;;-------------
+            ((*self.wInfo).view_ids[0:1]= $
+             [widget_button(rec,VALUE='View Record...',UVALUE='viewrecord', $
+                            /SEPARATOR),$
+              widget_button(rec,VALUE='View Record (new viewer)...', $
+                            UVALUE='viewrecord-new')]), $
+            ;;-------------
             widget_button(rec,VALUE='Delete',UVALUE='delete',/SEPARATOR),$
             widget_button(rec,VALUE='Rename',UVALUE='renamerecord'),$
             widget_button(rec,VALUE='Disable',UVALUE='disablerecord'),$
             widget_button(rec,VALUE='Enable',UVALUE='enablerecord'),$
             ;;-------------
-            ((*self.wInfo).view_ids[0:1]= $
-             [widget_button(rec,VALUE='View...      ',UVALUE='viewrecord', $
-                            /SEPARATOR),$
-              widget_button(rec,VALUE='View (new viewer)...      ', $
-                            UVALUE='viewrecord-new')]), $
-            widget_button(rec,VALUE='Show Filenames...',UVALUE='filenames'),$
+            widget_button(rec,VALUE='Show Filenames...',UVALUE='filenames', $
+                         /SEPARATOR),$
             widget_button(rec,VALUE='Show Header...',UVALUE='headers'),$
             widget_button(rec,VALUE='Show Keyword Value(s)...', $
                           UVALUE='header-keyword')]
@@ -536,7 +544,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   b1=widget_button(cube,VALUE='Use Reconstructed Positions', $
                    UVALUE='reconstructed', /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.reconstructed_pos
-
+  b1=widget_button(cube,VALUE='Trim Wavelengths',UVALUE='wavecut', $
+                   /CHECKED_MENU)
+  widget_control, b1,SET_BUTTON=self.wavecut
+  
   
   ;;-------------
   (*self.wInfo).MUST_MODULE= $
@@ -1505,15 +1516,15 @@ pro CubeProj::UpdateButtons
   nsel=n_elements(sel) 
   if (nsel gt 1) ne ((*self.wInfo).nsel_sav gt 1)then begin 
      if nsel gt 1 then begin 
-        widget_control,(*self.wInfo).view_ids[0],SET_VALUE='View Stack...'
+        widget_control,(*self.wInfo).view_ids[0],SET_VALUE='View Stack... '
         widget_control,(*self.wInfo).view_ids[1], $
-                       SET_VALUE='View Stack (new viewer)...'
+                       SET_VALUE='View Stack (new viewer)... '
         widget_control,(*self.wInfo).view_ids[2], $
                        SET_VALUE='View Stack '
      endif else begin 
-        widget_control,(*self.wInfo).view_ids[0],SET_VALUE='View...'
+        widget_control,(*self.wInfo).view_ids[0],SET_VALUE='View Record...'
         widget_control,(*self.wInfo).view_ids[1], $
-                       SET_VALUE='View (new viewer)...'
+                       SET_VALUE='View Record (new viewer)...'
         widget_control,(*self.wInfo).view_ids[2], $
                        SET_VALUE='View Record'
      endelse 
@@ -1778,11 +1789,11 @@ pro CubeProj::ReadBackgroundFromFile,file
   endif 
      
   oSP=obj_new('IRS_Spectrum')
-  oSP->Read,rff
+  oSP->Read,file
   oSP->GetProperty,WAVE_UNITS=wu,FLUX_UNITS=fu,WAVELENGTH=wav,SPECTRUM=sp
   obj_destroy,oSP
   
-  if ~stregex(fu,'e/s/(pix|px)') then $
+  if ~stregex(fu,'e/s/(pix|px)',/BOOLEAN) then $
      self->Error,'1D Background Spectrum must be un-fluxed (e/s/pix)'
   
   ptr_free,self.BG_SP
@@ -1872,51 +1883,52 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
        ((~keyword_set(cur) && ((self.ACCOUNTS_VALID AND 6b) ne 6b))? $
      " (needs rebuilding)":"")]
   if keyword_set(cur) then begin 
-     str=[str,' Cube Created: '+ $
+     str=[str,'Cube Created: '+ $
           (this.CUBE_DATE eq 0.0d?"(not yet)":jul2date(this.CUBE_DATE))]
      if this.CUBE_DATE eq 0.0d then return,str
   endif 
-  str=[str,' ' + (this.MODULE?this.MODULE:"(no module)")+ $
+  str=[str,(this.MODULE?this.MODULE:"(no module)")+ $
        (this.ORDER ne 0?' Order '+strtrim(this.ORDER,2): $
         ' all orders') + (self->N_Records() gt 0? $
                           (' -- '+strtrim(self->N_Records(),2)+' BCDs '):"")]
   
-  str=[str,' Using IRS Calib object: '+(this.CAL_FILE?this.cal_file:"(none)")+ $
+  str=[str,'Using IRS Calib object: '+(this.CAL_FILE?this.cal_file:"(none)")+ $
        " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
   
   if this.BACK_DATE ne 0.0d then begin 
-     str=[str,' Background:'+ $
+     str=[str,'Background: '+ $
           (strtrim(ptr_valid(this.BACK_EXP_LIST)? $
                    n_elements(*this.BACK_EXP_LIST):0,2)+' records, '+ $
            jul2date(this.BACK_DATE))]
   endif else if this.BG_SP_FILE then begin 
-     str=[str,' Background: 1D from file: ','   '+this.BG_SP_FILE]
+     str=[str,'Background: 1D from file: ','   '+this.BG_SP_FILE]
   endif else begin 
-     str=[str,' Background: none']
+     str=[str,'Background: none']
   endelse 
   
-  str=[str,' FLUXCON: '+(this.FLUXCON?"Yes":"No")]
-  str=[str,'    SLCF: '+(this.SLCF?"Yes":"No")]
-  str=[str,' Positions: '+(this.RECONSTRUCTED_POS?"Reconstructed":"Requested")]
+  str=[str,'FLUXCON: '+(this.FLUXCON?"Yes":"No")]
+  str=[str,'   SLCF: '+(this.SLCF?"Yes":"No")]
+  str=[str,'WAVECUT: '+(this.wavecut?"Yes":"No")]
+  str=[str,'Positions: '+(this.RECONSTRUCTED_POS?"Reconstructed":"Requested")]
   
   nbadpix=ptr_valid(this.GLOBAL_BAD_PIXEL_LIST)? $
           n_elements(*this.GLOBAL_BAD_PIXEL_LIST):0
-  str=[str,' Bad Pixels: '+(nbadpix gt 0?strtrim(nbadpix,2):"none")]
+  str=[str,'Bad Pixels: '+(nbadpix gt 0?strtrim(nbadpix,2):"none")]
   
   if nbadpix gt 0 && $
      (this.GLOBAL_BP_BYHAND || ptr_valid(this.GLOBAL_BP_FILES)) then begin 
-     str=[str,' Bad Pixel Sources:']
-     if this.GLOBAL_BP_BYHAND then str=[str,'   <By Hand>']
+     str=[str,'Bad Pixel Sources:']
+     if this.GLOBAL_BP_BYHAND then str=[str,' <By Hand>']
      if ptr_valid(this.GLOBAL_BP_FILES) then $
-        str=[str,'   '+*this.GLOBAL_BP_FILES]
+        str=[str,'  '+*this.GLOBAL_BP_FILES]
   endif 
   
   if this.GLOBAL_BP_SAVEFILE then $
-     str=[str,' Bad Pixels Saved To'+ $
+     str=[str,'Bad Pixels Saved To'+ $
           (this.GLOBAL_BP_SAVEFILE_UPTODATE?':':' (outdated):'), $
-          '   '+this.GLOBAL_BP_SAVEFILE]
+          '  '+this.GLOBAL_BP_SAVEFILE]
   
-  aps=' Apertures:'
+  aps='Apertures:'
   if NOT ptr_valid(this.APERTURE) OR this.MODULE eq '' then begin 
      aps=aps+' (default)' 
   endif else begin 
@@ -1924,7 +1936,7 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
      ords=obj_valid(self.cal)?self.cal->Orders(this.MODULE):intarr(nap)+1
      for i=0,nap-1 do begin 
         ap=(*this.APERTURE)[i]
-        aps=[aps,string(FORMAT='(%"  %s  %4.2f->%4.2f : %4.2f->%4.2f")',$
+        aps=[aps,string(FORMAT='(%" %s  %4.2f->%4.2f : %4.2f->%4.2f")',$
                         (nap eq 1?"All Orders":("Order "+strtrim(ords[i],2))),$
                         ap.low,ap.high)]
      endfor 
@@ -1936,7 +1948,7 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
                   '" arcsec"," (",F6.3," arcsec/pixel)")',this.NSTEP, $
                   this.STEP_SIZE*3600.0D*(this.NSTEP-1), $
                   this.PLATE_SCALE*3600.0D)]
-  str=[str,' '+string(FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")',$
+  str=[str,string(FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")',$
                       this.PR_SIZE)]
   
   if keyword_set(nd) then return,str
@@ -1954,7 +1966,7 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
      radec,pos[0],abs(pos[1]),rh,rm,rs,dd,dm,ds
      ra=string(FORMAT='(I0,"h",I2.2,"m",F5.2,"s")',rh,rm,rs)
      dec=sign+string(FORMAT='(I0,"d",I2.2,"m",F5.2,"s")',abs(dd),dm,ds)
-     str=[str,string(FORMAT='(%"   EXP: %2.0d (%d/%d) (%2.0d,%2.0d) ' + $
+     str=[str,string(FORMAT='(%"  EXP: %2.0d (%d/%d) (%2.0d,%2.0d) ' + $
                      'RA: %s, DEC: %s")', $
                      rec.EXP,rec.CYCLE+1,rec.NCYCLES,rec.ROW,rec.COLUMN, $
                      ra,dec)]
@@ -2207,7 +2219,7 @@ end
 ;        must be freed by the caller (but their contents must be left
 ;        alone).
 ;=============================================================================
-function CubeProj::PRs,ORDERS=ords,ALL_ORDERS=all,FULL=full
+function CubeProj::PRs,ORDERS=ords,ALL_ORDERS=all,FULL=full,WAVE_CUT=wc
   self->LoadCalib               ;ensure we have a loaded calibration object
   self->NormalizeApertures
   if n_elements(ords) eq 0 or keyword_set(all) then begin 
@@ -2219,10 +2231,10 @@ function CubeProj::PRs,ORDERS=ords,ALL_ORDERS=all,FULL=full
   prs=ptrarr(nords)
   for i=0,nords-1 do begin
      ap=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[i]
-     prs[i]=ptr_new(self.cal->GetWAVSAMP(self.MODULE,ords[i],/PIXEL_BASED,$
-                                         FULL=full,APERTURE=ap, $
-                                         PR_WIDTH=self.PR_SIZE[1] eq 0.0? $
-                                         1.0:self.PR_SIZE[1]))
+     prs[i]=ptr_new(self.cal->GetWAVSAMP( $
+            self.MODULE,ords[i],/PIXEL_BASED,FULL=full,APERTURE=ap, $
+            WAVECUT=n_elements(wc) gt 0?keyword_set(wc):self.wavecut, $
+            PR_WIDTH=self.PR_SIZE[1] eq 0.0?1.0:self.PR_SIZE[1]))
   endfor 
   return,prs
 end
@@ -2559,7 +2571,8 @@ pro CubeProj::MergeAccount,dr,order,account
   ;; Offset all to the correct cube plane (some we'll change soon)
   account.cube_plane+=mrec.offset
   
-  ;; which account records hold planes which must be split and interpolated?
+  ;; which account records hold planes which must be split and
+  ;; interpolated onto the new wavelength grid?
   wh=where(h gt 0 AND $
            histogram(split_planes,REVERSE_INDICES=ri_order) gt 0,cnt) 
   for i=0,cnt-1 do begin 
@@ -2567,14 +2580,14 @@ pro CubeProj::MergeAccount,dr,order,account
      to_plane=to_planes[ri_order[ri_order[wh[i]]]]
      frac=fracs[ri_order[ri_order[wh[i]]]]
      
-     ;; Split the elements which are on affected planes
+     ;; Split the elements which are on affected (overlap) planes
      changers=ri_cube[ri_cube[wh[i]]:ri_cube[wh[i]+1]-1]
      split_acc=account[changers]
      
-     ;; The first plane (gets frac worth)
+     ;; The first target plane gets frac worth of the split element
      account[changers].area*=frac
      account[changers].CUBE_PLANE=to_plane
-     ;; The next plane (gets 1-frac worth)
+     ;; The next target plane gets 1-frac worth of the split element
      split_acc.area*=(1.-frac)
      split_acc.CUBE_PLANE=to_plane+1
      
@@ -2682,7 +2695,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      
      pos=self.reconstructed_pos?(*self.DR)[i].REC_POS:(*self.DR)[i].RQST_POS
      
-     ;; Building in another order?
+     ;; Building in another order?  Transform coordinates over.
      if (*self.DR)[i].TARGET_ORDER ne self.ORDER AND $
         self.ORDER ne 0 then begin
         self.cal->TransformCoords,self.MODULE,pos,(*self.DR)[i].PA_RQST, $
@@ -2692,7 +2705,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      endif
 
      ad2xy,pos[0],pos[1],astr,x,y
-     offset=[x,y]+.5
+     offset=[x,y]+.5            ;NASALib WCSism
      
      ;; (Probably small) difference between PA of this BCD and the
      ;; mean map PA
@@ -4107,12 +4120,13 @@ pro CubeProj__define
       fluxcon:0b, $             ;whether to build with FLUXCON fluxes
       slcf: 0b, $               ;whether to build with the SLCF
       reconstructed_pos:0b, $   ;whether to build with reconstructed positions
+      wavecut: 0b, $            ;whether to trim wavelengths with WAVECUT
       cal_file:'', $            ;the calibration file used (if not a full
                                 ; directory, in the "calib/" subdir)
       NSTEP:[0L,0L], $          ;perpendicular (row), parallel (col) steps
       STEP_SIZE: [0.0D,0.0D], $ ;perpendicular, parallel slit step sizes (deg)
       PLATE_SCALE:0.0D, $       ;the plate scale (degrees/pixel)
-      PR_SIZE:[0.0,0.0]}        ;the , parallel (long axis), perpendicular
+      PR_SIZE:[0.0,0.0]}        ;the, parallel (long axis), perpendicular
                                 ; (short axis) size of the PRs to use (pixels)
   c={CubeProj, $
 ;     INHERITS IDLitComponent, $ ;Use Property stuff
