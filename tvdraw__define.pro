@@ -830,7 +830,7 @@ pro tvDraw__define
       min:0.0, $                ;min data value to scale to
       scale_max: 0, $           ;whether to scale using max data value
       max:0.0, $                ;max data value to scale to
-      bottom:0, $               ;bottom color index to scale to
+      bottom:0b, $              ;bottom color index to scale to
       top:0, $                  ;top color index to scale to
       pan:[0,0], $              ;device pixel offsets for lower left corner
       offset:[0,0],$            ;the image pixeloffset of the lower left
