@@ -9,10 +9,6 @@ pro CubeRec::Message, msg
         self->Extract
         return
      end 
-     'TVDRAW_SNAPSHOT': begin 
-        if self.show_ws then self->ShowWS
-        return
-     end 
      'TVDRAW_POSTDRAW': begin 
 ;        self->Extract
         return
@@ -62,7 +58,7 @@ pro CubeRec::Message, msg
 end
 
 ;=============================================================================
-;  On - Signup for all our messages.
+;  On - (Extraction Tool) Signup for all our messages.
 ;=============================================================================
 pro CubeRec::On
   if self.mode gt 1 then return ;don't enable it for Rec mode
@@ -75,7 +71,7 @@ pro CubeRec::On
 end
 
 ;=============================================================================
-;  Off - No more postdraw events needed. 
+;  Off - (Extraction Tool) No more postdraw events needed. 
 ;=============================================================================
 pro CubeRec::Off,_EXTRA=e
   self->tvPlug::Off,_EXTRA=e
@@ -130,18 +126,18 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
      endif
      self.mode=mode
   endif else begin
-     if n_elements(bcd) ne 0 then begin 
+     if n_elements(bcd) ne 0 then begin ; BCD=0 was passed
         if self.mode eq 2 then self.mode=0 ;go to full by default
      endif                      ; otherwise, just leave it the same
   endelse
 
   if self.mode eq 2 then begin  ;bcd mode
-     self->Reset,/DISABLE         ;no need for our extraction tool.
-  endif else if NOT self->Enabled() then self->Enable
-  if self.show_ws then begin 
-     self.oDraw->MsgSignup,self,TVDRAW_SNAPSHOT=self.mode eq 2
-     self.oDraw->ReDraw,/SNAPSHOT     
-  endif
+     self->Reset,/DISABLE       ;no need for our extraction tool.
+     self.oAper->On
+  endif else begin 
+     if NOT self->Enabled() then self->Enable
+     self.oAper->Off
+  endelse 
 
   ;;Switch the base showing
   others=where(indgen(3) ne self.mode)
@@ -178,30 +174,6 @@ pro CubeRec::EnsureCube
      widget_control, self.wBase[self.mode],SENSITIVE=0
      self->Error,'Cube no longer valid.'
   endif 
-end
-
-;=============================================================================
-;  ShowWS - Show the current WS record for the cube, if there is one
-;=============================================================================
-pro CubeRec::ShowWS
-  self->EnsureCube
-  self.oDraw->GetProperty,OFFSET=off,DISPSIZE=ds,PAN=pan,ZOOM=zm
-  plot,[0],[0],XRANGE=[off[0],off[0]+ds[0]],YRANGE=[off[1],off[1]+ds[1]], $
-       XSTYLE=5,YSTYLE=5,POSITION=[pan,pan+ds*zm],/DEVICE,/NODATA,/NOERASE
-  self.cube->GetProperty,APERTURE=aps,CALIB=cal
-  self.cal=cal
-  nap=n_elements(aps)
-  ords=self.cal->Orders(self.MODULE)
-  for ord=0,n_elements(ords)-1 do begin
-     if nap gt 0 then ap=nap eq 1?aps[0]:aps[ord]
-     ;; What about PR width? Probably the cube should tell us this.
-     prs=cal->GetWAVSAMP(self.MODULE,ords[ord],/PIXEL_BASED,APERTURE=ap)
-     for i=0,n_elements(prs)-1 do begin
-        x=prs[i].X
-        y=prs[i].Y
-        oplot,[x,x[0]],[y,y[0]],COLOR=self.color
-     endfor
-  endfor
 end
 
 pro CubeRec_event,ev
@@ -255,17 +227,6 @@ pro CubeRec::StackEvent,ev
 end
 
 ;=============================================================================
-;  BCDEvent - Handle events from the BCD Record base
-;============================================================================
-pro CubeRec::BCDEvent,ev
-  ;; Only the "Show WS" button there
-  if self.show_ws eq ev.select then return
-  self.show_ws=ev.select
-  self.oDraw->MsgSignup,self,TVDRAW_SNAPSHOT=self.show_ws
-  self.oDraw->ReDraw,/SNAPSHOT 
-end
-
-;=============================================================================
 ;  Extract -  Extract a spectrum from box
 ;=============================================================================
 pro CubeRec::Extract
@@ -287,20 +248,6 @@ pro CubeRec::Extract
 end
 
 ;=============================================================================
-;  Start -  Signup for events
-;=============================================================================
-pro CubeRec::Start
-  if self.mode ne 2 then self->Off,/DISABLE 
-  if self.show_ws then self.oDraw->MsgSignup,self,/TVDRAW_SNAPSHOT
-  ;; Sign-up for some keys
-  ;; Probe for a tvKey plug-in, and sign up with it.
-;  key=(self.oDraw->GetMsgObjs(CLASS='tvKEY'))[0]
-;  if NOT obj_valid(key) then return
-  ;; add us the the recipient list of the Key object...
-;  key->MsgSignup,self,/TVKEY_KEY
-end
-
-;=============================================================================
 ;  Cleanup
 ;=============================================================================
 pro CubeRec::Cleanup
@@ -311,11 +258,10 @@ end
 ;=============================================================================
 ;  Init -  Initialize the CubeRec object
 ;=============================================================================
-function CubeRec::Init,parent,oDraw,CUBE=cube,COLOR=color,_EXTRA=e
+function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   
   if n_elements(color) eq 0 then color=!D.TABLE_SIZE-1
-  self.color=color
   
   ;; Get a tvrbox object, signing ourselves up for box messages from it.
   self.Box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,COLOR=color,_EXTRA=e)
@@ -354,11 +300,10 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,COLOR=color,_EXTRA=e
   self.wFull=widget_button(self.wBase[1],value='Full Cube')
   
   ;; Populate the third base: for the BCD's
-  self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/NONEXCLUSIVE,$
-                            UVALUE={self:self,method:'BCDEvent'}, $
-                            /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
-  wsbut=widget_button(self.wBase[2],value='Show WAVSAMP Samples')
+  self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
+  self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
   self->MsgSetup,['CUBEREC_SPEC','CUBEREC_FULL','CUBEREC_UPDATE']
+  self->MsgSignup,self.oAper,/CUBEREC_UPDATE ;give them our message
   return,1
 end
 
@@ -376,13 +321,12 @@ pro CubeRec__define
       playing:0, $              ;whether we're "playing" the full cube
       spec:obj_new(), $         ;our CubeSpec tool
       box:obj_new(), $          ;our extraction box object
+      oAper: obj_new(), $       ;our aperture viewing/editing tool
       STACK:ptr_new(), $        ;the stacked image
-      show_ws:0b, $             ;whether to show the WAVSAMP overlay
       BCD:ptr_new(), $          ;the BCD data
       BCD_ERR:ptr_new(), $      ;the BCD error
       MODULE:'',$               ;the modules for cube or rec
       cal:obj_new(), $          ;the object
-      color:0, $                ;the color to use for ourselves
       ;; Widget ID's
       wBase:lonarr(3), $        ;the three bases (full/stack/rec)
       wInfoLine:0L, $           ;A line of info on the current stack/etc.
@@ -391,13 +335,15 @@ pro CubeRec__define
       wPlayStop:0L,$            ;the play/stop button
       wStackInfo:0L, $          ;The stack information
       wFull:0L}                 ;The "Switch to Full mode" button
+  
   ;; The messages we send
   msg={CUBEREC_SPEC,Info:'',wavelength:ptr_new(),spec:ptr_new()}
-  ;;  spec is 2xn or 3xn, message is a text message describing the extraction.
+  ;;  spec is 2xn or 3xn, info is a text message describing the extraction.
   
   msg={CUBEREC_FULL,wavelength:0.0} ;s
   msg={CUBEREC_UPDATE,BCD_MODE:0,CUBE:obj_new(),MODULE:''} ;XXX WCS!
-  ;;What about "contributed to" in full cube mode: showing which
+  
+  ;;What about backtrack in full cube mode: showing which
   ;;BCD's/pixels contributed to a given cube pixel.  How?  Maybe
   ;;pop up a list with BCD/pixel
 end
