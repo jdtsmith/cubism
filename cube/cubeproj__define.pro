@@ -1246,7 +1246,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            CALIB=calib, MODULE=module, APERTURE=ap, $
                            PROJECT_NAME=pn,DR=dr, TLB_OFFSET=tboff, $
                            TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
-                           ASTROMETRY=astr
+                           ASTROMETRY=astr,POSITION_ANGLE=pa
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
@@ -1293,6 +1293,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   endif 
   if arg_present(version) then version=self.version
   if arg_present(astr) then astr=self->CubeAstrometryRecord()
+  if arg_present(pa) then pa=self.PA
 end
 
 ;=============================================================================
