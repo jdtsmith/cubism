@@ -16,12 +16,13 @@ pro compile_cubism
   
   files=file_search(sourcepath,'*.pro')
   skip_files=['cubism_dir','cubism_version','compile_cubism', $
-              ps+'scrap'+ps,'CVS'+ps]
+              ps+'scraps'+ps,'CVS'+ps]
   resolve_routine,'XManager',/COMPILE_FULL_FILE
   skip=0
   for i=0,n_elements(files)-1 do begin 
      for j=0,n_elements(skip_files)-1 do begin 
         if strpos(files[i],skip_files[j]) ne -1 then begin 
+           print,'Skipping '+files[i]
            skip=1
            break
         endif
