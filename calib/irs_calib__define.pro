@@ -396,6 +396,8 @@ function IRS_Calib::Info, modules, orders, SHORT=short
      if fcf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'FLUXCON',fcf)]
      slcff=self.SLCF_FILE[md]
      if slcff ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'SLCF',slcff)]
+     wcf=self.WAVECUT_FILE[md]
+     if wcf then str=[str,string(FORMAT='(A12,": ",A)','WAVECUT',wcf)]
      
      str=[str,'']
      for j=0,no-1 do begin 
@@ -419,6 +421,9 @@ function IRS_Calib::Info, modules, orders, SHORT=short
                                              rec.SLIT_LENGTH),$
              "          WAVELENGTH(min,center,max):" + $
              string(FORMAT='(3F10.4)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX),$
+             "          WAVECUT:" + $
+             (array_equal(rec.WAVECUT,0.0)?" none": $
+              string(FORMAT='(" Low: ",F10.4," High:",F10.4)',rec.WAVECUT)), $
              "          FLUXCON:"+string(FORMAT='(G12.3)',rec.FLUXCON)+ $
              " KEY WAVLENGTH: "+ string(FORMAT='(G8.3)',rec.FLUXCON_KEY_WAV),$
              "          TUNE: "+strjoin(string(FORMAT='(G9.3)',rec.TUNE))]
@@ -558,47 +563,65 @@ end
 ;               wavelength within the order.
 ;  
 ;               The newly created WAVSAMP is cached for fast recovery,
-;               unless NO_CACHE is set.
+;               unless NO_CACHE is set.  If WAVECUT is passed, the
+;               pseudo_rects are trimmed to the WAVECUT wavelengths.
 ;=============================================================================
 function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
                                 PIXEL_BASED=pb, PR_WIDTH=width, $
                                 NO_CACHE=nc, SAVE_POLYGONS=sp, $
-                                WAVELENGTH_SCALED=wvscld
+                                WAVELENGTH_SCALED=wvscld,WAVECUT=wavecut
   rec=self->GetRecord(module,order,/MUST_EXIST)
   ws=self->FindWAVSAMP(module,order,APERTURE=aperture,COUNT=nsamp,FULL=full, $
                        PIXEL_BASED=pb, PR_WIDTH=width,WAVELENGTH_SCALED=wvscld)
   
   if ~keyword_set(sp) then begin ;no polygons requested
      ;; return the first match
-     if nsamp gt 0 then return,*(*rec.WAVSAMPS)[ws[0]].PR 
+     if nsamp gt 0 then prs=*(*rec.WAVSAMPS)[ws[0]].PR 
   endif else begin 
      for i=0,nsamp-1 do begin 
         ;; return the first match with saved polygons
         pr=(*rec.WAVSAMPS)[ws[i]].PR
-        if ptr_valid((*pr)[0].POLYGONS) then return,*(*rec.WAVSAMPS)[ws[i]].PR
+        if ptr_valid((*pr)[0].POLYGONS) then begin 
+           prs=*pr
+           break
+        endif 
      endfor 
-     ;; free matches, to create one again later *with* POLYs
-     if nsamp gt 0 then self->FreeWAVSAMP,RECORD=rec,INDEX=ws
+     ;; free all these matches, to create them again below *with* POLYs
+     if nsamp gt 0 && n_elements(prs) eq 0 then $
+        self->FreeWAVSAMP,RECORD=rec,INDEX=ws
   endelse
   
-  ;; No clip is cached for this aperture, so make a new one
-  ws=self->Clip(module,order,APERTURE=aperture,PIXEL_BASED=pb,PR_WIDTH=width, $
-                SAVE_POLYGONS=sp,FULL=full,RECORD=rec)
   
-  if size(ws,/TYPE) ne 8 then message,'Error clipping WAVSAMP.'
-  
-  ;; And add it to the cache for rapid recovery, unless asked not to
-  if keyword_set(nc) eq 0 then begin 
-     if ptr_valid(rec.WAVSAMPS) then begin 
-        ;; Only add it if it's a distinct WAVSAMP record
-        wh=where((*rec.WAVSAMPS).PR eq ws.PR,cnt)
-        if cnt eq 0 then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] 
-     endif else rec.WAVSAMPS=ptr_new(ws)
+  if n_elements(prs) eq 0 then begin 
+     ;; No clip is cached for this aperture, so make one
+     ws=self->Clip(module,order,APERTURE=aperture,PIXEL_BASED=pb, $
+                   PR_WIDTH=width,SAVE_POLYGONS=sp,FULL=full,RECORD=rec)
+     if size(ws,/TYPE) ne 8 then message,'Error clipping WAVSAMP.'
+     
+     prs=*ws.PR
+     ;; And add it to the cache for rapid recovery, unless asked not to
+     if ~keyword_set(nc) then begin 
+        if ptr_valid(rec.WAVSAMPS) then begin 
+           ;; Only add it if it's a new, distinct WAVSAMP record
+           wh=where((*rec.WAVSAMPS).PR eq ws.PR,cnt)
+           if cnt eq 0 then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] 
+        endif else rec.WAVSAMPS=ptr_new(ws)
+     endif 
+     self->SetRecord,rec
   endif 
   
-  self->SetRecord,rec
+  ;; Trim wavelengths if requested
+  if keyword_set(wavecut) then begin 
+     if array_equal(rec.WAVECUT,0.0) then $
+        message,'No WAVECUT wavelength trim data loaded in calib set.'
+     low=min(rec.WAVECUT,MAX=high)
+     wh=where(prs.lambda gt low AND prs.lambda lt high,cnt)
+     if cnt eq 0 then message,'WAVECUT Error: No PRs remain'
+     prs=prs[wh]
+  endif 
+  
   ;; Return the list of pseudo-rects
-  return,*ws.PR
+  return,prs
 end
 
 ;=============================================================================
@@ -739,7 +762,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
      endelse 
   endfor 
   
-  ;; ascending wavelength
+  ;; ensure ascending wavelength
   prs=prs[sort(prs.lambda)]
   
   ;; Construct the WAVSAMP and set it into the record
@@ -1042,16 +1065,20 @@ end
 pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                          LINETILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
                          PLATESCALE_VERSION=psv,PMASK_VERSION=pmv, $
-                         FLUXCON_VERSION=fcv,SLCF_VERSION=slcfv,ONLY=only, $
-                         RECOVER_FROM_WAVSAMP=rcvfws
-  cals=replicate({name:'', group:'', type:''},8)
-  cals.name=['WAVSAMP','ORDFIND','PMASK','LINETILT','FLUXCON', $
-             'SLCF',   'FRAMETABLE','PLATESCALE']
-  cals.group=['single' ,'single' ,'single','single','single', $
-              'single','all',       'all']
-  cals.type= ['tbl'    ,'tbl'    ,'fits'  ,'tbl'   ,'tbl', $
-              'tbl',   'tbl',       'tbl']
-
+                         FLUXCON_VERSION=fcv,SLCF_VERSION=slcfv, $
+                         WAVECUT_VERSION=wvcv, $
+                         ONLY=only, RECOVER_FROM_WAVSAMP=rcvfws
+  
+  cals=[{name:'WAVSAMP'   , group:'single', type:'tbl' }, $
+        {name:'ORDFIND'   , group:'single', type:'tbl' }, $
+        {name:'PMASK'     , group:'single', type:'fits'}, $
+        {name:'LINETILT'  , group:'single', type:'tbl' }, $
+        {name:'FLUXCON'   , group:'single', type:'tbl' }, $
+        {name:'SLCF'      , group:'single', type:'tbl' }, $
+        {name:'FRAMETABLE', group:'all'   , type:'tbl' }, $
+        {name:'PLATESCALE', group:'all'   , type:'tbl' }, $
+        {name:'WAVECUT'   , group:'single', type:'tbl' }]
+  
   version=[n_elements(wv)  gt 0?fix(wv)>0:0,  $
            n_elements(orv) gt 0?fix(orv)>0:0, $
            n_elements(pmv) gt 0?fix(pmv)>0:0, $
@@ -1059,7 +1086,8 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
            n_elements(fcv) gt 0?fix(fcv)>0:0, $
            n_elements(slcfv) gt 0?fix(slcfv)>0:0, $ 
            n_elements(fv)  gt 0?fix(fv)>0:0,  $
-           n_elements(psv) gt 0?fix(psv)>0:0]
+           n_elements(psv) gt 0?fix(psv)>0:0, $
+           n_elements(wvcv) gt 0?fix(wvcv)>0:0]
   
   if keyword_set(only) then begin 
      which=where([n_elements(wv), $
@@ -1069,7 +1097,8 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                   n_elements(fcv), $
                   n_elements(slcfv), $
                   n_elements(fv), $
-                  n_elements(psv) ] ne 0 ,cnt)
+                  n_elements(psv),$
+                  n_elements(wvcv)] ne 0 ,cnt)
      if cnt eq 0 then return
      cals=cals[which]           ;only these cals are to be used
      version=version[which]
@@ -1078,6 +1107,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   if n_elements(module) ne 0 then modules=[irs_module(module)] $
   else modules=indgen(4)        ;do them all, by default
   
+  ;; Singles load a single set of data per module
   singles=where(cals.group eq 'single',COMPLEMENT=alls,NCOMPLEMENT=acnt,scnt)
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
@@ -1095,6 +1125,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
      endfor
   endfor
   
+  ;; Alls are not module specific, but are relevant for all modules
   for j=0,acnt-1 do begin 
      base="irs_"+cals[alls[j]].name+"v"
      cfile=self->CalibrationFileVersion(base,version[alls[j]], $
@@ -1358,6 +1389,20 @@ end
 
 
 ;=============================================================================
+;  ParseWAVECUT
+;=============================================================================
+pro IRS_Calib::ParseWAVECUT,file,module
+  m=irs_module(module)
+  data=read_ipac_table(file)
+  for i=0,n_elements(data.ORDER)-1 do begin 
+     rec=self->GetRecord(m,data[i].ORDER)
+     rec.WAVECUT=[data[i].wavecut_low,data[i].wavecut_high]
+     self->SetRecord,rec
+  endfor 
+  self.WAVECUT_FILE[m]=file
+end
+
+;=============================================================================
 ;  ParseFluxcon - Read and parse the specified FLUXCON file, saving
 ;                 the data in the object.
 ;=============================================================================
@@ -1493,6 +1538,7 @@ pro IRS_Calib__define
          FLUXCON_FILE:strarr(5),$ ;the name of the FLUXCON coefficient file
          PMASK_FILE:strarr(5),$ ;the name of the pmask files   
          SLCF_FILE:strarr(5), $ ;name of the SLCF files
+         WAVECUT_FILE:strarr(5), $ ;the name of the WAVECUT files (if any)
          PMASK:ptrarr(5), $     ;the pmask, one for each module
          SLCF: ptrarr(5), $     ;SLCF for each module (at most)
          cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
@@ -1511,6 +1557,7 @@ pro IRS_Calib__define
        WAV_CENTER: 0.0, $       ;[um] the central order wavelength
        WAV_MIN: 0.0, $          ;[um] the minimum order wavelength
        WAV_MAX: 0.0, $          ;[um] the maximum order wavelength
+       WAVECUT: [0.0,0.0], $    ;[um] suggested low and high trim wavelengths
        SLIT_LENGTH: 0.0, $      ;[pix] the length of the slit
        PLATE_SCALE: 0.0, $      ;[deg/pix] the plate scale along the slit
        A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
@@ -1521,6 +1568,7 @@ pro IRS_Calib__define
        FLUXCON_KEY_WAV:0.0,$    ;fluxcon reference wavelength
        TUNE:fltarr(6),$         ;fluxcon tuning coefficients "a"
        WAVSAMPS: ptr_new()}     ;A list of IRS_WAVSAMP structs
+                                ; (cached for various apertures, etc.)
   
   ;; A wavsamp set for a single order and a given aperture, either
   ;; "traditional" (from the WAVSAMP file), or "pixel-based"
