@@ -105,14 +105,17 @@
 ;
 ; MODIFICATION HISTORY:
 ;    $Log$
+;    Revision 1.3  2001/08/17 22:49:19  jdsmith
+;              Log cleanup
+;
 ;    Revision 1.2  2001/08/17 18:11:49  jdsmith
-;    	  A substantial rewrite of SCORE-era messaging, with new
-;    	  messages, simpler access to the recipient list (see
-;    	  MsgList), etc.  The message flow also changed somewhat, with
-;    	  the introduction of another image buffer (immod), which
-;    	  allows plug-ins cleaner separation of passive and active
-;    	  response to changes in the source data (like new images,
-;    	  zooming, etc.).
+;	  A substantial rewrite of SCORE-era messaging, with new
+;         messages, simpler access to the recipient list (see
+;         MsgList), etc.  The message flow also changed somewhat, with
+;         the introduction of another image buffer (immod), which
+;         allows plug-ins cleaner separation of passive and active
+;         response to changes in the source data (like new images,
+;         zooming, etc.).
 ;
 ;    Revision 1.1  2001/08/01 19:29:24  jdsmith
 ;             Imported source from SCORE files.
