@@ -40,10 +40,10 @@ pro tvPlug::Message,msg, TYPE=type
   type=tag_names(msg,/STRUCTURE_NAME)
   ;; if it's a change in exclusive message, which we'll handle for
   ;; every type of plug-in.
-  if type eq 'TVDRAW_EXCLUSIVE' then begin
-     if msg.obj eq self then $  ;we are now the active exclusive
-        self->On else if self.active then self->Off
-  endif
+;   if type eq 'TVDRAW_EXCLUSIVE' then begin
+;      if msg.obj eq self then $  ;we are now the active exclusive
+;         self->On else if self.active then self->Off
+;   endif
 end
 
 ;=============================================================================
