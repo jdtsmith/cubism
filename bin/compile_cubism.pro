@@ -1,6 +1,7 @@
 pro compile_cubism
   FORWARD_FUNCTION TRNLOG
   @cubism_dir
+  ps=path_sep()
   bindir=filepath(ROOT=cubism_dir,'bin')
   if file_test(filepath(ROOT=bindir,'cubism_vm.sav')) then $
      file_delete,filepath(ROOT=bindir,'cubism_vm.sav')
