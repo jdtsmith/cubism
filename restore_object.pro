@@ -134,7 +134,7 @@ end
 ;=============================================================================
 function restore_object,file,class, OTHER_CLASSES=oc, VAR_NAME=var
   restore_object_resolve,class, ri
-  if n_elements(oc) eq 0 then restore_object_resolve,oc,ri
+  if n_elements(oc) ne 0 then restore_object_resolve,oc,ri
   restore,file,/RELAXED_STRUCTURE_ASSIGNMENT,RESTORED_OBJECTS=objs
   if n_elements(var) ne 0 then begin 
      tmp=execute('thisvar='+var)
