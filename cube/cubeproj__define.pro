@@ -154,7 +154,7 @@ pro CubeProj::ShowEvent, ev
      'remove-background': begin 
         ptr_free,self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK
         self.BACK_CNT=0 & self.BACK_DATE=0.0D
-        self.ACCOUNTS_VALID AND=NOT 4b
+        self.ACCOUNTS_VALID AND=NOT 4b ;bg's no longer valid
         self->UpdateButtons
      end 
      'loadcalib': self->LoadCalib,/SELECT
@@ -1280,6 +1280,7 @@ end
 ;               indicated by the CUBE keyword (default to BCD mode)
 ;=============================================================================
 pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
+  FORWARD_FUNCTION LookupManagedWidget
   pvcr=ptr_valid(self.cuberecs)
   ;; clean list
   if pvcr then begin 
@@ -1290,7 +1291,36 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
      endif else if nc gt 0 then *self.cuberecs=(*self.cuberecs)[wh]
   endif 
   
-  ;; Need a new viewer?
+  ;; First look for a pre-existing, unassociated viewer
+  if ~keyword_set(new_viewer) && ~pvcr then begin 
+     catch, err                 ;Make sure we have LookUpManagedWidget.
+     if err then begin 
+        catch,/cancel
+        resolve_routine,'XManager',/COMPILE_FULL_FILE
+     endif else void=routine_info('lookupmanagedwidget',/SOURCE,/FUNCTIONS)
+     catch,/cancel
+     ids=LookupManagedWidget('CubeView')
+     for i=0,n_elements(ids)-1 do begin 
+        if ~widget_info(ids[i],/VALID_ID) then continue
+        rec=widget_info(ids[i],FIND_BY_UNAME='CubeRec')
+        if ~widget_info(rec,/VALID_ID) then continue
+        widget_control, rec,GET_UVALUE=rec
+        if ~obj_valid(rec) || ~obj_isa(rec,'CubeRec') then continue
+        rec->GetProperty,CUBE=cube
+        if ~obj_valid(cube) then begin 
+           free_rec=rec
+           break
+        endif 
+     endfor 
+     if n_elements(free_rec) ne 0 then begin 
+        self->MsgSignup,free_rec
+        self.cuberecs=ptr_new([rec])
+        return
+     endif 
+  endif 
+     
+  
+  ;; Do we need a new viewer, spawn one if neessary
   if keyword_set(new_viewer) || ~pvcr then begin 
      if pvcr then self->MsgListRemove,*self.cuberecs
      cubeview,CUBE=self,RECORD=rec ;have them sign up for our messages     
@@ -1299,19 +1329,19 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
      return
   endif
   
-  ;; Pick the best existing viewer
+  ;; Pick the best match among the viewers we're communicating with
   recs=self->GetMsgObjs(CLASS='CubeRec')
   talking=obj_valid(recs[0])
   
   for r=0,n_elements(*self.cuberecs)-1 do begin 
      rec=(*self.cuberecs)[r]
      rec->GetProperty,BCD_MODE=bcd_mode
-     if bcd_mode eq ~keyword_set(cube_mode) then begin 
+     if bcd_mode eq ~keyword_set(cube_mode) then begin ;the right mode
         ;; Not already talking to him?
         if ~talking || rec ne recs[0] then begin 
            if talking then self->MsgListRemove,recs
-           self->MsgSignup,rec
-        endif 
+           self->MsgSignup,rec  ;sign up the correct one
+        endif                   ;else we've already got the right one
         return
      endif 
   endfor 
@@ -1417,7 +1447,7 @@ pro CubeProj::SetBackgroundFromRecs,recs
   self.BACK_CNT=n
   self.BACK_DATE=systime(/JULIAN)
   self.Changed=1b
-  self.ACCOUNTS_VALID OR= 4b
+  self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
   self->UpdateButtons
 end
 
@@ -1484,7 +1514,7 @@ end
 ;=============================================================================
 function CubeProj::Info,entries, NO_DATA=nd
   str=['IRS Spectral Cube: '+self->ProjectName()+ $
-       (((self.ACCOUNTS_VALID AND (NOT 1b)) ne 0b)?" (needs rebuilding)":"")]
+       (((self.ACCOUNTS_VALID AND 6b) ne 6b)?" (needs rebuilding)":"")]
   str=[str,' Cube Created: '+ $
        (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))]
   str=[str,' ' + (self.MODULE?self.MODULE:"(no module)")+ $
@@ -2300,7 +2330,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
   endfor
   self->BuildRevAcct            ;we need these too...
   if self.feedback then wset,save_win
-  self.ACCOUNTS_VALID OR= 1b
+  self.ACCOUNTS_VALID=7b        ;everything is now valid
 end
 
 ;=============================================================================
@@ -2577,7 +2607,7 @@ pro CubeProj::LayoutBCDs
   new_size=ceil(exact_size-.001) ;no hangers-on
   if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
      self.CUBE_SIZE[0:1]=new_size
-     self.ACCOUNTS_VALID OR= 2b
+     self.ACCOUNTS_VALID AND= NOT 2b
   endif
 
   ;; Find the cube center in the sky coordinate system
@@ -2633,7 +2663,7 @@ end
 pro CubeProj::BuildCube
   if NOT ptr_valid(self.DR) then return
   self->RestoreAll              ;get all of the data, if necessary
-  if ~(self.ACCOUNTS_VALID AND 1b) OR $
+  if (self.ACCOUNTS_VALID AND 3b) ne 3b OR $
      ~array_equal(ptr_valid((*self.DR).ACCOUNT),1b) OR $
      self.feedback then self->BuildAccount else self->BuildRevAcct
   
@@ -3550,7 +3580,7 @@ pro CubeProj__define
      DR: ptr_new(), $           ;All the BCD's: pointer to list of
                                 ; data record structures of type CUBE_DR
      ACCOUNTS_VALID: 0b,$       ; are the account records valid?
-                                ;  0: no, 1:yes, 2:size, 4: bg
+                                ;  1:accts, 2:size, 4: bg
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      CUBE_UNC:  ptr_new(),$     ;a pointer to the nxmxl uncertainty cube
      CUBE_SIZE: [0L,0L,0L],$    ;the size of the cube, (n,m,l)
