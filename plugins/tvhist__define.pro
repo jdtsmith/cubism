@@ -26,28 +26,26 @@ end
 ;	ac (see tvPlug).
 ;=============================================================================
 pro tvHist::Update, ac
-  ;; turn box on and off whenever we update
-  if n_elements(ac) eq 0 then begin ;if no ac, just do it, and get out
-     self->tvPlug::Update
+  if n_elements(ac) ne 0 then begin
+     case ac of
+        0b: begin               
+           self.box->Off
+        end
+        
+        1b: begin
+           self.box->On
+        end
+        
+        2b: begin               ;if turned on *again* .. means turn *off*!
+           self.box->Off
+           self.active=0b   
+           self->Reset          ;reset box and resume original scaling
+        end
+     endcase 
+     self->tvPlug::Update,ac    ;chain up, sending change status 
      return
   endif 
-  ;; otherwise only toggle box if our active status has actually changed.
-  case ac of
-     0b: begin               
-        self.box->Off
-     end
-     
-     1b: begin
-        self.box->On
-     end
-     
-     2b: begin                  ;if turned on *again* .. means turn *off*!
-        self.box->Off
-        self.recip.ACTIVE=0b   
-        self->Reset             ;reset box and resume original scaling
-     end
-  endcase 
-  self->tvPlug::Update,ac       ;chain up, sending change status 
+  self->tvPlug::Update
 end
 
 function tvHist::Icon
@@ -173,23 +171,20 @@ end
 ;	curve will be drawn over the top.
 ;=============================================================================
 function tvHist::Init,oDraw,EXCLUSIVE=exc,COLOBJ=col,DIVISOR=div,NBINS=nb, $
-               _EXTRA=e
+                      _EXTRA=e
   if (self->tvPlug::Init(oDraw) ne 1) then return,0 ;chain up
   if n_elements(div) eq 0 then self.div=1 else self.div=div
   if n_elements(nb) eq 0 then self.nbins=200 else self.nbins=nb
   
   if obj_valid(col) then if obj_isa(col,'tvColor') then self.colobj=col
- 
-  ;; Sign up with Draw object for exclusives only (we lead tvrbox)
-  self.recip.EXCLUSIVE=keyword_set(exc)
-  self.recip.ACTIVE=1b-self.recip.EXCLUSIVE
-  self.recip.REDRAW=1b
-
-  ;; Get a tvrbox object, signing ourselves up for box messages.
+  
+  ;; Get a tvrbox object, signing ourselves up for box messages from it.
   self.box=obj_new('tvrbox', oDraw, MsgList=[self],/NO_REDRAW, $
                    ACTIVE=self.recip.ACTIVE,_EXTRA=e)
 
-  self->Update               
+  ;; Sign up with Draw object for exclusives only (we lead tvrbox)
+  self->Update,EXCLUSIVE=keyword_set(exc),ACTIVE=1b-keyword_set(exc), $
+     /PREDRAW,/POSTDRAW
   return,1
 end
 
