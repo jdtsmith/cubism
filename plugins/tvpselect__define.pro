@@ -1,9 +1,13 @@
-;-----------------------------------------------------------------------
-;        MESSAGE FUNCTION
-;-----------------------------------------------------------------------
+;=============================================================================
+;  Message
+;=============================================================================
 ;; We're only getting key messages
 pro tvPSelect::Message,msg
-  up=msg.key eq self.switch_key[0] & down=msg.key eq self.switch_key[1]
+  if msg.release then return    ; Press only
+  if msg.type eq 6 then return  ; non-ASCII keys not allowed
+  if msg.modifiers ne 0b then return 
+  up=strlowcase(msg.ch) eq self.switch_key[0] 
+  down=strlowcase(msg.ch) eq self.switch_key[1]
   if NOT up and NOT down then return
   pl=widget_info(self.wList,/DROPLIST_SELECT) 
   np=widget_info(self.wList,/DROPLIST_NUMBER) 
@@ -15,16 +19,18 @@ pro tvPSelect::Message,msg
 end
 
 
-;-----------------------------------------------------------------------
-;        PROPERTY  FUNCTION
-;-----------------------------------------------------------------------
-
+;=============================================================================
+;  GetProperty
+;=============================================================================
 pro tvPSelect::GetProperty, PLANES=planes, IMAGE=image
   if arg_present(planes) then planes=self.Planes
   if arg_present(image) then image =self.Image
 end 
 
 
+;=============================================================================
+;  SetProperty
+;=============================================================================
 pro tvPSelect::SetProperty, PLANES=pl
   if keyword_set(pl) then begin
      ptr_free,self.Planes
@@ -33,48 +39,30 @@ pro tvPSelect::SetProperty, PLANES=pl
   endif 
 end
 
-;-----------------------------------------------------------------------
-;        EVENT FUNCTION
-;-----------------------------------------------------------------------
-
+;=============================================================================
+; Event
+;=============================================================================
 pro tvPSelect_Event,ev
   widget_control, ev.handler, get_uvalue=self
   self->Event,ev
 end
-
-
 pro tvPSelect::Event, ev
   ;; Set the next image, without changing zoom etc (same sized image)
   self.oDraw->SetProperty, IMORIG=(*self.Image)[*,*,ev.index],/NO_RESIZE
 end
 
 
-;-----------------------------------------------------------------------
-;        CLEANUP FUNCTION
-;-----------------------------------------------------------------------
+;=============================================================================
+; Cleanup
+;=============================================================================
 pro tvPSelect::Cleanup
   ptr_free,self.Image,self.Planes
   self->tvPlug::Cleanup
 end
 
-
-;-----------------------------------------------------------------------
-;        START FUNCTION
-;-----------------------------------------------------------------------
-
-
-pro tvPSelect::Start
-  self->tvPlug::Start
-  ;; Probe for a tvKey plug-in, and sign up with it.
-  oKey=(self.oDraw->GetMsgObjs(CLASS='tvKEY'))[0]
-  if obj_valid(oKey) then oKey->MsgSignup,self,/TVKEY_KEY
-end
-
-;-----------------------------------------------------------------------
-;        INIT FUNCTION
-;-----------------------------------------------------------------------
-
-
+;=============================================================================
+;  Init
+;=============================================================================
 function tvPSelect::Init, parent, oDraw, im,COLUMN=col,NOLABEL=nl, $
                           START=strt,PLANES=pl,SWITCH_KEYs=sk,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
@@ -99,11 +87,13 @@ function tvPSelect::Init, parent, oDraw, im,COLUMN=col,NOLABEL=nl, $
   self.wList=widget_droplist(base,VALUE=strtrim(*self.Planes,2), UVALUE=self,$
                              EVENT_PRO='tvpselect_event')
   if strt ne 0 then widget_control, self.wList, set_droplist_select=strt
+  self.oDraw->MsgSignup,self,/DRAW_KEY
   return,1
 end
-;-----------------------------------------------------------------------
-;        STRUCTURE DEFINITION 
-;-----------------------------------------------------------------------
+
+;=============================================================================
+; tvPSelect__define
+;=============================================================================
 pro tvPSelect__define
   struct={tvPSelect, $
           Inherits tvPlug, $
