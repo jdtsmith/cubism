@@ -74,7 +74,7 @@ pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
                       WAVELENGTH_CONVERT=wc,NO_WEIGHT_CONVERT=nwc
   weights=(fr=(br=-1))
   if NOT ptr_valid(self.map_sets) then return
-  wh=where(strlowcase((*self.map_sets).name) eq strlowcase(name),cnt)
+  wh=where(strlowcase((*self.map_sets).name) eq strlowcase(name[0]),cnt)
   if cnt eq 0 then return
   map=(*self.map_sets)[wh[0]]
   if ptr_valid(map.weights) then begin 
@@ -187,7 +187,7 @@ pro IRSMapSet::LoadSets,files, NAMES=names
   if size(files,/TYPE) ne 7 then return ;cancelled  
   cnt=n_elements(files) 
   
-  names=strarr(cnt)
+  if cnt gt 1 then names=strarr(cnt) else names=''
   for i=0,cnt-1 do begin
      fr=(br=(weights=0))
      self->ReadMapSetFile,files[i],FORERANGES=fr,BACKRANGES=br, $
