@@ -13,13 +13,38 @@ pro tvHist::Message, msg
   endcase 
 end 
 
+;=============================================================================
+;	On:  Get all our messages.
+;=============================================================================
+pro tvHist::On
+  if self.active then begin     ;if turned on *again* .. means Reset
+     self->Reset                ;reset to no box drawn
+     return
+  end
+  self->tvPlug::On
+  self.box->On
+  self.oDraw->MsgSignup,self,/TVDRAW_PREDRAW,/TVDRAW_POSTDRAW
+end
+
+;=============================================================================
+;       Off: If we have a box drawn, keep processing.
+;=============================================================================
+pro tvHist::Off
+  self->tvPlug::Off
+  self.box->Off
+  ;; If we have no box ever drawn, shut down the message flow
+  if self.box->IsDrawn() eq 0 then begin 
+     if obj_valid(self.colobj) then self.colobj->DrawCbar
+     self.oDraw->MsgSignup,self,/NONE,/TVDRAW_EXCLUSIVE
+  endif
+end
+
 function tvHist::Icon
   return,[[  0b,  0b],[  0b,  0b],[  0b,  1b],[  0b,  1b], $
           [128b, 11b],[128b, 30b],[128b, 54b],[152b,100b], $
           [188b,192b],[198b,128b],[131b,128b],[  1b,  0b], $
           [  0b,  0b],[170b,170b],[ 85b, 85b],[170b,170b]]
 end
-
 ;;************************End OverRiding methods*******************************
 
 ;=============================================================================
@@ -50,7 +75,7 @@ pro tvHist::PlotHist,im
   
   min=self.min & max=self.max
   if min eq max then begin 
-     self.oDraw->GetProperty, DRAWWIDGET=dw
+     self.oDraw->GetProperty,DRAWWIDGET=dw 
      wmessage,PARENT_GROUP=dw,'Undefined Histogram, Aborting!',/ERROR
      self->Reset
      return
@@ -83,64 +108,35 @@ pro tvHist::Reset
 end
 
 ;=============================================================================
-;	On:  Get all our messages.
-;=============================================================================
-pro tvHist::On
-  if self.active then begin     ;if turned on *again* .. means Reset
-     self->Reset            ;reset to no box drawn
-     return
-  end
-  self->tvPlug::On
-  self.box->On
-  self->Update,/EXCLUSIVE,/PREDRAW,/POSTDRAW
-end
-
-;=============================================================================
-;       Off: If we have a box drawn, keep processing.
-;=============================================================================
-pro tvHist::Off
-  self->tvPlug::Off
-  self.box->Off
-  ;; If no box ever drawn, sign up for exclusives only, otherwise,
-  ;; keep all the messages coming
-  if self.box->IsDrawn() eq 0 then begin 
-     self.colobj->DrawCbar
-     self->Update,/ALL_OFF,/EXCLUSIVE
-  endif 
-end
-
-;=============================================================================
-;	Start:  Post-Initialization
+;	Start  Find the color object if none passed
 ;=============================================================================
 pro tvHist::Start
   self->tvPlug::Start
   if NOT obj_valid(self.colobj) then begin 
-     test=self.oDraw->GetMsgObjs(CLASS='tvcolor')
-     if NOT obj_valid(test[0]) then begin 
-        wmessage, PARENT_GROUP=self.wBASE,'No Color plug-in registered.'
+     test=self.oDraw->GetMsgObjs(CLASS='tvColor')
+     if NOT obj_valid(test[0]) then begin
+        self.oDraw->GetProperty,DRAWWIDGET=dw
+        wmessage, PARENT_GROUP=dw,'No Color plug-in registered.'
         return
      endif 
      self.ColObj=test[0]
   endif 
-  self.Box->GetProperty,COLOR=col
-  self.color=col
   self->Histo
 end
 
 ;=============================================================================
-;	init.  Initialize the histogram with a tvDraw object.  All tvRBox
-;	keywords are relevant (see tvrbox).
-;	If COLOR is passed, and is a valid tvColor object, a histogram
-;	curve will be drawn over the top.
+;       Init - Initialize the histogram with a tvDraw object.  All
+;              tvRBox keywords are relevant (see tvrbox).  
 ;=============================================================================
-function tvHist::Init,oDraw,EXCLUSIVE=exc,COLOBJ=col,NBINS=nb, $
-                      _EXTRA=e
+function tvHist::Init,oDraw,EXCLUSIVE=exc,NBINS=nb,_EXTRA=e
   if (self->tvPlug::Init(oDraw) ne 1) then return,0 ;chain up
   if n_elements(nb) eq 0 then self.nbins=200 else self.nbins=nb
-  if obj_valid(col) then if obj_isa(col,'tvColor') then self.colobj=col
-  
   ;; Get a tvrbox object, signing ourselves up for box messages from it.
-  self.box=obj_new('tvrbox', oDraw, MsgList=[self],/NO_REDRAW,_EXTRA=e)
+  self.box=obj_new('tvRBox', oDraw,_EXTRA=e)
+  self.Box->MsgSignup,self,/ALL
+  self.Box->GetProperty,COLOR=col
+  self.color=col                ;for drawing the histogram over the color-bar
+  self->Off
   return,1
 end
 
@@ -154,7 +150,7 @@ pro tvHist__define
           max:0.0, $            ;the maximum hist value
           nbins:0, $            ;number of bins, defaults to 100
           colobj:obj_new(), $   ;a tvColor object we might be using
-          color:0, $              ;the color to draw the histogram with
+          color:0, $            ;the color to draw the histogram with
           box:obj_new()}        ;a tvRBox to use.
   return
 end
