@@ -127,16 +127,18 @@ pro tvHist::Histo,im
         1:
         2:
         5: begin 
-           *im=self.min>(*im)<self.max
+           self.oDraw->SetDrawMinMax,MIN=self.min,MAX=self.max
            break
         end 
         3: begin 
-           *im=sqrt(self.min>(*im)<self.max-self.min)
+           *im=sqrt(*im-self.min)
+           self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(self.max-self.min)
            break
         end
         4: begin 
-           *im=alog10(self.min>(*im)<self.max-self.min+ $
-                      (self.max-self.min)*1.e-6)
+           *im=alog10(*im-self.min + (self.max-self.min)*1.e-6)
+           self.oDraw->SetDrawMinMax,MIN=alog10((self.max-self.min)*1.e-6), $
+                                     MAX=alog10((self.max-self.min)*(1.+1.e-6))
            break
         end
      endswitch
@@ -158,7 +160,7 @@ pro tvHist::Histo,im
   switch self.scale_mode of 
      0: begin                   ; linear
         mx=max(take,min=mn)
-        if mx gt mn then *im=(mn>(*im)<mx)    
+        if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
         break
      end
      
@@ -168,19 +170,22 @@ pro tvHist::Histo,im
         s=take[sort(take)]
         mx=s[((nt-1)*([99,95])[self.scale_mode-1]/100)<(nt-2)]
         mn=s[((nt-1)*([1,5])[self.scale_mode-1]/100)>1]
-        if mx gt mn then *im=mn>*im<mx
+        if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
         break
      end
      
      3: begin                   ;sqrt
         mx=max(take,min=mn)
-        *im=sqrt((boxon?(mn>*im<mx):*im)-mn)
+        *im=sqrt((mn>*im)-mn)
+        self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(mx-mn)
         break
      end
      
      4: begin                   ;logarithm
         mx=max(take,min=mn)
-        *im=alog10((boxon?(mn>*im<mx):*im)-mn+(mx-mn)*1.e-6)
+        *im=alog10((mn>*im)-mn+(mx-mn)*1.e-6)
+        self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*1.e-6), $
+                                  MAX=alog10((mx-mn)*(1.+1.e-6))
         break
      end
      
