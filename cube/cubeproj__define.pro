@@ -170,38 +170,32 @@ pro CubeProj::ShowEvent, ev
      'loadcalib': self->LoadCalib,/SELECT
      'load-append-badpixels': self->LoadBadPixels,/APPEND
      'feedback': begin 
-        self.feedback=1b-self.feedback
+        self->SetProperty,FEEDBACK=1b-self.feedback
         widget_control, ev.id, SET_BUTTON=self.feedback
      end
      'fluxcon': begin 
-        self.fluxcon=1b-self.fluxcon
+        self->SetProperty,FLUXCON=1b-self.fluxcon
         widget_control, ev.id, SET_BUTTON=self.fluxcon
-        self.changed=1b
      end
      'slcf': begin 
-        self.slcf=1b-self.slcf
+        self->SetProperty,SLCF=1b-self.slcf
         widget_control, ev.id, SET_BUTTON=self.slcf
-        self.changed=1b
      end
      'wavecut': begin 
-        self.wavecut=1b-self.wavecut
+        self->SetProperty,WAVECUT=1b-self.wavecut
         widget_control, ev.id, SET_BUTTON=self.wavecut
-        self->ResetAccounts
-        self.changed=1b
      end
      'reconstructed': begin 
-        self.reconstructed_pos=1b-self.reconstructed_pos
+        self->SetProperty,RECONSTRUCTED_POSITIONS=1b-self.reconstructed_pos
         widget_control, ev.id, SET_BUTTON=self.reconstructed_pos
-        self->ResetAccounts
-        self.changed=1b
      end
      'save-with-data': begin 
-        self.SaveMethod XOR=1b
+        self->SetProperty,SAVE_DATA=1b-logical_true(self.SaveMethod AND 1b)
         widget_control, ev.id, SET_BUTTON=self.SaveMethod AND 1b
      end 
      'save-with-accounts': begin 
-        self.SaveMethod XOR=2b
-        widget_control, ev.id, SET_BUTTON=(self.SaveMethod AND 2b) ne 0b
+        self->SetProperty,SAVE_ACCOUNTS=1b-logical_true(self.SaveMethod AND 2b)
+        widget_control, ev.id, SET_BUTTON=logical_true(self.SaveMethod AND 2b)
      end 
      
      'add-droop-aor':     self->AddGroup,/DROOPRES
@@ -1141,7 +1135,7 @@ end
 ;=============================================================================
 ;  LoadBackGroundList - Load background exposures from file
 ;=============================================================================
-pro CubeProj::LoadBackGroundList,file,ERROR=err
+pro CubeProj::LoadBackGroundList,file,ERROR=err,_EXTRA=e
   catch, err
   if err ne 0 then begin 
      if n_elements(un) ne 0 then free_lun,un
@@ -1166,7 +1160,7 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err
   if cnt lt n_elements(bg) then $
      self->Warning,strtrim(n_elements(bg)-cnt,2)+ $
                    ' record(s) not present in project'
-  self->SetBackgroundFromRecs,wh
+  self->SetBackgroundFromRecs,wh,_EXTRA=e
 end
 
 
@@ -1992,7 +1986,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
                           APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
-                          GLOBAL_BAD_PIXEL_LIST=gbpl, $
+                          GLOBAL_BAD_PIXEL_LIST=gbpl, WAVECUT=wavecut, $
                           RECONSTRUCTED_POSITIONS=rcp, $
                           FLUXCON=fc,SLCF=slcf,SAVE_ACCOUNTS=sa,SAVE_DATA=sd
   update_cal=0b
@@ -2073,6 +2067,15 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      if bpl[0] ne -1 then self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bpl)
      self.Changed=1b
   endif
+  
+  if n_elements(wc) ne 0 then begin 
+     if self.wavecut ne wc then begin 
+        self.wavecut=wc
+        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        update_cal=1b
+     endif
+  endif
+  
   if n_elements(rcp) ne 0 then begin 
      self.reconstructed_pos=keyword_set(rcp) 
      self->ResetAccounts,/NO_UPDATE & self.Changed=1b
@@ -2101,17 +2104,18 @@ end
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $ $
-                           SLIT_LENGTH=sl, CALIB=calib, CAL_FILE=cf, $
+                           SLIT_LENGTH=sl, CALIB=calib, CALIB_FILE=cf, $
                            MODULE=module, ORDER=order, APERTURE=ap, $
                            PROJECT_NAME=pn,DR=dr, FLUXCON=fc, SLCF=slcf, $
                            TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
                            VERSION=version, ASTROMETRY=astr,POSITION=pos, $
-                           POSITION_ANGLE=pa, BACKGROUND=bg, $
+                           POSITION_ANGLE=pa, BACKGROUND=bg, WAVECUT=wavecut, $
                            GLOBAL_BAD_PIXEL_LIST=gbpl, PMASK=pmask, $
                            RECONSTRUCTED_POSITIONS=rp, SAVE_DATA=sd, $
                            SAVE_ACCOUNT=sa, DATE_OBS=dobs, BAD_PIXEL_LIST=bpl,$
-                           ALL_RECORDS=all_recs, RECORDS=recs, $
-                           RECORD_SET=rec_set, POINTER=ptr,WAVECUT=wavecut
+                           FILENAMES=fn, ALL_RECORDS=all_recs, RECORDS=recs, $
+                           RECORD_SET=rec_set, POINTER=ptr
+                           
   ptr=keyword_set(ptr)
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
      account=ptr?self.account:*self.account
@@ -2211,6 +2215,8 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      bpl=(*self.DR)[recs[0]].BAD_PIXEL_LIST
      if ~ptr && ptr_valid(bpl) then bpl=*bpl
   endif 
+  
+  if arg_present(fn) then fn=(*self.DR)[recs].file
   
 end
 
