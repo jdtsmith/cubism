@@ -21,15 +21,29 @@
 ;    and see class IRS_Calib
 ;
 ; NOTES:
-;  
-;    The extraction apertures are defined for a single order, and
-;    consist of two pairs of normalized (on [0.0,1.0]) floating point
-;    numbers: low, and high.  Each pair specifies the starting (top,
-;    or shorter wavelength) aperture, and the ending (bottom, or
-;    longer wavelength) aperture in terms of fractional slit lengths
-;    measured from the "low" side of the slit.  This means a value of
-;    ".2" corresponds to 20% of the slit length from the leftmost
-;    edge, and traces any line tilt.
+;
+;    The extraction apertures are defined for a single order.  There
+;    are two types of aperture: box, and wavelength-scaled.  If scale
+;    is non-zero, it takes precedence.
+;
+;    WAVELENGTH SCALED
+;
+;    Wavelength scaled apertures are specified with a normalized
+;    coordinate for the aperture center, a fiducial reference
+;    wavelength, and a normalized width at the fiducial wavelength.
+;    The aperture will be scaled to this pixel size at this wavlength,
+;    with the size scaling linearly with wavelength for all other
+;    aperture positions.
+;    
+;    BOX SCALED
+;
+;    Box scaled apertures consist of two pairs of normalized (on
+;    [0.0,1.0]) floating point numbers: low, and high.  Each pair
+;    specifies the starting (top, or shorter wavelength) aperture, and
+;    the ending (bottom, or longer wavelength) aperture in terms of
+;    fractional slit lengths measured from the "low" side of the slit.
+;    This means a value of ".2" corresponds to 20% of the slit length
+;    from the leftmost edge, and traces any line tilt.
 ;
 ;    A single, slightly tilted slit image demonstrating the normalized
 ;    coordinates, with spatial direction nearly left-right, and
@@ -61,6 +75,7 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2004-03-07 (J.D. Smith): Added wavelength-scaled apertures
 ;    2002-08-27 (J.D. Smith): Initial migration from SMART codebase.
 ;    2001-12-13 (J.D. Smith): Written
 ;-
@@ -69,7 +84,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002 J.D. Smith
+;  Copyright (C) 2001,2002,2004 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -90,6 +105,9 @@
 
 pro IRS_APERTURE__define
   st={IRS_APERTURE,$
-      Low: [0.0,0.0], $         ;The "low in the slit" (left) aperture pair.
-      High:[0.0,0.0]}           ; & "high in the slit" (right). Normalized.
+      Low:  [0.0,0.0], $        ; The "low in the slit" (left) aperture pair
+      High: [0.0,0.0], $        ; & "high in the slit" (right). Normalized
+      Wavscl: 0b, $             ; Whether we are wavelength scaling   
+      Scale:[0.0,0.0,0.0]}      ; width/wavelength/cenpos for wav-scaling
+
 end
