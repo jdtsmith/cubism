@@ -53,7 +53,7 @@
 ;	
 ;       CALLING SEQUENCE:
 ;
-;          obj->GetProperty, [IMORIG=,IMMOD=, IMSCL=, PAN=, SIZE=, $
+;          obj->GetProperty, [IMORIG=,IMMOD=, IMSCL=, IMDISP=, PAN=, SIZE=, $
 ;                            ZOOM=, OFFSET=,DISPSIZE=,DRAWWIN=, $
 ;                            WINSIZE=, PIXWIN=,TOP=, BOTTOM=, $
 ;                            DRAWWIDGET=, _REF_EXTRA=]
@@ -63,6 +63,7 @@
 ;          IMORIG: The original, unmodified image.
 ;          IMMOD: The modified image (e.g. filtered, rescaled, etc.)
 ;          IMSCL: The byte-scaled image as displayed.
+;          IMDISP: The byte-scaled, resized image, as displayed.
 ;          PAN: The X,Y gutter from lower left edge of the draw canvas
 ;             to the corner of the image
 ;          SIZE: The size (dimensions) of the original image.
@@ -393,10 +394,10 @@ end
 ;                returned value is a structure with fields equivalent
 ;                to the keyword names.
 ;=============================================================================
-pro tvDraw::GetProperty, IMORIG=io,IMMOD=im, IMSCL=is, PAN=pn, SIZE=sz, $
-                         ZOOM=zm, OFFSET=off,DISPSIZE=disp,DRAWWIN=draw, $
-                         WINSIZE=ws, PIXWIN=pw,TOP=top, BOTTOM=bot, $
-                         DRAWWIDGET=draww,_REF_EXTRA=re
+pro tvDraw::GetProperty, IMORIG=io,IMMOD=im, IMSCL=is, IMDISP=id, PAN=pn, $
+                         SIZE=sz, ZOOM=zm, OFFSET=off,DISPSIZE=disp, $
+                         DRAWWIN=draw, WINSIZE=ws, PIXWIN=pw,TOP=top, $
+                         BOTTOM=bot, DRAWWIDGET=draww,_REF_EXTRA=re
   
   ;; Chain up using by-reference keyword inheritance
   if n_elements(re) ne 0 then self->ObjMsg::GetProperty,_EXTRA=re
@@ -411,6 +412,7 @@ pro tvDraw::GetProperty, IMORIG=io,IMMOD=im, IMSCL=is, PAN=pn, SIZE=sz, $
   if arg_present(zm) then zm=self.zoom
   if arg_present(io) then io=self.imorig
   if arg_present(is) then is=self.imscl
+  if arg_present(id) then id=self.imdisp
   if arg_present(im) then im=self.immod
   if arg_present(off) then off=self.offset
   if arg_present(disp) then disp=self.dispsize
