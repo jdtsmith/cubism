@@ -542,7 +542,7 @@ end
 ;=============================================================================
 function CubeProj::Load,file,ERROR=err
   catch, err
-  if err then begin 
+  if err ne 0 then begin 
      catch,/cancel
      self->Error,['Error loading project from '+file,!ERROR_STATE.MSG],$
                  /RETURN_ONLY
@@ -1936,7 +1936,7 @@ end
 ;     XXXX: Switch from position to wavelength based ????        
 ;=============================================================================
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
-                         BG_VALS=bg_vals,MAP_NAME=mname
+                         BG_VALS=bg_vals,MAP_NAME=mname, SAVE=sf
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
@@ -1998,34 +1998,74 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      stack=stack-background
   endif
   
+  if keyword_set(sf) then self->SaveMap,stack,sf
   return,stack
 end
+
+;=============================================================================
+;  SaveMap - Save a Stacked Map to FITS 
+;=============================================================================
+pro CubeProj::SaveMap,map,sf
+  if size(sf,/TYPE) ne 7 then begin 
+     xf,sf,/SAVEFILE, /RECENT, $
+        FILTERLIST=['*.fits', '*.*', '*'], $
+        TITLE='Save Map As FITS File...', $
+        /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(), $
+        START=strlowcase(strjoin(strsplit(self->ProjectName(),/EXTRACT),'_'))+$
+        "_map.fits"
+     if size(sf,/TYPE) ne 7 then return
+  endif
+  
+  catch, err
+  if err ne 0 then begin 
+     self->Error,['Error saving map to file '+sf,!ERROR_STATE.MSG]
+  endif 
+  widget_control,/HOURGLASS  
+
+  fxhmake,hdr,/date
+  ;; Description
+  sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
+              'This file contains a 2D map created from an IRS', $
+              'spectral cube, assembled from a step & stare spectral', $
+              'mapping dataset.', $
+              'For more information on SINGS see http://sings.stsci.edu'], $
+             hdr,/COMMENT
+  fxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
+  fxaddpar,hdr,'APERNAME',self.MODULE,' The IRS module'
+  fxaddpar,hdr,'CUBE_VER',self.version,' CUBISM version used'
+  self->LoadCalib
+  name=self.cal->Name()
+  if name eq '' then name=self.cal_file
+  fxaddpar,hdr,'CAL_SET',name,' IRS Calibration set used'
+  writefits,sf,map,hdr
+end
+
 
 ;=============================================================================
 ;  Extract - Extract a Spectrum from the Cube, and possibly save it
 ;            XXX - Other extractions, including physical coordinates
 ;=============================================================================
-function CubeProj::Extract,low,high, SAVE=sf, FITS=fits
+function CubeProj::Extract,low,high, SAVE=sf, ASCII=ascii
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to extract'
   sp=total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
            1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
 
-  if keyword_set(sf) then self->SaveSpectrum,sp,sf,FITS=fits
+  if keyword_set(sf) then self->SaveSpectrum,sp,sf,ASCII=ascii
   return,sp
 end
 
 ;=============================================================================
-;  SaveSpectrum - Save a Spectrum to FITS or ASCII
+;  SaveSpectrum - Save a Spectrum to FITS (the default) or ASCII
 ;=============================================================================
-pro CubeProj::SaveSpectrum,sp,sf,FITS=fits
-  fits=keyword_set(fits) 
+pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii
+  fits=NOT keyword_set(ascii)
   if size(sf,/TYPE) ne 7 then begin 
      xf,sf,/SAVEFILE, /RECENT, $
         FILTERLIST=[(fits?'*.fits':'*.txt'), '*.*', '*'], $
         TITLE='Save Spectrum As '+(fits?'FITS':'Text')+' File...', $
         /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(), $
         START=strlowcase(strjoin(strsplit(self->ProjectName(),/EXTRACT),'_'))+$
-        (fits?".fits":".txt")
+        "_sp"+(fits?".fits":".txt")
      if size(sf,/TYPE) ne 7 then return
   endif
   
