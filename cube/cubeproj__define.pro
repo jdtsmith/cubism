@@ -161,6 +161,14 @@ pro CubeProj::ShowEvent, ev
         self.feedback=1b-self.feedback
         widget_control, ev.id, SET_BUTTON=self.feedback
      end
+     'save-with-data': begin 
+        self.SaveMethod XOR=1b
+        widget_control, ev.id, SET_BUTTON=self.SaveMethod AND 1b
+     end 
+     'save-with-accounts': begin 
+        self.SaveMethod XOR=2b
+        widget_control, ev.id, SET_BUTTON=(self.SaveMethod AND 2b) ne 0b
+     end 
      
      'setorder': begin 
         self->GetProperty,CALIB=cal
@@ -384,12 +392,21 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   file=widget_button(mbar,VALUE='File',/MENU)
   b1=widget_button(file,VALUE='New...',UVALUE='newproject') 
   b1=widget_button(file,VALUE='Open...',UVALUE='open')
+  sm=widget_button(file,VALUE='Save Setup',/MENU)
+  b2=widget_button(sm,VALUE='Save Data with Project', $
+                   UVALUE='save-with-data', /CHECKED_MENU)
+  widget_control, b2,SET_BUTTON=self.SaveMethod AND 1b
+  b2=widget_button(sm,VALUE='Save Clip Accounts with Project', $
+                   UVALUE='save-with-accounts', /CHECKED_MENU)
+  widget_control, b2,SET_BUTTON=logical_true(self.SaveMethod AND 2b)
   b1=widget_button(file,VALUE='Save',UVALUE='save')
   b1=widget_button(file,VALUE='Save As...',UVALUE='save-as')
-  wMustCube=widget_button(file,VALUE='Write FITS Cube...',UVALUE='writefits')
-  ;;-------------
+  
   (*self.wInfo).MUST_SAVE_CHANGED= $
-     widget_button(file,VALUE='Revert To Saved...',uvalue='revert',/SEPARATOR)
+     widget_button(file,VALUE='Revert To Saved...',uvalue='revert')
+  ;;-------------  
+  wMustCube=widget_button(file,VALUE='Write FITS Cube...',$
+                          UVALUE='writefits',/SEPARATOR)
   ;;-------------
   b1=widget_button(file,VALUE='Rename Project...',uvalue='setprojectname', $
                    /SEPARATOR)
@@ -613,7 +630,8 @@ end
 ;=============================================================================
 ;  Save - Save a Project to file
 ;=============================================================================
-pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
+pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
+                   NO_ACOUNT=nacc
   if (size(file,/TYPE) ne 7 AND self.SaveFile eq '') OR keyword_set(as) $
      then begin 
      if self.SaveFile then start=self.SaveFile else begin 
@@ -635,35 +653,105 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
   detCal=self.cal & self.cal=obj_new() ;or the calibration object
   detCubeRecs=self.cuberecs & self.cuberecs=ptr_new() ; or the cuberec list
   
+  nr=self->N_Records()
+  
   if ptr_valid(self.DR) then begin 
+     ;; Check default save method
+     if n_elements(nodata) eq 0 then nodata=~(self.SaveMethod AND 1b)
+     if n_elements(noacc) eq 0 then noacc=~(self.SaveMethod AND 2b)
+     stub=ptrarr(nr)
      detRevAccts=(*self.DR).REV_ACCOUNT 
-     (*self.DR).REV_ACCOUNT=ptrarr(self->N_Records())
+     (*self.DR).REV_ACCOUNT=stub
+     if keyword_set(nodata) then begin 
+        detBCD=(*self.DR).BCD
+        (*self.DR).BCD=stub
+        detHEADER=(*self.DR).HEADER
+        (*self.DR).HEADER=stub
+        detUNC=(*self.DR).UNC
+        (*self.DR).UNC=stub
+        detBMASK=(*self.DR).BMASK
+        (*self.DR).BMASK=stub
+     endif else self->RestoreAll
+     if keyword_set(noacc) then begin 
+        detACCOUNT=(*self.DR).ACCOUNT
+        (*self.DR).ACCOUNT=stub
+     endif
   endif
+  
+  
   oldchange=self.Changed        ;we want the file written to have changed=0!
   self.Changed=0b               ;but save the old preference incase we fail
+  
   catch, serr
-  if serr ne 0 then begin       ;it failed!
-     catch,/CANCEL
-     self.wInfo=detInfo         ;reattach them
-     self.MsgList=detMsgList
-     self.cal=detCal
-     self.cuberecs=detCubeRecs
-     if ptr_valid(self.DR) then (*self.DR).REV_ACCOUNT=detRevAccts
-     self.Changed=oldchange     ;reassign our old changed status
-     self->Error,['Error Saving to File: ',file]
-  endif 
-  save,self,FILENAME=file,COMPRESS=comp
+  if serr ne 0 then self.Changed=oldchange $ ;failed, reassign old changed
+  else save,self,FILENAME=file,COMPRESS=comp
   catch,/CANCEL
+  
   ;; Reattach 
   self.wInfo=detInfo           
   self.MsgList=detMsgList   
   self.cal=detCal
   self.cuberecs=detCubeRecs
-  if ptr_valid(self.DR) then (*self.DR).REV_ACCOUNT=detRevAccts
+  if ptr_valid(self.DR) then begin 
+     (*self.DR).REV_ACCOUNT=detRevAccts
+     if keyword_set(nodata) then begin 
+        (*self.DR).BCD=detBCD
+        (*self.DR).HEADER=detHEADER        
+        (*self.DR).UNC=detUNC
+        (*self.DR).BMASK=detBMASK
+     endif 
+     if keyword_set(noacc) then begin 
+        (*self.DR).ACCOUNT=detACCOUNT
+     endif 
+  endif 
+  
+  if serr then self->Error,['Error Saving to File: ',file]
+  
   if strlen(self.SaveFile) eq 0 or keyword_set(AS) then self.SaveFile=file
   self->UpdateTitle
 end
 
+;=============================================================================
+;  RestoreData - Restore selected data from file
+;=============================================================================
+pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt
+  if n_elements(sel) eq 0 then sel=self->CurrentSelect()
+  wh=where(~ptr_valid((*self.DR)[sel].BCD),cnt)
+  if cnt eq 0 then return
+  widget_control, /HOURGLASS
+  
+  for i=0,cnt-1 do begin 
+     which=sel[wh[i]]
+     file=(*self.DR)[which].FILE
+     if ~file_test(file,/READ) then $
+        self->Error,["Couldn't restore data from file (check filename): ",file]
+     (*self.DR)[which].BCD=ptr_new(readfits(file,/SILENT,hdr))
+     (*self.DR)[which].HEADER=ptr_new(hdr)
+     
+     ;; Optional BMASK, UNCERTAINTY
+     ptr_free,(*self.DR)[which].BMASK,(*self.DR)[which].UNC
+     parts=stregex(file,'^(.*)bcd(_fp)?.fits$',/EXTRACT,/SUBEXPR)
+     root=parts[1]
+     unc_file=root+'func.fits'
+     bmask_file=root+'bmask.fits'
+     
+     if file_test(bmask_file) then $
+        (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
+     
+     if file_test(unc_file) then $
+        (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
+  endfor
+  print, 'Restored: ',cnt
+end
+
+;=============================================================================
+;  RestoreAll - Restore All data
+;=============================================================================
+pro CubeProj::RestoreAll
+  self->RestoreData,indgen(self->N_Records()),RESTORE_CNT=cnt
+  if cnt gt 0 then self->Info, $
+     string(FORMAT='("Restored ",I0," record",A)',cnt,cnt gt 1?"s":"")
+end
 
 ;=============================================================================
 ;  LoadBadPixels - Load bad pixels from file
@@ -986,10 +1074,12 @@ function CubeProj::List
                else acct="Yes"
             endif else acct="Invalid"
          endif else acct="No"
+         if self.reconstructed_pos then pos=(*self.DR).REC_POS else $
+            pos=(*self.DR)[i].RQST_POS
+         
          s=string(FORMAT='(" ",A,T23,A10,T34,A12,T48,A3,T59,A,T70,A)', $
                   (*self.DR)[i].ID, $
-                  radecstring((*self.DR)[i].RQST_POS[0],/RA), $
-                  radecstring((*self.DR)[i].RQST_POS[1]), $
+                  radecstring(pos[0],/RA),radecstring(pos[1]), $
                   ptr_valid((*self.DR)[i].UNC)?'Yes':'No', $
                   ptr_valid((*self.DR)[i].BMASK)?'Yes':'No', $
                   acct)
@@ -1155,6 +1245,7 @@ end
 ;=============================================================================
 pro CubeProj::ViewRecord,rec,NEW_VIEWER=new
   self->RecOrSelect,rec
+  self->RestoreData,rec
   self->FindViewer,NEW_VIEWER=new
   self->Send,RECORD=rec
 end
@@ -1259,8 +1350,10 @@ pro CubeProj::Sort,sort
      3: s=sort((*self.DR).DATE)
      4: s=sort((*self.DR).FOVID)
      5: s=sort((*self.DR).EXP)
-     6: s=sort((*self.DR).RQST_POS[0])
-     7: s=sort((*self.DR).RQST_POS[1])
+     6: s=sort(self.reconstructed_pos?(*self.DR).REC_POS[0]: $
+               (*self.DR).RQST_POS[0])
+     7: s=sort(self.reconstructed_pos?(*self.DR).REC_POS[1]: $
+               (*self.DR).RQST_POS[1])
      8: s=sort(ptr_valid((*self.DR).UNC))
      9: s=sort(ptr_valid((*self.DR).BMASK))
      10: s=sort(ptr_valid((*self.DR).ACCOUNT))
@@ -1277,7 +1370,7 @@ pro CubeProj::Sort,sort
   endif 
 end
 
-pro CubeProj::PrintInfo,entries,_EXTRA=e
+pro CubeProj::Print,entries,_EXTRA=e
   print,transpose(self->Info(entries,_EXTRA=e))
 end
 
@@ -1334,8 +1427,9 @@ function CubeProj::Info,entries, NO_DATA=nd
   for i=0,n_elements(entries)-1 do begin 
      rec=(*self.DR)[entries[i]]
      str=[str,rec.id+":"+rec.file]
-     sign=rec.RQST_POS[1] ge 0.0?'+':'-'
-     radec,rec.RQST_POS[0],abs(rec.RQST_POS[1]),rh,rm,rs,dd,dm,ds
+     pos=self.reconstructed_pos?rec.REC_POS:rec.RQST_POS
+     sign=pos[1] ge 0.0?'+':'-'
+     radec,pos[0],abs(pos[1]),rh,rm,rs,dd,dm,ds
      ra=string(FORMAT='(I0,"h",I2.2,"m",F5.2,"s")',rh,rm,rs)
      dec=sign+string(FORMAT='(I0,"d",I2.2,"m",F5.2,"s")',abs(dd),dm,ds)
      str=[str,string(FORMAT='(%"   EXP: %2.0d (%d/%d) (%2.0d,%2.0d) ' + $
@@ -1437,7 +1531,7 @@ end
 ;                POINTER set.
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
-                           CUBE_UNCERTAINTY=err, PR_SIZE=prz, PR_WIDTH=prw, $
+                           UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $
                            CALIB=calib, MODULE=module, APERTURE=ap, $
                            PROJECT_NAME=pn,DR=dr, TLB_OFFSET=tboff, $
                            TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
@@ -1892,6 +1986,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
                          (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
                           ' all orders'), $
                          self.NSTEP,self.STEP_SIZE*3600.0D*self.NSTEP)
+     (*self.wInfo).feedback_window=!D.WINDOW
      plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
           POSITION=[15,15,xsize-15,ysize-4],/DEVICE, $
           yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
@@ -1939,8 +2034,8 @@ pro CubeProj::BuildAccount,_EXTRA=e
 ;                    self.cube_size[1]-((*self.DR)[i].COLUMN-1)*stepsz[1]-1] + $
 ;                   self.PR_SIZE/2.
      
-     pos=(*self.DR)[i].RQST_POS
-
+     pos=self.reconstructed_pos?(*self.DR)[i].REC_POS:(*self.DR)[i].RQST_POS
+     
      ;; Building in another order?
      if (*self.DR)[i].TARGET_ORDER ne self.ORDER AND $
         self.ORDER ne 0 then begin
@@ -2387,6 +2482,7 @@ end
 ;=============================================================================
 pro CubeProj::BuildCube
   if NOT ptr_valid(self.DR) then return
+  self->RestoreAll              ;get all of the data, if necessary
   if self.ACCOUNTS_VALID ne 1b OR $
      NOT array_equal(ptr_valid((*self.DR).ACCOUNT),1b) OR $
      self.feedback then self->BuildAccount else self->BuildRevAcct
@@ -2402,6 +2498,7 @@ pro CubeProj::BuildCube
   endif else use_bpmask=0
   
   if self.feedback then begin 
+     if ptr_valid(self.wInfo) then wset,(*self.wInfo).feedback_window
      csz=self.cube_size[0]*self.cube_size[1]
      ctarg=self.cube_size[2]/2
   endif 
@@ -2840,19 +2937,21 @@ end
 ;=============================================================================
 pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
   if n_elements(dir) eq 0 then $
-     xf,dir,/DIRECTORY,/RECENT,TITLE='Select AOR Directory'
+     xf,dir,/DIRECTORY,/RECENT,TITLE='Select AOR Directory', $
+        PARENT_GROUP=self->TopBase(),/MODAL
   if size(dir,/TYPE) ne 7 then return
   
   if ~file_test(dir,/DIRECTORY) || $
      ~stregex(dir,'[0-9]{10}'+path_sep()+'?$',/BOOLEAN) then $
      self->Error,'Must select AOR directory of form 0123456789'
-  if keyword_set(cd) then filt='*.coadd2d.fits' else filt='*.bcd_fp.fits'
+  if keyword_set(cd) then filt='*coa*2d.fits' else filt='*bcd{,_fp}.fits'
   files=file_search(dir,filt,/TEST_REGULAR)
   for i=0,n_elements(files)-1 do begin 
      hdr=headfits(files[i])
      rec={FILE:files[i],OBJECT:strtrim(sxpar(hdr,'OBJECT'),2), $
-          FOV:sxpar(hdr,'FOVID'), NCYCLES:long(sxpar(hdr,'NCYCLES')), $
-          TIME:sxpar(hdr,'EXPTOT_T'), $
+          FOV:long(sxpar(hdr,'FOVID')), $
+          NCYCLES:long(sxpar(hdr,'NCYCLES')), $
+          TIME:float(sxpar(hdr,'EXPTOT_T')), $
           STEPS:long([sxpar(hdr,'STEPSPAR'),sxpar(hdr,'STEPSPER')])}
      if n_elements(all) eq 0 then all=[rec] else all=[all,rec]
   endfor 
@@ -2931,7 +3030,9 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
   endif
   for i=0,n_elements(files)-1 do begin 
      bcd=readfits(files[i],header,/SILENT)
-     bfile=strmid(files[i],0,strpos(files[i],'.bcd_fp.fits'))+'.bmask.fits'
+     parts=stregex(files[i],'^(.*)bcd(_fp)?.fits$',/EXTRACT,/SUBEXPR)
+     root=parts[1]
+     bfile=root+'bmask.fits'
      if file_test(bfile,/READ) then bmask=readfits(bfile,/SILENT)
      self->AddBCD,bcd,header,FILE=files[i],BMASK=bmask,ERR=err,_EXTRA=e
      if keyword_set(err) then break
@@ -3211,6 +3312,7 @@ pro CubeProj__define
      feedback:0b, $             ;whether to show feedback when building cube
      reconstructed_pos:0b, $    ;whether to build with reconstructed positions
      SaveFile:'', $             ;the file it was saved to
+     SaveMethod:0b, $           ;bit 1: data, bit 2: accounts
      sort:0b, $                 ;our sorting order
      version:'', $              ;the Cubism version of this cube
      cuberecs:ptr_new(), $      ;a list of cubeview records's we've spawned
@@ -3227,7 +3329,7 @@ pro CubeProj__define
   ;; The data structure for each input BCD
   rec={CUBE_DR, $
        ID:'',$                  ;A unique (hopefully) ID
-       file:'', $               ;the original file read for this data
+       file:'', $               ;the original file read for this BCD dataset
        TIME:0.0, $              ;The integration time
        DISABLED: 0b, $          ;whether this DR is disabled
        ACCOUNT: ptr_new(), $    ;list of {CUBE_PLANE,CUBE_PIX,BCD_PIX,AREAS}
@@ -3268,6 +3370,7 @@ pro CubeProj__define
          lines:0, $             ;number of list lines last set
          view_ids:lonarr(3), $  ;record view button ids
          nsel_sav: 0, $          ;save number of selected records
+         feedback_window: 0, $  ;window id of feedback
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
          MUST_SELECT:lonarr(16),$ ;the SW buttons which require any selected
