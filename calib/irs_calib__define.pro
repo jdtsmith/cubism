@@ -324,13 +324,14 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
      rec=self->GetRecord(module)
      pmask=rec.PMASK
   endif 
-  rec=self->GetRecord(module,order,/MUST_EXIST)
+  if arg_present(name) then name=self.name
+  if n_elements(module) ne 0 then $
+     rec=self->GetRecord(module,order,/MUST_EXIST)
   if size(rec,/TYPE) ne 8 then return
   if arg_present(sl) then   sl=rec.SLIT_LENGTH
   if arg_present(wc) then   wc=rec.WAV_CENTER
   if arg_present(wmn) then  wmn=rec.WAV_MIN
   if arg_present(wmx) then  wmx=rec.WAV_MAX
-  if arg_present(name) then name=self.name
   if arg_present(ps) then   ps=rec.PLATE_SCALE
   if arg_present(fluxcon) then fluxcon=rec.FLUXCON
   if arg_present(fluxcon_kw) then fluxcon_kw=rec.FLUXCON_KEY_WAV
