@@ -11,7 +11,7 @@ pro CubeBadPix::Message, msg
         if pt[0] eq -1 then return
         ;; Non-first button only: cycle through group
         if msg.press eq 4b then begin $
-           self.showing=(self.showing+1) mod 3
+           self.showing=(self.showing+1) mod (ptr_valid(self.bp_list)?3:2)
            self.oDraw->Redraw,/SNAPSHOT
            return
         endif else if msg.press ne 1b then return
@@ -117,7 +117,7 @@ end
 
 
 function CubeBadPix::MouseHelp
-  return,['Mark/Remove','','Show/Hide Static']
+  return,['Mark/Remove','','ShowAll/Fatal/User']
 end
 
 
