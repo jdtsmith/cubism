@@ -15,9 +15,9 @@ pro CubeRec::Message, msg
      end 
      'CUBEVIEWSPEC_SAVE': begin 
         method=self.region_file?"ExtractFileRegion":"Extract"
-        if msg.export then call_method,method,self,/EXPORT, $
-                                       FILE=self.region_file else $
-           call_method,method,self,/SAVE,ASCII=msg.ascii,FILE=self.region_file
+        if msg.export then $
+           call_method,method,self,/EXPORT $
+        else call_method,method,self,/SAVE,FILE=self.region_file
         return
      end
      ;; Send updates for these
