@@ -3,11 +3,6 @@
 ;
 ;    RESTORE_OBJECT
 ;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
-;
 ; DESCRIPTION:
 ;    
 ;    Restores an object from file, with care taken to ensure that the
@@ -16,7 +11,6 @@
 ;    
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
 ;    Object Restoration.
 ;    	
 ; CALLING SEQUENCE:
@@ -33,9 +27,9 @@
 ; INPUT KEYWORD PARAMETERS:
 ;
 ;    OTHER_CLASSES: List other classes to pre-resolve.  Only necessary
-;       if the object to be restored contains other objects of
-;       different classes whose class definitions will be saved and
-;       restored in the same way.
+;       if the object to be restored contains somewhere in its data
+;       hierarchy other objects of different classes whose class
+;       definitions will be saved and restored in the same way.
 ;       
 ; OUTPUTS:
 ;
@@ -62,14 +56,15 @@
 ;    will also be subject to this restore definition shadowing
 ;    problem.  If all auxiliary structures used by a class are defined
 ;    in the class__define procedure alongside the class, this problem
-;    will be circumvented.
+;    will also be circumvented using RESTORE_OBJECT.
 ;
 ; EXAMPLE:
 ;
 ;    obj=restore_object('/path/to/object.sav','MyClass')
 ;
 ; MODIFICATION HISTORY:
-;    
+;
+;    2002-08-18 (J.D. Smith): Wrapped class_define call in a catch.
 ;    2001-12-12 (J.D. Smith): Written.  Based directly on my routine
 ;       `resolve_obj' from SCOREX project code.  
 ;
@@ -79,24 +74,22 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
-;  under the terms of the GNU General Public License as published by
-;  the Free Software Foundation; either version 2, or (at your option)
-;  any later version.
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
 
@@ -110,7 +103,8 @@ pro restore_object_resolve,class, routine_info
      defpro=class[i]+'__DEFINE'
      if (where(routine_info eq defpro))[0] eq -1 then begin
         ;; Compile and define the class in one swell foop.
-        call_procedure,defpro
+        catch, err
+        if err eq 0 then call_procedure,defpro else catch,/cancel
      endif 
      supers=obj_class(class[i],/SUPERCLASS,COUNT=cnt)
      if cnt gt 0 then restore_object_resolve,supers,routine_info
