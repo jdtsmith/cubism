@@ -7,7 +7,11 @@ pro tvHist::Message, msg
   self->tvPlug::Message,msg,TYPE=type
   case type of
      'BOX': if self.freeze eq 0 then self.oDraw->Draw    ; box moved!
-     'TVDRAW_PREDRAW':  self->Histo,msg.im
+     'TVDRAW_PREDRAW':  begin
+        ptr_free,self.finite
+        self.finite=ptr_new(where(finite(*msg.im)))
+        self->Histo,msg.im
+     end 
      'TVDRAW_POSTDRAW': begin 
         self->CalcHist,msg.im
         self.oCol->DrawCbar
@@ -121,7 +125,7 @@ pro tvHist::Histo,im
      endif   
   endif
   
-  if self.freeze then begin 
+  if self.freeze then begin ;self.min and self.max are frozen
      switch self.scale_mode of
         0:
         1:
@@ -131,12 +135,12 @@ pro tvHist::Histo,im
            break
         end 
         3: begin 
-           *im=sqrt(*im-self.min)
+           *im=sqrt(*im-self.min>0)
            self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(self.max-self.min)
            break
         end
         4: begin 
-           *im=alog10(*im-self.min + (self.max-self.min)*1.e-6)
+           *im=alog10((*im - self.min)>0. + (self.max-self.min)*1.e-6)
            self.oDraw->SetDrawMinMax,MIN=alog10((self.max-self.min)*1.e-6), $
                                      MAX=alog10((self.max-self.min)*(1.+1.e-6))
            break
@@ -149,7 +153,7 @@ pro tvHist::Histo,im
   if boxon then take=(*im)[l:r,b:t] else begin 
      ;; linear with no hist box: do nothing, except record range
      if self.scale_mode eq 0 then begin 
-        self.min=min(*im,MAX=mx)
+        self.min=min(*im,MAX=mx,/NAN)
         self.max=mx
         return 	
      endif
@@ -159,7 +163,7 @@ pro tvHist::Histo,im
   
   switch self.scale_mode of 
      0: begin                   ; linear
-        mx=max(take,min=mn)
+        mx=max(take,min=mn,/NAN)
         if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
         break
      end
@@ -175,14 +179,14 @@ pro tvHist::Histo,im
      end
      
      3: begin                   ;sqrt
-        mx=max(take,min=mn)
+        mx=max(take,min=mn,/NAN)
         *im=sqrt((mn>*im)-mn)
         self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(mx-mn)
         break
      end
      
      4: begin                   ;logarithm
-        mx=max(take,min=mn)
+        mx=max(take,min=mn,/NAN)
         *im=alog10((mn>*im)-mn+(mx-mn)*1.e-6)
         self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*1.e-6), $
                                   MAX=alog10((mx-mn)*(1.+1.e-6))
@@ -190,13 +194,13 @@ pro tvHist::Histo,im
      end
      
      5: begin                   ;histeq
-        mx=max(take,min=mn)
+        mx=max(take,min=mn,/NAN)
         if mx eq mn then return
         bs=(mx-mn)/500
-        h=histogram(*im,BINSIZE=bs,MIN=mn,MAX=mx)
+        h=histogram(*im,BINSIZE=bs,MIN=mn,MAX=mx,/NAN)
         h[0]=0.                 ;don't elevate the background
         h=total(temporary(h),/CUMULATIVE,/DOUBLE)
-        *im=h[((mn>*im<mx)-mn)/bs]
+        (*im)[*self.finite]=h[((mn>(*im)[*self.finite]<mx)-mn)/bs]
         break
      end
   endswitch
@@ -224,7 +228,8 @@ end
 pro tvHist::CalcHist,im
   self.oCol->GetProperty,TOP=top,BOTTOM=bottom
   *self.imhist= $
-     histogram(*im,MIN=bottom,MAX=top,BINSIZE=float(top-bottom)/self.nbins>1) 
+     histogram(*im,MIN=bottom,MAX=top,BINSIZE=float(top-bottom)/self.nbins>1, $
+               /NAN)
   nh=n_elements(*self.imhist)
   ;; plot scale neglects endpoints (which can have large counts).
   self.imhist_max=max((*self.imhist)[1:nh-2])
@@ -244,7 +249,7 @@ pro tvHist::PlotHist
   xyouts,2,!D.Y_SIZE-12,string(FORMAT='("Max: ",I0)',self.imhist_max), $
          COLOR=self.color,CHARSIZE=1.2,/DEVICE
   xyouts,!D.X_SIZE-20,!D.Y_SIZE-12,ALIGNMENT=1.0, $
-         string(FORMAT='(G0.4,"-",G0.4)',self.min,self.max),/DEVICE, $
+         string(FORMAT='(G0.4,"!96!X",G0.4)',self.min,self.max),/DEVICE, $
          COLOR=self.color,CHARSIZE=1.2
   if self.freeze then self->PlotFreezeLock,/NO_SET_WIN 
   wset,oldwin  
@@ -270,7 +275,7 @@ end
 ;  Cleanup
 ;=============================================================================
 pro tvHist::Cleanup
-  ptr_free,self.imhist
+  ptr_free,self.imhist,self.finite
 end
 
 ;=============================================================================
@@ -321,8 +326,9 @@ pro tvHist__define
           INHERITS tvPlug, $    ;make it a plug-in
           imhist:ptr_new(), $   ;the image histogram
           imhist_max:0L, $      ;the maximum histogram value
-          min:0.0, $            ;the minimum hist value
-          max:0.0, $            ;the maximum hist value
+          min:0.0, $            ;the minimum scaling value
+          max:0.0, $            ;the maximum scaling value
+          finite:ptr_new(), $   ;where finite
           nbins:0, $            ;number of bins, defaults to 100
           scale_mode: 0, $      ;0:linear 1:99% 2:95% 3:sqrt 4:log 5:histeq
           wScalButs:lonarr(6), $ ;the scaling widget buttons
