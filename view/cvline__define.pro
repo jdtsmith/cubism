@@ -163,7 +163,7 @@ end
 function cvLine::ValString, im,point,EXTRA_STRING=ext
   pt=floor(point)
   ext='       '
-  if self.bcd_mode && self.mask then begin 
+  if self.bcd_mode && ptr_valid(self.mask) then begin 
      m=(*self.mask)[pt[0],pt[1]]
      if m ne 0 then begin 
         irs_bmask,m,CODE_STRING=cs
