@@ -269,7 +269,10 @@ pro CubeViewSpec::Event,ev
         return
      end
      
-     self.wQuit: widget_control, ev.top,/DESTROY
+     self.wQuit: begin 
+        widget_control, ev.top,/DESTROY
+        return
+     end 
      
      self.wSaveBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0}
      self.wSaveASCBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,1}
