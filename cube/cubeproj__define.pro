@@ -2398,9 +2398,9 @@ end
 ;                         N.B.:
 ;
 ;                         Pixel indexing conventions:
-;                          FITS HEADERS/FORTRAN : 1st centered on [1.0,1.0]
-;                          NASALIB WCS PROGRAMS : 1st centered on [0.0,0.0]
-;                          CUBISM aka God-Given : 1st centered on [0.5,0.5]
+;                          FITS HEADERS/FORTRAN :  1st centered on [1.0,1.0]
+;                          NASALIB WCS PROGRAMS :  1st centered on [0.0,0.0]
+;                          CUBISM, aka God-Given : 1st centered on [0.5,0.5]
 ;
 ;                         CROTA vs PA:
 ;                          FITS standard (CROTA,CD,PC) measure CCW
@@ -2606,12 +2606,12 @@ pro CubeProj::BuildCube
      rev_acc=*(*self.DR)[dr].REV_ACCOUNT
      rev_min=(*self.DR)[dr].REV_MIN
      bcd=*(*self.DR)[dr].BCD
-     if self.fluxcon then bcd/=fluxcon
      if ptr_valid(self.BACKGROUND) then bcd-=*self.BACKGROUND
+     if self.fluxcon then bcd/=fluxcon
      use_unc=ptr_valid((*self.DR)[dr].UNC)
      if use_unc then begin 
         unc=*(*self.DR)[dr].UNC
-        if self.fluxcon then unc/=fluxcon
+        if self.fluxcon then unc/=fluxcon ;XXX should include background error 
      endif
      
      ;; Exclude BCD pix with any of BMASK bits 8,10,12,13,& 14 set from
@@ -2870,7 +2870,7 @@ end
 ;             ASCII - Pass to SaveSpectrum
 ;             P - Polygon (2xn) list of pixel or celestial coordinates
 ;                 to extract.  Will be converted to pixel coords if
-;                 celestial.
+;                 celestial. Partial pixel extraction occurs.
 ;=============================================================================
 function CubeProj::Extract,low,high, EXPORT=exp, SAVE=sf, ASCII=ascii, $
                            POLY=p,OUTPUT_POLY=op,CELESTIAL=celestial, $
@@ -2879,29 +2879,28 @@ function CubeProj::Extract,low,high, EXPORT=exp, SAVE=sf, ASCII=ascii, $
   
   if keyword_set(aff) then begin 
      if size(aff,/TYPE) ne 7 then begin 
-        xf,afff,/RECENT, $
+        xf,aff,/RECENT, $
            FILTERLIST=['*.txt', '*.*', '*'], $
         TITLE='Save Spectrum As '+(fits?'FITS':'Text')+' File...', $
            /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(),/MODAL
      endif 
-     if size(sf,/TYPE) ne 7 then return,-1
+     if size(aff,/TYPE) ne 7 then return,-1
      p=self->ReadSpecAperture(aff)
      if n_elements(p) eq 1 then self->Error,['No aperture found for file:',sf]
-     
-
      celestial=1
   endif 
   
   if keyword_set(celestial) then begin 
-     ra=p[0,*] & dec=p[1,*]
-     ad2xy,ra,dec,self->CubeAstrometryRecord(),x,y
-     op=[[x],[y]]
-     
-     overlap_pix=polyfillaa(x,y,self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
+     ad2xy,p[0,*],p[1,*],self->CubeAstrometryRecord(),x,y
+     x+=.5 & y+=.5              ;restore *correct* pixel indexing
+     op=[tranpose(x),transpose(y)]
+     overlap_pix=polyfillaa(x,y,self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
                             AREAS=areas)
-     
      if overlap_pix[0] eq -1 then $
-        self->Error,'Selected aperture does not overlap cube'
+        self->Error,'Selected aperture does not overlap cube' $
+     else if min(x,MAX=mxx) lt 0 or mxx gt self.CUBESIZE[0]-1 or $
+        min(y,MAX=mxy) lt 0 or mxy gt self.CUBESIZE[1]-1 then $
+           self->Warn,'Aperture lies partially outside of cube.'
   endif 
   
   
@@ -2993,11 +2992,15 @@ pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii,COORDS=coords
         printf,un,FORMAT='(%"# Extracted %dx%d [%d,%d] -> [%d,%d]")',delta, $
                coords
         printf,un,FORMAT= '("# Box: ",2(A,",",A,:," ; "),"]")', $
-               radecstring(ra[0],/RA),radecstring(dec[0]), $
-               radecstring(ra[1],/RA),radecstring(dec[1])
+               radecstring(ra[0],/RA,PRECISION=3), $
+               radecstring(dec[0],PRECISION=3), $
+               radecstring(ra[1],/RA,PRECISION=3), $
+               radecstring(dec[1],PRECISION=3)
         printf,un,FORMAT='("#      ",2(A,",",A,:," ; "),"]")', $
-               radecstring(ra[2],/RA),radecstring(dec[2]), $
-               radecstring(ra[3],/RA),radecstring(dec[3])
+               radecstring(ra[2],/RA,PRECISION=3), $
+               radecstring(dec[2],PRECISION=3), $
+               radecstring(ra[3],/RA,PRECISION=3), $
+               radecstring(dec[3],PRECISION=3)
         printf,un,'#      LAM (um)          FLUX (e/s/pixel)'
      endif 
      printf,un,FORMAT='(2G18.10)',transpose([[*self.WAVELENGTH],[sp]])
@@ -3021,28 +3024,32 @@ function CubeProj::ReadSpecAperture,file
             [sxpar(h,RA_UL),sxpar(h,DEC_UL)] ]
   endif else if stregex(file,'\.txt$',/BOOLEAN) then begin ; text
      line=''
-     match='([0-9]{2}:[0-9]{2}:[0-9.]+)'
+     match='([+-]?[0-9]{2}:[0-9]{2}:[0-9.]+)'
      openr,un,file,/get_lun
-     while not eof(lun) do begin
-        readf, lun, line
+     while not eof(un) do begin
+        readf, un, line
         if strmid(line,0,1) ne '#' then break
         if strmid(line,2,4) eq 'Box:' then begin 
            ext=stregex(line,match+','+match+' ; '+match+','+match,/EXTRACT, $
                        /SUBEXPR)
-           if n_elements(ext) lt 4 then return,-1
+           if n_elements(ext) lt 5 then return,-1
            ra=[ext[1],ext[3]]
-           dec=[ext[1],ext[3]]
-           readf, lun, line     ;get next line
+           dec=[ext[2],ext[4]]
+           readf, un, line     ;get next line
            ext=stregex(line,match+','+match+' ; '+match+','+match,/EXTRACT, $
                        /SUBEXPR)
-           if n_elements(ext) lt 4 then return,-1
+           if n_elements(ext) lt 5 then return,-1
            ra=[ra,ext[1],ext[3]]
-           dec=[dec,ext[1],ext[3]]
+           dec=[dec,ext[2],ext[4]]
+           aper=make_array(2,n_elements(ra),/DOUBLE)
+           for i=0,n_elements(ra)-1 do begin 
+              aper[0,i]=ten(strsplit(ra[i],":",/EXTRACT))*15.0D
+              aper[1,i]=ten(strsplit(dec[i],":",/EXTRACT))
+           endfor 
+           break
         endif 
-        ra=ten(strsplit(ra,":"))*15.0D
-        dec=ten(strsplit(dec,":"))
-        aper=[ 1#ra, 1#dec ]
      endwhile 
+     free_lun,un
   endif  
   return,aper
 end
@@ -3414,7 +3421,7 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update
                     ptr_new(),ptr_new()}
      return
   endif else if keyword_set(update) then begin 
-     self->MsgSend,{CUBEPROJ_UPDATE,self.BAD_PIXEL_LIST}
+     self->MsgSend,{CUBEPROJ_UPDATE,self,self.BAD_PIXEL_LIST}
      return
   endif 
   
@@ -3629,12 +3636,15 @@ pro CubeProj__define
          MUST_BACK:lonarr(3), $ ;background record must be set
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
          MUST_UNRESTORED:0L}    ;must have unrestored data
-
+  
+  ;; Messages: send a cube, record, etc.
+  
+  ;; XXX send updates on new cube build (for those who are viewing them, etc.)
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),BCD:ptr_new(),UNC:ptr_new(),BMASK:ptr_new(), $
        BACKGROUND:ptr_new()}    ;XXX UNC
-  msg={CUBEPROJ_UPDATE, BAD_PIXEL_LIST:ptr_new()}
+  msg={CUBEPROJ_UPDATE, CUBE:obj_new(), BAD_PIXEL_LIST:ptr_new()}
 end
 
 
