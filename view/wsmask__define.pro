@@ -81,7 +81,7 @@ end
 ;  Cleanup
 ;=============================================================================
 pro WSMask::Cleanup
-  ptr_free,self.mask,self.aper
+  ptr_free,self.mask
   self->tvPlug::Cleanup
 end
 
