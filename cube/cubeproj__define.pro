@@ -218,6 +218,39 @@ pro CubeProj::ShowEvent, ev
      end 
 
      
+     'select-by-keyword': begin 
+        keys=strtrim(strmid(*(*self.DR)[0].HEADER,0,8),2)
+        wh=where(keys,good)
+        if good eq 0 then return
+        keys=keys[wh]
+        ret=popup('Keyword',keys, ENTRY='Match (regex):', $
+                    TITLE='Select File By Keyword', $
+                  PARENT_GROUP=self->TopBase(),MODAL=0,/COMBOBOX)
+        if ~ret.text then return
+        hlist=(*self.DR).HEADER
+        outlist=strarr(n_elements(hlist))
+        for j=0,n_elements(hlist)-1 do begin 
+           keys=strtrim(strmid(*hlist[j],0,8),2)
+           wh=where(keys eq ret.select,cnt)
+           outlist[j]=strtrim(strmid((*hlist[j])[wh[0]],10,20),2)
+        endfor 
+        wh=where(stregex(outlist,ret.text,/BOOLEAN),cnt)
+        if cnt eq 0 then self->Error,'No files matched'
+        widget_control, (*self.wInfo).SList, SET_LIST_SELECT=wh
+        self->UpdateButtons
+     end 
+     
+     'invert-select': begin 
+        top=widget_info((*self.wInfo).SList,/LIST_TOP)
+        inds=bytarr(self->N_Records())
+        sel=widget_info((*self.wInfo).SList, /LIST_SELECT)
+        if sel[0] ne -1 then inds[sel]=1
+        wh=where(~inds,cnt)
+        widget_control,(*self.wInfo).SList, SET_LIST_SELECT=wh
+        widget_control,(*self.wInfo).SList, SET_LIST_TOP=top
+        self->UpdateButtons
+     end 
+        
      'replace-string': $
         begin 
         if sel[0] eq -1 then return
@@ -305,7 +338,7 @@ pro CubeProj::ShowEvent, ev
               strlist=[strlist,str]
         endfor 
         which=strtrim(which,2)
-        self->Info,[which+':',strlist],TITLE=which+' Keyword Listing'
+        self->Info,[which+':',strlist],TITLE=which+' Keyword Listing',/SCROLL
      end 
      
      'switchlist': begin 
@@ -456,9 +489,17 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).MUST_PROJ[0]=widget_button(edit,VALUE='Select All', $
                                            UVALUE='select-all')
   (*self.wInfo).MUST_PROJ[1]=widget_button(edit,VALUE='Select By Filename',$
-                                           UVALUE='select-by-filename')
+                                           UVALUE='select-by-filename', $
+                                           /SEPARATOR)
+  (*self.wInfo).MUST_PROJ[2]=widget_button(edit,VALUE='Select By Keyword',$
+                                           UVALUE='select-by-keyword')
+  (*self.wInfo).MUST_PROJ[3]=widget_button(edit,VALUE='Invert Selection',$
+                                           UVALUE='invert-select',/SEPARATOR)
+  
+  
+  
   wMustSel=widget_button(edit,VALUE='Replace File Substring...', $
-                         UVALUE='replace-string') 
+                         UVALUE='replace-string',/SEPARATOR)
   
   ;;*** Data Record menu
   rec=widget_button(mbar,VALUE='Record',/MENU)
@@ -494,7 +535,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Cube menu  
   cube=widget_button(mbar,VALUE='Cube',/MENU)
-  (*self.wInfo).MUST_PROJ[2]= $
+  (*self.wInfo).MUST_PROJ[4]= $
      widget_button(cube,VALUE='Build Cube',UVALUE='buildcube') 
   (*self.wInfo).MUST_ACCT= $
      widget_button(cube,VALUE='Reset Accounts',UVALUE='resetaccounts')
@@ -2628,11 +2669,11 @@ pro CubeProj::BuildCube
         if self.fluxcon then unc/=fluxcon ;XXX should include background error 
      endif
      
-     ;; Exclude BCD pix with any of BMASK bits 8,10,12,13,& 14 set from
+     ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
      ;; entering the cube
      if ptr_valid((*self.DR)[dr].BMASK) then begin 
         use_bmask=1
-        bmask=(*(*self.DR)[dr].BMASK AND 29952U) eq 0L 
+        bmask=(*(*self.DR)[dr].BMASK AND 28928U) eq 0L 
         if use_bpmask then bmask AND= bpmask
      endif else if use_bpmask then begin 
         use_bmask=1
@@ -3601,7 +3642,7 @@ pro CubeProj__define
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
          MUST_SELECT:lonarr(16),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
-         MUST_PROJ:lonarr(3), $ ;SW button which requires a valid project
+         MUST_PROJ:lonarr(5), $ ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(3), $ ;background record must be set
