@@ -142,6 +142,7 @@ pro CubeViewSpec::Event,ev
                                (ev.key eq 5 or ev.key eq 7?-del:del))<$
                               (n_elements(*self.lam)-1)
                  self.wavelength=(*self.lam)[self.wav_ind]
+                 if self.map_name then self->ResetMap
                  self->Plot
                  self->Send
                  return
@@ -169,6 +170,7 @@ pro CubeViewSpec::Event,ev
               self->MergeRegs
               self->Plot
               if n_elements(*self.fit) ne 0 then self->ResetFit
+              if self.map_name then self->ResetMap
               self->Send
            end 
               
@@ -243,6 +245,7 @@ pro CubeViewSpec::Event,ev
                  if self.got ge 0 then begin ;if selecting range, cancel
                     self.got=-1 
                     self->Plot  
+                    if self.map_name then self->ResetMap
                  endif else self->Reset,/KEEP
               end
               else:
@@ -270,6 +273,7 @@ pro CubeViewSpec::Event,ev
                  (*self.reg[self.seltype])[*,self.selected]=range
                  self->MergeRegs
                  if n_elements(*self.fit) ne 0 then self->ResetFit
+                 if self.map_name then self->ResetMap
                  self->Plot
                  self->Send
               endif else if self->ShowingValueLine() then self->Plot
@@ -338,7 +342,8 @@ pro CubeViewSpec::MapEvent,ev
      self.selected=-1
      self->Plot
      self->UpdateButtons
-     self->Send,MAP_NAME=name
+     self.map_name=name
+     self->Send
      return
   endif 
   
@@ -360,7 +365,10 @@ pro CubeViewSpec::MapEvent,ev
                       FORERANGES=self.reg[1], $
                       BACKRANGES=self.reg[0],WAVELENGTH_CONVERT=*self.lam
         if cncld then return
-        if name then self->Send,MAP_NAME=name ;it's now this name
+        if name then begin 
+           self.map_name=name   ;it's now this name
+           self->Send
+        endif 
      end
      'load': oMap->LoadSets
      'reset': oMap->LoadDefaultSets
@@ -400,17 +408,31 @@ pro CubeViewSpec::BuildMapMenu,menu,ACTIVATE=act
   endif
 end
 
+
+;=============================================================================
+;  ResetMap - Reset the map set
+;=============================================================================
+pro CubeViewSpec::ResetMap
+  self.map_name=""
+  if ptr_valid(self.wMapSets) then $
+     for i=0,n_elements(*self.wMapSets)-1  do $
+        widget_control, (*self.wMapSets)[i],SET_BUTTON=0
+end
+
 ;=============================================================================
 ;  Send - Send the currently selected set of regions as a stack, or
 ;         just the wavelength if in full mode.
 ;=============================================================================
 pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
-  free_back=0
+  if n_elements(mn) eq 0 then if self.map_name then mn=self.map_name
   if self.mode eq 0L then begin ;full mode
      if self.wavelength eq 0.0 then return
      msg={CUBEVIEWSPEC_FULL,self.wavelength}
   endif else begin ;; map mode
      msg={CUBEVIEWSPEC_STACK}
+     
+     msg.weight_cont=self.weight_cont
+
      if n_elements(mn) ne 0 then begin ;named set, just pass it along
         msg.name=mn
         msg.info=string(FORMAT='(%"Map Set: %s")',mn)
@@ -420,29 +442,30 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
         s=sort(lams[0,*]) & lams=lams[*,s]
         if lams[0,0] gt lams[1,0] then lams=lams[[1,0],*]
         msg.info="Stack: "+strjoin(string(FORMAT='(F5.2,"-",F5.2)',lams),", ")
-        if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
         msg.foreground=self.reg[1]
         msg.weights=self.weights
-        msg.weight_cont=self.weight_cont
-        ;; Send either the fit, or the background regions themselves.
-        if ptr_valid(self.reg[0]) && n_elements(*self.fit) gt 0 && $
-           self.medlam ne 0. then begin 
-           msg.background=ptr_new(poly( $
-                          (*self.lam)[self->RegionIndices(*self.reg[1])], $
-                          *self.fit)*10.^self.renorm)
-           msg.info=msg.info+' -- Fit'
-        endif else begin 
-           if self.weight_cont && ptr_valid(self.reg[0]) then $
-              msg.info+=' -- Lambda-Weighted'
-           msg.background=self.reg[0]
-        endelse 
-        ;;if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
-        if ptr_valid(self.reg[0]) then msg.info+=')'
+        
      endelse 
+     
+     if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
+     ;; Send either the fit, or the background regions themselves.
+     if ptr_valid(self.reg[0]) && n_elements(*self.fit) gt 0 && $
+        self.medlam ne 0. && n_elements(mn) eq 0 then begin 
+        msg.background=ptr_new(poly( $
+                       (*self.lam)[self->RegionIndices(*self.reg[1])], $
+                       *self.fit)*10.^self.renorm)
+        msg.info=msg.info+' -- Fit'
+     endif else begin 
+        if self.weight_cont && ptr_valid(self.reg[0]) then $
+           msg.info+=' -- Lambda-Weighted'
+        if n_elements(mn) eq 0 then msg.background=self.reg[0]
+     endelse 
+     ;;if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
+     if ptr_valid(self.reg[0]) then msg.info+=')'
+     
   endelse 
   self->MsgSend,msg
   if keyword_set(js) eq 0 then self->SetWin ;in case it was taken away
-
 end
 
 ;=============================================================================
@@ -590,6 +613,7 @@ pro CubeViewSpec::Fit
   
   ;; Show it under continuum and peak, along with width, if calculated
   self->UpdateButtons
+  if self.map_name then self->ResetMap
   self->Plot
   self->Send
 end
@@ -690,6 +714,7 @@ pro CubeViewSpec::Delete
      self.selected=-1
   endelse 
   self->UpdateButtons
+  if self.map_name then self->ResetMap
   self->Plot
   self->Send
 end
@@ -704,6 +729,7 @@ pro CubeViewSpec::Reset,KEEP=k
   if NOT keyword_set(k) then begin
      ptr_free,self.reg 
      ptr_free,self.weights
+     self->ResetMap
      self.selected=-1
   endif                         ;Sets up axes for region drawing
   self.medlam=0                 ;This signals no fit.
@@ -1178,6 +1204,7 @@ pro CubeViewSpec__define
       wavelength:0.0, $         ;the current wavelength (if full mode)
       upgoing:0b, $             ;whether the wavelength is increasing or not
       weight_cont:0b, $         ;fit continuum lambda-weighted
+      map_name:'', $            ;the map name, if any
       ;; Widget/Window/ColorMap ID's
       wBase:0L, $               ;the window base
       wMapSets:ptr_new(), $     ;point to map set buttons
