@@ -3,30 +3,22 @@
 ;
 ;    tvPixTbl
 ;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
-;
 ; DESCRIPTION:
 ;    
-;    A pixel table plugin that displays a 5x5 matrix of the values of
+;    A table plugin that displays a 5x5 matrix of the values of
 ;    the pixels around the mouse when it is over a tvdraw object.
 ;    
 ; CATEGORY:
 ;
 ;    Data display.
-;    	
 ;
 ; METHODS:
 ;
-
-;    INIT:  (alway start with the INIT method function)
+;    INIT:  
 ;
 ;       CALLING SEQUENCE:
 ;
 ;          obj=obj_new('tvPixTbl',parent,odraw, [_EXTRA=]
-;             [opt_arg1,...,/BIN_KEYWORD,KEYWORD=])
 ;
 ;       INPUT PARAMETERS:
 ;
