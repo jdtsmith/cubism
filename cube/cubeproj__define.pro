@@ -190,6 +190,10 @@ pro CubeProj::ShowEvent, ev
         self->SetProperty,RECONSTRUCTED_POSITIONS=1b-self.reconstructed_pos
         widget_control, ev.id, SET_BUTTON=self.reconstructed_pos
      end
+     'pix_omega': begin 
+        self->SetProperty,PIXEL_OMEGA=1b-self.pix_omega
+        widget_control, ev.id, SET_BUTTON=self.pix_omega
+     end 
      'save-with-data': begin 
         self->SetProperty,SAVE_DATA=1b-logical_true(self.SaveMethod AND 1b)
         widget_control, ev.id, SET_BUTTON=self.SaveMethod AND 1b
@@ -211,8 +215,9 @@ pro CubeProj::ShowEvent, ev
         if self.MODULE eq 'SH' or self.MODULE eq 'LH' then ords=['All',ords]
         ord=popup('Choose Cube Build Order',ords,TITLE='Cube Build Order', $
                   PARENT_GROUP=self->TopBase(),/MODAL, $
-                  SELECT=self.ORDER eq 0?0:where(ords eq self.ORDER))
-        if ord eq 'All' then ord=0 else ord=ord
+                  SELECT=self.ORDER eq 0?0:where(ords eq $
+                                                 strtrim(self.ORDER,2)))
+        if ord eq 'All' then ord=0 else ord=long(ord)
         self->SetProperty,ORDER=ord
      end
      
@@ -535,18 +540,25 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   b1=widget_button(cube,VALUE='Show Cube Build Feedback',UVALUE='feedback', $
                    /CHECKED_MENU,/SEPARATOR) 
   widget_control, b1, /SET_BUTTON
+  ;;-------------
   b1=widget_button(cube,VALUE='Build Cube with FLUXCON',UVALUE='fluxcon', $
-                   /CHECKED_MENU)
+                   /CHECKED_MENU,/SEPARATOR)
   widget_control, b1,SET_BUTTON=self.fluxcon
+  (*self.wInfo).MUST_FLUXCON=widget_button(cube,VALUE='Build in MJy/sr', $
+                                           UVALUE='pix_omega',/CHECKED_MENU)
+  widget_control, (*self.wInfo).MUST_FLUXCON,SET_BUTTON=self.pix_omega, $
+                  SENSITIVE=self.fluxcon
   b1=widget_button(cube,VALUE='Build Cube with SLCF',UVALUE='slcf', $
                    /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.slcf  
+  
+  ;;-------------
+  b1=widget_button(cube,VALUE='Trim Wavelengths',UVALUE='wavecut', $
+                   /CHECKED_MENU,/SEPARATOR)
+  widget_control, b1,SET_BUTTON=self.wavecut
   b1=widget_button(cube,VALUE='Use Reconstructed Positions', $
                    UVALUE='reconstructed', /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.reconstructed_pos
-  b1=widget_button(cube,VALUE='Trim Wavelengths',UVALUE='wavecut', $
-                   /CHECKED_MENU)
-  widget_control, b1,SET_BUTTON=self.wavecut
   
   
   ;;-------------
@@ -663,11 +675,11 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
 end
 
 pro CubeProj::KillShow
-  if self->isWidget() then if widget_info((*self.wInfo).SList,/VALID_ID) $
+  if self->isWidget() && widget_info((*self.wInfo).SList,/VALID_ID) $
   then begin 
      widget_control, (*self.wInfo).Base,KILL_NOTIFY='',/DESTROY
-     (*self.wInfo).showing=-1
   endif 
+  if ptr_valid(self.wInfo) then (*self.wInfo).showing=-1
 end
 
 ;=============================================================================
@@ -1229,12 +1241,6 @@ pro CubeProj::WriteFits,file
   fxaddpar,hdr,'PS3_1','WAVELENGTH','Coordinate table column name'
   
   ;; Description
-  ; sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
-;               'For more information on SINGS see http://sings.stsci.edu', $
-;               'This file contains a spectral cube assembled from an IRS', $
-;               'spectral mapping dataset.'], $
-;             hdr,/COMMENT
-  
   fxaddpar,hdr,'CUBE-DT',jul2date(self.CUBE_DATE),' Cube build date'
   
   fxaddpar,hdr,'FILENAME',filestrip(file),' Name of this file'
@@ -1562,6 +1568,7 @@ pro CubeProj::UpdateButtons
   widget_control, (*self.wInfo).MUST_UNRESTORED,SENSITIVE= $
                   ptr_valid(self.DR) && $
                   ~array_equal(ptr_valid((*self.DR).BCD),1b)
+  widget_control, (*self.wInfo).MUST_FLUXCON,SENSITIVE=self.fluxcon
 end
 
 ;=============================================================================
@@ -1580,9 +1587,10 @@ end
 ;  UpdateAll
 ;=============================================================================
 pro CubeProj::UpdateAll,NO_LIST=nl
+  if ~self->IsWidget() then return
   self->UpdateButtons
-  if NOT keyword_set(nl) then self->UpdateColumnHeads
-  if NOT keyword_set(nl) then self->UpdateList
+  if ~keyword_set(nl) then self->UpdateColumnHeads
+  if ~keyword_set(nl) then self->UpdateList
   self->UpdateTitle
 end
 
@@ -1992,7 +2000,8 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
                           GLOBAL_BAD_PIXEL_LIST=gbpl, WAVECUT=wavecut, $
                           RECONSTRUCTED_POSITIONS=rcp, $
-                          FLUXCON=fc,SLCF=slcf,SAVE_ACCOUNTS=sa,SAVE_DATA=sd
+                          FLUXCON=fc,SLCF=slcf,PIXEL_OMEGA=po, $
+                          SAVE_ACCOUNTS=sa,SAVE_DATA=sd
   update_cal=0b
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
@@ -2072,9 +2081,9 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      self.Changed=1b
   endif
   
-  if n_elements(wc) ne 0 then begin 
-     if self.wavecut ne wc then begin 
-        self.wavecut=wc
+  if n_elements(wavecut) ne 0 then begin 
+     if self.wavecut ne wavecut then begin 
+        self.wavecut=wavecut
         self->ResetAccounts,/NO_UPDATE & self.Changed=1b
         update_cal=1b
      endif
@@ -2092,11 +2101,14 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      self.slcf=keyword_set(slcf) 
      self.Changed=1b
   endif 
+  if n_elements(po) ne 0 then begin 
+     self.pix_omega=keyword_set(po) 
+     self.Changed=1b
+  endif 
   if n_elements(sa) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 2b) OR ishft(keyword_set(sa),1)
   if n_elements(sd) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 1b) OR keyword_set(sd)
-  
   
   if update_cal then self->Send,/CALIB_UPDATE
   self->UpdateAll,/NO_LIST
@@ -2110,7 +2122,8 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $ $
                            SLIT_LENGTH=sl, CALIB=calib, CAL_FILE=cf, $
                            MODULE=module, ORDER=order, APERTURE=ap, $
-                           PROJECT_NAME=pn,DR=dr, FLUXCON=fc, SLCF=slcf, $
+                           PROJECT_NAME=pn,DR=dr, FLUXCON=fc, SLCF=slcf, $ $
+                           PIXEL_OMEGA=po, $
                            TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
                            VERSION=version, ASTROMETRY=astr,POSITION=pos, $
                            POSITION_ANGLE=pa, BACKGROUND=bg, WAVECUT=wavecut, $
@@ -2166,6 +2179,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   endif
   if arg_present(fc) then fc=self.fluxcon
   if arg_present(slcf) then slcf=self.slcf
+  if arg_present(po) then po=self.pix_omega
   if arg_present(tbsize) then begin 
      if NOT ptr_valid(self.wInfo) then tbsize=-1 else $
         if widget_info((*self.wInfo).Base,/VALID_ID) then $
@@ -2319,7 +2333,7 @@ end
 ;=============================================================================
 ;  LoadCalib - Ensure the calibration object is loaded and available.
 ;=============================================================================
-pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,_EXTRA=e
+pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,_EXTRA=e
   @cubism_dir
   if keyword_set(sel) then begin 
      cd,filepath(ROOT_DIR=irs_calib_dir,"sets")
@@ -2349,7 +2363,7 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,_EXTRA=e
   endif
   if ~self.cal_file || keyword_set(force) then begin 
      self.cal_file=filestrip(irs_recent_calib(_EXTRA=e)) ;use the most recent
-     self->ResetAccounts,/NO_UPDATE
+     if ~keyword_set(nr) then self->ResetAccounts,/NO_UPDATE
      self.changed=1b            
      if n_elements(specified) eq 0 then $
         self->Info,['Calibration set unspecified, loading most recent: ', $
@@ -2361,32 +2375,34 @@ end
 
 ;=============================================================================
 ;  Flux - Flux a spectrum using FLUXCON, SLCF, and effective pixel
-;         solid angle, if requested.  Input is in e/s/pix.
+;         solid angle, if SOLID_ANGLE requested.  Input is in e/s/pix.
 ;=============================================================================
-pro CubeProj::Flux,lam,sp,ORDER=ord,SLCF=do_slcf
+pro CubeProj::Flux,lam,sp,ORDER=ord,SLCF=do_slcf,PIXEL_OMEGA=solid
   if n_elements(ord) eq 0 then ord=self.ORDER
   if ord eq 0 then self->Error,'Cannot flux combined multi-order spectrum.'
   self.cal->GetProperty,self.MODULE,ord,FLUXCON=fluxcon,TUNE=tune, $
-                        KEY_WAV=key_wav,SLCF=slcf
+                        KEY_WAV=key_wav,SLCF=slcf, $
+                        PIXEL_OMEGA=pix_effective_omega
   flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
   
   if keyword_set(do_slcf) then begin 
      if ptr_valid(slcf) then begin 
         slcf=*slcf
         slcf=interpol(slcf[1,*],slcf[0,*],lam)
-        sp*=slcf/flux_conv   
+        sp*=slcf/flux_conv      ;Jy/pix
      endif else sp/=flux_conv
   endif else sp/=flux_conv
+  
+  if keyword_set(solid) then sp/=pix_effective_omega*1.e6 ; MJy/sr
 end
 
 
 ;=============================================================================
 ;  FluxImage - Make an image to match the BCD which contains, for each
 ;              pixel, the factor to convert it from e/s/pix to
-;              Jy/pixel by multiplication. (fluxed=instrumental*fluximage).
-;              Also modify by the SLCF, if requested.  Also include
-;              the factor to map from Jy per pixel to MJy per
-;              steradian.
+;              Jy/pixel (or MJy/sr) by
+;              multiplication. (fluxed=instrumental*fluximage).  Also
+;              modify by the SLCF, if requested.  
 ;=============================================================================
 function CubeProj::FluxImage
   if ~ptr_valid(self.DR) then return,-1
@@ -2399,7 +2415,7 @@ function CubeProj::FluxImage
   for i=0,n_elements(ords)-1 do begin 
      lam=(*prs[i]).lambda
      self.cal->GetProperty,self.MODULE,ords[i],FLUXCON=fluxcon,TUNE=tune, $
-                           KEY_WAV=key_wav,SLCF=slcf
+                           KEY_WAV=key_wav,SLCF=slcf,PIXEL_OMEGA=pix_omega
      flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
      if ptr_valid(slcf) then begin 
         slcf=*slcf
@@ -2408,8 +2424,9 @@ function CubeProj::FluxImage
      
      for j=0,n_elements(lam)-1 do begin 
         fac=1.
-        if self.fluxcon then fac/=flux_conv[j]
+        if self.fluxcon then fac/=flux_conv[j] ; now in Jy/px
         if self.slcf && n_elements(slcf) gt 0 then fac*=slcf[j]
+        if self.pix_omega gt 0 then fac/=pix_omega*1.e6 ;MJy/sr
         pix=*(*prs[i])[j].pixels
         areas=*(*prs[i])[j].areas
         total_areas[pix]+=areas
@@ -2473,7 +2490,7 @@ pro CubeProj::MergeSetup,ORDS=ords
                                 frac:ptr_new()},nord))
   
   last_over=0
-  wh_clear_sav=-1
+  wh_clear_sav=-1               ;to keep track of still 
   nap=n_elements(*self.APERTURE)
   wave_zero=lonarr(nord)
   for ord=1L,nord-1L do begin
@@ -2489,9 +2506,11 @@ pro CubeProj::MergeSetup,ORDS=ords
      
      ;; No overlap case... just concatenate
      if min_wav2 gt max_wav1 then begin 
+        print,FORMAT='(%"No overlap:  %2d->%2d")',ords[ord-1],ords[ord]
         if n_elements(wave) gt 0 then wave=[wave,wave1] else wave=wave1
         wave_zero[ord]=wave_zero[ord-1]+n_elements(wave1) 
         last_over=0 & wh_clear_sav=-1
+        wave1=wave2
         continue
      endif
   
@@ -2504,17 +2523,20 @@ pro CubeProj::MergeSetup,ORDS=ords
      ;; Use as the primary wavelength set whichever had more samples in
      ;; the overlap region
      if cnt1 ge cnt2 then begin ; merge in the 2nd order's overlap.
-;        print,FORMAT='(%"Merge 2nd orders overlap: %2d->%2d")',ords[ord-1],$
-;              ords[ord]
+        ;print,FORMAT='(%"Merge 2nd orders overlap: %2d->%2d")',ords[ord-1],$
+        ;      ords[ord]
         use_wav=wave1[wh_over1]
         lose_wav=wave2[wh_over2]
         self->AddMergeRec,ord,wh_over2,lose_wav
      endif else begin           ;merge in the 1st order's overlap
-;        print,FORMAT='(%"Merge 1st orders overlap: %2d->%2d")',ords[ord-1],$
-;              ords[ord]
+        ;print,FORMAT='(%"Merge 1st orders overlap: %2d->%2d")',ords[ord-1],$
+        ;      ords[ord]
         use_wav=wave2[wh_over2]
         lose_wav=wave1[wh_over1] ;offset into *current* wave1, may have been
                                 ; (likely ) trimmed 
+        ;; wh_clear_sav is needed to account for the fact that wave1 was
+        ;; very likely trimmed on the last round, and thus the appropriate
+        ;; planes to use have changed
         self->AddMergeRec,ord-1, wh_clear_sav[0] ne -1? $
                           wh_clear_sav[wh_over1]:wh_over1,lose_wav
      endelse
@@ -3332,7 +3354,8 @@ pro CubeProj::BuildCube
         bg=interpol((*self.BG_SP)[1,*],(*self.BG_SP)[0,*], $
                     *self.wavelength,/LSQUADRATIC)
      endelse 
-     if self.fluxcon then self->Flux,*self.wavelength,bg,SLCF=self.slcf
+     if self.fluxcon then self->Flux,*self.wavelength,bg,SLCF=self.slcf, $
+                                     PIXEL_OMEGA=self.pix_omega
      bg=rebin(reform(bg,1,1,n_elements(*self.wavelength)), $
               size(*self.CUBE,/DIMENSIONS),/SAMPLE)
      *self.CUBE-=bg
@@ -3464,7 +3487,7 @@ end
 ;             FROM_FILE - Load extraction region from spectrum file
 ;=============================================================================
 function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
-                           OUTPUT_POLY=op
+                           OUTPUT_POLY=op,_EXTRA=e
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to extract'
   if keyword_set(rff) then begin
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
@@ -3506,7 +3529,7 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
          [h[0],low[1]]]
   endelse 
   
-  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP,REGION=op
+  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP,REGION=op,_EXTRA=e
 
   if keyword_set(exp) then $
      self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
@@ -3518,7 +3541,7 @@ end
 ;=============================================================================
 ;  SaveSpectrum - Save a Spectrum using a spectrum object
 ;=============================================================================
-pro CubeProj::SaveSpectrum,file,sp,oSP,REGION=op
+pro CubeProj::SaveSpectrum,file,sp,oSP,REGION=op,COMMENTS=comm
   if ~obj_valid(oSP) then begin 
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
                  self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
@@ -3541,12 +3564,18 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,REGION=op
      if n_elements(destroy) ne 0 then obj_destroy,oSP
      return
   endif 
-
+  
+  if self.as_built.fluxcon then begin 
+     units=self.as_built.pix_omega?'MJy/sr':'Jy/pix'
+  endif else units='e/s/pix'
+  
+  
   oSP->SetProperty,SPECTRUM=sp,WAVELENGTH=*self.wavelength, WAVE_UNITS='um', $
-                   FLUX_UNITS=self.as_built.fluxcon?'MJy/sr':'e/s/pix'
+                   FLUX_UNITS=units
   
   oSP->InitHeader
   oSP->AddPar,'CBSMVERS',self.version,'CUBISM Build Version'
+  
   
   ;; Add the first header as inheritance
   m=min((*self.DR).DCEID,pos)
@@ -3557,6 +3586,8 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,REGION=op
   oSP->AddHist,['This file contains a spectral extraction created from',$
                 'an IRS spectral mapping dataset.'],/COMMENT
   
+  if n_elements(comm) ne 0 then oSP->AddHist,comm,/COMMENT
+
   oSP->Save,file
   
   if n_elements(destroy) ne 0 then obj_destroy,oSP
@@ -3597,20 +3628,24 @@ end
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                          BG_VALS=bg_vals,MAP_NAME=mname, SAVE=save, $
                          CONTINUUM_IMAGE=background, WAVELENGTH_WEIGHTED=ww, $
-                         ALL=all, _EXTRA=e
+                         ALL=all, TEMP_STACK=ts,_EXTRA=e
   
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   ;; Get a map set by name
+  wl=*self.WAVELENGTH
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
      oMap->GetMap,mname,WEIGHTS=weights,FORERANGES=foreranges, $
-                  BACKRANGES=backranges, WAVELENGTH_CONVERT=*self.WAVELENGTH, $
+                  BACKRANGES=backranges, WAVELENGTH_CONVERT=wl, $
                   _EXTRA=e
   endif else if keyword_set(all) then $
-     foreranges=[0,n_elements(*self.WAVELENGTH)-1]
+     foreranges=[0,n_elements(wl)-1]
   
   sf=size(foreranges,/DIMENSIONS)
-  if n_elements(sf) eq 2 then nfr=sf[1] else nfr=1
+  if n_elements(foreranges) ne 0 then begin 
+     if foreranges[0] eq -1 then nfr=0 else $
+        if n_elements(sf) eq 2 then nfr=sf[1] else nfr=1
+  endif else nfr=0
   
   nbr=0
   if n_elements(backranges) ne 0 then begin 
@@ -3620,12 +3655,53 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      endif 
   endif
   
+  if nfr gt 0 then fore_cnt=long(total(foreranges[1,*]-foreranges[0,*]+1))
+  if nbr gt 0 then back_cnt=long(total(backranges[1,*]-backranges[0,*]+1))
   
-  ;; Compute a background
+  
   if keyword_set(ww) then begin 
      ;; Wavelength weighted Backrounds
+     if nbr eq 0 then $
+        self->Error,'Must select continuum regions for wavelength weighting.'
+
+     ;; Collect the cube planes and associated wavelengths
+     fore_wav=fltarr(fore_cnt) & fore_planes=lonarr(fore_cnt)
+     cnt=0
+     for i=0,nfr-1 do begin 
+        this_cnt=foreranges[1,i]-foreranges[0,i]+1
+        fore_wav[cnt]=wl[foreranges[0,i]:foreranges[1,i]]
+        fore_planes[cnt]=foreranges[0,i]+lindgen(this_cnt)
+        cnt+=this_cnt
+     endfor
+     back_wav=fltarr(back_cnt) & back_planes=lonarr(back_cnt)
+     cnt=0
+     for i=0,nbr-1 do begin 
+        this_cnt=backranges[1,i]-backranges[0,i]+1
+        back_wav[cnt]=wl[backranges[0,i]:backranges[1,i]]
+        back_planes[cnt]=backranges[0,i]+lindgen(this_cnt)
+        cnt+=this_cnt
+     endfor
      
+     fore_cube=(*self.CUBE)[*,*,fore_planes]
+     stack=total(fore_cube,/NAN,3)/(total(finite(fore_cube),3)>1.e-15)* $
+           fore_cnt
+     
+     back_cube=(*self.CUBE)[*,*,back_planes]
+     back_finite=finite(back_cube)
+     
+     background=fltarr(self.CUBE_SIZE[0:1])
+     for i=0,fore_cnt-1 do begin 
+        print,1./(1.+abs(fore_wav[i]-back_wav))
+        back_weights=rebin(reform(1./(1.+abs(fore_wav[i]-back_wav)), $
+                                  [1,1,back_cnt]), $
+                           [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
+        ;; Remove the weighted average background for this foreground plane
+        background+=total(back_cube*back_weights,3,/NAN)/ $
+                    total(back_weights*back_finite>1.e-15,3)
+     endfor 
+     stack-=background
   endif else begin 
+     ;; Non wavelength-weighted
      nbgv=n_elements(bg_vals)
      
      nw=n_elements(weights)
@@ -3634,63 +3710,59 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      if use_weights then begin  ;A weight vector overrides foreground regions
         stack=total(*self.CUBE * $
                     rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],$
-                          /SAMPLE),3,/NAN)/total(weights)
+                          /SAMPLE),3,/NAN);/total(weights)
      endif else begin           ;Foreground regions
         stack=fltarr(self.CUBE_SIZE[0:1])
         fcnt=lonarr(self.CUBE_SIZE[0:1])
-        fixed_cnt=0
         for i=0,nfr-1 do begin 
            if foreranges[0,i] eq foreranges[1,i] then begin 
               stack+=(*self.CUBE)[*,*,foreranges[0,i]]
               fcnt+=long(finite((*self.CUBE)[*,*,foreranges[0,i]]))
            endif else begin 
               stack+= $
-                 total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],/NAN,3)
-              fcnt+=long(total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
-                                                   foreranges[1,i]]),3))
+                 total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]], $
+                       /NAN,3)
+              fcnt+=total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
+                                              foreranges[1,i]]),3)
            endelse 
-           fixed_cnt+=foreranges[1,i]-foreranges[0,i]+1
         endfor
-        if nfr gt 0 then stack=stack/(fcnt>1L)*fixed_cnt
+        if nfr gt 0 then stack=stack/(fcnt>1L)*fore_cnt
      endelse 
      
-     if nbr eq 0 AND nbgv eq 0 then return,stack
-     
-     ;; Background Values provided
+     ;; Background 
      if nbgv gt 0 then begin 
-        if nbgv ne fixed_cnt then $
+        if nbgv ne fore_cnt then $
            self->Error,'Wrong number of background values passed'
         stack-=total(bg_vals)
         return,stack
-     endif
-     
-     bcnt=lonarr(self.CUBE_SIZE[0:1])
-     background=fltarr(self.CUBE_SIZE[0:1])
-     fixed_cnt=0
-     for i=0,nbr-1 do begin 
-        if backranges[0,i] eq backranges[1,i] then begin 
-           background+=(*self.CUBE)[*,*,backranges[0,i]]
-           bcnt+=long(finite((*self.CUBE)[*,*,backranges[0,i]]))
-        endif else begin 
-           background+=total((*self.CUBE)[*,*,backranges[0,i]: $
-                                          backranges[1,i]], /NAN,3)
-           bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
-                                                backranges[1,i]]),3))
-        endelse 
-        fixed_cnt+=backrange[1-i]-backranges[0,i]+1
-     endfor 
-     background=background/(bcnt>1L)*fixed_cnt
-     stack-=background
+     endif else if nbr gt 0 then begin 
+        bcnt=lonarr(self.CUBE_SIZE[0:1])
+        background=fltarr(self.CUBE_SIZE[0:1])
+        for i=0,nbr-1 do begin 
+           if backranges[0,i] eq backranges[1,i] then begin 
+              background+=(*self.CUBE)[*,*,backranges[0,i]]
+              bcnt+=long(finite((*self.CUBE)[*,*,backranges[0,i]]))
+           endif else begin 
+              background+=total((*self.CUBE)[*,*,backranges[0,i]: $
+                                             backranges[1,i]], /NAN,3)
+              bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
+                                                   backranges[1,i]]),3))
+           endelse 
+        endfor 
+        background=background/(bcnt>1L)*fore_cnt
+        stack-=background
+     endif 
   endelse
   
-  if keyword_set(save) then self->SaveMap,stack,save
+  if keyword_set(save) then self->SaveMap,stack,save,_EXTRA=e
   return,stack
 end 
 
 ;=============================================================================
 ;  SaveMap - Save a Stacked Map to FITS 
 ;=============================================================================
-pro CubeProj::SaveMap,map,sf
+pro CubeProj::SaveMap,map,sf,COMMENTS=comm
+  ;; XXX break out to IRS_Map...
   if size(sf,/TYPE) ne 7 then begin 
      xf,sf,/SAVEFILE, /RECENT, $
         FILTERLIST=['*.fits', '*.*', '*'], $
@@ -3712,11 +3784,24 @@ pro CubeProj::SaveMap,map,sf
   putast,hdr,self->CubeAstrometryRecord()
   self->AddHeaderInfo,hdr
   
+  m=min((*self.DR).DCEID,pos)
+  self->RestoreData,pos
+  h1=*(*self.DR)[pos].HEADER
+  sxdelpar,h1,['SIMPLE','BITPIX','CD1_1','CD1_2','CD2_1','CD2_2','NAXIS', $
+               'NAXIS1','NAXIS2','CRVAL1','CRVAL2','CTYPE1','CTYPE2',$
+               'CRPIX1','CRPIX2','EQUINOX']
+  sxaddhist,' ',hdr,/BLANK
+  sxaddhist,'         / KEYWORDS FROM FIRST BCD',hdr,/BLANK
+  sxaddhist,' ',hdr,/BLANK
+  sxaddhist,h1,hdr,/BLANK
+  
   ;; Description
   sxaddhist, ['This file contains a 2D map created from an IRS', $
               'spectral cube, assembled from a spectral mapping dataset.'], $
              hdr,/COMMENT
-  fxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
+  
+  if n_elements(comm) ne 0 then sxaddhist,comm,hdr,/COMMENT
+  sxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
   writefits,sf,map,hdr
 end
 
@@ -3724,15 +3809,15 @@ end
 ;  AddHeaderInfo - Add the header information only we know
 ;=============================================================================
 pro CubeProj::AddHeaderInfo,hdr
-  fxaddpar,hdr,'APERNAME',self.MODULE,' IRS module'
+  fullname=irs_fov(MODULE=self.MODULE,ORDER=self.ORDER,POSITION=0,/SLIT_NAME, $
+                   /LOOKUP_MODULE)
+  fxaddpar,hdr,'APERNAME',fullname,' IRS module and order'
+  fxaddpar,hdr,'SOFTWARE','CUBISM',' Spectral Cube Assembly Software'
   fxaddpar,hdr,'CUBS_VER',self.version,' CUBISM version used'
   self->LoadCalib
   name=self.cal->Name()
   if name eq '' then name=self.cal_file
   fxaddpar,hdr,'CAL_SET',name,' IRS Calibration set used'
-;   sxaddhist,['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
-;              'For more information on SINGS see http://sings.stsci.edu'], $
-;            hdr,/COMMENT
 end
 
 ;=============================================================================
@@ -4205,6 +4290,8 @@ pro CubeProj__define
       BACK_SP_FILE: '', $       ;Background 1D spectrum file
       fluxcon:0b, $             ;whether to build with FLUXCON fluxes
       slcf: 0b, $               ;whether to build with the SLCF
+      pix_omega: 0b, $          ;whether to build to MJy/sr units using
+                                ; effective solid angle of pixels
       reconstructed_pos:0b, $   ;whether to build with reconstructed positions
       wavecut: 0b, $            ;whether to trim wavelengths with WAVECUT
       cal_file:'', $            ;the calibration file used (if not a full
@@ -4318,7 +4405,8 @@ pro CubeProj__define
          MUST_BACK:lonarr(4), $ ;background record must be set
          MUST_BG_SP:0L, $       ;required background spectrum
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
-         MUST_UNRESTORED:0L}    ;must have unrestored data
+         MUST_UNRESTORED:0L, $  ;must have unrestored data
+         MUST_FLUXCON: 0L}      ;must have Fluxcon building set
   
   ;; Messages: send a cube, record, etc.
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
