@@ -274,7 +274,7 @@ pro CubeProj::ShowEvent, ev
      end
      
      'sort': begin 
-        flags=bytarr((*self.wInfo).which_list eq 0?6:5)
+        flags=bytarr(6)
         self.sort=ev.value
         flags[ev.value-(5*(ev.value ge 6))]=1b ;keep ID selected if set
         widget_control, (*self.wInfo).Base,UPDATE=0
@@ -402,6 +402,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   ;;*** Data Record menu
   rec=widget_button(mbar,VALUE='Record',/MENU)
   b1=widget_button(rec,VALUE='Add BCD Data...',UVALUE='adddata')
+  b2=widget_button(rec,VALUE='Import BCDs from AOR...',UVALUE='AddAOR') 
   wMustSel=[wMustSel, $
             widget_button(rec,VALUE='Delete',UVALUE='delete'),$
             widget_button(rec,VALUE='Rename',UVALUE='renamerecord'),$
@@ -466,9 +467,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                ['ID               ', $
                 'RA     ', $
                 'Dec      ', $
-                'Error', $
+                'Unc', $
+                'BMask',$
                 'Account'], $
-               BUTTON_UVALUE=[0,6,7,8,9],UVALUE='sort',/ROW,MAP=0)
+               BUTTON_UVALUE=[0,6,7,8,9,10],UVALUE='sort',/ROW,MAP=0)
   
   b1=widget_button(headbase,VALUE='>',UVALUE='switchlist')
   
@@ -478,10 +480,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup', $
                 ['Enable','Disable','Delete','Header', $
-                 'View Record','View Cube','Add Data','Save','Close'],$
+                 'View Record','View Cube','Import AOR','Save','Close'],$
                 BUTTON_UVALUE= $
                 ['enablerecord','disablerecord','delete','headers', $
-                 'viewrecord','viewcube','adddata','save','exit'])
+                 'viewrecord','viewcube','addaor','save','exit'])
   ;; list of buttons that require a selection to be meaningful
   (*self.wInfo).MUST_SELECT=[wMustSel,ids[0:4]]
   
@@ -626,7 +628,7 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp
 end
 
 ;=============================================================================
-;  WriteFits - Write the Cube, Error, etc. to FITS file
+;  WriteFits - Write the Cube, Uncertainty, etc. to FITS file
 ;=============================================================================
 pro CubeProj::WriteFits,file
   if NOT ptr_valid(self.CUBE) then return 
@@ -692,7 +694,7 @@ pro CubeProj::WriteFits,file
   
   ;; Write the primary header and data
   fxwrite,file,hdr,*self.CUBE
-;  fxwrite,file,hdr,*self.ERR
+;  fxwrite,file,hdr,*self.CUBE_UNC
   
   ;; Make the wavelength LUT extension header
   fxbhmake,hdr,1,'WCS-TAB','Wavelength look-up table for cube dimension 3'
@@ -810,7 +812,8 @@ end
 ;  Showing - Is the project showing?
 ;=============================================================================
 function CubeProj::Showing
-  return,XRegistered('CubeProj_Show:'+self.ProjectName+self.savefile,/NOSHOW)
+  return, $
+     XRegistered('CubeProj_Show:'+self.ProjectName+self.savefile,/NOSHOW) gt 0
 end
 
 ;=============================================================================
@@ -876,11 +879,12 @@ function CubeProj::List
                else acct="Yes"
             endif else acct="Invalid"
          endif else acct="No"
-         s=string(FORMAT='(" ",A,T23,A10,T34,A12,T48,A3,T59,A)', $
+         s=string(FORMAT='(" ",A,T23,A10,T34,A12,T48,A3,T59,A,T70,A)', $
                   (*self.DR)[i].ID, $
                   radecstring((*self.DR)[i].RQST_POS[0],/RA), $
                   radecstring((*self.DR)[i].RQST_POS[1]), $
-                  ptr_valid((*self.DR)[i].ERROR)?'Yes':'No', $
+                  ptr_valid((*self.DR)[i].UNC)?'Yes':'No', $
+                  ptr_valid((*self.DR)[i].BMASK)?'Yes':'No', $
                   acct)
       endelse       
       if (*self.DR)[i].DISABLED then begin 
@@ -906,8 +910,7 @@ pro CubeProj::UpdateButtons
   widget_control,(*self.wInfo).MUST_MULTISELECT,SENSITIVE=n_elements(sel) gt 1
 
   for i=0,n_elements((*self.wInfo).MUST_CAL)-1  do  $
-     widget_control,((*self.wInfo).MUST_CAL)[i],  $
-                    SENSITIVE=obj_valid(self.cal)
+     widget_control,((*self.wInfo).MUST_CAL)[i], SENSITIVE=obj_valid(self.cal)
   
   for i=0,n_elements((*self.wInfo).MUST_PROJ)-1  do  $
      widget_control, (*self.wInfo).MUST_PROJ[i], SENSITIVE=ptr_valid(self.DR)
@@ -929,7 +932,7 @@ end
 ;=============================================================================
 pro CubeProj::UpdateColumnHeads
   if NOT self->IsWidget() then return
-  flags=bytarr(10)
+  flags=bytarr(11)
   flags[self.sort]=1b
   if (*self.wInfo).which_list eq 0 then flags=flags[0:5] else $
      flags=[flags[0],flags[6:*]]
@@ -1068,8 +1071,9 @@ pro CubeProj::Sort,sort
      5: s=sort((*self.DR).EXP)
      6: s=sort((*self.DR).RQST_POS[0])
      7: s=sort((*self.DR).RQST_POS[1])
-     8: s=sort(ptr_valid((*self.DR).ERROR))
-     9: s=sort(ptr_valid((*self.DR).ACCOUNT))
+     8: s=sort(ptr_valid((*self.DR).UNC))
+     9: s=sort(ptr_valid((*self.DR).BMASK))
+     10: s=sort(ptr_valid((*self.DR).ACCOUNT))
   endcase
   *self.DR=(*self.DR)[s]        ;rearrange
   if self->IsWidget() then begin 
@@ -1229,18 +1233,19 @@ end
 ;  GetProperty
 ;=============================================================================
 pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
-                           ERROR=err, PR_SIZE=prz, PR_WIDTH=prw, CALIB=calib, $
-                           MODULE=module, APERTURE=ap,PROJECT_NAME=pn,DR=dr, $
-                           TLB_OFFSET=tboff,TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
-                           VERSION=version,ASTROMETRY=astr
+                           CUBE_UNCERTAINTY=err, PR_SIZE=prz, PR_WIDTH=prw, $
+                           CALIB=calib, MODULE=module, APERTURE=ap, $
+                           PROJECT_NAME=pn,DR=dr, TLB_OFFSET=tboff, $
+                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
+                           ASTROMETRY=astr
   if arg_present(account) then $
      if ptr_valid(self.ACCOUNT) then account=*self.account
   if arg_present(wave) then $
      if ptr_valid(self.WAVELENGTH) then wave=*self.WAVELENGTH
   if arg_present(cube) then $
      if ptr_valid(self.CUBE) then cube=*self.CUBE
-  if arg_present(err) then $
-     if ptr_valid(self.ERR) then err=*self.ERR
+  if arg_present(unc) then $
+     if ptr_valid(self.CUBE_UNC) then unc=*self.CUBE_UNC
   if arg_present(prz) then prz=self.PR_SIZE
   if arg_present(prw) then prw=self.PR_SIZE[1]
   if arg_present(calib) then begin 
@@ -1322,11 +1327,12 @@ end
 ;=============================================================================
 ;  BCD
 ;=============================================================================
-function CubeProj::BCD, which,ERROR=err
+function CubeProj::BCD, which,UNCERTAINTY=unc,BMASK=bmask
   if which lt 0 or which ge self->N_Records() then $
      self->Error,"Invalid record number: "+strtrim(which,2)
   return,*(*self.DR)[which].BCD
-  if arg_present(err) then err=*(*self.DR)[which].ERR
+  if arg_present(unc) then unc=*(*self.DR)[which].UNC
+  if arg_present(bmask) then bmask=*(*self.DR)[which].BMASK
 end
 
 ;=============================================================================
@@ -1692,11 +1698,20 @@ pro CubeProj::BuildAccount,_EXTRA=e
 ;      basic_offset=[((*self.DR)[i].ROW-1)*stepsz[0], $
 ;                    self.cube_size[1]-((*self.DR)[i].COLUMN-1)*stepsz[1]-1] + $
 ;                   self.PR_SIZE/2.
-     ad2xy,(*self.DR)[i].RQST_POS[0],(*self.DR)[i].RQST_POS[1],astr,x,y
+     
+     pos=(*self.DR)[i].RQST_POS
+
+     ;; Building in another order?
+     if (*self.DR)[i].TARGET_ORDER ne self.ORDER AND $
+        self.ORDER ne 0 then begin
+        self.cal->TransformCoords,self.MODULE,pos,(*self.DR)[i].PA_RQST, $
+                                  ORDER1=(*self.DR)[i].TARGET_ORDER, $
+                                  self.MODULE,ORDER2=self.ORDER,newpos
+        pos=newpos
+     endif 
+
+     ad2xy,pos[0],pos[1],astr,x,y
      offset=[x,y]+.5
-     ;offset=float(self.CUBE_SIZE[0:1])/2 + $
-     ;       rot_pa ## ((*self.DR)[i].RQST_POS  - self.POSITION)/ $
-     ;       self.PLATE_SCALE
      
      ;; (Probably small) difference between PA of this BCD and the
      ;; mean map PA
@@ -1709,7 +1724,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
         
         ;; Pre-allocate an account list 
-        if NOT feedback_only then begin 
+        if ~feedback_only then begin 
            nacc=4*n_elements(prs) 
            account=replicate({CUBE_ACCOUNT_LIST},nacc)
            prmin=0L & prmax=n_elements(prs)-1
@@ -1740,6 +1755,11 @@ pro CubeProj::BuildAccount,_EXTRA=e
               rot=transpose([[ ct,-st], $
                              [ st, ct]])
            endif
+           
+           if self.feedback && j eq 1L && self->Showing() then begin 
+              widget_control, (*self.wInfo).SList, SET_LIST_SELECT=i
+           endif
+              
            ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
               bcdpixel=(*prs[j].PIXELS)[k]
@@ -1807,9 +1827,9 @@ end
 ;=============================================================================
 pro CubeProj::BuildRevAcct
   for i=0L,n_elements(*self.DR)-1 do begin 
-     if (*self.DR)[i].DISABLED then continue 
      if self.ACCOUNTS_VALID eq 1b AND ptr_valid((*self.DR)[i].REV_ACCOUNT) $
         then continue else ptr_free,(*self.DR)[i].REV_ACCOUNT
+     if (*self.DR)[i].DISABLED then continue 
      
      ;; Compute the total reverse index of the full cube index
      ;; histogram for this DR's accounting.  E.g. the account records
@@ -1991,19 +2011,21 @@ pro CubeProj::LayoutBCDs
      endif
   endfor
   self.PA=mean((*self.DR)[use].PA_RQST) ;match our PA to the most numerous
-  ;; Approximate cube center (pos average), for now
+  ;; Approximate cube center (pos average), for now (not critical)
   self.POSITION=total((*self.DR).RQST_POS,2)/self->N_Records()
   cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
   
   ords=self->BuildOrders()
   nap=n_elements(*self.APERTURE)
+  
   ;; Construct the bounding aperture for all orders being combined into cube
   for i=0,n_elements(ords)-1 do begin 
      ap=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[i]
      left=min(ap.low)           ;The bounding aperture for this order
      right=max(ap.high)
+     acen=.5*(left+right)-.5    ;positive acen shifts right
      ;; Celestial (degree) left/right offsets from slit center
-     off=([left,right]-.5)*self.PR_SIZE[0]
+     off=([0.,1.]-.5+acen)*self.PR_SIZE[0]
      if n_elements(final_off) eq 0 then final_off=off else begin 
         final_off[0]=final_off[0]<off[0] ;Bounding aperture assumes same 
         final_off[1]=final_off[1]>off[1] ;slit length for all build orders
@@ -2021,8 +2043,9 @@ pro CubeProj::LayoutBCDs
            [final_off[1],-pr_half]]-.5 ;nasalib standard: 0,0: center of pix
 
   for i=0,n_elements(*self.DR)-1 do begin 
-     c_pa=cos((270.0D - (*self.DR)[i].PA_RQST)/RADEG) 
-     s_pa=sin((270.0D - (*self.DR)[i].PA_RQST)/RADEG)
+     pa_rqst=(*self.DR)[i].PA_RQST
+     c_pa=cos((270.0D - pa_rqst)/RADEG) ;WCS uses CROTA = N CCW from +y 
+     s_pa=sin((270.0D - pa_rqst)/RADEG)
      cd_pa=self.PLATE_SCALE*[[-c_pa,-s_pa],[-s_pa,c_pa]]
      
      ;; Compute the RA/DEC of the 4 corners.
@@ -2032,27 +2055,20 @@ pro CubeProj::LayoutBCDs
      xy2ad,pr_rect[0,*],pr_rect[1,*],astr,a_rect,d_rect
 ;     prs[*,i]=[a_rect,d_rect]
      
-     ;; Compute corner positions in cube frame
+     ;; Offset to the correct order: account for building a cube using
+     ;; data pointed at another order.
+     if (*self.DR)[i].TARGET_ORDER ne self.ORDER AND $
+        self.ORDER ne 0 then begin
+        self.cal->TransformCoords,self.MODULE,[1.#a_rect,1.#d_rect],pa_rqst, $
+                                  ORDER1=(*self.DR)[i].TARGET_ORDER, $
+                                  self.MODULE,ORDER2=self.ORDER,newcoords,newpa
+        a_rect=newcoords[0,*] & d_rect=newcoords[1,*]
+     endif 
+        
+     ;; Compute corner celestial positions in cube frame
      ad2xy,a_rect,d_rect,cubeastr,x,y ;x,y in 0,0 pixel-centered
      x+=0.5 & y+=0.5            ;back to normal pixel convention (.5-centered)
 ;     prs[*,i]=[x,y]
-     
-     ;; Account for any differential rotation of this DR to sky coordinates
-;      delta_PA=(*self.DR)[i].PA_RQST-self.PA
-;      if delta_PA ne 0.0D then begin 
-;         ct=cos(delta_PA/RADEG) & st=sin(delta_PA/RADEG)
-;         ;; positive delta_PA ==> CCW rotation on sky grid
-;         rot=[[ ct, -st], $
-;              [ st,  ct]]
-;         pr_rect=transpose(rot ## transpose(pr_rect))
-;      endif
-     
-     ;; Rotate celestial coordinates into this left-handed <+w> -> +x system
-     ;; If PA=0, <+w>=+x=North, <+v>=+y=East
-;     sky_coords=reform(rot_pa ## (*self.DR)[i].RQST_POS)
-;     skyc[*,i]=[x,y]            ;sky_coords
-     
-;     pr_rect=pr_rect+rebin(sky_coords,2,4,/SAMPLE)
      
      ;; Accumulate pixel bounding rectangle
      if n_elements(x_min) ne 0 then begin 
@@ -2069,7 +2085,8 @@ pro CubeProj::LayoutBCDs
   
   ;; Establish the dimensions of the cube in the sky coordinate system
   exact_size=[x_max-x_min,y_max-y_min]
-  new_size=ceil(exact_size)
+
+  new_size=ceil(exact_size-.001) ;no hangers-on
   if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
      self.CUBE_SIZE[0:1]=new_size
      self.ACCOUNTS_VALID=2b
@@ -2139,13 +2156,13 @@ pro CubeProj::BuildCube
      rev_acc=*(*self.DR)[dr].REV_ACCOUNT
      rev_min=(*self.DR)[dr].REV_MIN
      bcd=*(*self.DR)[dr].BCD
-     use_err=ptr_valid((*self.DR)[dr].ERROR)
-     if use_err then err=*(*self.DR)[dr].ERROR
+     use_unc=ptr_valid((*self.DR)[dr].UNC)
+     if use_unc then unc=*(*self.DR)[dr].UNC
      
      ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
      ;; entering the cube
      if ptr_valid((*self.DR)[dr].BMASK) then $
-        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) gt 0 else bmask=[1.]
+        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) eq 0 else bmask=[1.]
         
      ;; Use the reverse account to populate the cube
      for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
@@ -2164,7 +2181,7 @@ pro CubeProj::BuildCube
   endfor 
   
   areas=areas>1.e-10            ;avoid divide by zero errors
-  ptr_free,self.CUBE,self.ERR
+  ptr_free,self.CUBE,self.CUBE_UNC
   self.CUBE=ptr_new(cube/areas)
   self.CUBE_DATE=systime(/JULIAN)
   self.Changed=1
@@ -2230,38 +2247,40 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                        /SAMPLE),3,/NAN)/total(weights)
   endif else begin              ;Foreground regions
      stack=fltarr(self.CUBE_SIZE[0:1])
-     fcnt=0
+     fcnt=lonarr(self.CUBE_SIZE[0:1])
+     bcnt=0
      for i=0,nfr-1 do begin 
         stack=stack+ $
               total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]],/NAN,3)
-        fcnt=fcnt+foreranges[1,i]-foreranges[0,i]+1
+        fcnt+=long(total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
+                                             foreranges[1,i]]),3))
+        bcnt+=foreranges[1,i]-foreranges[0,i]+1
      endfor
-     if nfr gt 0 then stack=stack/fcnt
+     if nfr gt 0 then stack/=(fcnt>1L)
   endelse 
   
   if nbr eq 0 AND nbgv eq 0 then return,stack
   
-  ;; Background Values
+  ;; Background Values provided
   if nbgv gt 0 then begin 
      if nbgv ne fcnt then $
         self->Error,'Wrong number of background values passed'
-     stack=stack-total(bg_vals)/fcnt ; average(fi-bgvi)
+     stack=stack-total(bg_vals)/bcnt ; average(fi-bgvi)
      return,stack
   endif
   
   ;; Compute a background
-  bcnt=0
+  bcnt=lonarr(self.CUBE_SIZE[0:1])
   background=fltarr(self.CUBE_SIZE[0:1])
   for i=0,nbr-1 do begin 
-     background=background+ $
-                total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]],/NAN,3)
-     bcnt=bcnt+backranges[1,i]-backranges[0,i]+1.
+     background+=total((*self.CUBE)[*,*,backranges[0,i]:backranges[1,i]], $
+                       /NAN,3)
+     bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
+                                          backranges[1,i]]),3))
   endfor 
-  if bcnt gt 0 then begin 
-     background=background/bcnt
-     stack=stack-background
-  endif
-  
+  background/=(bcnt>1L)
+  stack-=background
+	  
   if keyword_set(save) then self->SaveMap,stack,save
   return,stack
 end
@@ -2274,7 +2293,8 @@ end
 function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   nrec=self->N_Records()
   if nrec eq 0 then return,-1
-  if NOT ptr_valid((*self.DR)[0].REV_ACCOUNT) then self->BuildRevAcct
+  ;; At least one reverse account required
+  if array_equal(ptr_valid((*self.DR).REV_ACCOUNT),0b) then self->BuildRevAcct
   if n_elements(pix) eq 2 then pix=pix[0]+pix[1]*self.CUBE_SIZE[0]
   if n_elements(plane) ne 0 then $
      z=pix+plane*self.CUBE_SIZE[0]*self.CUBE_SIZE[1] $
@@ -2282,6 +2302,7 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   show=keyword_set(follow) AND self->Showing()
   if show then show_vec=bytarr(nrec)
   for i=0,nrec-1 do begin 
+     if ~ptr_valid((*self.DR)[i].REV_ACCOUNT) then continue
      if z lt (*self.DR)[i].REV_MIN then continue
      thisz=z-(*self.DR)[i].REV_MIN
      ri=*(*self.DR)[i].REV_ACCOUNT
@@ -2295,11 +2316,9 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
      ret.AREA=accs.AREA
      if n_elements(all) eq 0 then all=[ret] else all=[all,ret]
   endfor 
-  if n_elements(all) ne 0 then begin 
-     if show then $
-        widget_control, (*self.wInfo).SList, SET_LIST_SELECT=where(show_vec)
-     return,all 
-  endif else return,-1
+  if show then $
+     widget_control, (*self.wInfo).SList, SET_LIST_SELECT=where(show_vec)
+  return,n_elements(all) ne 0?all:-1
 end
 
 ;=============================================================================
@@ -2495,7 +2514,84 @@ pro CubeProj::ShowAperture
   self->Info,['Apertures: ','',ap_str],TITLE=self->ProjectName()+' Apertures'
 end
      
-     
+;=============================================================================
+;  AddAOR - Add an entire AOR from a full AOR directory, with choice
+;           of module(s) and observations.
+;=============================================================================
+pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
+  if n_elements(dir) eq 0 then $
+     xf,dir,/DIRECTORY,/RECENT,TITLE='Select AOR Directory'
+  
+  widget_control, /HOURGLASS
+  if ~file_test(dir,/DIRECTORY) || $
+     ~stregex(dir,'[0-9]{10}'+path_sep()+'?$',/BOOLEAN) then $
+     self->Error,'Must select AOR directory of form 0123456789'
+  if keyword_set(cd) then filt='*.coadd2d.fits' else filt='*.bcd_fp.fits'
+  files=file_search(dir,filt,/TEST_REGULAR)
+  for i=0,n_elements(files)-1 do begin 
+     hdr=headfits(files[i])
+     rec={FILE:files[i],OBJECT:strtrim(sxpar(hdr,'OBJECT'),2), $
+          FOV:sxpar(hdr,'FOVID'), NCYCLES:sxpar(hdr,'NCYCLES'), $
+          TIME:sxpar(hdr,'EXPTOT_T'), $
+          STEPS:[sxpar(hdr,'STEPSPAR'),sxpar(hdr,'STEPSPER')]}
+     if n_elements(all) eq 0 then all=[rec] else all=[all,rec]
+  endfor 
+  
+  uniq_objs=uniq(all.OBJECT,sort(all.OBJECT))
+  for i=0,n_elements(uniq_objs)-1 do begin 
+     object=all[uniq_objs[i]].OBJECT
+     wh=where(all.OBJECT eq object,cnt)
+     uniq_fovs=uniq(all[wh].FOV,sort(all[wh].FOV))
+     nfovs=n_elements(uniq_fovs) 
+     for j=0,nfovs-1 do begin 
+        this=all[wh[uniq_fovs[j]]]
+        these=all[wh[where(all[wh].FOV eq this.fov)]]
+        fovname=irs_fov(this.fov,/SHORT_NAME,MODULE=md,ORDER=ord)
+        pos=strpos(fovname,'_cen')
+        if pos ne -1 then fovname=strmid(fovname,0,pos)
+        ;; Assume same FOV and same OBJECT == one map
+        rec={CNT:n_elements(these),FOVNAME:fovname, OBJECT:this.OBJECT,$
+             FILES:ptr_new(these.file),STEPS:this.STEPS, $
+             TIME:this.TIME, NCYCLES:this.NCYCLES,MERGE:0b}
+        if n_elements(choices) eq 0 then choices=rec else begin 
+           choices=[choices,rec]
+           ;; The separate low-res slits are compatible with each other
+           if ord gt 0 and (md eq 'SL' or md eq 'LL') then begin
+              other=md+strtrim(ord eq 2?1:2,2)
+              whfov=where(choices.FOVNAME eq other,cnt)
+              if cnt gt 0 then begin 
+                 ;; both are present
+                 rec.FOVNAME=other+'+'+fovname
+                 rec.FILES=ptr_new([*rec.FILES,*choices[whfov[0]].FILES])
+                 rec.cnt+=choices[whfov[0]].CNT
+                 rec.MERGE=1b
+                 choices=[choices,rec]
+              endif 
+           endif
+        endelse 
+     endfor 
+  endfor 
+  
+  list=strarr(n_elements(choices))
+  for i=0,n_elements(choices)-1 do begin 
+     if choices[i].MERGE then begin 
+        list[i]=string(FORMAT='(%"%s %s (%d files)")', $
+                       choices[i].OBJECT,choices[i].FOVNAME,choices[i].CNT)
+     endif else begin 
+        list[i]=string(FORMAT='(%"%s %s (%d files) %dx%d@%d (%ss)")', $
+                       choices[i].OBJECT,choices[i].FOVNAME,choices[i].CNT, $
+                       choices[i].STEPS,choices[i].NCYCLES, $
+                       strtrim(string(FORMAT='(F20.2)',choices[i].TIME),2))
+     endelse 
+  endfor 
+  
+  choice=multchoice('Choose Data:',list,TITLE='Load AOR', $
+                    PARENT_GROUP=self->TopBase(),/MODAL)
+  if choice[0] ne -1 then self->AddData,*choices[choice[0]].FILES
+  ptr_free,choices.FILES
+end
+
+
 ;=============================================================================
 ;  AddData - Add one or more BCD data files to the cube.
 ;=============================================================================
@@ -2513,7 +2609,10 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
   endif
   for i=0,n_elements(files)-1 do begin 
      bcd=readfits(files[i],header,/SILENT)
-     self->AddBCD,bcd,header,FILE=files[i],_EXTRA=e
+     bfile=strmid(files[i],0,strpos(files[i],'.bcd_fp.fits'))+'.bmask.fits'
+     if file_test(bfile,/READ) then bmask=readfits(bfile,/SILENT)
+     self->AddBCD,bcd,header,FILE=files[i],BMASK=bmask,ERR=err,_EXTRA=e
+     if keyword_set(err) then break
   endfor
   self->CheckModules            ;Set default build order, and double check.
   self->UpdateList & self->UpdateButtons
@@ -2523,22 +2622,27 @@ end
 ;  AddBCD - Add a bcd image to the cube, optionally overriding the
 ;           header derived values.
 ;=============================================================================
-pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
-                     COLUMN=col, ROW=row, RQST_POS=rqpos, REC_POS=rpos, PA=pa
+pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
+                     EXP=exp,COLUMN=col, ROW=row, RQST_POS=rqpos, $
+                     REC_POS=rpos, PA=pa,ERR=err
   self->LoadCalib
+  ;; Don't add same file twice
   if n_elements(file) ne 0 AND ptr_valid(self.DR) then $
      if NOT array_equal((*self.DR).file ne file,1b) then return
   s=size(bcd,/DIMENSIONS)
   rec={CUBE_DR}
   if n_elements(s) eq 3 then begin 
      if s[2] eq 2 then begin 
-        rec.BCD=ptr_new(bcd[*,*,0]) & rec.ERROR=ptr_new(bcd[*,*,1])
+        rec.BCD=ptr_new(bcd[*,*,0]) & rec.UNC=ptr_new(bcd[*,*,1])
      endif else self->Error,'Incorrect BCD dimensions: '+ $
                             strjoin(strtrim(size(bcd,/DIMENSIONS),2),",")
   endif else if n_elements(s) eq 2 then begin 
      rec.BCD=ptr_new(bcd)
   endif
-  if size(error,/N_DIMENSIONS) eq 2 then rec.ERROR=ptr_new(error)
+  
+  if n_elements(bmask) ne 0 then rec.BMASK=ptr_new(bmask)
+  
+  if size(unc,/N_DIMENSIONS) eq 2 then rec.UNC=ptr_new(unc)
   if size(header,/TYPE) ne 7 then self->Error,'Header must be a string array'
   rec.header=ptr_new(header)
   
@@ -2587,19 +2691,18 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,ERROR=err,EXP=exp, $
      rec.RQST_POS=[sxpar(header,'RA_RQST'),sxpar(header,'DEC_RQST')]
   if n_elements(pa_rqst) ne 0 then rec.PA_RQST=pa_rqst else begin 
      rec.PA_RQST=sxpar(header,'PA_RQST')
-     self.cal->TransformCoords,self.module,[0,0],rec.PA_RQST,void,new_pa
+     self.cal->TransformBoreSightCoords,self.module,[0,0], $
+                                        rec.PA_RQST,void,new_pa
      rec.PA_RQST=new_pa          ; transform requested PA to the slit
   endelse 
   
   ;; RQST is SIRTF-field-centric, not FOV-centric.
-  ;;PA_RQST =     253.118909799814 / [deg] Requested pos. angle of axis 2 (E of N)  
-  
+
   ;; Achieved (reconstructed) positions/PA
   if n_elements(rpos) eq 3 then rec.REC_POS=rpos else $
      rec.REC_POS=[sxpar(header,'RA_SLT'),sxpar(header,'DEC_SLT')]
   if n_elements(pa) ne 0 then rec.PA=pa else $
      rec.PA=sxpar(header,'PA_SLT')
-  
   
   ;; Date/Obstime
   ;; J2000 Ephemeris time at MJD5144.5
@@ -2638,30 +2741,35 @@ pro CubeProj::Send,RECORD=record,CUBE=cube
      return
   endif
   nrec=n_elements(record) 
-  if nrec ne 0 then begin 
-     stackQ=nrec gt 1
-     rec=(*self.DR)[record]
-     if stackQ then begin 
-        bcd=*rec[0].BCD
-        err=*rec[0].BCD
-        for i=1,nrec-1 do begin 
-           bcd=bcd+*rec[i].BCD
-           err=err+*rec[i].BCD
-        endfor 
-        bcd_p=(self.STACK=ptr_new(bcd,/NO_COPY))
-        err_p=(self.STACK_ERR=ptr_new(err,/NO_COPY))
-        str=string(FORMAT='(%"%s <Stack of %d recs>")', $
-                   self->ProjectName(),nrec)
-     endif else begin 
-        bcd_p=rec.BCD
-        err_p=rec.ERROR
-        str=string(FORMAT='(%"%s <%s> %s")', $
-                   self->ProjectName(),rec.ID, $
-                   irs_fov(rec.FOVID,/SHORT_NAME))
-     endelse 
-     self->MsgSend,{CUBEPROJ_RECORD, $
-                    self,str,self.MODULE,self.ORDER,self.CAL,bcd_p,err_p}
-  endif
+  if nrec eq 0 then return
+  
+  stackQ=nrec gt 1
+  rec=(*self.DR)[record]
+  if stackQ then begin 
+     bcd=*rec[0].BCD
+     unc=*rec[0].UNC^2          ;add in quadrature
+     mask=*rec[0].BMASK
+     for i=1,nrec-1 do begin 
+        bcd+=*rec[i].BCD
+        unc+=*rec[i].UNC^2
+        mask AND=*rec[0].BMASK  ;accumulate mask flags
+     endfor 
+     bcd_p=ptr_new(bcd,/NO_COPY)
+     unc_p=ptr_new(sqrt(unc))
+     mask_p=ptr_new(mask,/NO_COPY)
+     str=string(FORMAT='(%"%s <Stack of %d recs>")', $
+                self->ProjectName(),nrec)
+  endif else begin 
+     bcd_p=rec.BCD
+     unc_p=rec.UNC
+     mask_p=rec.BMASK
+     str=string(FORMAT='(%"%s <%s> %s")', $
+                self->ProjectName(),rec.ID, $
+                irs_fov(rec.FOVID,/SHORT_NAME))
+  endelse 
+  self->MsgSend,{CUBEPROJ_RECORD, $
+                 self,str,self.MODULE,self.ORDER,self.CAL, $
+                 bcd_p,unc_p,mask_p}
 end
 
 ;=============================================================================
@@ -2685,7 +2793,7 @@ end
 pro CubeProj::Cleanup
   heap_free,self.DR
   heap_free,self.MERGE
-  ptr_free,self.APERTURE,self.CUBE,self.ERR,self.wInfo
+  ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC,self.wInfo
   if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->ObjMsg::Cleanup
 end
@@ -2731,12 +2839,10 @@ pro CubeProj__define
                                 ; for each order
      DR: ptr_new(), $           ;All the BCD's: pointer to list of
                                 ; data record structures of type CUBE_DR
-     STACK:ptr_new(),$          ;A summed BCD stack
-     STACK_ERR:ptr_new(),$      ;A summed BCD Error stack
      ACCOUNTS_VALID: 0b,$       ; are the account records valid?
                                 ;  0: no, 1:yes, 2:size changed
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
-     ERR:  ptr_new(),$          ;a pointer to the nxmxl error cube
+     CUBE_UNC:  ptr_new(),$     ;a pointer to the nxmxl uncertainty cube
      CUBE_SIZE: [0L,0L,0L],$    ;the size of the cube, (n,m,l)
      CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
      NSTEP:[0L,0L], $           ;parallel (col), perpendicular (row) steps
@@ -2790,7 +2896,7 @@ pro CubeProj__define
        PA_RQST: 0.0D, $         ;Requestion PA of slit (+w?)
        AORKEY: 0L, $            ;the AOR ID KEY
        BCD: ptr_new(), $        ;the BCD
-       ERROR:ptr_new(), $       ;the BCD's error image
+       UNC:ptr_new(), $         ;the BCD's uncertainty image
        BMASK:ptr_new(), $       ;the BCD's BMASK image
        EXP: 0L, $               ;the exposure number in the mapping sequence
        CYCLE:0L, $              ;the cycle number at this position
@@ -2821,7 +2927,7 @@ pro CubeProj__define
 
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
-       CAL:obj_new(),BCD:ptr_new(),ERROR:ptr_new()}
+       CAL:obj_new(),BCD:ptr_new(),UNC:ptr_new(),BMASK:ptr_new()}
 end
 
 
