@@ -9,10 +9,11 @@
 ;=============================================================================
 pro tvSwitcher::Message, msg
   self->tvPlug_lite::Message,msg,TYPE=type
-  if type eq 'TVPLUG_ON_OFF' then begin 
+  if type eq 'TVPLUG_ON_OFF' || type eq 'TVPLUG_ENABLE_DISABLE' then begin 
      wh=where(self->GetMsgObjs() eq msg.Object,cnt)
      ;; If we're managing it, set the button (if there is one)
      if cnt gt 0 then self->SetButton,msg.Object,wh[0] else return
+     if type eq 'TVPLUG_ENABLE_DISABLE' then return
      ;; If an exclusive has reported turning on, turn all others off
      if (*self.MsgList)[wh[0]].Exclusive AND msg.Status then $
         self->Exclusive,wh[0]
@@ -133,7 +134,7 @@ pro tvSwitcher::Start
   
   for i=0,no-1 do begin 
      ;; Signup for on and off messages from these plug-ins
-     objs[i]->MsgSignup,self,/TVPLUG_ON_OFF
+     objs[i]->MsgSignup,self,/TVPLUG_ON_OFF,/TVPLUG_ENABLE_DISABLE
      ;; Add the button
      ic=objs[i]->Icon()
      if NOT keyword_set(ic) then continue
