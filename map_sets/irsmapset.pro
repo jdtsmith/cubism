@@ -126,16 +126,8 @@ pro IRSMapSet::SaveMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
                        FILE=file,WAVELENGTH_CONVERT=wc,FORCE=force, $
                        CANCELED=cncld
   cncld=0
-  if n_elements(name) eq 0 then $
-     name=getinp('Map Set Name:',TITLE='Map Sets', /MODAL, $
-                 PARENT_GROUP=self->ReportWidget())
-  
-  if name eq '' then begin 
-     cncld=1
-     return
-  endif 
-  
   if n_elements(file) eq 0 then begin 
+     if n_elements(name) eq 0 then name='untitled'
      file=strlowcase(name)
      file=strjoin(strsplit(file,/EXTRACT),'_')+'.map' ;no spaces
      xf,file,/RECENT,FILTERLIST=['*.map','*.*','*'],/SAVEFILE, $
@@ -145,7 +137,13 @@ pro IRSMapSet::SaveMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
         cncld=1
         return
      endif 
+     name=strmid(file,strpos(file,path_sep(),/REVERSE_SEARCH)+1)
+     name=strmid(name,0,strpos(name,'.',/REVERSE_SEARCH))
+  endif else if n_elements(name) eq 0 then begin 
+     name=strmid(file,strpos(file,path_sep(),/REVERSE_SEARCH)+1)
+     name=strmid(name,0,strpos(file,'.',/REVERSE_SEARCH))
   endif 
+  
   openw,lun,file,/GET_LUN,ERROR=err
   if err then self->Error,["Cannot write file: "+file+':',!ERROR_STATE.MSG]
 
@@ -177,10 +175,13 @@ pro IRSMapSet::SaveMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
 
 end
 
+;=============================================================================
+;  LoadSets - Load Map Sets from file
+;=============================================================================
 pro IRSMapSet::LoadSets,files
   if n_elements(files) eq 0 then begin 
      xf,files,/RECENT,FILTERLIST=['*.map','*.*','*'],/MULTIPLE, $
-        TITLE='Lad Map Sets',/NO_SHOW_ALL,SELECT=0, $
+        TITLE='Load Map Sets',/NO_SHOW_ALL,SELECT=0, $
         START=file,PARENT_GROUP=self->ReportWidget()
   endif 
   if size(files,/TYPE) ne 7 then return ;cancelled  
