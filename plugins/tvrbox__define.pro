@@ -127,6 +127,11 @@ pro tvRBox::Message, msg
            self->DrawCorners
         endif 
      end
+     
+     'TVDRAW_RESIZE': begin 
+        self.oDraw->GetProperty,WINSIZE=ws
+        self.winsize=ws
+     end 
   endcase 
 end
 
@@ -134,7 +139,7 @@ pro tvRBox::On
   self->tvPlug::On
   ;; Button and redraw events, no more snapshots
   self.oDraw->MsgSignup,self,/DRAW_BUTTON,/DRAW_KEY,/TVDRAW_POSTDRAW, $
-                        /TVDRAW_REDRAW,TVDRAW_SNAPSHOT=0
+                        /TVDRAW_REDRAW,TVDRAW_SNAPSHOT=0,/TVDRAW_RESIZE
   usersym,*self.ux,*self.uy,/FILL
   if self->IsDrawn() then begin 
      if self.corners then self.oDraw->ReDraw,/SNAPSHOT ;remove bg corners
@@ -150,7 +155,8 @@ pro tvRBox::Off
      self->EraseBox
      if self.corners then begin 
         ;;corner redraws and new images needed
-        self.oDraw->MsgSignup,self,/NONE,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT
+        self.oDraw->MsgSignup,self,/NONE,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT, $
+                              /TVDRAW_RESIZE
         self.oDraw->ReDraw,/SNAPSHOT ;get our corners into the background
      endif 
   endif 
@@ -405,8 +411,8 @@ function tvRBox::Init,oDraw,COLOR=color,THICK=thick,HANDLE=handle,KNOBRAD=kr,$
   self.boxflag=-1               ;default to undrawn
   
   ;; get properties from the Draw object, mirror them here.
-  self.oDraw->GetProperty,WINSIZE=winsize,PIXWIN=pixwin
-  self.pixwin=pixwin & self.winsize=winsize
+  self.oDraw->GetProperty,WINSIZE=winsize
+  self.winsize=winsize
   if n_elements(thick) eq 0 then $
      self.thick=1.5*float(max(winsize))/256<2 else self.thick=thick
   self->MsgSetup,'BOX'
@@ -441,7 +447,6 @@ pro tvRBox__define
           ux:ptr_new(), $       ;the x vector for the usersym 
           uy:ptr_new(), $       ;the y vector for the usersym
           zoom:0.0, $           ;the saved zoom state of the display
-          pixwin:0, $           ;the pixwin id of the window 
           buttondwn:0b, $       ;whether a button is yet pressed
           winsize:[0,0]}        ;size of the window displayed in
   st={BOX,flag:0}
