@@ -374,7 +374,7 @@ pro CubeProj::ShowEvent, ev
                     title,                               $
                     thiscube,                            $
                     '                                 ', $
-                    '       JD Smith -- 2002-2004     ', $
+                    '       JD Smith -- 2002-2005     ', $
                     '  http://sings.stsci.edu/cubism  ', $
                     '*********************************']
      end
@@ -517,6 +517,13 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).MUST_ACCT= $
      widget_button(cube,VALUE='Reset Accounts',UVALUE='resetaccounts')
   ;;-------------
+  wMustCube=[wMustCube, $
+             widget_button(cube,VALUE='View Cube...',UVALUE='viewcube', $
+                           /SEPARATOR) , $
+             widget_button(cube,VALUE='View Cube (new viewer)...', $
+                           UVALUE='viewcube-new')]
+  
+  ;;-------------
   b1=widget_button(cube,VALUE='Show Cube Build Feedback',UVALUE='feedback', $
                    /CHECKED_MENU,/SEPARATOR) 
   widget_control, b1, /SET_BUTTON
@@ -536,44 +543,44 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      widget_button(cube,value='Set Cube Build Order...',UVALUE='setorder', $
                    /SEPARATOR)
   wMustCal=widget_button(cube,VALUE='Aperture(s)...',UVALUE='showaperture')
-  ;;-------------
+  
+  
+  ;;*** Background menu    
+  background=widget_button(mbar,VALUE='Background',/MENU)
   wMustSel=[wMustSel,$
-            widget_button(cube,VALUE='Set Background from Rec(s)...', $
-                          UVALUE='setbackgroundfromrecs',/SEPARATOR)]
-  but=widget_button(cube,VALUE='Load Background Rec(s)...', $
+            widget_button(background,VALUE='Set Background from Rec(s)...', $
+                          UVALUE='setbackgroundfromrecs')]
+  but=widget_button(background,VALUE='Load Background Rec(s)...', $
                     UVALUE='loadbackgroundlist')
   (*self.wInfo).MUST_BACK= $
-     [widget_button(cube,VALUE='Save Background Rec(s)...', $
+     [widget_button(background,VALUE='Save Background Rec(s)...', $
                     UVALUE='savebackgroundlist'), $
-      widget_button(cube,VALUE='View Background...', $
+      widget_button(background,VALUE='View Background...', $
                     UVALUE='viewbackground'), $
-      widget_button(cube,VALUE='View Background (new viewer)..', $
+      widget_button(background,VALUE='View Background (new viewer)..', $
                     UVALUE='viewbackground-new'), $
-      widget_button(cube,VALUE='Remove Background', $
+      widget_button(background,VALUE='Remove Background', $
                     UVALUE='remove-background')]
   ;;-------------
-  but=widget_button(cube,VALUE='Load Background Spectrum...',/SEPARATOR, $
-                    UVALUE='readbackgroundfromfile')
+  but=widget_button(background,VALUE='Load Background Spectrum...', $
+                    /SEPARATOR, UVALUE='readbackgroundfromfile')
   (*self.wInfo).MUST_BG_SP= $
-     widget_button(cube,VALUE='Remove Background Spectrum...', $
+     widget_button(background,VALUE='Remove Background Spectrum...', $
                    UVALUE='remove-bg-sp')
   
-  ;;-------------
-  but=widget_button(cube,VALUE='Load Bad Pixels...',UVALUE='loadbadpixels', $
+  
+  ;;*** BadPix menu  
+  badpix=widget_button(mbar,VALUE='BadPix',/MENU) 
+  
+  but=widget_button(badpix,VALUE='Load Bad Pixels...',UVALUE='loadbadpixels', $
                     /SEPARATOR)
-  but=widget_button(cube,VALUE='Load and Append Bad Pixels...', $
+  but=widget_button(badpix,VALUE='Load and Append Bad Pixels...', $
                     UVALUE='load-append-badpixels')
   (*self.wInfo).MUST_BPL= $
-     [widget_button(cube,VALUE='Save Bad Pixels...',UVALUE='savebadpixels') , $
-      widget_button(cube,VALUE='Clear Bad Pixel List', $
+     [widget_button(badpix,VALUE='Save Bad Pixels...',UVALUE='savebadpixels'),$
+      widget_button(badpix,VALUE='Clear Bad Pixel List', $
                     UVALUE='clearbadpixels')]
   
-  ;;-------------
-  wMustCube=[wMustCube, $
-             widget_button(cube,VALUE='View Cube...',UVALUE='viewcube', $
-                           /SEPARATOR) , $
-             widget_button(cube,VALUE='View Cube (new viewer)...', $
-                           UVALUE='viewcube-new')]
   
   ;;*** Info menu
   info=widget_button(mbar,VALUE='Info',/MENU)
@@ -1328,6 +1335,8 @@ pro CubeProj::Revert
   msav=self.MsgList             ;to the transmogrified self.
   nsav=self.ProjectName
   self.wInfo=ptr_new() & self.MsgList=ptr_new() ;the detachment
+  crsav=self.cuberecs & self.cuberecs=ptr_new()
+  
   oldchange=self.Changed
   self.Changed=0b               ;to ensure we won't try to save ourselves 
   self.ProjectName=''           ;avoid name conflict with new self.
@@ -1339,9 +1348,7 @@ pro CubeProj::Revert
   if rerr eq 0 then begin 
      ;; Self has been overwritten by restore.... kill our old self.
      
-     obj_destroy,oldself        ;kill our old self, except wInfo and MsgList
-     self.wInfo=wsav            ;attach wInfo and MsgList to new self
-     self.MsgList=msav
+     obj_destroy,oldself        ;kill our old self, except detached
      self->UpdateList           ;just in case things changed
      
      ;; let any widgets know about the change in self!
@@ -1352,9 +1359,13 @@ pro CubeProj::Revert
      self->UpdateTitle
   endif else begin              ;failed, restore the old self
      self.ProjectName=nsav
-     self.wInfo=wsav & self.MsgList=msav 
      self.Changed=oldchange
   endelse 
+  
+  self.wInfo=wsav 
+  self.MsgList=msav 
+  self.cuberecs=crsav
+
   self->UpdateAll
   self->Send,/UPDATE
 end
@@ -1613,7 +1624,7 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
   endif 
      
   
-  ;; Do we need a new viewer, spawn one if neessary
+  ;; Do we need a new viewer, spawn one if necessary
   if keyword_set(new_viewer) || ~pvcr then begin 
      if pvcr then self->MsgListRemove,*self.cuberecs
      cubeview,CUBE=self,RECORD=rec ;have them sign up for our messages     
@@ -1766,12 +1777,16 @@ pro CubeProj::ReadBackgroundFromFile,file
      if size(file,/TYPE) ne 7 then return
   endif 
      
-  ;; XXX Read with IRS_Spectrum
-  rdfloat,file,lam,bg,SKIPLINE=1
+  oSP=obj_new('IRS_Spectrum')
+  oSP->Read,rff
+  oSP->GetProperty,WAVE_UNITS=wu,FLUX_UNITS=fu,WAVELENGTH=wav,SPECTRUM=sp
+  obj_destroy,oSP
   
-  ;; XXX Ensure in e/s/pix units!!!
+  if ~stregex(fu,'e/s/(pix|px)') then $
+     self->Error,'1D Background Spectrum must be un-fluxed (e/s/pix)'
+  
   ptr_free,self.BG_SP
-  self.BG_SP=ptr_new(transpose([[lam],[bg]]))
+  self.BG_SP=ptr_new(transpose([[wav],[sp]]))
   self.BG_SP_FILE=file
 end
 
@@ -1869,12 +1884,16 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
   str=[str,' Using IRS Calib object: '+(this.CAL_FILE?this.cal_file:"(none)")+ $
        " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
   
-  str=[str,' Background: '+ $
-       ((this.BACK_DATE ne 0.0d)? $
-        (strtrim(ptr_valid(this.BACK_EXP_LIST)? $
-                 n_elements(*this.BACK_EXP_LIST):0,2)+' records, '+ $
-         jul2date(this.BACK_DATE)): $
-        (this.BG_SP_FILE?'1D from file: '+this.BG_SP_FILE:"none"))]
+  if this.BACK_DATE ne 0.0d then begin 
+     str=[str,' Background:'+ $
+          (strtrim(ptr_valid(this.BACK_EXP_LIST)? $
+                   n_elements(*this.BACK_EXP_LIST):0,2)+' records, '+ $
+           jul2date(this.BACK_DATE))]
+  endif else if this.BG_SP_FILE then begin 
+     str=[str,' Background: 1D from file: ','   '+this.BG_SP_FILE]
+  endif else begin 
+     str=[str,' Background: none']
+  endelse 
   
   str=[str,' FLUXCON: '+(this.FLUXCON?"Yes":"No")]
   str=[str,'    SLCF: '+(this.SLCF?"Yes":"No")]
@@ -2300,7 +2319,7 @@ end
 
 ;=============================================================================
 ;  Flux - Flux a spectrum using FLUXCON, SLCF, and effective pixel
-;         solid angle, if requested.  Input is in e/s/pixel.
+;         solid angle, if requested.  Input is in e/s/pix.
 ;=============================================================================
 pro CubeProj::Flux,lam,sp,ORDER=ord,SLCF=do_slcf
   if n_elements(ord) eq 0 then ord=self.ORDER
@@ -2321,7 +2340,7 @@ end
 
 ;=============================================================================
 ;  FluxImage - Make an image to match the BCD which contains, for each
-;              pixel, the factor to convert it from e/s/pixel to
+;              pixel, the factor to convert it from e/s/pix to
 ;              Jy/pixel by multiplication. (fluxed=instrumental*fluximage).
 ;              Also modify by the SLCF, if requested.  Also include
 ;              the factor to map from Jy per pixel to MJy per
@@ -3259,12 +3278,10 @@ pro CubeProj::BuildCube
   ptr_free,self.CUBE,self.CUBE_UNC
   self.CUBE=ptr_new(cube/areas)
   
-  if ptr_valid(self.BG_SP) then begin 
-     ;; Assume they are in correct units
+  if ptr_valid(self.BG_SP) && ~ptr_valid(self.BACKGROUND) then begin 
+     ;; Assume they are in correct non-fluxed units (e/s/pix)
      bg=interpol((*self.BG_SP)[1,*],(*self.BG_SP)[0,*],*self.wavelength)
-     
      if self.fluxcon then self->Flux,*self.wavelength,bg,SLCF=self.slcf
-
      bg=rebin(reform(bg,1,1,n_elements(*self.wavelength)), $
               size(*self.CUBE,/DIMENSIONS),/SAMPLE)
      *self.CUBE-=bg
