@@ -47,7 +47,6 @@ pro tvSwitcher::Event, ev
   type=tag_names(ev,/STRUCTURE_NAME)
   if type eq 'WIDGET_TRACKING' then begin 
      if ev.enter eq 1 then begin 
-        self.oDraw->Focus
         if obj_valid(self.oColor) then self.oColor->SetColors,/NO_REDRAW
      endif 
      return
@@ -56,6 +55,7 @@ pro tvSwitcher::Event, ev
   ;; Button Clicked
   widget_control, ev.id,get_uvalue=which
   self->Toggle,which
+  self.oDraw->Focus
 end
 
 ;=============================================================================
