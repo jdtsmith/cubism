@@ -1,0 +1,19 @@
+\order flux
+\comment Identifier = b0_fluxcon.tbl
+\comment Flux conversion factors and order tuning coefficients.
+\comment Version 0.0 09/18/02 PM    Defined this file.
+\comment         0.1 01/03/03 PM    Short Low key wavelengths and passbands, adjusted to avoid A0V H lines.
+\comment         0.2 03/15/03 PM    Set flux conversions, assuming saturation at 20 Jy corresponding to 2.99 e- in 6 sec, all orders, factor 2 uncertain.
+\comment         1.0 12/20/03 PM    Updated all coefficents based on SV data, in 5th order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR7891 map (7868928), optimized for the two nods, and tested against point sources flux calibrator HR8585 (7869440) and representative science cases.
+\comment                             ***** NOTE:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with aperture extraction widths
+\comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S8.9/031213/b0_psf_fov.tbl.  Wavsamp dependence is  /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b0_wavsamp.tbl   
+\comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b0_flatfield.fits.
+\comment History
+\character channelID = 0
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |               |            |               |           |               |           |               |           |              |
+ 1            13.0500           0.80000           0.00000         0.00000        0.00000          0.00000         7599.07       1.2450e+02     0.9957237     0.00000      -0.0306030     0.00000       0.0062415      0.00000       0.0049952     0.00000        0.0004135      0.00000     -0.0000190     0.00000
+ 2             6.5500           0.40000           0.00000         0.00000        0.00000          0.00000         3854.77       1.2450e+03     0.9987236     0.00000      -0.0178148     0.00000       0.0379134      0.00000       0.0137479     0.00000       -0.0254747      0.00000     -0.0088425     0.00000
+ 3             7.9600           0.22000           0.00000         0.00000        0.00000          0.00000         5685.39       1.2450e+03     1.0006658     0.00000      -0.0242644     0.00000      -0.3525990      0.00000       0.5883071     0.00000        1.0286973      0.00000     -1.5325626     0.00000
