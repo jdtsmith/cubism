@@ -297,10 +297,12 @@ pro CubeProj::ShowEvent, ev
         @cubism_version
         if self.version ne '' AND cubism_version ne self.version then $
            thiscube=' (Curr. Cube: '+self.version+')' else thiscube=''
-        
+        title='CUBISM '+cubism_version
+        tlen=strlen(title) & left=(33-tlen)/2
+        title=strjoin(replicate(' ',left>0)) + title
         self->Info,TITLE='About Cube Project', $
                    ['*********************************', $
-                    '       CUBISM '+cubism_version,     $
+                    title,                               $
                     thiscube,                            $
                     '                                 ', $
                     '       JD Smith -- 2002,2003     ', $
@@ -914,7 +916,7 @@ end
 ;=============================================================================
 pro CubeProj::UpdateColumnHeads
   if NOT self->IsWidget() then return
-  flags=bytarr(9)
+  flags=bytarr(10)
   flags[self.sort]=1b
   if (*self.wInfo).which_list eq 0 then flags=flags[0:5] else $
      flags=[flags[0],flags[6:*]]
