@@ -252,7 +252,7 @@ function cw_xf_event, ev
    widget_control, stash, get_uvalue=state, /NO_COPY
    catch, err
    if err ne 0 then begin 
-      message,!ERR_STRING, PARENT_GROUP=ev.top
+      message,!ERR_STRING,/CONTINUE
       WIDGET_CONTROL, stash, SET_UVALUE=state, /NO_COPY ;reset state
       return,0
    endif    
