@@ -1178,6 +1178,7 @@ pro CubeProj::UpdateList,CLEAR_SELECTION=cs
   if NOT self->IsWidget() then return
   widget_control, (*self.wInfo).Base,UPDATE=0
   if keyword_set(cs) then begin 
+     widget_control, (*self.wInfo).SList, set_value=self->List()
      self->SetListSelect,-1
   endif else begin 
      ls=self->CurrentSelect()<(self->N_Records()-1)
@@ -2049,6 +2050,7 @@ end
 ;               the orders get interpolated, and where.
 ;=============================================================================
 pro CubeProj::MergeSetup,ORDS=ords
+  self->LoadCalib
   ords=self->BuildOrders()
   ptr_free,self.WAVELENGTH
   heap_free,self.MERGE
@@ -2072,10 +2074,10 @@ pro CubeProj::MergeSetup,ORDS=ords
                                 wave:ptr_new(), to:ptr_new(), $
                                 frac:ptr_new()},nord))
   
+  last_over=0
+  wh_clear_sav=-1
   nap=n_elements(*self.APERTURE)
-  wave_zero=lonarr(nord) & wh_clear_sav=-1
-;  plot,[18,40],[0,11],/NODATA,/XSTYLE,/YSTYLE
-;  oplot,wave1,replicate(1,n_elements(wave1))
+  wave_zero=lonarr(nord)
   for ord=1L,nord-1L do begin
      ;; Work with previous, overlap with current order
      wave2=(self.cal->GetWAVSAMP(self.MODULE,ords[ord],/PIXEL_BASED, $
@@ -2085,23 +2087,12 @@ pro CubeProj::MergeSetup,ORDS=ords
      nw1=n_elements(wave1) & nw2=n_elements(wave2) 
      min_wav1=min(wave1,max=max_wav1)
      min_wav2=min(wave2,max=max_wav2)
-;     oplot,wave2,replicate(ord+1,nw2) 
-     
-     ;; Are we prepending or appending?
-     prepend=(min_wav2 lt min_wav1 AND wave2[0] lt wave2[1]) OR $
-             (min_wav1 lt min_wav2 AND wave1[0] gt wave1[1])
      
      ;; No overlap case... just concatenate
-     if min_wav2 gt max_wav1 OR max_wav2 lt min_wav1 then begin 
-        if prepend then begin   ; prepend new
-           if n_elements(wave) gt 0 then wave=[wave1,wave] else wave=wave1
-           wave_zero[0:ord-1]=wave_zero[0:ord-1]+n_elements(wave2) 
-        endif else begin        ; append new
-           if n_elements(wave) gt 0 then wave=[wave,wave1] else wave=wave1
-           wave_zero[ord]=wave_zero[ord-1]+n_elements(wave1) 
-        endelse
-        wh_clear_sav=-1
-;        plots,wave(wave_zero[ord]),!Y.CRANGE,/DATA        
+     if min_wav2 gt max_wav1 then begin 
+        if n_elements(wave) gt 0 then wave=[wave,wave1] else wave=wave1
+        wave_zero[ord]=wave_zero[ord-1]+n_elements(wave1) 
+        last_over=0 & wh_clear_sav=-1
         continue
      endif
   
@@ -2112,67 +2103,45 @@ pro CubeProj::MergeSetup,ORDS=ords
                     wave2 lt max_wav1,cnt2,COMPLEMENT=wh_clear2)
      
      ;; Use as the primary wavelength set whichever had more samples in
-     ;; the original overlap region
-     if cnt1 ge cnt2 then begin  ; merge in the 2nd's waves.
+     ;; the overlap region
+     if cnt1 ge cnt2 then begin ; merge in the 2nd order's overlap.
+;        print,FORMAT='(%"Merge 2nd orders overlap: %2d->%2d")',ords[ord-1],$
+;              ords[ord]
         use_wav=wave1[wh_over1]
         lose_wav=wave2[wh_over2]
         self->AddMergeRec,ord,wh_over2,lose_wav
-;        oplot,use_wav,replicate(ord,n_elements(use_wav)),COLOR=3
-;        oplot,lose_wav,replicate(ord+1,n_elements(lose_wav)),COLOR=2
-        ;;if max_wav1 gt max_wav2 then lead_in=1
-        ;;if min_wav1 lt min_wav2 then lead_out=1
-     endif else begin           ;merge in the 1st's remaining waves.
+     endif else begin           ;merge in the 1st order's overlap
+;        print,FORMAT='(%"Merge 1st orders overlap: %2d->%2d")',ords[ord-1],$
+;              ords[ord]
         use_wav=wave2[wh_over2]
-        lose_wav=wave1[wh_over1]
-        ;; This order's working segment may have already been
-        ;; truncated on the last round
-        self->AddMergeRec,ord-1,wh_clear_sav[0] ne -1? $
+        lose_wav=wave1[wh_over1] ;offset into *current* wave1, may have been
+                                ; (likely ) trimmed 
+        self->AddMergeRec,ord-1, wh_clear_sav[0] ne -1? $
                           wh_clear_sav[wh_over1]:wh_over1,lose_wav
-;        oplot,use_wav,replicate(ord+1,n_elements(use_wav)),COLOR=3
-;        oplot,lose_wav,replicate(ord,n_elements(lose_wav)),COLOR=2
-        ;if max_wav2 gt max_wav1 then lead_in=1
-        ;if min_wav2 lt min_wav1 then lead_out=1
      endelse
      
-;     nu=n_elements(use_wav)
-;     nl=n_elements(lose_wav)
-;      if lead_in then begin      ;ease into the new sampling at the short end
-;         nlead=2>(nu-1)<3
-;         su=sort(use_wav)
-;         sl=sort(lose_wav)
-;         delta_use=mean(use_wav[su[1:nlead-1]]-use_wav[su[0:nlead-2]])
-;         delta_lose
-        
-;      endif
-;      if lead_out then begin     ;ease into the new sampling at the long end
-;     endif 
-
-     ;; Excise the overlapping chunks from both, leaving the clear chunks
-     if wh_clear1[0] ne -1 then wave1=wave1[wh_clear1] 
+     ;; accumulate offset information
+     wave_zero[ord]=wave_zero[ord-1]+last_over
+     if wh_clear1[0] ne -1 then wave_zero[ord]+=n_elements(wh_clear1) 
+     ;; must correct via overlap count to ensure alignment
+     wave_zero[ord]+=(cnt1-cnt2)>0
+     
+;     print,FORMAT='(%"Offsetting %2d to %3d with len1: %3d (%3d/%3d)")', $
+;           ords[ord],wave_zero[ord], n_elements(wh_clear1),cnt1,cnt2
+     
+     ;; Excise the overlapping chunks from both sides
+     if wh_clear1[0] ne -1 then wave1=wave1[wh_clear1]
      if wh_clear2[0] ne -1 then wave2=wave2[wh_clear2]
      
-     ;; Concat wave1 and overlap onto wavelengths: either
-     ;;  [wave1 use_wav wave2] or [wave2 use_wav wave1], depending on order
-     if prepend then begin
-        if n_elements(wave) gt 0 then wave=[use_wav,wave1,wave] $
-        else wave=[use_wav,wave1]
-        wave_zero[0:ord-1]=wave_zero[0:ord-1]+n_elements(wave2) ;shift down
-     endif else begin           
-        ;; the next will go at the use_wave boundary
-        wave_zero[ord]=n_elements(wave)+n_elements(wave1) 
-        ;; appending new set of wavelengths
-        if n_elements(wave) gt 0 then wave=[wave,wave1,use_wav] $
-        else wave=[wave1,use_wav]
-;        oplot,wave,replicate(ord+.25,n_elements(wave))
-     endelse
-;     plots,wave[wave_zero[ord]],!Y.CRANGE,/DATA
+     ;; Concat wave1 and overlap into full wavelength
+     if n_elements(wave) gt 0 then wave=[wave,wave1,use_wav] $
+     else wave=[wave1,use_wav]
+     
+     last_over=cnt2 & wh_clear_sav=wh_clear2
      wave1=wave2
-     wh_clear_sav=wh_clear2
   endfor
   ;; graft on the last remaining piece
-  if prepend then wave=[wave2,wave] else wave=[wave,wave2]
-;  oplot,wave,replicate(ord+.25,n_elements(wave))
-  
+  wave=[wave,wave2]
   (*self.MERGE).offset=wave_zero
   
   ;; Finish the merge vector, computing plane split fractions and
@@ -2186,11 +2155,12 @@ pro CubeProj::MergeSetup,ORDS=ords
      map_loc=value_locate(wave,merge_wave)
      if NOT array_equal(map_loc ne -1,1b) then $
         self->Error,'Cannot merge non-bracketing wavelengths'
-     ;;  the fraction in the first bin (independent of up-going vs. down-going)
+     ;;  the fraction in the first bin (independent of up- vs. down-going)
      (*self.MERGE)[ord].frac=ptr_new((wave[map_loc+1]-merge_wave)/ $
                                      (wave[map_loc+1]-wave[map_loc]))
      (*self.MERGE)[ord].to=ptr_new(map_loc,/NO_COPY)
   endfor 
+;  print,'Total wavelength: ',n_elements(wave) 
   self.WAVELENGTH=ptr_new(wave,/NO_COPY)
 end
 
@@ -2215,7 +2185,7 @@ pro CubeProj::MergeAccount,dr,order,account
   dr_acct=(*self.DR)[dr].ACCOUNT
   if NOT ptr_valid(mrec.planes) then begin 
      ;;no merging needed, just append list to account, suitably offset
-     account.cube_plane=account.cube_plane+mrec.offset
+     account.cube_plane+=mrec.offset
      if NOT ptr_valid(dr_acct) then begin 
         (*self.DR)[dr].ACCOUNT=ptr_new(account,/NO_COPY)
      endif else *dr_acct=[*dr_acct,account]
@@ -2223,33 +2193,34 @@ pro CubeProj::MergeAccount,dr,order,account
   endif
   
   ;; Split planes in the merge vector among two planes.
-  planes=*mrec.planes           ;order's account planes to be manipulated
+  split_planes=*mrec.planes     ;order's account planes to be manipulated
   to_planes=*mrec.to            ; ... and sent to these cube planes
   fracs=*mrec.frac              ; ... with these fractions
   
   ;; First group the account records by the cube plane(s) they affect
-  minp=min(planes,MAX=maxp)
-  h=histogram(account.cube_plane,MIN=minp,MAX=maxp,REVERSE_INDICES=ri_cube)
+  minsp=min(split_planes,MAX=maxsp)
+  h=histogram(account.cube_plane,MIN=minsp,MAX=maxsp,REVERSE_INDICES=ri_cube)
   
   ;; Offset all to the correct cube plane (some we'll change soon)
-  account.cube_plane=account.cube_plane+mrec.offset
+  account.cube_plane+=mrec.offset
   
-  ;; which plane bins hold planes which must be split and interpolated?
-  wh=where(h gt 0 and histogram(planes,REVERSE_INDICES=ri_order) gt 0,cnt) 
+  ;; which account records hold planes which must be split and interpolated?
+  wh=where(h gt 0 AND $
+           histogram(split_planes,REVERSE_INDICES=ri_order) gt 0,cnt) 
   for i=0,cnt-1 do begin 
      if ri_cube[wh[i]+1] eq ri_cube[wh[i]] then continue
      to_plane=to_planes[ri_order[ri_order[wh[i]]]]
      frac=fracs[ri_order[ri_order[wh[i]]]]
      
-     ;; Split the elements on affected planes
+     ;; Split the elements which are on affected planes
      changers=ri_cube[ri_cube[wh[i]]:ri_cube[wh[i]+1]-1]
      split_acc=account[changers]
      
      ;; The first plane (gets frac worth)
-     account[changers].area=account[changers].area*frac
+     account[changers].area*=frac
      account[changers].CUBE_PLANE=to_plane
      ;; The next plane (gets 1-frac worth)
-     split_acc.area=split_acc.area*(1.-frac)
+     split_acc.area*=(1.-frac)
      split_acc.CUBE_PLANE=to_plane+1
      
      if n_elements(new_acc) eq 0 then new_acc=[split_acc] else $
@@ -2413,8 +2384,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
            endif
            
            if self.feedback && j eq 1L && self->Showing() then $
-              self->SetListSelect,i
-           
+              self->SetListSelect,i,/NO_PRESERVE_TOP
               
            ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
@@ -3013,7 +2983,7 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   endfor 
   
   if show then begin 
-     self->SetListSelect,where(show_vec)
+     self->SetListSelect,where(show_vec),/NO_PRESERVE_TOP
      self->UpdateButtons
   endif 
   return,n_elements(all) ne 0?all:-1
@@ -3210,7 +3180,7 @@ pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii,BOX=box,RA=ra,DEC=dec, $
      if n_elements(box) gt 0 then $
         printf,un,FORMAT='(%"# Extracted %dx%d [%d,%d] -> [%d,%d]")',delta, $
                box
-     if n_elements(ff) eq 0 then $
+     if n_elements(ff) ne 0 then $
         printf,un,FORMAT='(%"# Extracted with region from %s")', $
                file_basename(ff)
      if n_elements(ra) ne 0 then begin 
@@ -3941,14 +3911,12 @@ pro CubeProj__define
          MUST_UNRESTORED:0L}    ;must have unrestored data
   
   ;; Messages: send a cube, record, etc.
-  
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),BCD:ptr_new(),UNC:ptr_new(),BMASK:ptr_new(), $
        BACKGROUND:ptr_new()}    ;XXX UNC
   msg={CUBEPROJ_UPDATE, CUBE:obj_new(), BAD_PIXEL_LIST:ptr_new(), NEW_CUBE:0b}
 end
-
 
 ;; Switch to properties-based config using IDLitComponent
 ;; Properties:
