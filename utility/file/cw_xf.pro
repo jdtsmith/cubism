@@ -205,36 +205,36 @@ end
 ;      xf_strip = strips off last filename or directory in file or
 ;      directory path
 ;=========================================================================
-function  xf_strip, filepath
+function  xf_strip, file_path
    common cw_xfblock, sep ,recfile
 
-   len=strlen(filepath)
+   len=strlen(file_path)
    ;; Lop off final '/' (or '\')i.e. for directories
-   if (len gt 1) and strmid(filepath,len-1,1) eq sep then $
-    filepath=strmid(filepath,0,len-1)
+   if (len gt 1) and strmid(file_path,len-1,1) eq sep then $
+    file_path=strmid(file_path,0,len-1)
    i=0
    while (i ne -1) do begin
       store=i
-      i=strpos(filepath,sep,i)
+      i=strpos(file_path,sep,i)
       if (i ne -1) then i=i+1
    endwhile
 
-   return, strmid(filepath,0,store)
+   return, strmid(file_path,0,store)
 end
 
 ;=====================================================================
 ;	xf_getdir = Get directory from supplied filename
-;	 (use current directory if filepath has no directory part)
+;	 (use current directory if file_path has no directory part)
 ;=====================================================================
-function xf_getdir,filepath,FULL=full
+function xf_getdir,file_path,FULL=full
    common cw_xfblock, sep, recfile
    ;; Parse out the directory from the supplied value
-   dir=xf_strip(filepath)
+   dir=xf_strip(file_path)
    if dir eq '' then begin      ;value entered is only filename
       cd, curr=dir
       if dir ne sep then dir=dir+sep
-      full=dir+filepath
-   endif else full=filepath
+      full=filepath(ROOT=dir,file_path)
+   endif else full=file_path
    return, dir
 end
 
@@ -258,7 +258,7 @@ function cw_xf_event, ev
        begin
          widget_control,ev.id,get_value=dir
          dir=dir(0)
-         if strmid(dir,0,1) eq '~' then dir=getenv('HOME')+strmid(dir,1,199)
+         if strmid(dir,0,1) eq '~' then dir=getenv('HOME')+strmid(dir,1)
          len=strlen(dir)
          if strmid(dir,len-1,1) ne sep then dir=dir+sep
          widget_control,ev.id,set_val=dir
@@ -415,9 +415,9 @@ function cw_xf_event, ev
             list=widget_info(state.files_id,/LIST_SELECT) 
             nli=n_elements(list) 
             if nli eq 1 then begin 
-               selection=path[0]+filelist[list[0]] 
+               selection=filepath(ROOT_DIR=path[0],filelist[list[0]])
             endif else begin 
-               selection=replicate(path,nli)+filelist[list]
+               selection=filepath(ROOT_DIR=path[0],filelist[list])
             endelse 
          endelse 
          
@@ -580,9 +580,9 @@ function cw_xf_event, ev
                if list[0] ne -1 then begin 
                   nli=n_elements(list) 
                   if nli eq 1 then begin 
-                     selection=path[0]+filelist[list[0]] 
+                     selection=filepath(ROOT=path[0],filelist[list[0]])
                   endif else begin 
-                     selection=replicate(path,nli)+filelist[list]
+                     selection=filepath(ROOT=path[0],filelist[list])
                   endelse 
                endif else selection=''
             endelse 
