@@ -9,9 +9,9 @@ pro CubeRec::Message, msg
         self->Extract
         return
      end 
-     'TVDRAW_POSTDRAW': begin 
-;        self->Extract
-        return
+
+     'CUBEVIEWSPEC_SAVE': begin 
+        self->Extract,/SAVE,ASCII=msg.ascii
      end
      'CUBEVIEWSPEC_FULL': begin 
         self.cur_wav=value_locate(*self.wavelength,msg.wavelength)>0
@@ -21,7 +21,7 @@ pro CubeRec::Message, msg
         self->EnsureCube
         widget_control, self.wStackInfo,SET_VALUE=msg.info
         ptr_free,self.stack
-        if msg.name then $
+        if msg.name then $      ; A named map
            self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name)) $
         else begin 
            if ptr_valid(msg.background) then begin
@@ -79,7 +79,6 @@ pro CubeRec::On
   end
   self->tvPlug::On
   self.Box->On
-  self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW
 end
 
 ;=============================================================================
@@ -88,9 +87,6 @@ end
 pro CubeRec::Off,_EXTRA=e
   self->tvPlug::Off,_EXTRA=e
   self.Box->Off
-  ;; If we have no box ever drawn, shut down the message flow
-  if self.box->IsDrawn() eq 0b then $
-     self.oDraw->MsgSignup,self,TVDRAW_POSTDRAW=0
 end
 
 pro CubeRec::Reset,_EXTRA=e
@@ -152,7 +148,12 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
      if NOT self->Enabled() then self->Enable
      self.oAper->Off,/RESET
   endelse 
-
+  
+  ;; The menu button
+  if widget_info(self.wMapSaveBut,/VALID_ID) then begin 
+     widget_control, self.wMapSaveBut,SENSITIVE=self.mode eq 1
+  endif 
+  
   ;;Switch the base showing
   others=where(indgen(3) ne self.mode)
   for i=0,1 do widget_control, self.wBase[others[i]],MAP=0
@@ -237,28 +238,37 @@ end
 ;  StackEvent - Handle event from the Stack base
 ;=============================================================================
 pro CubeRec::StackEvent,ev
-  ;; Only the "Full" button: If he's listening, the CubeSpec will send
-  ;; out a message which we will hear about, and toggle mode
+  ;; Only the "Full" button press.  If he's listening, the CubeSpec
+  ;; will send out a message which we will hear about, and toggle mode
   ;; accordingly.  If he's not listening, we're in Full mode already
   ;; anyway (and hence won't be here).
   self->MsgSend,{CUBEREC_FULL,(*self.wavelength)[self.cur_wav]}
 end
 
 ;=============================================================================
+;  SaveMapEvent -  Save the showing image as a map
+;=============================================================================
+pro CubeRec::SaveMapEvent,ev
+  self->CheckCube
+  if NOT ptr_valid(self.STACK) then self->Error,'No valid map to save.'
+  self.cube->SaveMap,*self.STACK
+end
+
+;=============================================================================
 ;  Extract -  Extract a spectrum from box
 ;=============================================================================
-pro CubeRec::Extract
-  if NOT obj_valid(self.cube) then $
-     self->Error,'Cube no longer valid (perhaps it was destroyed?).'
+pro CubeRec::Extract,_EXTRA=e
+  self->CheckCube
   self.Box->Getlrtb,l,r,t,b
-  spec=self.cube->Extract([l,b],[r,t])
+  spec=self.cube->Extract([l,b],[r,t],_EXTRA=e)
   info=string(FORMAT='(%"Extracted from %s, [%d,%d]->[%d,%d]")', $
               self.cube->ProjectName(),l,b,r,t)
   if obj_valid(self.oView) eq 0 then begin 
      self.oView=obj_new('CubeViewSpec',PARENT_GROUP=self.wBase[0])
      ;; Set up messages between us
      self->MsgSignup,self.oView,/CUBEREC_SPEC,/CUBEREC_FULL
-     self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL
+     self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL, $
+                           /CUBEVIEWSPEC_SAVE
      if self.mode eq 0 then $
         self->MsgSend, $
            {CUBEREC_FULL,self.cur_wav,(*self.wavelength)[self.cur_wav]}
@@ -266,6 +276,14 @@ pro CubeRec::Extract
   sp=ptr_new(spec,/NO_COPY)
   self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,sp}
   ptr_free,sp
+end
+
+;=============================================================================
+;  CheckCube - Make sure our cube is still alive
+;=============================================================================
+pro CubeRec::CheckCube
+  if NOT obj_valid(self.cube) then $
+     self->Error,'Cube no longer valid (perhaps it was destroyed?).'
 end
 
 ;=============================================================================
@@ -279,7 +297,8 @@ end
 ;=============================================================================
 ;  Init -  Initialize the CubeRec object
 ;=============================================================================
-function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,_EXTRA=e
+function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
+                       _EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
 
   if n_elements(color) eq 0 then color=!D.TABLE_SIZE-1
@@ -332,6 +351,12 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,_EXTRA=e
   self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
   self->MsgSetup,['CUBEREC_SPEC','CUBEREC_FULL','CUBEREC_UPDATE']
   self->MsgSignup,self.oAper,/CUBEREC_UPDATE ;give them our message
+  
+  ;; Add a menu element if allowed
+  if n_elements(menu) ne 0 then if widget_info(menu,/valid_id) then $
+     self.wMapSaveBut=widget_button(menu,value='Save Map as FITS...', $
+                                    SENSITIVE=0,EVENT_PRO='cuberec_event', $
+                                    UVALUE={self:self,method:'SaveMapEvent'})
   return,1
 end
 
@@ -364,7 +389,8 @@ pro CubeRec__define
       wPlayStop:0L,$            ;the play/stop button
       wSlider:0L, $             ;play speed slider
       wStackInfo:0L, $          ;The stack information
-      wFull:0L}                 ;The "Switch to Full mode" button
+      wFull:0L,$                ;The "Switch to Full mode" button
+      wMapSaveBut:0L}           ;The Save Map as FITS button
   
   ;; The messages we send
   
