@@ -387,7 +387,7 @@ pro CubeProj::ShowEvent, ev
         title='CUBISM '+cubism_version
         tlen=strlen(title) & left=(33-tlen)/2
         title=strjoin(replicate(' ',left>0)) + title
-        self->Info,TITLE='About Cube Project', $
+        self->Info,TITLE='About Cubism', $
                    ['*********************************', $
                     title,                               $
                     thiscube,                            $
@@ -585,7 +585,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      [wMustCal, $
       widget_button(info,VALUE='Calibration Set Details...',UVALUE='calset')]
   ;;-------------
-  b1=widget_button(info,VALUE='About CubeProject',UVALUE='about',/SEPARATOR)
+  b1=widget_button(info,VALUE='About Cubism',UVALUE='about',/SEPARATOR)
   
   b=widget_base(base,/COLUMN,/BASE_ALIGN_LEFT,SPACE=1,YPAD=0,XPAD=0) 
   headbase=widget_base(b,/ROW,XPAD=0,YPAD=0,/FRAME,SPACE=1) 
