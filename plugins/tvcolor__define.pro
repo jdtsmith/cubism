@@ -379,8 +379,10 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
      sm_loadct,get_names=colors,/SILENT
      
      ;; which of the full list to keep
-     if n_elements(uc) eq 0 then uc=indgen(n_elements(colors))  else $
-        uc=uniq(0> uc < (n_elements(colors)-1))
+     if n_elements(uc) eq 0 then uc=indgen(n_elements(colors))  else begin 
+        uc=0>uc<(n_elements(colors)-1)
+        uc=uc[uniq(uc,sort(uc))]
+     endelse 
      
      if keyword_set(menu) then begin ; button -- in a menu
         self.wColtabl=widget_button(menu,value='Colormaps', $
