@@ -67,10 +67,10 @@
 ;##############################################################################
 common irs_dir, irs_calib_dir
 if n_elements(irs_calib_dir) eq 0 then begin
-   irs_dir_marker
-   source=(routine_info('irs_dir_marker',/SOURCE)).PATH
+   irs_calib_dir_marker
+   source=(routine_info('irs_calib_dir_marker',/SOURCE)).PATH
    dir=strmid(source,0,strpos(source,path_sep(),/REVERSE_SEARCH))
    if NOT file_test(dir,/DIRECTORY) then $
-      message,'Cannot locate IRS calibration data directory.'
+      message,'Cannot locate IRS calibration data directory: '+dir
    irs_calib_dir=dir
 endif
