@@ -11,7 +11,7 @@ pro irs_bmask,mask,PMASK=pm,SATURATED=sat,NO_FLAT=nf,NO_PLANES=np, $
   if arg_present(cs) then begin 
      cs=(flags[14]?'*':'.')+(flags[10]?'S':'.')+(flags[8]?'F':'.')+ $
         (flags[12]?'1':(flags[13]?'0':'.'))
-     if (mask AND 39679) gt 0 then begin 
+     if (mask AND 35583UL) gt 0 then begin 
         flags[[14,10,8,13,12]]=0b
         cs+="["+strjoin(strtrim(where(flags),2),",")+"]"
      endif 
