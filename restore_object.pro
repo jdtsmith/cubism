@@ -15,7 +15,7 @@
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    obj=restore_object(file,class,[OTHER_CLASSES=])
+;    obj=restore_object(file,class,[OTHER_CLASSES=,VAR_NAME=])
 ;
 ; INPUT PARAMETERS:
 ;
@@ -30,6 +30,10 @@
 ;       if the object to be restored contains somewhere in its data
 ;       hierarchy other objects of different classes whose class
 ;       definitions will be saved and restored in the same way.
+;
+;    VAR_NAME: The string name of a variable saved in the object.  If
+;       passed, the object saved with this variable name (e.g. "self")
+;       will be returned, in preference to any others.
 ;       
 ; OUTPUTS:
 ;
@@ -58,12 +62,25 @@
 ;    in the class__define procedure alongside the class, this problem
 ;    will also be circumvented using RESTORE_OBJECT.
 ;
+;    Object which contain other object will be written and read from
+;    the save file in the order they were created, not in hierarchical
+;    order.  To ensure the correct object is returned, we check the
+;    class.  However, if an object contains another object of the
+;    *same* class (e.g. an IDL_Container containing another
+;    IDL_Container somewhere), you need to resolve the ambiguity by
+;    providing the variable name under which the topmost object was
+;    saved (e.g. "self").  This is always safe, if more cumbersome.
+;
 ; EXAMPLE:
 ;
 ;    obj=restore_object('/path/to/object.sav','MyClass')
+;    ;; Get the object saved as "self", and pre-compile some helper classes.
+;    obj2=restore_object('/path/to/object2.sav','ThisClass',VAR_NAME='self',$
+;                        OTHER_CLASSES=['HelperClass','OtherHelperClass'])
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2002-09-04 (J.D. Smith): Added VAR_NAME, and test for correct class.
 ;    2002-08-18 (J.D. Smith): Wrapped class_define call in a catch.
 ;    2001-12-12 (J.D. Smith): Written.  Based directly on my routine
 ;       `resolve_obj' from SCOREX project code.  
@@ -115,9 +132,18 @@ end
 ;       restore_object - Restore the object from file, resolving it's
 ;                        class and methods beforehand.
 ;=============================================================================
-function restore_object,file,class, OTHER_CLASSES=oc
+function restore_object,file,class, OTHER_CLASSES=oc, VAR_NAME=var
   restore_object_resolve,class, ri
   if n_elements(oc) eq 0 then restore_object_resolve,oc,ri
   restore,file,/RELAXED_STRUCTURE_ASSIGNMENT,RESTORED_OBJECTS=objs
-  return,objs[0]
+  if n_elements(var) ne 0 then begin 
+     tmp=execute('thisvar='+var)
+     wh=where(objs eq thisvar,cnt)
+     if cnt gt 0 then return,objs[wh[0]]
+  endif 
+  ;; Just find the first object of the correct class
+  c=strupcase(class)
+  for i=0,n_elements(objs)-1 do $
+     if obj_class(objs[i]) eq c then return, objs[i]
+  return,-1
 end
