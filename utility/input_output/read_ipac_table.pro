@@ -100,7 +100,7 @@ function read_ipac_table,file, HEADERS=hdr
         firstchar = strmid(line,0,1)
         case firstchar of
            '\': begin 
-              parts=strtrim(stregex(line,'^\\([a-z ]+)(.*)$', $
+              parts=strtrim(stregex(line,'^\\([a-z ]+=?)(.*)$', $
                                     /SUBEXPR,/EXTRACT),2)
               if n_elements(hdr) eq 0 then begin 
                  hdr=create_struct(parts[1],parts[2]) 
