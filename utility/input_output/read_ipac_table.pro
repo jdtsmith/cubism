@@ -53,7 +53,8 @@
 ;    print,foo
 ;
 ; MODIFICATION HISTORY:
-;    
+;
+;    2003-11-24 (J.D. Smith): Better header keyword value treatment.
 ;    2002-08-27 (J.D. Smith): Initial migration from SMART codebase.
 ;    2001-12-02 (J.D. Smith): Written, based very loosely on routine
 ;        "read_tbl" provided by Jim Ingalls of the SSC.
@@ -119,7 +120,8 @@ function read_ipac_table,file, HEADERS=hdr_in
                  got_tags=1
                  break
               endif 
-              if got_type then break ; skip anything beyond the type field
+              ;; skip any other headers beyond the type field
+              if got_type then break 
               for i=0,n_elements(tok)-1 do begin 
                  case 1 of 
                     strmatch(tok[i],'r*'): begin 
