@@ -116,7 +116,7 @@ pro tvPhot::Phot
      self.cntrd=self.cntrd+[l,b] ;in real terms
      skyrad=self.Rad+self.SkyWidth
      low=(floor(self.cntrd-SkyRad)-1)>0
-     high=(ceil(self.cntrd+SkyRad)+1)<(size(*io,/DIMENSIONS))[0]
+     high=(ceil(self.cntrd+SkyRad)+1)<(size(*io,/DIMENSIONS)-1)[0]
      take=(*io)[low[0]:high[0],low[1]:high[1]]
      photcen=self.cntrd-low     ;in terms of our new take
      phot=sm_ap_phot(take,photcen,ERROR=err,SKYRADIUS=SkyRad, $
