@@ -23,6 +23,7 @@
 ; KEYWORD PARAMETERS:
 ;       SWITCHAB        return instead the indices of A that are in
 ;                       (exist) in B
+;       PRESERVE_ORDER  Preserve the ordering of elements in B.
 ;
 ; OUTPUTS:
 ;       Index into B of elements found in vector A.  If no
@@ -72,7 +73,7 @@
 ;                       JD Smith  8/2/02
 ;                               Changed keywords to match where_not_array.
 ;-
-FUNCTION where_array,A,B,cnt,SWITCHAB=iA_in_B
+FUNCTION where_array,A,B,cnt,SWITCHAB=iA_in_B,PRESERVE_ORDER=po
 
 ; Check for: correct number of parameters
 ;                        that A and B have each only 1 dimension
@@ -104,8 +105,13 @@ FUNCTION where_array,A,B,cnt,SWITCHAB=iA_in_B
    if cnt eq 0 then return,-1
    
 ; normally (without keyword), return index of B that exist in A
-   if keyword_set(iA_in_B) then return, I mod Na
-   return,I/Na
-
+   if keyword_set(po) then begin 
+      x=I mod Na
+      y=I/Na
+      if keyword_set(iA_in_B) then return,x[sort(y)] else return,y[sort(x)]
+   endif else begin 
+      if keyword_set(iA_in_B) then return, I mod Na
+      return,I/Na
+   endelse 
 END
 
