@@ -58,12 +58,15 @@ pro CubeRec::Message, msg
         self.bcd_BMASK=msg.BMASK
         self.bcd_BACKGROUND=msg.BACKGROUND
         self.module=msg.MODULE
+        ptr_free,self.rec_set
+        if ptr_valid(msg.RECORD_SET) then self.rec_set=ptr_new(*msg.RECORD_SET)
         self->SwitchMode,/BCD
      end
      'CUBEPROJ_CUBE': begin 
         widget_control, self.wInfoLine,set_value='Cube: '+msg.INFO
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
         self.cube=msg.CUBE
+        ptr_free,self.rec_set
         if ptr_valid(self.wavelength) then $
            cur_wav=(*self.wavelength)[self.cur_wav]
         self.wavelength=msg.WAVELENGTH
@@ -76,10 +79,16 @@ pro CubeRec::Message, msg
         ;; we don't want BCD mode, but either cube mode will do
         self->SwitchMode,BCD=0
      end
-     'CUBEPROJ_UPDATE': if msg.new_cube && self.mode ge 2 then return
+     'CUBEPROJ_UPDATE': begin 
+        if msg.new_cube && self.mode ge 2 then return
+        self.cube=msg.cube
+        self.cube->GetProperty,WAVELENGTH=wl,/POINTER
+        self.wavelength=wl
+     end 
   endcase
   self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
-                 self.cur_wav, self.cube,self.MODULE,self.bcd,self.bcd_BMASK}
+                 self.cur_wav, self.cube,self.MODULE,self.bcd,self.bcd_BMASK, $
+                 self.rec_set}
   self->UpdateView
 end
 
@@ -401,7 +410,7 @@ end
 ;=============================================================================
 pro CubeRec::Cleanup
   ;; bcd,wavelength, and error are not ours to destroy
-  ptr_free,self.STACK           
+  ptr_free,self.STACK,self.rec_set
   self->tvPlug::Cleanup
 end
 
@@ -518,6 +527,7 @@ pro CubeRec__define
       BCD_BACKGROUND:ptr_new(),$ ;the BCD background to subtract (togglable)
       MODULE:'',$               ;the modules for cube or rec
       cal:obj_new(), $          ;the calibration object
+      rec_set:ptr_new(), $      ;the record(s) being examined
       ;; Widget ID's
       wBase:lonarr(3), $        ;the three bases (full/stack/rec)
       wInfoLine:0L, $           ;A line of info on the current stack/etc.
@@ -543,5 +553,6 @@ pro CubeRec__define
   
   ;; General update
   msg={CUBEREC_UPDATE,BCD_MODE:0,FULL_MODE:0,PLANE:0L, $
-       CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new()}
+       CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new(), $
+       RECORD_SET: ptr_new()}
 end
