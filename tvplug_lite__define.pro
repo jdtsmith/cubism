@@ -36,25 +36,34 @@ end
 
 ;=============================================================================
 ;  Icon - Return the Icon (2d bitmap array) to use for this plug-in,
-;         if appropriate, otherwise just the class name. To be
-;         overridden.
+;         if appropriate.  To be overridden.
 ;=============================================================================
 function tvPlug_lite::Icon
-  ;; If no icon, use the class name instead
-  return,obj_class(self)
+  ;; Default is no icon
+  return,''                     ; obj_class(self)
 end
 
 ;=============================================================================
 ;  Description - A concise description of the plug-in, suitable for a
-;                tool-tip or menu item.  Defaults to the class name
-;                (minus a leading "tv" if present).
+;                tool-tip or menu item.  To be overridden. Defaults to
+;                nothing.
 ;=============================================================================
 function tvPlug_lite::Description
-  descrip=obj_class(self)
-  if strpos('tv',obj_class(self)) eq 0 then descrip=strmid(descrip,2)
-  return,descrip
+;  descrip=obj_class(self)
+;  if strpos('tv',obj_class(self)) eq 0 then descrip=strmid(descrip,2)
+  return,''                     ;descrip
 end
 
+;=============================================================================
+;  Start - Just a dummy in case a plug-in needs no Startup.
+;=============================================================================
+pro tvPlug_lite::Start
+  return
+end
+
+;=============================================================================
+;  Cleanup
+;=============================================================================
 pro tvPlug_lite::Cleanup
   obj_destroy,self.oDraw        ;all for one, and one for all
   self->ObjMsg::Cleanup         ;cleans up all subscribers
@@ -67,7 +76,7 @@ function tvPlug_lite::Init,oDraw, _EXTRA=e
   if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up
   if Obj_Isa(oDraw,'tvDraw') then begin 
      self.oDraw=oDraw 
-     oDraw->Plug,self           ;register us as a plug-in with oDraw...
+     self.oDraw->Plug,self           ;register us as a plug-in with oDraw...
   endif else begin 
      message,string('Specified object is not valid tvDraw object: ',oDraw)
      return,0
