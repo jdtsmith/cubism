@@ -1,19 +1,20 @@
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
-;	Message. Only redraw, and box messages.
+;	Message. Only snapshot, and box messages.
 ;=============================================================================
 pro tvPhot::Message, msg
   self->tvPlug::Message,msg,TYPE=type
+  print,type
   ;; Whenever we get a POST, or a BOX, a redraw will let us change up
   switch type of
      'BOX':
      'TVDRAW_POSTDRAW': begin 
         self->Erase             ;Erase in case the centroid is gone
-        self->Phot              ;calculate and display photometry     
+        self->Phot              
         break
      end
-     'TVDRAW_REDRAW': self->Draw ;Draw us to make sure our circles are visible
+     'TVDRAW_SNAPSHOT': self->Draw ;Make sure our circles are visible
   endswitch
 end 
 
@@ -28,7 +29,7 @@ pro tvPhot::On
   end
   self->tvPlug::On
   self.box->On
-  self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW
+  self.oDraw->MsgSignup,self,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT
   if widget_info(self.wBase,/VALID_ID) eq 0 then self->wShow
 end
 
@@ -36,12 +37,11 @@ end
 ;       Off - Our box will stay around for us
 ;=============================================================================
 pro tvPhot::Off
-  self->tvPlug::Off
   if widget_info(self.wBase,/VALID_ID) then self->wDestroy
   self.box->Off
-  self->Erase
   self.oDraw->MsgSignup,self,/NONE
-  self.oDraw->SendRedraw
+  if self->On() then self.oDraw->Redraw,/SNAPSHOT
+  self->tvPlug::Off
 end
 
 function tvPhot::Icon
@@ -239,8 +239,8 @@ pro tvPhot::Phot
                    self.cntrd,'***','***') 
   endelse 
   widget_control, self.wSlab, set_value=str
-  ;; note we do not draw here, since our box sends a redraw just after the
-  ;; BOX message.
+  erase
+  self.oDraw->ReDraw,/SNAPSHOT
 end
 
 pro tvphot_event, ev
@@ -250,8 +250,6 @@ end
 
 pro tvPhot::Event,ev
   widget_control, ev.handler, get_value=tmp
-  
-  
   new=0
   if ev.handler eq self.wRad then begin 
      catch, converr
