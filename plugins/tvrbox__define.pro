@@ -132,7 +132,6 @@ end
 pro tvRBox::Off 
   self->tvPlug::Off
   self->Update,/ALL_OFF
-  print,'BOX OFF: ',self.boxflag
   if self->IsDrawn() then begin 
      self->EraseBox
      if self.corners then begin 
@@ -148,7 +147,7 @@ pro tvRBox::Reset
   if self->IsDrawn() then begin ;we had a box to begin with
      self->tvPlug::Off
      self->EraseBox
-     self.boxflag=-1b
+     self.boxflag=-1
      self.oDraw->SendRedraw
   endif 
 end
