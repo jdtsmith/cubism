@@ -18,8 +18,7 @@
 ;
 ;    IRS_DIR: Included through file irs_dir.pro.  Defines the path
 ;       location of the IRS calibration directory.  This path,
-;       irs_calib_dir, is auto-defined if it doesn't yet exist, and
-;       is taken from the !PATH.
+;       irs_calib_dir, is auto-defined if it doesn't yet exist.
 ;
 ; METHODS:
 ;
@@ -62,7 +61,7 @@
 ;	INPUT PARAMETERS:
 ;
 ;          module: Module for which to return the calibration record.
-;            Can either be a string (LH,LL,SH,SL) or integer (0-3,
+;            Can either be a string (SL,SH,LL,LH) or integer (0-3,
 ;            respectively).
 ;
 ;          order: Integer order of the module for which a calibration
@@ -111,8 +110,8 @@
 ;          	
 ;       CALLING SEQUENCE:
 ;
-;          wavsamp=obj->GetWAVSAMP(module,order, [aperture, /FULL,
-;                                  /NO_CACHE,/PIXEL_BASED,SLIT_WIDTH=])
+;          wavsamp=obj->GetWAVSAMP(module,order, [APERTURE=, /FULL,
+;                                  /NO_CACHE,/PIXEL_BASED,PR_WIDTH=])
 ;          
 ;	INPUT PARAMETERS:
 ;
@@ -123,9 +122,9 @@
 ;            record is requested.  Order "3" represents the bonus in
 ;            both SL and LL.z
 ;
-;	OPTIONAL INPUT PARAMETERS:
-;	
-;          aperture: A structure of the form:
+;       INPUT KEYWORD PARAMETERS:
+;
+;          APERTURE: A structure of the form:
 ;          
 ;               {IRS_APERTURE, $
 ;                  Low: [low_top,low_bottom], $
@@ -135,11 +134,9 @@
 ;             low and high aperture boundaries.  See
 ;             IRS_Aperture__define for more information.  If
 ;             omitted, the full slit aperture is used.
-;             
-;       INPUT KEYWORD PARAMETERS:
 ;
-;          FULL: If set, the full slit aperture is used, and any
-;             passed aperture argument is ignored.
+;          FULL: If set, the full slit aperture is used no matter what
+;             (if anything) is passed in APERTURE.
 ;
 ;          NO_CACHE: If set, any WAVSAMP created will not be cached.
 ;             This helps save memory.
@@ -148,8 +145,8 @@
 ;             no full, pixel-based WAVSAMP yet exists from which to
 ;             generate this WAVSAMP, it is created.
 ;
-;          SLIT_WIDTH: If PIXEL_BASE is set, the width of the PR in
-;             pixels.  Defaults to 1.  
+;          PR_WIDTH: If PIXEL_BASE is set, the width of the PR in
+;cal=             pixels.  Defaults to 1.
 ;
 ;          SAVE_POLYGONS: If set, the polygons created by clipping to
 ;             the detector grid are saved.  These polygons are
@@ -264,16 +261,13 @@
 ;    expanded as appropriate.  Each individual IRS_Calib object
 ;    represents a particular snapshot of calibration data, which may
 ;    evolve over time, due to updates in the calibration thread, or
-;    changing instrumental preformance.  This object can be loaded and
-;    saved into a IRS_Proj (either fully, or just by name), in order
-;    to associate a given extraction with the calibration parameters
-;    associated with it.
+;    changing instrumental performance.  
 ;
 ;    See the document "SSC--ISC: Interface Products and Conventions"
 ;    for further description of these calibration products.
 ;
 ;    IRS_Calib object sets can be found in the subdirectory
-;    calib/sets.
+;    calib/sets in this distribution.
 ;
 ; INHERITANCE TREE:
 ;
@@ -326,8 +320,7 @@
 ;       GetProperty - Get object properties
 ;=============================================================================
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
-                              WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
-                              DETSIZE=sz
+                            WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx
   rec=self->GetRecord(module,order,/MUST_EXIST)
   if size(rec,/TYPE) ne 8 then return
   if arg_present(name) then name=self.name
@@ -335,7 +328,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   if arg_present(wc) then  wc=rec.WAV_CENTER
   if arg_present(wmn) then  wmn=rec.WAV_MIN
   if arg_present(wmx) then  wmx=rec.WAV_MAX
-  if arg_present(sz) then sz=self.detsize[*,0>module<5]
+  ;;if arg_present(sz) then sz=self.detsize[*,0>irs_module(module)<5]
 end
 
 ;=============================================================================
@@ -380,7 +373,7 @@ pro IRS_Calib::Print, modules, orders
         print,"          C:"+strjoin(string(FORMAT='(G10.3)',rec.C))
         print,"          SLIT_LENGTH:"+string(FORMAT='(G10.3)',rec.SLIT_LENGTH)
         print,"          WAVELENGTH(min,center,max):"+ $
-              string(FORMAT='(3G10.3)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX)
+              string(FORMAT='(3F10.4)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX)
         if nw gt 0 then $
            print,"          Apertures:" else $
            print,"       No Apertures"
@@ -393,7 +386,7 @@ pro IRS_Calib::Print, modules, orders
                       n_elements(*(*rec.WAVSAMPS)[k].PR))
            if ws.PIXEL_BASED ne 0.0 then $
               flags=[string(FORMAT='("pixel-based, width=",F5.3)', $
-                            ws.SLIT_WIDTH)]
+                            ws.PR_WIDTH)]
            if ptr_valid((*ws.PR)[0].POLYGONS) then $
               if flags[0] eq "" then flags=["with polygons"] else $
               flags=[flags,"with polygons"]
@@ -420,26 +413,26 @@ end
 ;=============================================================================
 ;       FindWAVSAMP - Find and return the indices of WAVSAMPs matching
 ;                     the criteria passed. The module and order
-;                     arguments are required, but if aperture is
+;                     arguments are required, but if APERTURE is
 ;                     omitted, and FULL isn't set, matching WAVSAMPs
 ;                     of any aperture in that record will be returned.
 ;                     The default is non-pixelbased, or, when
-;                     PIXEL_BASED is set, a SLIT_WIDTH of 1 (unless
+;                     PIXEL_BASED is set, a PR_WIDTH of 1 (unless
 ;                     specifically overriden).
 ;=============================================================================
-function IRS_Calib::FindWAVSAMP, module, order, aperture,COUNT=nsamp, $
-                                   PIXEL_BASED=pb, SLIT_WIDTH=width, $
-                                   FULL=full,RECORD=rec
+function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
+                                 COUNT=nsamp, PIXEL_BASED=pb, PR_WIDTH=width, $
+                                 FULL=full, RECORD=rec
   rec=self->GetRecord(module,order,/MUST_EXIST)
   if NOT ptr_valid(rec.WAVSAMPS) then begin 
      nsamp=0
      return,-1
   endif 
   
-  ;; Default to finding full aperture
+  ;; Find full aperture, specified aperture, or any aperture
   if keyword_set(full) then begin 
-     aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
-  endif 
+     aper={IRS_APERTURE,[0.,0.],[1.,1.]}
+  endif else if n_elements(aperture) ne 0 then aper=aperture
   
   if n_elements(pb) eq 0 then pb=0b ;default to non-pb
   if n_elements(width) eq 0 then width=1.0 ;Default to 1xn PRs
@@ -452,16 +445,16 @@ function IRS_Calib::FindWAVSAMP, module, order, aperture,COUNT=nsamp, $
   
   ;; Find WAVSAMP's with the right slit pixel width (if pixel-based)
   if keyword_set(pb) then begin 
-     wh_width=where(abs((*rec.WAVSAMPS)[wh_pix].SLIT_WIDTH-width) $
+     wh_width=where(abs((*rec.WAVSAMPS)[wh_pix].PR_WIDTH-width) $
                     le eps, nsamp)
      if nsamp gt 0 then wh_pix=wh_pix[wh_width] else return,-1
   endif 
   
   ;; Search for one of this type already cached with this aperture
-  if n_elements(aperture) ne 0 then begin 
+  if n_elements(aper) ne 0 then begin 
      aps=(*rec.WAVSAMPS)[wh_pix].Aperture
-     wh_ap=where(total(abs(aps.low-rebin(aperture.low,2,nsamp)) le eps AND $
-                       abs(aps.high-rebin(aperture.high,2,nsamp)) le eps,1) $
+     wh_ap=where(total(abs(aps.low- rebin(aper.low,2,nsamp))  le eps AND $
+                       abs(aps.high-rebin(aper.high,2,nsamp)) le eps,1) $
                  eq 2,nsamp)
      if nsamp gt 0 then wh_pix=wh_pix[wh_ap] else return,-1
   endif 
@@ -473,25 +466,20 @@ end
 ;=============================================================================
 ;       GetWAVSAMP - Generate a list of IRS_WAVSAMP_PSEUDORECT
 ;                    structures for a given module, order, and
-;                    aperture (or the FULL aperture), with the option
+;                    APERTURE (or the FULL aperture), with the option
 ;                    for PIXEL_BASED WAVSAMPs.  If a PIXEL_BASED clip
 ;                    is requested, and the FULL PIXEL_BASED WAVSAMP
 ;                    does not exist, it is created and cached.  The
 ;                    newly created WAVSAMP is cached for fast
 ;                    recovery, unless NO_CACHE is set.
 ;=============================================================================
-function IRS_Calib::GetWAVSAMP, module, order, aperture, FULL=full, $
-                                  PIXEL_BASED=pb,SLIT_WIDTH=width, $
-                                  NO_CACHE=nc,SAVE_POLYGONS=sp
+function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
+                                PIXEL_BASED=pb, PR_WIDTH=width, $
+                                NO_CACHE=nc, SAVE_POLYGONS=sp
   rec=self->GetRecord(module,order,/MUST_EXIST)
   
-  ;; Default to the full aperture, even if FULL isn't set
-  if n_elements(aperture) eq 0 then begin 
-     aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
-  endif 
-
-  ws=self->FindWAVSAMP(module,order,aperture,COUNT=nsamp,FULL=full, $
-                       PIXEL_BASED=pb, SLIT_WIDTH=width)
+  ws=self->FindWAVSAMP(module,order,APERTURE=aperture,COUNT=nsamp,FULL=full, $
+                       PIXEL_BASED=pb, PR_WIDTH=width)
   
   if keyword_set(sp) eq 0 then begin 
      ;; return the first match
@@ -500,13 +488,14 @@ function IRS_Calib::GetWAVSAMP, module, order, aperture, FULL=full, $
      for i=0,nsamp-1 do begin 
         ;; return the first match with saved polygons
         pr=(*rec.WAVSAMPS)[ws[i]].PR
-        if ptr_valid((*pr)[0].POLYGONS) then return,*(*rec.WAVSAMPS)[ws[i]]
+        if ptr_valid((*pr)[0].POLYGONS) then return,*(*rec.WAVSAMPS)[ws[i]].PR
      endfor 
-     self->FreeWAVSAMP,INDS=ws[0] ; free it, to create again later *with* POLYs
+     ;; free matches, to create one again later *with* POLYs
+     if nsamp gt 0 then self->FreeWAVSAMP,RECORD=rec,INDEX=ws
   endelse
   
   ;; No clip is cached for this aperture, so make a new one
-  ws=self->Clip(module,order,aperture,PIXEL_BASED=pb,SLIT_WIDTH=width, $
+  ws=self->Clip(module,order,APERTURE=aperture,PIXEL_BASED=pb,PR_WIDTH=width, $
                 SAVE_POLYGONS=sp,FULL=full,RECORD=rec)
   
   if size(ws,/TYPE) ne 8 then message,'Error clipping WAVSAMP.'
@@ -532,9 +521,8 @@ end
 ;                     specified with indices provided by optional
 ;                     keyword INDEX.
 ;=============================================================================
-pro IRS_Calib::FreeWAVSAMP, module, order, aperture,RECORD=rec,INDEX=inds, $
-                              ALL=all,_EXTRA=e
-
+pro IRS_Calib::FreeWAVSAMP, module, order, APERTURE=aperture,RECORD=rec, $
+                            INDEX=inds, ALL=all,_EXTRA=e
   if n_elements(rec) eq 0 then rec=self->GetRecord(module,order,/MUST_EXIST)
   if size(rec,/TYPE) ne 8 then return ;nothing to delete
   if NOT ptr_valid(rec.WAVSAMPS) then return
@@ -546,10 +534,11 @@ pro IRS_Calib::FreeWAVSAMP, module, order, aperture,RECORD=rec,INDEX=inds, $
      return
   endif
   
-  if n_elements(inds) eq 0 then $
-     inds=self->FindWAVSAMP(module,order,aperture,COUNT=nsamp,_EXTRA=e)
-  
-  if nsamp eq 0 then return
+  if n_elements(inds) eq 0 then begin 
+     inds=self->FindWAVSAMP(module,order,APERTURE=aperture,COUNT=nsamp, $
+                            _EXTRA=e)
+     if nsamp eq 0 then return
+  endif 
   
   ;; Normalize the indices
   mask=bytarr(n_elements(*rec.WAVSAMPS))
@@ -567,14 +556,14 @@ end
 ;       PixelWAVSAMP - Generate a list of pixel-based
 ;                      IRS_WAVSAMP_PSEUDORECT structures for a given
 ;                      module and order, for the FULL aperture, and
-;                      the SLIT_WIDTH indicated (defaults to 1).  In
+;                      the PR_WIDTH indicated (defaults to 1).  In
 ;                      contrast to the SSC-supplied WAVSAMP, these
 ;                      have fixed sample widths, and align as closely
 ;                      as possible to the pixel boundaries.  Set this
 ;                      new WAVSAMP into the record, and clip the full
 ;                      version.
 ;=============================================================================
-pro IRS_Calib::PixelWAVSAMP, module, order,SLIT_WIDTH=width, _EXTRA=e
+pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   rec=self->GetRecord(module,order,/MUST_EXIST)
   B=rec.B
   last=5
@@ -583,7 +572,8 @@ pro IRS_Calib::PixelWAVSAMP, module, order,SLIT_WIDTH=width, _EXTRA=e
   
   if n_elements(width) eq 0 then width=1.
   
-  y_cen=findgen(128)+0.5        ;Pre-specified PSEUDORECT y pixel centers
+  ;; Pre-specified PSEUDORECT y centers, one for each row
+  y_cen=findgen(128)+0.5        
   for i=0,n_elements(y_cen)-1 do begin 
      ;; Solve for the normalized wavelength roots, in normalized wavelength
      ;;   y=Sum(i=0,5){ B[i]*lam_norm^i }
@@ -662,7 +652,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,SLIT_WIDTH=width, _EXTRA=e
   ;; Construct the WAVSAMP and set it into the record
   ws={IRS_WAVSAMP}
   ws.PIXEL_BASED=1b
-  ws.SLIT_WIDTH=width
+  ws.PR_WIDTH=width
   ws.Aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
   ws.PR=ptr_new(prs,/NO_COPY)
   
@@ -687,7 +677,7 @@ end
 ;              If SAVE_POLYGONS is set, populate the POLYGONS field of
 ;              each WAVSAMP with the resultant clipped polygons.
 ;
-;              Apertures are specified in normalized coordinates, with
+;              APERTUREs are specified in normalized coordinates, with
 ;              0.0 at the "bottom" of the slit (at left), and 1.0 at
 ;              right in the "top" of the slit:
 ;
@@ -701,21 +691,23 @@ end
 ;                                          \-----------3
 ;                                          
 ;=============================================================================
-function IRS_Calib::Clip, module, order, aper,FULL=clip_full,PIXEL_BASED=pb,$
-                            SLIT_WIDTH=width,SAVE_POLYGONS=sp, RECORD=rec
+function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
+                          PIXEL_BASED=pb, PR_WIDTH=width, SAVE_POLYGONS=sp, $
+                          RECORD=rec
+  
+  if n_elements(aper) eq 0 then aper={IRS_APERTURE,[0.,0.],[1.,1.]}
   
   ;; Find the always-present full slit aperture wavsamp clip, i.e.
   ;;    low: [0.,0.] ; high: [1.,1.]
   wh_full=self->FindWAVSAMP(module,order,/FULL,PIXEL_BASED=pb, $
-                            SLIT_WIDTH=width, COUNT=cnt,RECORD=rec)
+                            PR_WIDTH=width, COUNT=cnt,RECORD=rec)
   if cnt eq 0 then begin 
      if keyword_set(pb) then begin ; Just make a full wavsamp for them
-        self->PixelWAVSAMP,module,order,SLIT_WIDTH=width
+        self->PixelWAVSAMP,module,order,PR_WIDTH=width
         wh_full=self->FindWAVSAMP(module,order,/FULL,PIXEL_BASED=pb, $
-                                  SLIT_WIDTH=width, COUNT=cnt,RECORD=rec)
+                                  PR_WIDTH=width, COUNT=cnt,RECORD=rec)
         if cnt eq 0 then message,'Failed to created PIXEL-BASED full WAVSAMP.'
-        ;; If they're after the full clip, it's just been done
-        if self->IsFullAperture(aper) then return,(*rec.WAVSAMPS)[wh_full[0]]
+        if self->IsFullAperture(aper) then clip_full=1
      endif else message,'Full slit aperture WAVSAMP not available ' + $
         '(check for WAVSAMP files).'
   endif
@@ -909,7 +901,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
         ;; A specific version was requested, check it
         if version[j] gt 0 then begin 
            cfile=base+strtrim(version[j],2)+'.tbl'
-           if file_test(filepath(ROOT=irs_calib_dir,SUBDIR=["data","ssc"], $
+           if file_test(filepath(ROOT=irs_calib_dir,SUBDIR="ssc", $
                                  cfile),/READ,/REGULAR) eq 0 then begin 
               message,'No such calibration file: '+cfile
               version[j]=0
@@ -919,7 +911,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
         ;; Find all versions for this module
         if version[j] eq 0 then begin 
            cal_files=findfile(COUNT=fcnt,filepath(ROOT=irs_calib_dir, $
-                                       SUBDIR=["data","ssc"],base+"*.tbl"))
+                                       SUBDIR="ssc",base+"*.tbl"))
            if fcnt eq 0 then begin 
               message, /CONTINUE,"Didn't find any calibration files: " +$
                        cals[j]+' for '+irs_module(md,/TO_NAME)
@@ -1073,7 +1065,6 @@ pro IRS_Calib__define
          WAVSAMP_FILE:strarr(5), $ ;the names of the wavsamp files (WAVSAMP)
          TILT_FILE:strarr(5),$  ;the name of the tilt file (c)
          ORDER_FILE:strarr(5), $ ;the name of the ordfind output file (a & b)
-         detsize:intarr(2,5),  $ ;the x,y size of the detector
          cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
                                 ;for each module: 0:LH, 1:LL, 2:SH, 3:SL
   
@@ -1098,7 +1089,7 @@ pro IRS_Calib__define
   ;; (generated directly from the A,B and C coefficients).
   st={IRS_WAVSAMP, $
       PIXEL_BASED: 0b, $        ;whether traditional or pixel-based WAVSAMP
-      SLIT_WIDTH: 0.0, $        ;if PIXEL_BASED, the width of the PR
+      PR_WIDTH: 0.0, $          ;if PIXEL_BASED, the width of the PR
       Aperture:{IRS_APERTURE}, $ ;The IRS_APERTURE aperture
       PR: ptr_new()}            ;A list of IRS_WAVSAMP_PSEUDORECT structs
   
