@@ -1,18 +1,10 @@
 
-
-- Export stacked maps from CubeView (with headers intact).
-- Ratio maps possible with CubeView?
-
-
-=================================================================
-
-
 - Project interface.
 
-- WCS stuff (and refined cube positions)
+- WCS stuff, for maps and cubes (and refined cube positions).
 
 - Positional (instead of logical grid) cube sample placement (for
-  mixed targetting constituent BCDs)
+  mixed targetting constituent BCDs).
 
 - Line record showing wavelength/WCS.
 
