@@ -105,15 +105,15 @@ void polyclip(int argc, void *argv[]) {
   for(pix=0;pix<nv;pix++) {
     i=vi[pix]; j=vj[pix];
     np=np_in;
-    //printf("Starting with:\n");
+    /* printf("Starting with:\n"); */
     for(k=0;k<np;k++) {
       px_in[k]=poly_x[k]; py_in[k]=poly_y[k];
-      //printf("(%7.3f,%7.3f) ",px_in[k],py_in[k]);
+      /* printf("(%7.3f,%7.3f) ",px_in[k],py_in[k]); */
     }
-    //printf("\n\n");
+    /* printf("\n\n"); */
     
     for(ctype=0;ctype<4;ctype++) {
-      //printf("Round: %d, pixel (%d,%d)\n",ctype,i,j);
+      /* printf("Round: %d, pixel (%d,%d)\n",ctype,i,j); */
       ind=0;
       for(k=-1;k<np;k++) {
 	k1=(k==-1)?np-1:k;
@@ -130,8 +130,8 @@ void polyclip(int argc, void *argv[]) {
 	}
 
 	if(k>=0) {
-	  //printf("%d: (%7.3f,%7.3f) [%s] -> (%7.3f,%7.3f) [%s]\n",
-	  // k,sx,sy,in_s?"in":"out",px,py,in_p?"in":"out");
+	  /* printf("%d: (%7.3f,%7.3f) [%s] -> (%7.3f,%7.3f) [%s]\n", */
+	  /* k,sx,sy,in_s?"in":"out",px,py,in_p?"in":"out"); */
 
 	  if (in_s^in_p) { /* Crossing boundary */
 	    tmp_ind=ri_ind+ind;
@@ -164,27 +164,27 @@ void polyclip(int argc, void *argv[]) {
       }
       if(ind==0 || ctype==3) break; /* Done, or entirely outside this plane */
       np=ind;
-      //printf("IND: %d\n",ind,ri_ind);
+      /* printf("IND: %d\n",ind,ri_ind); */
       for(k=0;k<np;k++){
-	//printf("(%7.3f,%7.3f) ",px_out[ri_ind+k],py_out[ri_ind+k]);
+	/* printf("(%7.3f,%7.3f) ",px_out[ri_ind+k],py_out[ri_ind+k]); */
 	tmp_ind=ri_ind+k;
 	px_in[k]=px_out[tmp_ind]; 
 	py_in[k]=py_out[tmp_ind];
       }
-      //printf("\n");
+      /* printf("\n"); */
     }
-    //printf("IND: %d, RI_IND: %d\n",ind,ri_ind);
+    /* printf("IND: %d, RI_IND: %d\n",ind,ri_ind); */
     /* Compute the area of this polygon */
     areas_out[pix]=0.0;
     for(k=0;k<ind;k++) {
       tmp_ind=ri_ind+k;
       k1=(k==ind-1?ri_ind:tmp_ind+1);
-      //printf("pix: %d, %d %d: %f %f %f %f %f\n",pix,tmp_ind,k1,px_out[tmp_ind],
-      //     py_out[tmp_ind],px_out[tmp_ind]*py_out[k1],
-      //     -py_out[tmp_ind]*px_out[k1],
-      //     px_out[tmp_ind]*py_out[k1]-py_out[tmp_ind]*px_out[k1]);
+      /* printf("pix: %d, %d %d: %f %f %f %f %f\n",pix,tmp_ind,k1,px_out[tmp_ind], 
+           py_out[tmp_ind],px_out[tmp_ind]*py_out[k1],
+           -py_out[tmp_ind]*px_out[k1],
+           px_out[tmp_ind]*py_out[k1]-py_out[tmp_ind]*px_out[k1]); */
       areas_out[pix]+=px_out[tmp_ind]*py_out[k1]-py_out[tmp_ind]*px_out[k1];
-      //printf(" ==> %f\n",areas_out[pix]/2.);
+      /* printf(" ==> %f\n",areas_out[pix]/2.); */
     }
     areas_out[pix]/=2.;
     if(areas_out[pix]<0.) areas_out[pix]=-areas_out[pix];
