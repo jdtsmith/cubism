@@ -76,42 +76,42 @@
 ;
 ;##############################################################################
 
-function irs_fov, fov, MODULE=md, ORDER=ord, POSITION=pos
+function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos
   
-  void={IRS_FOV,ID:0,NAME:'',MODULE:'',ORDER:0,POSITION:0}
-  fvs=[{IRS_FOV, 26, 'IRS_Short-Lo_1st_Order_1st_Position','SL',1,1}, $
-       {IRS_FOV, 27, 'IRS_Short-Lo_1st_Order_2nd_Position','SL',1,2}, $
-       {IRS_FOV, 28, 'IRS_Short-Lo_1st_Order_Center_Position','SL',1,0}, $
-       {IRS_FOV, 29, 'IRS_Short-Lo_Module_Center','SL',0,0}, $
-       {IRS_FOV, 32, 'IRS_Short-Lo_2nd_Order_1st_Position','SL',2,1}, $
-       {IRS_FOV, 33, 'IRS_Short-Lo_2nd_Order_2nd_Position','SL',2,2}, $
-       {IRS_FOV, 34, 'IRS_Short-Lo_2nd_Order_Center_Position','SL',2,0}, $
-       {IRS_FOV, 38, 'IRS_Long-Lo_1st_Order_1st_Position','LL',1,1}, $
-       {IRS_FOV, 39, 'IRS_Long-Lo_1st_Order_2nd_Position','LL',1,2}, $
-       {IRS_FOV, 40, 'IRS_Long-Lo_1st_Order_Center_Position','LL',1,0}, $
-       {IRS_FOV, 41, 'IRS_Long-Lo_Module_Center','LL',0,0}, $
-       {IRS_FOV, 44, 'IRS_Long-Lo_2nd_Order_1st_Position','LL',2,1}, $
-       {IRS_FOV, 45, 'IRS_Long-Lo_2nd_Order_2nd_Position','LL',2,2}, $
-       {IRS_FOV, 46, 'IRS_Long-Lo_2nd_Order_Center_Position','LL',2,0}, $
-       {IRS_FOV, 50, 'IRS_Short-Hi_1st_Position','SH',0,1}, $
-       {IRS_FOV, 51, 'IRS_Short-Hi_2nd_Position','SH',0,2}, $
-       {IRS_FOV, 52, 'IRS_Short-Hi_Center_Position','SH',0,0}, $
-       {IRS_FOV, 56, 'IRS_Long-Hi_1st_Position','LH',0,1}, $
-       {IRS_FOV, 57, 'IRS_Long-Hi_2nd_Position','LH',0,2}, $
-       {IRS_FOV, 58, 'IRS_Long-Hi_Center_Position','LH',0,0} ]
+  void={IRS_FOV,ID:0,NAME:'',SHORT_NAME:'',MODULE:'',ORDER:0,POSITION:0}
+  f=[{IRS_FOV,26,'IRS_Short-Lo_1st_Order_1st_Position',   'SL1_a',  'SL',1,1},$
+     {IRS_FOV,27,'IRS_Short-Lo_1st_Order_2nd_Position',   'SL1_b',  'SL',1,2},$
+     {IRS_FOV,28,'IRS_Short-Lo_1st_Order_Center_Position','SL1_cen','SL',1,0},$
+     {IRS_FOV,29,'IRS_Short-Lo_Module_Center',            'SL_cen', 'SL',0,0},$
+     {IRS_FOV,32,'IRS_Short-Lo_2nd_Order_1st_Position',   'SL2_a',  'SL',2,1},$
+     {IRS_FOV,33,'IRS_Short-Lo_2nd_Order_2nd_Position',   'SL2_b',  'SL',2,2},$
+     {IRS_FOV,34,'IRS_Short-Lo_2nd_Order_Center_Position','SL2_cen','SL',2,0},$
+     {IRS_FOV,38,'IRS_Long-Lo_1st_Order_1st_Position',    'LL1_a',  'LL',1,1},$
+     {IRS_FOV,39,'IRS_Long-Lo_1st_Order_2nd_Position',    'LL1_b',  'LL',1,2},$
+     {IRS_FOV,40,'IRS_Long-Lo_1st_Order_Center_Position', 'LL1_cen','LL',1,0},$
+     {IRS_FOV,41,'IRS_Long-Lo_Module_Center',             'LL_cen', 'LL',0,0},$
+     {IRS_FOV,44,'IRS_Long-Lo_2nd_Order_1st_Position',    'LL2_a',  'LL',2,1},$
+     {IRS_FOV,45,'IRS_Long-Lo_2nd_Order_2nd_Position',    'LL2_b',  'LL',2,2},$
+     {IRS_FOV,46,'IRS_Long-Lo_2nd_Order_Center_Position', 'LL2_cen','LL',2,0},$
+     {IRS_FOV,50,'IRS_Short-Hi_1st_Position',             'SH_a',   'SH',0,1},$
+     {IRS_FOV,51,'IRS_Short-Hi_2nd_Position',             'SH_b',   'SH',0,2},$
+     {IRS_FOV,52,'IRS_Short-Hi_Center_Position',          'SH_cen', 'SH',0,0},$
+     {IRS_FOV,56,'IRS_Long-Hi_1st_Position',              'LH_a',   'LH',0,1},$
+     {IRS_FOV,57,'IRS_Long-Hi_2nd_Position',              'LH_b',   'LH',0,2},$
+     {IRS_FOV,58,'IRS_Long-Hi_Center_Position',           'LH_cen', 'LH',0,0} ]
   
   if size(fov,/type) eq 7 then begin 
-     wh=where(strupcase(fvs.name) eq strupcase(fov),cnt)
+     wh=where(strupcase(f.NAME) eq strupcase(fov),cnt)
      if cnt eq 0 then return,-1
-     ret=fvs[wh[0]].id
+     ret=f[wh[0]].ID
   endif else begin 
-     wh=where(fvs.id eq fov,cnt)
+     wh=where(f.ID eq fov,cnt)
      if cnt eq 0 then return,-1
-     ret=fvs[wh[0]].name
+     if keyword_set(sn) then ret=f[wh[0]].SHORT_NAME else ret=f[wh[0]].NAME
   endelse 
   
-  if arg_present(md)  then md= fvs[wh[0]].MODULE
-  if arg_present(ord) then ord=fvs[wh[0]].ORDER
-  if arg_present(pos) then pos=fvs[wh[0]].POSITION
+  if arg_present(md)  then md= f[wh[0]].MODULE
+  if arg_present(ord) then ord=f[wh[0]].ORDER
+  if arg_present(pos) then pos=f[wh[0]].POSITION
   return,ret
 end
