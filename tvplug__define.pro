@@ -91,7 +91,8 @@ end
 ;              plug-in, if appropriate.  To be overridden.
 ;=============================================================================
 function tvPlug::Icon
-  return,-1
+  ;; If no icon, use the class name instead
+  return,obj_class(self)
 end
 
 ;; Tells whether active or NOT
