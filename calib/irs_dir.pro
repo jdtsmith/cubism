@@ -1,47 +1,45 @@
 ;+
 ; NAME:  
 ;
-;    SMART_DIR
-;
-; CONTACT:
-;
-;    UPDATED VERSIONs of SMART and more information can be found at:
-;       http://isc.astro.cornell.edu/smart/download
+;    IRS_DIR
 ;
 ; DESCRIPTION:
 ;    
-;    Sets up a common block (SMART_DIR) describing standard locations
-;    in the SMART file structure, when included in procedures.
+;    Sets up a common block (IRS_DIR) describing standard locations
+;    in the IRS file structure, when included in procedures.
 ;    
 ; CATEGORY:
 ;
-;    SMART IRS Spectral Reduction, Analysis and Processing.
+;    IRS IRS Spectral Reduction, Analysis and Processing.
 ;    Setup
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    SMART_DIR
+;    @irs_dir (at the beginning of a file to use the irs_calib_dir variable)
 ;
 ; SIDE EFFECTS:
 ;
-;    If the directories are not yet setup, they will be.
+;    If the calibration data directory are not yet setup, they will be.
 ;
 ; RESTRICTIONS:
 ;
-;    SMART_DIR relies on the IDL !PATH to contain the relevant
-;    directories for accessing, e.g., calibration files.  Normally,
-;    this should work seamlessly.  If you have a highly customized IDL
-;    !PATH, you must ensure that at least the smart/calib directory is
+;    IRS_DIR relies on the IDL path containing the relevant
+;    directories for accessing calibration files.  Normally, this
+;    should work seamlessly.  If you have a highly customized IDL
+;    !PATH, you must ensure that at least the calib/data directory is
 ;    represented there.
 ;
 ; EXAMPLE:
 ;
-;    pro my_routine_which_needs_smart_directory_info
-;       @smart_dir
+;    pro my_routine_which_needs_irs_directory_info
+;       @irs_dir
+;       f=func(irs_calib_dir)
 ;       ...
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2002-08-27 (J.D. Smith): Updated to use a marker procedure
+;       irs_calib_dir_marker.pro.
 ;    2001-11-15 (J.D. Smith): Written
 ;-
 ;    $Id$
@@ -49,36 +47,30 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Cornell University
+;  Copyright (C) 2001,2002 J.D. Smith
 ;
-;  This file is part of SMART.
-;
-;  SMART is free software; you can redistribute it and/or modify it
+;  This file is free software; you can redistribute it and/or modify it
 ;  under the terms of the GNU General Public License as published by
 ;  the Free Software Foundation; either version 2, or (at your option)
 ;  any later version.
 ;  
-;  SMART is distributed in the hope that it will be useful, but
+;  This file is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
 ;  
 ;  You should have received a copy of the GNU General Public License
-;  along with SMART; see the file COPYING.  If not, write to the Free
+;  along with This file; see the file COPYING.  If not, write to the Free
 ;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 ;  02111-1307, USA.
 ;
 ;##############################################################################
-
-common smart_dir, smart_calib_dir
-
-if n_elements(smart_calib_dir) eq 0 then begin
-   ;;figure out the calibration directory
-   ;; FIXME: Upgrade this to v5.5
-   if !VERSION.RELEASE le '5.4.1' then sep=":" else $
-      sep=call_function('path_sep',/SEARCH_PATH)
-   paths=strsplit(!PATH,sep,/EXTRACT)
-   wh=where(stregex(paths,filepath('data',subdir=["~,smart,calib"])+'$') ne -1,cnt)
-   if cnt eq 0 then message,'Cannot locate SMART calibration directory.'
-   smart_calib_dir=paths[wh[0]]
+common irs_dir, irs_calib_dir
+if n_elements(irs_calib_dir) eq 0 then begin
+   irs_dir_marker
+   source=(routine_info('irs_dir_marker',/SOURCE)).PATH
+   dir=strmid(source,0,strpos(source,path_sep(),/REVERSE_SEARCH))
+   if NOT file_test(dir,/DIRECTORY) then $
+      message,'Cannot locate IRS calibration data directory.'
+   irs_calib_dir=dir
 endif
