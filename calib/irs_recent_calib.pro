@@ -18,7 +18,13 @@
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    recent_cal_file=irs_recent_calib()
+;    recent_cal_file=irs_recent_calib([/PRE_LL])
+;
+; INPUT KEYWORD PARAMETERS:
+;
+;    PRE_FTBOTH: Look for the most recent with "preFTBoth" in the name,
+;       indicating a relevant frametable before 2004-07-13, when the
+;       LLBoth (and SLBoth) frame table was updated.
 ;
 ; COMMON BLOCKS:
 ;
@@ -26,6 +32,7 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2004-10-28 (J.D. Smith): Added support for "preFTboth" cals.
 ;    2002-11-15 (J.D. Smith): Written
 ;-
 ;    $Id$
@@ -33,7 +40,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001-2003 J.D. Smith
+;  Copyright (C) 2001-2004 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -51,9 +58,11 @@
 ;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
-function irs_recent_calib
+function irs_recent_calib,PRE_FTBOTH=pre_FTBOTH
   @cubism_dir
-  files=findfile(filepath(ROOT=irs_calib_dir,SUBDIR="sets",'*.cal'))
+  if keyword_set(pre_FTBOTH) then filt='*preFTboth*.cal' else filt='*.cal'
+  
+  files=findfile(filepath(ROOT=irs_calib_dir,SUBDIR="sets",filt))
   dates=lon64arr(2,n_elements(files))
   for i=0,n_elements(files)-1 do begin 
      openr,un,/get_lun,files[i]
