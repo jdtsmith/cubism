@@ -3,6 +3,7 @@
 ;  Message - Let's hear about new Stacks, Switch to Full, Records, or cubes 
 ;=============================================================================
 pro CubeRec::Message, msg
+  if widget_info(self.wBase[0],/VALID_ID) eq 0 then return
   self->tvPlug::Message,msg,TYPE=type
   case type of
      'BOX': begin 
@@ -58,7 +59,7 @@ pro CubeRec::Message, msg
            self.cur_wav=pos
         endif
         widget_control, self.wLambda,SET_VALUE= $
-                        string(*msg.wavelength,FORMAT='(F7.4)')
+                        string(*msg.wavelength,FORMAT='(F7.4)'),/CLEAR_EVENTS
         ;; we don't want BCD mode, but either cube mode will do
         self->SwitchMode,BCD=0
      end
@@ -69,7 +70,7 @@ pro CubeRec::Message, msg
 end
 
 ;=============================================================================
-;  On - (Extraction Tool) Signup for all our messages.
+;  On - (Extraction Tool)
 ;=============================================================================
 pro CubeRec::On
   if self.mode gt 1 then return ;don't enable it for Rec mode
@@ -82,7 +83,7 @@ pro CubeRec::On
 end
 
 ;=============================================================================
-;  Off - (Extraction Tool) No more postdraw events needed. 
+;  Off - (Extraction Tool)
 ;=============================================================================
 pro CubeRec::Off,_EXTRA=e
   self->tvPlug::Off,_EXTRA=e
@@ -353,7 +354,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
   self->MsgSignup,self.oAper,/CUBEREC_UPDATE ;give them our message
   
   ;; Add a menu element if allowed
-  if n_elements(menu) ne 0 then if widget_info(menu,/valid_id) then $
+  if n_elements(menu) ne 0 then if widget_info(menu,/VALID_ID) then $
      self.wMapSaveBut=widget_button(menu,value='Save Map as FITS...', $
                                     SENSITIVE=0,EVENT_PRO='cuberec_event', $
                                     UVALUE={self:self,method:'SaveMapEvent'})
@@ -375,7 +376,7 @@ pro CubeRec__define
       spec:obj_new(), $         ;our CubeSpec tool
       box:obj_new(), $          ;our extraction box object
       oAper: obj_new(), $       ;our aperture viewing/editing tool
-      oView: obj_new(), $       ;our viewing tool
+      oView: obj_new(), $       ;our ViewSpec tool
       STACK:ptr_new(), $        ;the stacked image
       BCD:ptr_new(), $          ;the BCD data
       BCD_ERR:ptr_new(), $      ;the BCD error
