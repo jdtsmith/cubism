@@ -1,3 +1,9 @@
+
+- Re-organize file structure, moving common dependencies (like in
+  util) to a higher level, or separate module.
+
+=============================
+
 - Implement a spacebar scale freeze on CubeViewSpec (hmmm... change to
   < and > for peak region select?).
 
@@ -27,7 +33,7 @@
   arrays for assoc'd pixel indices, and areas.  Then the wrapper code
   could just peel out the pointers and stick them into the relevant
   data structure.  {pixel: 0L, poly:ptr_new(), area:0.0} Too much
-  trouble?
+  trouble?  Could just use a reverse-indices approach.
 
 
 
