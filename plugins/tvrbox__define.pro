@@ -306,6 +306,7 @@ pro tvRBox::EraseBox
   lr=self.boxoff+(self.boxsize)*[1,-1]
   ur=(self.boxoff>lr)+(self.thick+2.*self.hsize) > 0
   ll=(self.boxoff<lr)-(self.thick+2.*self.hsize) > 0
+  if NOT array_equal(ll lt self.winsize,1b) then return
   dist=fix(ur-ll+1) < (self.winsize-ll) > 1
   self.oDraw->Erase,ll,dist
 end
