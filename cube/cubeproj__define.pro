@@ -150,10 +150,10 @@ pro CubeProj::ShowEvent, ev
      'setorder': begin 
         self->GetProperty,CALIB=cal
         ords=strtrim(cal->Orders(self.MODULE),2)
-        
         if self.MODULE eq 'SH' or self.MODULE eq 'LH' then ords=['All',ords]
         ord=popup('Choose Cube Build Order',ords,TITLE='Cube Build Order', $
-                  PARENT_GROUP=self->TopBase(),/MODAL)
+                  PARENT_GROUP=self->TopBase(),/MODAL, $
+                  SELECT=self.ORDER eq 0?0:where(ords eq self.ORDER))
         if ord eq 'All' then self.ORDER=0 else self.ORDER=ord
      end
      
@@ -670,7 +670,8 @@ end
 ;=============================================================================
 pro CubeProj::ExportToMain
    ;; Simple fix -- replace dashes/spaces with underscores
-  def=strjoin(strsplit(self->ProjectName(),'[^a-zA-Z0-9_]',/EXTRACT),'_')
+  def=strjoin(strsplit(self->ProjectName(),'[^a-zA-Z0-9_]',$
+                       /EXTRACT,/REGEX),'_')
   var_name=getinp('Name of exported Cube object var:',def, $
                   TITLE='Export Cube Project to Command Line', $
                   /MODAL, PARENT_GROUP=self->TopBase())
@@ -897,10 +898,10 @@ end
 ;=============================================================================
 ;  UpdateAll
 ;=============================================================================
-pro CubeProj::UpdateAll
+pro CubeProj::UpdateAll,NO_LIST=nl
   self->UpdateButtons
-  self->UpdateColumnHeads
-  self->UpdateList
+  if NOT keyword_set(nl) then self->UpdateColumnHeads
+  if NOT keyword_set(nl) then self->UpdateList
   self->UpdateTitle
 end
 
@@ -1199,7 +1200,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
   if n_elements(chngd) ne 0 then self.Changed=chngd
   if n_elements(spn) ne 0 then self.Spawned=spn
   if n_elements(fb) ne 0 then self.feedback=fb
-  self->UpdateAll
+  self->UpdateAll,/NO_LIST
 end
 
 ;=============================================================================
@@ -1253,7 +1254,8 @@ function CubeProj::PRs,ORDERS=ords,ALL_ORDERS=all,FULL=full
      ap=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[i]
      prs[i]=ptr_new(self.cal->GetWAVSAMP(self.MODULE,ords[i],/PIXEL_BASED,$
                                          FULL=full,APERTURE=ap, $
-                                         PR_WIDTH=self.PR_SIZE[1]))
+                                         PR_WIDTH=self.PR_SIZE[1] eq 0.0? $
+                                         1.0:self.PR_SIZE[1]))
   endfor 
   return,prs
 end
@@ -1339,7 +1341,7 @@ pro CubeProj::MergeSetup,ORDS=ords
   wave1=(self.cal->GetWAVSAMP(self.MODULE,ords[0],/PIXEL_BASED, $
                               PR_WIDTH=self.PR_SIZE[1], $
                               APERTURE=(*self.APERTURE)[0])).lambda
-  if self.ORDER gt 0 then begin ;nothing to do
+  if self.ORDER gt 0 then begin ;single order, nothing to do
      self.WAVELENGTH=ptr_new(wave1)
      return
   endif 
@@ -1471,11 +1473,10 @@ end
 ;                 combine by using the pre-computed interpolated
 ;                 wavelength sampling in the region of overlap, and
 ;                 splitting individual polygon area overlaps between
-;                 planes with with linear interpolation.  If they
-;                 don't overlap, just concatenate the accounting
-;                 cubes.  ORDER is the logical order number index in
-;                 sequence (as opposed to the optical grating order
-;                 number).
+;                 planes with linear interpolation.  If they don't
+;                 overlap, just concatenate the accounting cubes.
+;                 ORDER is the logical order number index in sequence
+;                 (as opposed to the optical grating order number).
 ;=============================================================================
 pro CubeProj::MergeAccount,dr,order,account
   if NOT ptr_valid(self.MERGE) then begin ; only one order
@@ -1911,7 +1912,7 @@ pro CubeProj::CheckModules,id,ERROR=err
      self->Error,["Data from only one module is permitted: ", $
                   "   "+strjoin(modules[u],",")],/RETURN_ONLY
   self.module=modules[u[0]]
-  ;;if array_equal(orders,orders[0]) then self.ORDER=orders[0]
+  if array_equal(orders,orders[0]) then self.ORDER=orders[0]
 end
 
 ;=============================================================================
@@ -1923,8 +1924,6 @@ pro CubeProj::Normalize
   
   if NOT ptr_valid(self.DR) then $
      self->Error,'No data records'
-  
-  self->CheckModules
   
   ;; For low-res use the target order as the order, if they're all the same.
 ;   if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
@@ -2070,6 +2069,7 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
      bcd=readfits(files[i],header,/SILENT)
      self->AddBCD,bcd,header,FILE=files[i],_EXTRA=e
   endfor
+  self->CheckModules            ;Set default build order, and double check.
   self->UpdateList & self->UpdateButtons
 end
 
