@@ -158,7 +158,12 @@ pro CubeProj::ShowEvent, ev
         self.ACCOUNTS_VALID AND=NOT 4b ;bg's no longer valid
         self->UpdateButtons
      end 
+     'remove-bg-sp': begin 
+        ptr_free,self.BG_SP
+        self.BG_SP_FILE=''
+     end 
      'loadcalib': self->LoadCalib,/SELECT
+     'load-append-badpixels': self->LoadBadPixels,/APPEND
      'feedback': begin 
         self.feedback=1b-self.feedback
         widget_control, ev.id, SET_BUTTON=self.feedback
@@ -166,6 +171,11 @@ pro CubeProj::ShowEvent, ev
      'fluxcon': begin 
         self.fluxcon=1b-self.fluxcon
         widget_control, ev.id, SET_BUTTON=self.fluxcon
+        self.changed=1b
+     end
+     'slcf': begin 
+        self.slcf=1b-self.slcf
+        widget_control, ev.id, SET_BUTTON=self.slcf
         self.changed=1b
      end
      'reconstructed': begin 
@@ -510,9 +520,12 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   b1=widget_button(cube,VALUE='Show Cube Build Feedback',UVALUE='feedback', $
                    /CHECKED_MENU,/SEPARATOR) 
   widget_control, b1, /SET_BUTTON
-  b1=widget_button(cube,VALUE='Build Cube with FLUXCON',UVALUE='fluxcon', $ $
+  b1=widget_button(cube,VALUE='Build Cube with FLUXCON',UVALUE='fluxcon', $
                    /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.fluxcon
+  b1=widget_button(cube,VALUE='Build Cube with SLCF',UVALUE='slcf', $
+                   /CHECKED_MENU)
+  widget_control, b1,SET_BUTTON=self.slcf  
   b1=widget_button(cube,VALUE='Use Reconstructed Positions', $
                    UVALUE='reconstructed', /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.reconstructed_pos
@@ -527,7 +540,6 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   wMustSel=[wMustSel,$
             widget_button(cube,VALUE='Set Background from Rec(s)...', $
                           UVALUE='setbackgroundfromrecs',/SEPARATOR)]
-  
   but=widget_button(cube,VALUE='Load Background Rec(s)...', $
                     UVALUE='loadbackgroundlist')
   (*self.wInfo).MUST_BACK= $
@@ -539,18 +551,25 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                     UVALUE='viewbackground-new'), $
       widget_button(cube,VALUE='Remove Background', $
                     UVALUE='remove-background')]
+  ;;-------------
+  but=widget_button(cube,VALUE='Load Background Spectrum...',/SEPARATOR, $
+                    UVALUE='readbackgroundfromfile')
+  (*self.wInfo).MUST_BG_SP= $
+     widget_button(cube,VALUE='Remove Background Spectrum...', $
+                   UVALUE='remove-bg-sp')
   
-  
+  ;;-------------
   but=widget_button(cube,VALUE='Load Bad Pixels...',UVALUE='loadbadpixels', $
                     /SEPARATOR)
+  but=widget_button(cube,VALUE='Load and Append Bad Pixels...', $
+                    UVALUE='load-append-badpixels')
   (*self.wInfo).MUST_BPL= $
      [widget_button(cube,VALUE='Save Bad Pixels...',UVALUE='savebadpixels') , $
       widget_button(cube,VALUE='Clear Bad Pixel List...', $
                     UVALUE='clearbadpixels')]
   
-
+  ;;-------------
   wMustCube=[wMustCube, $
-             ;;-------------
              widget_button(cube,VALUE='View Cube...',UVALUE='viewcube', $
                            /SEPARATOR) , $
              widget_button(cube,VALUE='View Cube (new viewer)...', $
@@ -864,7 +883,7 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,_EXTRA=e
      ;unc_file=irs_associated_file(file,/UNCERTAINTY)
      bmask_file=irs_associated_file(file,/BMASK)
      
-     if size(bmask_file,/TYPE) eq 7 && file_test(bmask_file) then $
+     if bmask_file && file_test(bmask_file,/READ) then $
         (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
      
      ;if size(unc_file,/TYPE) eq 7 && file_test(unc_file) then $
@@ -960,7 +979,7 @@ end
 ;=============================================================================
 ;  LoadBadPixels - Load bad pixels from file
 ;=============================================================================
-pro CubeProj::LoadBadPixels,file,ERROR=err
+pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
   catch, err
   if err ne 0 then begin 
      if n_elements(un) ne 0 then free_lun,un
@@ -969,16 +988,31 @@ pro CubeProj::LoadBadPixels,file,ERROR=err
      file=-1
   endif
   if size(file,/TYPE) ne 7 then begin 
-     xf,file,/RECENT,FILTERLIST=['*.bpl','*.*','*'],$
-        TITLE='Load Bad Pixels...',/NO_SHOW_ALL,SELECT=0, $
-        /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
+     xf,file,/RECENT,FILTERLIST=['*.{bpl,fits}','*.*','*'],$
+        TITLE=(keyword_set(append)?'Append':'Load')+' Bad Pixels...', $
+        /NO_SHOW_ALL,SELECT=0,/MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
   endif 
   catch,/cancel
   if size(file,/TYPE) ne 7 then return ;cancelled
-  openr,un,file,/GET_LUN
-  bp=lonarr(file_lines(file),/NOZERO)
-  readf,un,bp
-  free_lun,un
+  if stregex(file,'\.fits$',/BOOLEAN) then begin 
+     mask=readfits(file)
+     bp=where(mask,cnt)         ;non-zero pixels are bad
+     if cnt eq 0 then return
+  endif else begin 
+     openr,un,file,/GET_LUN
+     bp=lonarr(file_lines(file),/NOZERO)
+     readf,un,bp
+     free_lun,un
+  endelse 
+  
+  if keyword_set(append) then begin 
+     if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then begin 
+        bp=[bp,*self.GLOBAL_BAD_PIXEL_LIST]
+        u=uniq(bp,sort(bp))
+        bp=bp[u]
+     endif 
+  endif 
+  
   if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST then $
      ptr_free,self.GLOBAL_BAD_PIXEL_LIST
   self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bp,/NO_COPY)
@@ -1041,7 +1075,7 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err
   readf,un,bg
   free_lun,un
        
-  wh=where_array((*self.DR).DCEID,bg,cnt)
+  wh=where_array(bg,(*self.DR).DCEID,cnt)
   if cnt lt n_elements(bg) then $
      self->Warning,strtrim(n_elements(bg)-cnt,2)+ $
                    ' record(s) not present in project'
@@ -1113,11 +1147,11 @@ pro CubeProj::WriteFits,file
   fxaddpar,hdr,'PS3_1','WAVELENGTH','Coordinate table column name'
   
   ;; Description
-  sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
-              'For more information on SINGS see http://sings.stsci.edu', $
-              'This file contains a spectral cube assembled from an IRS', $
-              'spectral mapping dataset.'], $
-             hdr,/COMMENT
+  ; sxaddhist, ['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
+;               'For more information on SINGS see http://sings.stsci.edu', $
+;               'This file contains a spectral cube assembled from an IRS', $
+;               'spectral mapping dataset.'], $
+;             hdr,/COMMENT
   
   fxaddpar,hdr,'CUBE-DT',jul2date(self.CUBE_DATE),' Cube build date'
   
@@ -1429,6 +1463,8 @@ pro CubeProj::UpdateButtons
      widget_control, ((*self.wInfo).MUST_BACK)[i], $
                      SENSITIVE=ptr_valid(self.BACKGROUND)
   
+  widget_control, (*self.wInfo).MUST_BG_SP,SENSITIVE=ptr_valid(self.BG_SP)
+  
   for i=0,n_elements((*self.wInfo).MUST_BPL-1)-1 do $
      widget_control, ((*self.wInfo).MUST_BPL)[i], $
                      SENSITIVE=ptr_valid(self.GLOBAL_BAD_PIXEL_LIST)
@@ -1612,7 +1648,6 @@ pro CubeProj::RenameRecord,rec,name
   self->UpdateAll
 end
 
-
 ;=============================================================================
 ;  SetBackgroundFromRecs - Set the BCD background from selected recs.
 ;=============================================================================
@@ -1648,6 +1683,30 @@ pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm
      ptr_free,self.BACK_EXP_LIST
   self.BACK_EXP_LIST=ptr_new((*self.DR)[recs].DCEID)
   self->UpdateButtons
+end
+
+
+;=============================================================================
+;  ReadBackgroundFromFile - Read in a background spectrum file
+;=============================================================================
+pro CubeProj::ReadBackgroundFromFile,file
+  if ptr_valid(self.BACKGROUND) then $
+     self->Error,'Cannot set background spectrum and record-based background.'
+  
+  if size(file,/TYPE) ne 7 then begin 
+     xf,file,/RECENT,FILTERLIST=['*.{tbl,fits}','*.*','*'],$
+        TITLE='Load Background Spectrum',/NO_SHOW_ALL,SELECT=0, $
+        /MODAL,PARENT_GROUP=self->TopBase()
+     if size(file,/TYPE) ne 7 then return
+  endif 
+     
+  ;; XXX Read with IRS_Spectrum
+  rdfloat,file,lam,bg,SKIPLINE=1
+  
+  ;; XXX Ensure in e/s/pix units!!!
+  ptr_free,self.BG_SP
+  self.BG_SP=ptr_new(transpose([[lam],[bg]]))
+  self.BG_SP_FILE=file
 end
 
 ;=============================================================================
@@ -1749,9 +1808,10 @@ function CubeProj::Info,entries, NO_DATA=nd,CURRENT=cur
         (strtrim(ptr_valid(this.BACK_EXP_LIST)? $
                  n_elements(*this.BACK_EXP_LIST):0,2)+' records, '+ $
          jul2date(this.BACK_DATE)): $
-        "none")]
+        (this.BG_SP_FILE?'1D from file: '+this.BG_SP_FILE:"none"))]
   
   str=[str,' FLUXCON: '+(this.FLUXCON?"Yes":"No")]
+  str=[str,'    SLCF: '+(this.SLCF?"Yes":"No")]
   str=[str,' Positions: '+(this.RECONSTRUCTED_POS?"Reconstructed":"Requested")]
   str=[str,' Bad Pixels: '+(ptr_valid(this.GLOBAL_BAD_PIXEL_LIST)? $
                             strtrim(n_elements(*this.GLOBAL_BAD_PIXEL_LIST), $
@@ -1816,7 +1876,7 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
                           GLOBAL_BAD_PIXEL_LIST=gbpl, $
                           RECONSTRUCTED_POSITIONS=rcp, $
-                          FLUXCON=fc,SAVE_ACCOUNTS=sa,SAVE_DATA=sd
+                          FLUXCON=fc,SLCF=slcf,SAVE_ACCOUNTS=sa,SAVE_DATA=sd
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
         self.PLATE_SCALE=ps
@@ -1896,16 +1956,16 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      self.fluxcon=keyword_set(fc) 
      self.Changed=1b
   endif 
+  if n_elements(slcf) ne 0 then begin 
+     self.slcf=keyword_set(slcf) 
+     self.Changed=1b
+  endif 
   if n_elements(sa) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 2b) OR ishft(keyword_set(sa),1)
   if n_elements(sd) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 1b) OR keyword_set(sd)
   self->UpdateAll,/NO_LIST
 end
-
-
-
-
 
 ;=============================================================================
 ;  GetProperty - Get properties, as a pointer to the original data if
@@ -1915,14 +1975,14 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
                            UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $ $
                            SLIT_LENGTH=sl, CALIB=calib, MODULE=module, $
                            ORDER=order, APERTURE=ap, PROJECT_NAME=pn,DR=dr, $
-                           FLUXCON=fc, TLB_OFFSET=tboff, TLB_SIZE=tbsize, $
-                           BCD_SIZE=bcdsz, VERSION=version, ASTROMETRY=astr, $
-                           POSITION=pos,POSITION_ANGLE=pa,BACKGROUND=bg, $
-                           GLOBAL_BAD_PIXEL_LIST=gbpl, PMASK=pmask, $
-                           RECONSTRUCTED_POSITIONS=rp, SAVE_DATA=sd, $
-                           SAVE_ACCOUNT=sa, DATE_OBS=dobs, BAD_PIXEL_LIST=bpl,$
-                           ALL_RECORDS=all_recs,RECORDS=recs, $
-                           RECORD_SET=rec_set, POINTER=ptr
+                           FLUXCON=fc, SLCF=slcf,TLB_OFFSET=tboff, $
+                           TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
+                           ASTROMETRY=astr,POSITION=pos,POSITION_ANGLE=pa, $
+                           BACKGROUND=bg, GLOBAL_BAD_PIXEL_LIST=gbpl, $
+                           PMASK=pmask, RECONSTRUCTED_POSITIONS=rp, $
+                           SAVE_DATA=sd, SAVE_ACCOUNT=sa, DATE_OBS=dobs, $
+                           BAD_PIXEL_LIST=bpl, ALL_RECORDS=all_recs, $
+                           RECORDS=recs, RECORD_SET=rec_set, POINTER=ptr
   ptr=keyword_set(ptr)
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
      account=ptr?self.account:*self.account
@@ -1967,6 +2027,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      endelse 
   endif
   if arg_present(fc) then fc=self.fluxcon
+  if arg_present(slcf) then slcf=self.slcf
   if arg_present(tbsize) then begin 
      if NOT ptr_valid(self.wInfo) then tbsize=-1 else $
         if widget_info((*self.wInfo).Base,/VALID_ID) then $
@@ -2020,7 +2081,6 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
   endif 
   
 end
-
 
 ;=============================================================================
 ;  GetKeyword - Return the keyword values of a given keyword for the
@@ -2157,34 +2217,68 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,_EXTRA=e
   self->UpdateButtons & self->UpdateTitle
 end
 
+;=============================================================================
+;  Flux - Flux a spectrum using FLUXCON, SLCF, and effective pixel
+;         solid angle, if requested.  Input is in e/s/pixel.
+;=============================================================================
+pro CubeProj::Flux,lam,sp,ORDER=ord,SLCF=do_slcf
+  if n_elements(ord) eq 0 then ord=self.ORDER
+  if ord eq 0 then self->Error,'Cannot flux combined multi-order spectrum.'
+  self.cal->GetProperty,self.MODULE,ord,FLUXCON=fluxcon,TUNE=tune, $
+                        KEY_WAV=key_wav,SLCF=slcf
+  flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
+  
+  if keyword_set(do_slcf) then begin 
+     if ptr_valid(slcf) then begin 
+        slcf=*slcf
+        slcf=interpol(slcf[1,*],slcf[0,*],lam)
+        sp*=slcf/flux_conv   
+     endif else sp/=flux_conv
+  endif else sp/=flux_conv
+end
+
 
 ;=============================================================================
-;  FluxConImage - Make an image to match the BCD which contains, for
-;                 each pixel, the factor to convert it from e/s to Jy
-;                 by division. (fluxcon=instrumental/fluxconimage)
+;  FluxImage - Make an image to match the BCD which contains, for each
+;              pixel, the factor to convert it from e/s/pixel to
+;              Jy/pixel by multiplication. (fluxed=instrumental*fluximage).
+;              Also modify by the SLCF, if requested.  Also include
+;              the factor to map from Jy per pixel to MJy per
+;              steradian.
 ;=============================================================================
-function CubeProj::FluxConImage
+function CubeProj::FluxImage
   if ~ptr_valid(self.DR) then return,-1
   
+  fimage=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=0.)  
+  total_areas=make_array(size(fimage,/DIMENSIONS),VALUE=0.)
+  
+  
   prs=self->PRs(/ALL_ORDERS,ORDERS=ords)
-  fcimage=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=0.)
-  total_areas=make_array(size(fcimage,/DIMENSIONS),VALUE=0.)
+  
   for i=0,n_elements(ords)-1 do begin 
      lam=(*prs[i]).lambda
      self.cal->GetProperty,self.MODULE,ords[i],FLUXCON=fluxcon,TUNE=tune, $
-                           KEY_WAV=key_wav
-     flux_conv=fluxcon*poly(lam-key_wav,tune)
+                           KEY_WAV=key_wav,SLCF=slcf
+     flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
+     if ptr_valid(slcf) then begin 
+        slcf=*slcf
+        slcf=interpol(slcf[1,*],slcf[0,*],lam)
+     endif else tmp=temporary(slcf)
+     
      for j=0,n_elements(lam)-1 do begin 
+        fac=1.
+        if self.fluxcon then fac/=flux_conv[j]
+        if self.slcf && n_elements(slcf) gt 0 then fac*=slcf[j]
         pix=*(*prs[i])[j].pixels
         areas=*(*prs[i])[j].areas
         total_areas[pix]+=areas
-        fcimage[pix]+=flux_conv[j]*areas
+        fimage[pix]+=fac*areas
      endfor 
   endfor 
   wh=where(total_areas gt 0.,cnt,COMPLEMENT=wh_none,NCOMPLEMENT=cnt_none)
-  if cnt gt 0 then fcimage[wh]/=total_areas[wh]
-  if cnt_none gt 0 then fcimage[wh_none]=1.
-  return,fcimage
+  if cnt gt 0 then fimage[wh]/=total_areas[wh]
+  if cnt_none gt 0 then fimage[wh_none]=1.
+  return,fimage
 end
 
 ;=============================================================================
@@ -2795,6 +2889,10 @@ function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
   return,astr
 end
 
+;=============================================================================
+;  ConvertCoords - Convert between celestial and array coordinates,
+;                  accounting correctly for pixel center conventions.
+;=============================================================================
 pro CubeProj::ConvertCoords,ra,dec,x,y,TO_RA_DEC=trd,TO_X_Y=txy
   if keyword_set(trd) then $
      xy2ad,x-.5,y-.5,self->CubeAstrometryRecord(),ra,dec $
@@ -2980,7 +3078,7 @@ pro CubeProj::BuildCube
      ctarg=self.cube_size[2]/2
   endif 
   
-  if self.fluxcon then fluxcon=self->FluxConImage()
+  if self.fluxcon || self.slcf then fluxim=self->FluxImage()
   
   cube_width=self.CUBE_SIZE[0]
   cube_wh=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
@@ -2998,11 +3096,12 @@ pro CubeProj::BuildCube
      
      bcd=*this_dr.BCD
      if ptr_valid(self.BACKGROUND) then bcd-=*self.BACKGROUND
-     if self.fluxcon then bcd/=fluxcon
+     if n_elements(fluxim) gt 0 then bcd*=fluxim
      use_unc=ptr_valid(this_dr.UNC)
      if use_unc then begin 
+        ;; XXX should include error in background
         unc=*this_dr.UNC
-        if self.fluxcon then unc/=fluxcon ;XXX should include background error 
+        if n_elements(fluxim) gt 0 then unc*=fluxim
      endif
      
      ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
@@ -3078,6 +3177,18 @@ pro CubeProj::BuildCube
   areas=areas>1.e-10            ;avoid divide by zero errors
   ptr_free,self.CUBE,self.CUBE_UNC
   self.CUBE=ptr_new(cube/areas)
+  
+  if ptr_valid(self.BG_SP) then begin 
+     ;; Assume they are in correct units
+     bg=interpol((*self.BG_SP)[1,*],(*self.BG_SP)[0,*],*self.wavelength)
+     
+     if self.fluxcon then self->Flux,*self.wavelength,bg,SLCF=self.slcf
+
+     bg=rebin(reform(bg,1,1,n_elements(*self.wavelength)), $
+              size(*self.CUBE,/DIMENSIONS),/SAMPLE)
+     *self.CUBE-=bg
+  endif 
+  
   self.CUBE_DATE=systime(/JULIAN)
   self->SnapshotParameters
   self.Changed=1
@@ -3162,91 +3273,28 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
 end
 
 
-
-;=============================================================================
-;  ReadSpecAperture - Read an aperture from a spectrum (ASCII or FITS)
-;                     on file
-;=============================================================================
-function CubeProj::ReadSpecAperture,file
-  aper=-1
-  if stregex(file,'\.fits$',/BOOLEAN) then begin ;FITS file
-     h=headfits(file,ERRMSG=err)
-     if err then return, -1
-     s=sxpar(h,'RA_LL',COUNT=cnt)
-     if cnt eq 0 then return,-1
-     aper=[ [sxpar(h,'RA_LL'),sxpar(h,'DEC_LL')], $
-            [sxpar(h,'RA_LR'),sxpar(h,'DEC_LR')], $
-            [sxpar(h,'RA_UR'),sxpar(h,'DEC_UR')], $
-            [sxpar(h,'RA_UL'),sxpar(h,'DEC_UL')] ]
-  endif else if stregex(file,'\.txt$',/BOOLEAN) then begin ; text
-     line=''
-     match='([+-]?[0-9]{2}:[0-9]{2}:[0-9.]+)'
-     openr,un,file,/get_lun
-     while not eof(un) do begin
-        readf, un, line
-        if strmid(line,0,1) ne '#' then break
-        if strmid(line,2,4) eq 'Box:' then begin 
-           ext=stregex(line,match+','+match+' ; '+match+','+match,/EXTRACT, $
-                       /SUBEXPR)
-           if n_elements(ext) lt 5 then return,-1
-           ra=[ext[1],ext[3]]
-           dec=[ext[2],ext[4]]
-           readf, un, line     ;get next line
-           ext=stregex(line,match+','+match+' ; '+match+','+match,/EXTRACT, $
-                       /SUBEXPR)
-           if n_elements(ext) lt 5 then return,-1
-           ra=[ra,ext[1],ext[3]]
-           dec=[dec,ext[2],ext[4]]
-           aper=make_array(2,n_elements(ra),/DOUBLE)
-           for i=0,n_elements(ra)-1 do begin 
-              aper[0,i]=ten(strsplit(ra[i],":",/EXTRACT))*15.0D
-              aper[1,i]=ten(strsplit(dec[i],":",/EXTRACT))
-           endfor 
-           break
-        endif 
-     endwhile 
-     free_lun,un
-  endif  
-  return,aper
-end
-
 ;=============================================================================
 ;  Extract - Extract a Spectrum from the Cube, and possibly save it
-;             EXP - If set, export extracted spectrum to command line
-;             SF - File to save to (passed to SaveSpectrum)
-;             ASCII - Pass to SaveSpectrum
-;             REGION - Polygon (2xn) list of celestial coordinates to
-;                      extract.  Will be converted to pixel
-;                      coords. Partial pixel extraction occurs.
+;             EXPORT - If set, export extracted spectrum to command line
+;             SAVE - File to save to.
 ;             FROM_FILE - Load extraction region from spectrum file
 ;=============================================================================
-function CubeProj::Extract,low,high, EXPORT=exp, SAVE=sf, ASCII=ascii, $
-                           OUTPUT_POLY=op,REGION=coords, $
-                           FROM_FILE=rff, CELESTIAL=celest
+function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
+                           OUTPUT_POLY=op
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to extract'
   if keyword_set(rff) then begin
-     if size(rff,/TYPE) ne 7 then begin 
-        xf,rff,/RECENT, $
-           FILTERLIST=['*.{fits,txt}', '*.*', '*'], $
-           TITLE='Select Spectrum File...', $
-           /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(),/MODAL
-     endif 
-     if size(rff,/TYPE) ne 7 then return,-1
-     coords=self->ReadSpecAperture(rff)
-     if n_elements(coords) eq 1 then $
-        self->Error,['No aperture found for file:',rff]
-     celest=1
-  endif 
+     oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
+                 self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
+                 PARENT_GROUP=self->TopBase())
+     oSP->Read,rff
+     oSP->GetProperty,REGION=oReg
+     if ~obj_valid(oReg) then return,-1
+  endif
   
-  if n_elements(coords) ne 0 then begin 
-     if keyword_set(celest) then begin 
-        ;; Celestial coords: convert ra,dec to x,y
-        self->ConvertCoords,coords[0,*],coords[1,*],x,y,/TO_X_Y 
-     endif else begin 
-        x=coords[0,*] & y=coords[1,*]
-        self->ConvertCoords,ra,dec,x,y,/TO_RA_DEC
-        coords=[1#ra,1#dec]
-     endelse
+  if n_elements(oReg) ne 0 then begin 
+     ;; Celestial coords: convert ra,dec to x,y
+     r=oReg->Region()           ;first region
+     self->ConvertCoords,r[0,*],r[1,*],x,y,/TO_X_Y 
      if arg_present(op) then op=[x,y]
      overlap_pix=polyfillaa(x,y,self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
                             AREAS=areas)
@@ -3263,116 +3311,63 @@ function CubeProj::Extract,low,high, EXPORT=exp, SAVE=sf, ASCII=ascii, $
      sp=total((*self.CUBE)[pix]* $
               rebin(areas,nover,self.CUBE_SIZE[2],/SAMPLE),$
               1,/NAN)/total(areas)
-     ;; Pass coords through to save file
-     if keyword_set(sf) then $
-        self->SaveSpectrum,sp,sf,ASCII=ascii,RA=coords[0,*],DEC=coords[1,*], $
-                           FROM_FILE=rff
   endif else begin 
-     ;; Regular "four corners" extraction
+     ;; Regular "four corners" integral pixel extraction
      sp=total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
               1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
-     if keyword_set(sf) then $
-        self->SaveSpectrum,sp,sf,ASCII=ascii,BOX=[[low],[high]],FROM_FILE=rff
+     if arg_present(op) then $
+        op=[[low[0],low[1]], $
+            [low[0],high[1]], $
+            [high[0],high[1]], $
+            [high[0],low[1]]]
   endelse 
   
+  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP  
+
   if keyword_set(exp) then $
      self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
   return,sp
 end
 
+
 ;=============================================================================
-;  SaveSpectrum - Save a Spectrum to FITS (the default) or ASCII
+;  SaveSpectrum - Save a Spectrum using a spectrum object
 ;=============================================================================
-pro CubeProj::SaveSpectrum,sp,sf,ASCII=ascii,BOX=box,RA=ra,DEC=dec, $
-                           FROM_FILE=ff
-  fits=NOT keyword_set(ascii)
-  if size(sf,/TYPE) ne 7 then begin 
-     xf,sf,/SAVEFILE, /RECENT, $
-        FILTERLIST=[(fits?'*.fits':'*.txt'), '*.*', '*'], $
-        TITLE='Save Spectrum As '+(fits?'FITS':'Text')+' File...', $
-        /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(), $
-        START=self->FileBaseName()+"_sp"+(fits?".fits":".txt"),/MODAL
-     if size(sf,/TYPE) ne 7 then return
-  endif
-  
-  catch, err
-  if err ne 0 then begin 
-     self->Error,['Error saving spectrum to file '+sf,!ERROR_STATE.MSG]
-  endif 
-  widget_control,/HOURGLASS  
-  
-  if n_elements(ra) eq 0 && n_elements(box) gt 0 then begin 
-     ;; Aperture Extraction coordinates
-     delta=box[*,1]-box[*,0]+1
-     ll=box[*,0]
-     lr=[box[0,1],box[1,0]]+[1,0]
-     ur=box[*,1]+1
-     ul=[box[0,0],box[1,1]]+[0,1]
-     all=[ [ll], [lr], [ur], [ul] ]
-     self->ConvertCoords,ra,dec,all[0,*],all[1,*],/TO_RA_DEC
-  endif 
-  
-  if fits then begin 
-     fxhmake,hdr,/date,/EXTEND
-     self->AddHeaderInfo,hdr
-     ;; Description
-     sxaddhist, ['This file contains a 1D spectrum extracted from an IRS', $
-                 'spectral cube, assembled from a spectral mapping dataset.'],$
-                hdr,/COMMENT
-     
-     fxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
- 
-     if n_elements(ra) ne 0 then begin 
-        fxaddpar,hdr,'RA_LL',ra[0],' RA of LL of extraction box'
-        fxaddpar,hdr,'DEC_LL',dec[0],' DEC of LL of extraction box'
-        fxaddpar,hdr,'RA_LR',ra[1],' RA of LR of extraction box'
-        fxaddpar,hdr,'DEC_LR',dec[1],' DEC of LR of extraction box'
-        fxaddpar,hdr,'RA_UR',ra[2],' RA of UR of extraction box'
-        fxaddpar,hdr,'DEC_UR',dec[2],' DEC of UR of extraction box'
-        fxaddpar,hdr,'RA_UL',ra[3],' RA of UL of extraction box'
-        fxaddpar,hdr,'DEC_UL',dec[3],' DEC of UL of extraction box'
-     endif 
-     
-     fxwrite,sf,hdr
-     
-     ;; Make the binary table
-     fxbhmake,hdr,1,'CUBESPEC','CUBISM cube-extracted spectrum'
-     fxbaddcol,wcol,hdr,*self.WAVELENGTH,'WAVELENGTH','Column label field 1', $
-               TUNIT='Microns'
-     fxbaddcol,fcol,hdr,*self.WAVELENGTH,'FLUX','Column label field 2', $
-               TUNIT=self.fluxcon?'Jy':'e/s'
-     fxbcreate,unit,sf,hdr
-     fxbwrite,unit,*self.WAVELENGTH,wcol,1
-     fxbwrite,unit,sp,fcol,1
-     fxbfinish,unit
+pro CubeProj::SaveSpectrum,file,sp,oSP
+  if ~obj_valid(oSP) then begin 
+     oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
+                 self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
+                 PARENT_GROUP=self->TopBase())
+     destroy=1
   endif else begin 
-     openw,un,/get_lun,sf
-     printf,un,'# Written '+systime(0)
-     printf,un,'# Cube: '+self->ProjectName()
-     if n_elements(box) gt 0 then $
-        printf,un,FORMAT='(%"# Extracted %dx%d [%d,%d] -> [%d,%d]")',delta, $
-               box
-     if n_elements(ff) ne 0 then $
-        printf,un,FORMAT='(%"# Extracted with region from %s")', $
-               file_basename(ff)
-     if n_elements(ra) ne 0 then begin 
-        printf,un,FORMAT= '("# Box: ",2(A,",",A,:," ; "),"]")', $
-               radecstring(ra[0],/RA,PRECISION=3), $
-               radecstring(dec[0],PRECISION=3), $
-               radecstring(ra[1],/RA,PRECISION=3), $
-               radecstring(dec[1],PRECISION=3)
-        printf,un,FORMAT='("#      ",2(A,",",A,:," ; "),"]")', $
-               radecstring(ra[2],/RA,PRECISION=3), $
-               radecstring(dec[2],PRECISION=3), $
-               radecstring(ra[3],/RA,PRECISION=3), $
-               radecstring(dec[3],PRECISION=3)
-     endif
-     printf,un,self.as_built.fluxcon? $
-            '#      LAM (um)       FLUX (Jy/pixel)' : $
-            '#      LAM (um)       FLUX (e/s/pixel)'
-     printf,un,FORMAT='(2G18.10)',transpose([[*self.WAVELENGTH],[sp]])
-     free_lun,un
+     ;; Re-use the region, since it must have been extracted from that.
+     oSP->GetProperty,REGION=oReg
+     oReg->UpdateAstrometry,self->CubeAstrometryRecord()
   endelse 
+  
+  oSP->SaveInit,file
+  if size(file,/TYPE) ne 7 then begin 
+     if n_elements(destroy) ne 0 then obj_destroy,oSP
+     return
+  endif 
+
+  oSP->SetProperty,SPECTRUM=sp,WAVELENGTH=*self.wavelength, WAVE_UNITS='um', $
+                   FLUX_UNITS=self.as_built.fluxcon?'MJy/sr':'e/s/pix'
+  
+  oSP->InitHeader
+  oSP->AddPar,'CBSMVERS',self.version,'CUBISM Build Version'
+  
+  ;; Add the first header as inheritance
+  m=min((*self.DR).DCEID,pos)
+  h1=*(*self.DR)[pos].HEADER
+  oSP->InheritHeader,h1,'KEYWORDS FROM FIRST BCD'
+  
+  oSP->AddHist,['This file contains a spectral extraction created from',$
+                'an IRS spectral mapping dataset.'],/COMMENT
+  
+  oSP->Save,file
+  
+  if n_elements(destroy) ne 0 then obj_destroy,oSP
 end
 
 
@@ -3395,21 +3390,31 @@ end
 ;                      interpolated onto the actual wavelength
 ;                      samples.  Overrides foreranges
 ;
-;             MNAME: A named map set to pull from the archive.  Ranges
-;                    and weights from the named map will override any
-;                    passed otherwise.
+;             MAP_NAME: A named map set to pull from the archive.
+;                       Ranges and weights from the named map will
+;                       override any passed otherwise.
 ;
-;     XXXX: Switch from position to wavelength based ????        
+;             WAVELENGTH_WEIGHTED: Rather than a simple average of
+;                      backgrounds, at each foreground wavelength, a
+;                      weighted average of all BG planes will be
+;                      performed, with more weight given to planes
+;                      according to their proximity by in wavelength.
+;
 ;=============================================================================
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
-                         BG_VALS=bg_vals,MAP_NAME=mname, SAVE=save
+                         BG_VALS=bg_vals,MAP_NAME=mname, SAVE=save, $
+                         CONTINUUM_IMAGE=ci, WAVELENGTH_WEIGHTED=ww,ALL=all
+  
+  ;; XXX WW
+  
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   ;; Get a map set by name
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
      oMap->GetMap,mname,WEIGHTS=weights,FORERANGES=foreranges, $
                   BACKRANGES=backranges, WAVELENGTH_CONVERT=*self.WAVELENGTH
-  endif
+  endif else if keyword_set(all) then $
+     foreranges=[0,n_elements(*self.WAVELENGTH)-1]
   
   sf=size(foreranges,/DIMENSIONS)
   if n_elements(sf) eq 2 then nfr=sf[1] else nfr=1
@@ -3517,15 +3522,15 @@ end
 ;  AddHeaderInfo - Add the header information only we know
 ;=============================================================================
 pro CubeProj::AddHeaderInfo,hdr
-  fxaddpar,hdr,'APERNAME',self.MODULE,' The IRS module'
+  fxaddpar,hdr,'APERNAME',self.MODULE,' IRS module'
   fxaddpar,hdr,'CUBS_VER',self.version,' CUBISM version used'
   self->LoadCalib
   name=self.cal->Name()
   if name eq '' then name=self.cal_file
   fxaddpar,hdr,'CAL_SET',name,' IRS Calibration set used'
-  sxaddhist,['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
-             'For more information on SINGS see http://sings.stsci.edu'], $
-            hdr,/COMMENT
+;   sxaddhist,['The SIRTF Nearby Galaxy Survey (SINGS) Legacy Project', $
+;              'For more information on SINGS see http://sings.stsci.edu'], $
+;            hdr,/COMMENT
 end
 
 ;=============================================================================
@@ -3705,11 +3710,11 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
      data=readfits(files[i],header,/SILENT)
      if ~stregex(files[i],'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
         bcdfile=irs_associated_file(files[i])
-        if size(bcdfile,/TYPE) eq 7 then header=headfits(bcdfile)
+        if bcdfile && file_test(bcdfile,/READ) then header=headfits(bcdfile)
      endif 
      
      bfile=irs_associated_file(files[i],/BMASK)
-     if size(bfile,/TYPE) eq 7 && file_test(bfile,/READ) then $
+     if bfile && file_test(bfile,/READ) then $
         bmask=readfits(bfile,/SILENT) else bmask=0
      
      self->AddBCD,data,header,FILE=files[i],BMASK=bmask,ERR=err,_EXTRA=e
@@ -3725,7 +3730,7 @@ end
 ;=============================================================================
 pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
                      DCEID=dceid,EXP=exp,COLUMN=col, ROW=row, $
-                     RQST_POS=rqpos, REC_POS=rpos, PA=pa,ERR=err
+                     RQST_POS=rqpos, REC_POS=rpos, PA=pa,ERR=err,DISABLED=dis
   self->LoadCalib
   ;; Don't add same file twice
   if n_elements(file) ne 0 AND ptr_valid(self.DR) then $
@@ -3818,6 +3823,9 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   
   rec.TIME=sxpar(header,'RAMPTIME')
   rec.DATE=systime(/JULIAN)
+  
+  ;; Disabled status
+  if keyword_set(dis) then rec.DISABLED=1b
   
   if ptr_valid(self.DR) then *self.DR=[*self.DR,rec] else $
      self.DR=ptr_new(rec,/NO_COPY)
@@ -3975,8 +3983,11 @@ pro CubeProj__define
       BACK_DATE: 0.0D, $        ;date background created
       BACK_CNT:0, $             ;count of records used to create background
       BACK_EXP_LIST: ptr_new(),$ ;list of expids used for the background
+      BG_SP_FILE:'', $          ;file used for 1D BG subtraction
       GLOBAL_BAD_PIXEL_LIST: ptr_new(),$ ;a user list of bad pixels to exclude
+      BACK_SP_FILE: '', $       ;Background 1D spectrum file
       fluxcon:0b, $             ;whether to build with FLUXCON fluxes
+      slcf: 0b, $               ;whether to build with the SLCF
       reconstructed_pos:0b, $   ;whether to build with reconstructed positions
       cal_file:'', $            ;the calibration file used (if not a full
                                 ; directory, in the "calib/" subdir)
@@ -4004,6 +4015,7 @@ pro CubeProj__define
      BACKGROUND: ptr_new(),$    ;the background image (if any) to subtract
      BACKGROUND_UNC:ptr_new(),$ ;the uncertainty in the background
      SCALED_BACK: ptr_new(), $  ;the scaled background for stacks
+     BG_SP: ptr_new(), $        ;2xn background spectrum for 1D subtractions
      POSITION:[0.0D,0.0D], $    ;optimized position of the cube center
      PA:0.0D, $                 ;optimized position angle of the cube
      MERGE:ptr_new(),$          ;a set of records to aid merging the orders
@@ -4086,6 +4098,7 @@ pro CubeProj__define
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(4), $ ;background record must be set
+         MUST_BG_SP:0L, $       ;required background spectrum
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
          MUST_UNRESTORED:0L}    ;must have unrestored data
   
