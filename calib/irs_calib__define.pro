@@ -146,7 +146,7 @@
 ;             generate this WAVSAMP, it is created.
 ;
 ;          PR_WIDTH: If PIXEL_BASE is set, the width of the PR in
-;cal=             pixels.  Defaults to 1.
+;             pixels.  Defaults to 1.
 ;
 ;          SAVE_POLYGONS: If set, the polygons created by clipping to
 ;             the detector grid are saved.  These polygons are
@@ -320,14 +320,17 @@
 ;  GetProperty - Get object properties
 ;=============================================================================
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
-                            WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx
+                            WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
+                            PLATE_SCALE=ps
   rec=self->GetRecord(module,order,/MUST_EXIST)
   if size(rec,/TYPE) ne 8 then return
-  if arg_present(name) then name=self.name
   if arg_present(sl) then sl=rec.SLIT_LENGTH
   if arg_present(wc) then  wc=rec.WAV_CENTER
   if arg_present(wmn) then  wmn=rec.WAV_MIN
   if arg_present(wmx) then  wmx=rec.WAV_MAX
+  if arg_present(name) then name=self.name
+  if arg_present(ps) then ps=rec.PLATE_SCALE
+
   ;;if arg_present(sz) then sz=self.detsize[*,0>irs_module(module)<5]
 end
 
@@ -356,6 +359,9 @@ end
 function IRS_Calib::Info, modules, orders
   if n_elements(modules) eq 0 then modules=indgen(4)
   str=' == IRS Calibration Object: '+self.Name+' =='
+  str=[str,'', $
+       '   PLATESCALE: '+self.PLATESCALE_FILE, $
+       '  FRAME_TABLE: '+self.FRAMETABLE_FILE]
   for i=0,n_elements(modules)-1 do begin 
      md=irs_module(modules[i])
      module=irs_module(md,/TO_NAME)
@@ -381,6 +387,9 @@ function IRS_Calib::Info, modules, orders
                         module,rec.order, $
                         rec.Date eq 0.0D?"--":jul2date(rec.Date))]
         nw=ptr_valid(rec.WAVSAMPS)?n_elements(*rec.WAVSAMPS):0
+        str=[str, $
+             string(FORMAT='("         Position: Z: ",F8.3," Y:",' + $
+                    'F8.3," Angle:",F8.3)',rec.TPF_Z,rec.TPF_Y,REC.TPF_ANGLE)]
         str=[str, $
              "          A:"+strjoin(string(FORMAT='(G10.3)',rec.A)), $
              "          B:"+strjoin(string(FORMAT='(G10.3)',rec.B)), $
@@ -418,7 +427,7 @@ function IRS_Calib::Info, modules, orders
                                   strtrim(n_elements(flags),2)+ $
                                   '(A,:,", "))',flags)+")"
            str=[str,aps]
-        endfor
+        endfor 
      endfor
   endfor
   return,str
@@ -500,7 +509,6 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
                                 PIXEL_BASED=pb, PR_WIDTH=width, $
                                 NO_CACHE=nc, SAVE_POLYGONS=sp
   rec=self->GetRecord(module,order,/MUST_EXIST)
-  
   ws=self->FindWAVSAMP(module,order,APERTURE=aperture,COUNT=nsamp,FULL=full, $
                        PIXEL_BASED=pb, PR_WIDTH=width)
   
@@ -582,6 +590,15 @@ end
 ;                 widths, and align as closely as possible to the
 ;                 pixel boundaries.  Set this new WAVSAMP into the
 ;                 record, and clip the full version.
+;
+;                 This will add a full pixel-based WAVSAMP to all records:
+;
+;                 for md=0,3 do begin & ords=i->Orders(md) &
+;                 for ord=0,n_elements(ords)-1 do
+;                 i->PixelWAVSAMP,md,ords[ord] &
+;                 endfor
+;
+;                 save,i,FILENAME='irs_2004_01_01-pb.cal',/COMPRESS
 ;=============================================================================
 pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   rec=self->GetRecord(module,order,/MUST_EXIST)
@@ -656,7 +673,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
      pr.angle=theta
      pr.cen=[x_cen,y_cen[i]]
      if n_elements(prs) eq 0 then begin 
-        prs=[pr] 
+        prs=[pr]
      endif else begin 
         if width le 1. then begin 
            ;; XXX- should we really do this?  It avoids gaps for 1xn
@@ -709,11 +726,11 @@ end
 ;                     0.0                       1.0 
 ;                      |=========================|
 ;             
-;                        <--low                   
-;                      1-------------    high-->  
-;                      |             \-----------0 
-;                      2-------------            |
-;                                    \-----------3
+;                        <--low                         ^
+;                      1-------------    high-->         \   angle theta
+;                      |             \-----------0        \   increasing
+;                      2-------------            |         |
+;                                    \-----------3         |
 ;                                    
 ;=============================================================================
 function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
@@ -779,7 +796,7 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
         if keyword_set(sp) then $
            (*new.PR)[i].POLYGONS=ptr_new()
      endelse 
-  endfor 
+  endfor
   ;; Remove the PR's which didn't fall on the array
   good=where(ptr_valid((*new.PR).PIXELS),goodcnt)
   if goodcnt eq 0 then message,'No WAVSAMP pseudo-rects exist on array'
@@ -816,53 +833,71 @@ pro IRS_Calib::Trim,x,y,APERTURE=aper
 end
 
 ;=============================================================================
-;  DeOverlap - Renormalize fractional areas for any areas of overlap
-;              between two PRs, given a list of PRs.  This assumes at
-;              most 2 PRs can overlap in any given location.  For unit
-;              width, unit spaced PRs, this is valid up to tilt angles
-;              of 60 degrees.
+;  TransformCoords - Transform from a SIRTF-FOV-centric coordinate set
+;                    to one centered on a given module/order.
 ;=============================================================================
-pro IRS_Calib::DeOverlap, prs
-  thisx=prs[0].X & thisy=prs[0].Y
-  for i=0,n_elements(prs)-2 do begin
-     nextx=prs[i+1].X
-     nexty=prs[i+1].Y
-     ;; Clip the adjacent PR's to find the overlap
-     twopolyclip,thisx,thisy,nextx,nexty
-     if thisx[0] ne -1 then begin
-        print,'Got an overlap: ',thisx,thisy
-        ;; Clip the overlapping area to the grid
-        overlap_pix=polyfillaa(thisx,thisy,128,128,AREAS=overlap_areas)
-        if overlap_pix[0] ne -1 then begin
-           wh=where_array(overlap_pix,*prs[i].PIXELS,cnt)
-           if cnt gt 0 then begin 
-              print,'deoverlapping pixels: ',(*prs[i].PIXELS)[wh]
-              print,'with overlap areas: ',overlap_areas
-              (*prs[i].AREAS)[wh]=(*prs[i].AREAS)[wh]-.5*overlap_areas
-           endif 
-           wh=where_array(overlap_pix,*prs[i+1].PIXELS,cnt)
-           if cnt gt 0 then $
-              (*prs[i+1].AREAS)[wh]=(*prs[i+1].AREAS)[wh]-.5*overlap_areas
-        endif 
-     endif 
-     thisx=nextx & thisy=nexty
-  endfor  
+pro IRS_Calib::TransformCoords,module,coords,pa,ORDER=ord,outcoords,outpa
+  ;; XXX CHECK THIS
+  rec=self->GetRecord(module,ord,/MUST_EXIST)
+  ang=pa/!RADEG
+  c=cos(ang) & s=sin(ang)
+  outcoords=coords + [[c,s],[-s,c]] ## [rec.TPF_Y,rec.TPF_Z]
+  outpa=pa+(360.0D - rec.TPF_ANGLE)
 end
 
 
 ;=============================================================================
+;  DeOverlap - Renormalize fractional areas for any areas of overlap
+;              between two PRs, given a list of PRs.  This assumes at
+;              most 2 PRs can overlap in any given location.  For unit
+;              width, unit spaced PRs, this is valid up to tilt angles
+;              of 60 degrees (i.e. always). XXX what about 2xn?
+;=============================================================================
+; pro IRS_Calib::DeOverlap, prs
+;   thisx=prs[0].X & thisy=prs[0].Y
+;   for i=0,n_elements(prs)-2 do begin
+;      nextx=prs[i+1].X
+;      nexty=prs[i+1].Y
+;      ;; Clip the adjacent PR's to find the overlap
+;      twopolyclip,thisx,thisy,nextx,nexty
+;      if thisx[0] ne -1 then begin
+;         print,'Got an overlap: ',thisx,thisy
+;         ;; Clip the overlapping area to the grid
+;         overlap_pix=polyfillaa(thisx,thisy,128,128,AREAS=overlap_areas)
+;         if overlap_pix[0] ne -1 then begin
+;            wh=where_array(overlap_pix,*prs[i].PIXELS,cnt)
+;            if cnt gt 0 then begin 
+;               print,'deoverlapping pixels: ',(*prs[i].PIXELS)[wh]
+;               print,'with overlap areas: ',overlap_areas
+;               (*prs[i].AREAS)[wh]=(*prs[i].AREAS)[wh]-.5*overlap_areas
+;            endif 
+;            wh=where_array(overlap_pix,*prs[i+1].PIXELS,cnt)
+;            if cnt gt 0 then $
+;               (*prs[i+1].AREAS)[wh]=(*prs[i+1].AREAS)[wh]-.5*overlap_areas
+;         endif 
+;      endif 
+;      thisx=nextx & thisy=nexty
+;   endfor  
+;end
+
+
+;=============================================================================
 ;  GetRecord - Get the calibration record for a given module and
-;              order, or make one, if none yet exists.
+;              order, or make one, if none yet exists.  If order is
+;              omitted, the first order for the matching module is
+;              returned.
 ;=============================================================================
 function IRS_Calib::GetRecord, module, order, MUST_EXIST=me
   m=irs_module(module)
   if ptr_valid(self.cal[m]) then begin 
-     wh=where((*self.cal[m]).Order eq order,cnt)
+     if n_elements(order) eq 0 then begin 
+        cnt=1 & wh=0            ; default to using the first order on the list
+     endif else wh=where((*self.cal[m]).Order eq order,cnt)
      if cnt gt 0 then return,(*self.cal[m])[wh[0]]
   endif 
   if keyword_set(me) then begin 
      message,'No such record exists: '+ $
-             irs_module(module,/TO_NAME)+' Order: '+strtrim(order,2)
+             irs_module(module,/TO_NAME)+' Order '+strtrim(order,2)
      return,-1
   endif 
   st={IRS_CalibRec}           ; None found, just create a new one
@@ -898,65 +933,87 @@ end
 
 ;=============================================================================
 ;  ReadCalib - Read (up to) all three calibration files for a given
-;              module or modules, and record in the object.
+;              module or modules, and record in the object.  Also
+;              module-inspecific calibration files and add data as
+;              appropriate.
 ;=============================================================================
 pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
-                           TILT_VERSION=tv,ONLY=only
-  @irs_dir                    ;get irs_calib_dir
-  
-  cals=['WAVSAMP','ORDFIND','LINETILT']
+                         TILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
+                         PLATESCALE_VERSION=psv,ONLY=only
+  cals=replicate({name:'', type:''},5)
+  cals.name=['ORDFIND', 'LINETILT','WAVSAMP','FRAMETABLE','PLATESCALE']
+  cals.type='single' & cals[[3,4]].type='all'
+
   version=[n_elements(wv)  gt 0?fix(wv)>0:0, $
            n_elements(orv) gt 0?fix(orv)>0:0, $
-           n_elements(tv)  gt 0?fix(tv)>0:0]
+           n_elements(tv)  gt 0?fix(tv)>0:0, $
+           n_elements(fv)  gt 0?fix(fv)>0:0, $
+           n_elements(psv) gt 0?fix(psv)>0:0]
   
   if keyword_set(only) then begin 
-     which=where([n_elements(wv) ne 0, $
-                  n_elements(orv) ne 0, $
-                  n_elements(tv) ne 0],cnt)
+     which=where([n_elements(wv)  , $
+                  n_elements(orv) , $
+                  n_elements(tv)  , $
+                  n_elements(fv)  , $
+                  n_elements(psv) ] ne 0 ,cnt)
      if cnt eq 0 then return
-     cals=cals[which]
+     cals=cals[which]           ;only these cals are to be used
      version=version[which]
   endif 
 
   if n_elements(module) ne 0 then modules=[irs_module(module)] $
   else modules=indgen(4)        ;do them all, by default
   
+  singles=where(cals.type eq 'single',COMPLEMENT=alls,NCOMPLEMENT=acnt,scnt)
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
-     for j=0,n_elements(cals)-1 do begin 
-        ;; BEWARE!!!! This relies on file naming conventions which the
-        ;; SSC has not yet agreed upon.
-        base="irs_b"+strtrim(md,2)+"_"+ cals[j]+"v"
-        
-        ;; A specific version was requested, check it
-        if version[j] gt 0 then begin 
-           cfile=base+strtrim(version[j],2)+'.tbl'
-           if file_test(filepath(ROOT=irs_calib_dir,SUBDIR="ssc", $
-                                 cfile),/READ,/REGULAR) eq 0 then begin 
-              message,'No such calibration file: '+cfile
-              version[j]=0
-           endif 
-        endif 
-        
-        ;; Find all versions for this module
-        if version[j] eq 0 then begin 
-           cal_files=findfile(COUNT=fcnt,filepath(ROOT=irs_calib_dir, $
-                                       SUBDIR="ssc",base+"*.tbl"))
-           if fcnt eq 0 then begin 
-              message, /CONTINUE,"Didn't find any calibration files: " +$
-                       cals[j]+' for '+irs_module(md,/TO_NAME)
-              continue
-           endif 
-           vers=max(fix((stregex(cal_files,base+"([0-9]+)"+".tbl$",$
-                                 /EXTRACT,/SUBEXPR))[1,*]),mpos)
-           cfile=cal_files[mpos] ;use the latest version
-        endif 
-        
-        ;; Now that we have the relevant calibration file, parse it.
-        call_method,'Parse'+cals[j],self,cfile,md
+     for j=0,scnt-1 do begin 
+        base="irs_b"+strtrim(md,2)+"_"+ cals[singles[j]].name+"v"
+        cfile=self->CalibrationFileVersion(base,version[singles[j]], $
+                                           cals[singles[j]].name,md)
+        if size(cfile,/TYPE) ne 7 then continue
+        call_method,'Parse'+cals[singles[j]].name,self,cfile,md
      endfor
   endfor
+  
+  for j=0,acnt-1 do begin 
+     base="irs_"+cals[alls[j]].name+"v"
+     cfile=self->CalibrationFileVersion(base,version[alls[j]], $
+                                        cals[alls[j]].name)
+     call_method,'Parse'+cals[alls[j]].name,self,cfile 
+  endfor
 end
+
+
+;=============================================================================
+;  Return - Latest calibration file, or requested version
+;=============================================================================
+function IRS_Calib::CalibrationFileVersion,base,version,name,md
+  @irs_dir                    ;get irs_calib_dir
+  ;; A specific version was requested, check it
+  if version gt 0 then begin 
+     cfile=base+strtrim(version,2)+'.tbl'
+     if file_test(filepath(ROOT=irs_calib_dir,SUBDIR="ssc", $
+                           cfile),/READ,/REGULAR) eq 0 then $
+        message,'No such calibration file: '+cfile
+  endif 
+        
+  ;; Find all versions for this module
+  if version eq 0 then begin 
+     cal_files=findfile(COUNT=fcnt,filepath(ROOT=irs_calib_dir, $
+                                            SUBDIR="ssc",base+"*.tbl"))
+     if fcnt eq 0 then begin 
+        message,/CONTINUE,"Didn't find any calibration files: " +$
+                name+(n_elements(md) ne 0?(' for '+irs_module(md,/TO_NAME)):"")
+        return,-1
+     endif
+     vers=max(fix((stregex(cal_files,base+"([0-9]+)"+".tbl$",$
+                           /EXTRACT,/SUBEXPR))[1,*]),mpos)
+     cfile=cal_files[mpos]      ;use the latest version
+  endif 
+  return,cfile
+end
+
 
 ;=============================================================================
 ;  ParseWAVSAMP - Read and parse the specified WAVSAMP file, clipping
@@ -1045,6 +1102,44 @@ pro IRS_Calib::ParseLineTilt,file,module
 end
 
 ;=============================================================================
+;  ParseFrameTable - Parse frame table and update individual orders
+;                    offsets/angles.
+;=============================================================================
+pro IRS_Calib::ParseFrameTable,file
+  data=read_ipac_table(file)
+  names=strupcase(strtrim(data.fov_name,2))
+  for i=0,4 do begin 
+     if ptr_valid(self.cal[i]) eq 0 then continue
+     for j=0,n_elements(*self.cal[i])-1 do begin 
+        mname=irs_fov(/LOOKUP_MODULE, /RETURN_NAME, $
+                      MODULE=irs_module(/TO_NAME,(*self.cal[i])[j].MODULE), $
+                      ORDER=(*self.cal[i])[j].ORDER, $
+                      POSITION=0)
+        wh=where(names eq strupcase(mname),cnt)
+        if cnt eq 0 then message,'No frame table entry found for: '+mname
+        (*self.cal[i]).TPF_Z= data[wh[0]].brown_theta_Y/60.D
+        (*self.cal[i]).TPF_Y=-data[wh[0]].brown_theta_Z/60.D
+        (*self.cal[i]).TPF_ANGLE=data[wh[0]].angle
+     endfor 
+  endfor 
+  self.FRAMETABLE_FILE=file
+end
+
+;=============================================================================
+;  ParsePlateScale
+;=============================================================================
+pro IRS_Calib::ParsePlateScale,file
+  data=read_ipac_table(file)
+  for i=0,4 do begin 
+     if ptr_valid(self.cal[i]) eq 0 then continue
+     wh=where(data.mod_num eq i,cnt)
+     if cnt eq 0 then continue
+     (*self.cal[i]).PLATE_SCALE=data[wh[0]].plate_scale/3600.0D
+  endfor 
+  self.PLATESCALE_FILE=file
+end
+
+;=============================================================================
 ;  CleanupWAVSAMP - Delete the contents of one or more WAVSAMP records
 ;                   by freeing the internal pointers, or just clear
 ;                   the PIXELS and AREAS (and optionally POLYGONS) if
@@ -1099,6 +1194,8 @@ end
 pro IRS_Calib__define
   class={IRS_Calib, $         
          Name: '', $            ;A name for this IRS Calibration object
+         PLATESCALE_FILE:'', $  ;The name of the plate scale file
+         FRAMETABLE_FILE:'', $ 
          WAVSAMP_FILE:strarr(5), $ ;the names of the wavsamp files (WAVSAMP)
          TILT_FILE:strarr(5),$  ;the name of the tilt file (c)
          ORDER_FILE:strarr(5), $ ;the name of the ordfind output file (a & b)
@@ -1112,10 +1209,14 @@ pro IRS_Calib__define
        MODULE: 0, $             ;which module 0:LH, 1:LL, 2:SH, 3:SL, 4:MSED
        ORDER: 0, $              ;the order number this data corresponds to.
        Date:0.0D, $             ;Date First constructed
-       WAV_CENTER: 0.0, $       ;the central order wavelength
-       WAV_MIN: 0.0, $          ;the minimum order wavelength
-       WAV_MAX: 0.0, $          ;the maximum order wavelength
-       SLIT_LENGTH: 0.0, $      ;the length of the slit in pixels
+       TPF_Z:0.0D, $            ;[deg] Offset of slit center in Z
+       TPF_Y:0.0D, $            ;[deg] Offset of slit center in Y
+       TPF_ANGLE:0.0D, $        ;[deg] angle of FOV +w C.W. from TPF +Z
+       WAV_CENTER: 0.0, $       ;[um] the central order wavelength
+       WAV_MIN: 0.0, $          ;[um] the minimum order wavelength
+       WAV_MAX: 0.0, $          ;[um] the maximum order wavelength
+       SLIT_LENGTH: 0.0, $      ;[pix] the length of the slit
+       PlATE_SCALE: 0.0, $      ;[deg/pix] the plate scale along the slit
        A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
        C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
@@ -1128,7 +1229,7 @@ pro IRS_Calib__define
       PIXEL_BASED: 0b, $        ;whether traditional or pixel-based WAVSAMP
       FULL: 0b, $               ;is this the full (untrimmed) WAVSAMP?
       PR_WIDTH: 0.0, $          ;if PIXEL_BASED, the width of the PR
-      Aperture:{IRS_APERTURE}, $ ;The IRS_APERTURE aperture
+      Aperture:{IRS_APERTURE}, $ ;The IRS_APERTURE aperture used for this WS
       PR: ptr_new()}            ;A list of IRS_WAVSAMP_PSEUDORECT structs
   
   ;; A single WAVSAMP pseudo-rectangle (PR), with pre-computed
@@ -1138,7 +1239,7 @@ pro IRS_Calib__define
   ;;         2         3
   st={IRS_WAVSAMP_PSEUDORECT , $
       lambda: 0.0, $            ;wavelength of PR center
-      cen:[0.0,0.0], $          ;x,y, center of PR
+      cen:[0.0,0.0], $          ;x,y, center of full-slit PR
       x:fltarr(4), $            ;X positions of the PR vertices
       y:fltarr(4), $            ;Y positions of the PR vertices
       angle: 0.0, $             ;Angle, anti-clockwise about x axis
