@@ -18,7 +18,7 @@
 ; INPUT PARAMETERS:
 ;
 ;    hist_or_comment: The string or string array to add, prepended
-;       with \HISTORY or \COMMENT.
+;       with \ HISTORY or \ COMMENT.
 ;
 ;    hdr: The IPAC TABLE header to be modified.
 ;
@@ -71,11 +71,11 @@ pro ipac_table_addhist,value,hdr,COMMENT=comm,BLANK=blank
   if n_elements(value) eq 0 then $
      message,'Invalid IPAC TABLE header: must be string or string array.'
   
-  add=(keyword_set(comm)?'\COMMENT ': $
-       (keyword_set(blank)?'\':'\HISTORY ')) + value
+  add=(keyword_set(comm)?'\ COMMENT ': $
+       (keyword_set(blank)?'\ ':'\ HISTORY ')) + value
   
   ;; Add comment before history, and history at end of History
-  wh=where(strpos(hdr,'\HISTORY') eq 0,cnt)
+  wh=where(strpos(hdr,'\ HISTORY') eq 0,cnt)
   if cnt gt 0 then insert_at=keyword_set(comm)?wh[0]:wh[cnt-1]+1
   
   if n_elements(hdr) gt 0 && hdr[0] then begin
