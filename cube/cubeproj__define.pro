@@ -170,10 +170,8 @@ pro CubeProj::ShowEvent, ev
      'replace-string': $
         begin 
         if sel[0] eq -1 then return
-        files=(*self.DR)[sel].FILE
+        f=(*self.DR)[sel].FILE
         cnt=0
-        for i=0,n_sel-1 do $
-           if n_elements(f) eq 0 then f=[*files[i]] else f=[f,*files[i]]
         nf=n_elements(f) 
         if nf gt 1 then begin 
            lab='Replacing text of '+strtrim(nf,2)+' files:'
@@ -287,11 +285,11 @@ pro CubeProj::ShowEvent, ev
      
      'about': self->Info,TITLE='About Cube Project', $
                          ['*********************************', $
-                          '       Cube Project v0.1         ', $
-                          '          CUBISM v0.01           ', $
+                          '       Cube Project v0.2         ', $
+                          '          CUBISM v0.1            ', $
                           '                                 ', $
-                          '         JD Smith -- 2002        ', $
-                          '  http://sings.sirtf.edu/cubism  ', $
+                          '       JD Smith -- 2002,2003     ', $
+                          '  http://sings.stsci.edu/cubism  ', $
                           '*********************************']
      
      else: call_method,action,self ;all others, just call the named method
