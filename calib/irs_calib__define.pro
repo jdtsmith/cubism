@@ -16,7 +16,7 @@
 ;    	
 ; COMMON BLOCKS:
 ;
-;    IRS_DIR: Included through file irs_dir.pro.  Defines the path
+;    CUBISM_DIR: Included through file cubism_dir.pro.  Defines the path
 ;       location of the IRS calibration directory.  This path,
 ;       irs_calib_dir, is auto-defined if it doesn't yet exist.
 ;
@@ -989,7 +989,7 @@ end
 ;  Return - Latest calibration file, or requested version
 ;=============================================================================
 function IRS_Calib::CalibrationFileVersion,base,version,name,md
-  @irs_dir                    ;get irs_calib_dir
+  @cubism_dir                    ;get irs_calib_dir
   ;; A specific version was requested, check it
   if version gt 0 then begin 
      cfile=base+strtrim(version,2)+'.tbl'
