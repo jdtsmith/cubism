@@ -232,6 +232,7 @@ end
 ;  MarkAll - Mark all bad pixels
 ;=============================================================================
 pro CubeBadPix::MarkAll
+  self->EnsureCube
   self.cube->GetProperty,GLOBAL_BAD_PIXEL_LIST=bpl,/POINTER
   if ptr_valid(bpl) then $
      for i=0,n_elements(*bpl)-1 do self->DrawMark,(*bpl)[i]
