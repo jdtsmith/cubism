@@ -428,8 +428,9 @@ function cw_xf_event, ev
           INPUT_FOCUS=1-state.keep_focus,SET_TEXT_SELECT=strlen(selection[0])
          if state.oc ne 0 or ev.clicks eq 2 then begin ;if oc or double clicked
             if state.sf ne 0 then begin ;ask user if he wants to overwrite
-               ret=widget_message('Overwrite '+selection+'?',/question, $
-                                  /DEFAULT_NO,TITLE='Overwrite?',DIALOG=ev.top)
+               ret=widget_message('Overwrite '+file_basename(selection)+'?', $
+                                  /question,/DEFAULT_NO,TITLE='Overwrite?', $
+                                  DIALOG=ev.top)
                if ret eq 'No' then begin ;no overwrite
                   ;;--- put state back into stash
                   widget_control, stash, set_uvalue=state, /NO_COPY
@@ -508,8 +509,9 @@ function cw_xf_event, ev
             endif
          endif else begin ; for saving, a nonexistant file is NOT and error.
             if file_test(selection) then begin ; file is valid
-               ret=widget_message('Overwrite '+selection+'?',/question, $
-                                  /DEFAULT_NO,TITLE='Overwrite?',DIALOG=ev.top)
+               ret=widget_message('Overwrite '+file_basename(selection)+'?', $
+                                  /question, /DEFAULT_NO,TITLE='Overwrite?', $
+                                  DIALOG=ev.top)
                if ret eq 'No' then begin ;no overwrite
                   widget_control, state.selection_id,set_value=dir
                    ;;--- put state back into stash before swallowing event
@@ -616,8 +618,9 @@ function cw_xf_event, ev
             endif else begin    ; for saving, a nonexistant file is NOT
                                 ; an error.
                if file_test(selection[0]) then begin ; file *is* valid
-                  ret=widget_message('Overwrite '+selection[0]+'?',/question, $
-                                     /DEFAULT_NO,TITLE='Overwrite?', $
+                  ret=widget_message('Overwrite '+ $
+                                     file_basename(selection[0])+'?', $
+                                     /question,/DEFAULT_NO,TITLE='Overwrite?',$
                                      DIALOG=ev.top)
                   if ret eq 'No' then begin ;no overwrite
                      ;;--- put state back into stash before swallowing event
