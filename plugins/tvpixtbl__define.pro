@@ -184,6 +184,7 @@ pro tvPixTbl::UpdateTable, im,point
   ;; create row and column labels
   widget_control, self.wTable, SET_VALUE=show, $
                   SET_TABLE_SELECT=[pad,pad], $
+                  USE_TABLE_SELECT=[0,0,self.tblsize], $
                   COLUMN_LABELS=strtrim(indgen(self.tblsize[0])-pad[0]+ $
                                         point[0],2), $
                   ROW_LABELS=strtrim(indgen(self.tblsize[1])-pad[1]+point[1],2)
