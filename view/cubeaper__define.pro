@@ -63,7 +63,7 @@ pro CubeAper::Message, msg
            0: begin             ;button press
               if msg.press ne 1b then return
               self.oDraw->SetWin
-              n=(size(*self.top_corners,/DIMENSIONS))[1]
+              n=n_elements(*self.top_corners)/4
               p=rebin(float([msg.X,msg.Y]),2,2*n,/SAMPLE)
               vals=[self.top_corners,self.bottom_corners,self.sides]
               
@@ -104,6 +104,7 @@ pro CubeAper::Message, msg
                  if nap gt 1 then *self.aps=(*self.aps)[self.working_on]
               endif
               self->UpdateApDrop
+              self->SetAper
               self.working_on=-1
               self.oDraw->MsgSignup,self,DRAW_MOTION=0 ;turn off motion
               self.editing=0b
@@ -159,10 +160,12 @@ end
 ;=============================================================================
 ;  Off - Editing off
 ;============================================================================
-pro CubeAper::Off
+pro CubeAper::Off,RESET=reset
   self.working_on=-1
-  self.mode=self.mode AND NOT 2b ;remove editing bit
+  if keyword_set(reset) then self.mode=0b else $
+     self.mode=self.mode AND NOT 2b ;remove editing bit
   widget_control,self.wWSBut,GET_VALUE=val
+  if keyword_set(reset) then val[0]=0
   val[1]=0
   widget_control,self.wWSBut,SET_VALUE=val
   widget_control, self.wWSButs[2],SENSITIVE=0 ;lock non-sensitive
@@ -304,8 +307,10 @@ pro CubeAper::UpdateApDrop
      ind=nap eq 1?0:(self.working_on>0)
      aps=[(*self.aps).low,(*self.aps).high]
   endelse 
-  prefix=nap gt 0?(nap eq 1?'All':string(FORMAT='(I2)',*self.orders)):'--'
-  prefix=prefix+':'
+  nord=n_elements(*self.orders) 
+  prefix=nap gt 0?(nap eq 1 AND nord gt 1?'All': $
+                   string(FORMAT='(I2)',*self.orders)):'--'
+  prefix=prefix+' : '
   widget_control,self.wapDrop,SET_DROPLIST_SELECT=ind,SET_VALUE= $
                  prefix+string(FORMAT='(%"%4.2f->%4.2f:%4.2f->%4.2f")',aps)
 end
@@ -327,6 +332,7 @@ pro CubeAper::SetFull
   (*self.aps).low =[0.,0.]
   (*self.aps).high=[1.,1.]
   self->UpdateApDrop
+  self->SetAper
   if self.mode AND 1b then self.oDraw->ReDraw,/SNAPSHOT
 end
 ;=============================================================================
@@ -352,9 +358,9 @@ function CubeAper::Init,parent,oDraw,COLOR=color
                         UVALUE=self)
   self.wapDrop=widget_droplist(base,VALUE='--- ____->____:____->____', $
                                EVENT_PRO='CubeAper_DiscardEvent')
-  but=cw_bgroup(parent,['Reset to Full','Send to Project'],UVALUE=self, $
+  but=cw_bgroup(parent,['Reset to Full'],UVALUE=self, $
                 EVENT_FUNC='CubeAper_SetEvent',/COLUMN, $
-                BUTTON_UVALUE=['SetFull','SetAper'])
+                BUTTON_UVALUE=['SetFull'])
   widget_control, ids[2],SENSITIVE=0
   if n_elements(color) ne 0 then self.color=color
   self.wWSButs=ids
