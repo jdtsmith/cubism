@@ -48,7 +48,7 @@ end
 ;  On
 ;=============================================================================
 pro tvPlug::On
-  self.active=1b
+  self.active=self.active OR 1b
   if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,1b}
 end
 
@@ -56,7 +56,8 @@ end
 ;  Off 
 ;=============================================================================
 pro tvPlug::Off,DISABLE=dis
-  self.active=0b+keyword_set(dis)*2b
+  self.active=self.active AND NOT 1b 
+  if keyword_set(dis) then self.active=self.active OR 2b
   if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,self.active}
 end
 
@@ -72,8 +73,17 @@ end
 ;  Enable
 ;=============================================================================
 pro tvPlug::Enable
-  self.active=self.active AND NOT 2b
+  self.active=self.active AND NOT 2b ;take off the disable bit
   if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,self.active}
+end
+
+;=============================================================================
+;  ReportWidget - A widget over which to display errors, etc.
+;=============================================================================
+function tvPlug::ReportWidget
+  if NOT obj_valid(self.oDraw) then return,-1L
+  self.oDraw->GetProperty,DRAWWIDGET=dw
+  return,dw
 end
 
 ;;*************************End OverRiding methods******************************
@@ -116,6 +126,7 @@ pro tvPlug__define
       INHERITS OMArray, $       ;helper class for ObjMsg for BOOLEAN
                                 ;  message recpient lists
       INHERITS tvPlug_lite, $   ;we're extending the lite version 
+      INHERITS ObjReport, $     ;make it a reporter
       on_off:0b, $              ;are we using on_off messages?
       active:0b}                ;flag: whether we're active (off,on,disabled)
   message={TVPLUG_ON_OFF, Object:obj_new(), Status:0b} ;an on or off message.
