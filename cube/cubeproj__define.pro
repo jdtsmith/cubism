@@ -1588,7 +1588,6 @@ pro CubeProj::BuildAccount,_EXTRA=e
      tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b],!D.TABLE_SIZE-5
      save_win=!D.WINDOW
      self->GetProperty,TLB_OFFSET=tboff,TLB_SIZE=tbsize
-     print,'got: ',tboff
      device,GET_SCREEN_SIZE=ss
      window,XSIZE=xsize,YSIZE=ysize, $
             XPOS=tboff[0]+tbsize[0], YPOS=ss[1]-tboff[1]-ysize, $
