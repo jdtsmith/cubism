@@ -1,13 +1,115 @@
+;+
+; NAME:  
+;
+;    tvPixtbl
+;
+; CONTACT:
+;
+;    UPDATED VERSIONs of SMART and more information can be found at:
+;       http://isc.astro.cornell.edu/smart/download
+;
+; DESCRIPTION:
+;    
+;    A pixel table plugin that displays a 5x5 matrix of the values of
+;    the pixels around the mouse when it is over a tvdraw object.
+;    
+; CATEGORY:
+;
+;    Data display.
+;    	
+;
+; METHODS:
+;
+
+;    INIT:  (alway start with the INIT method function)
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvPixtbl',parent,odraw, [Extra=]
+;             [opt_arg1,...,/BIN_KEYWORD,KEYWORD=])
+;
+;       INPUT PARAMETERS:
+;
+;          parent:  The widget id of the object widget's parent.
+;          
+;	   oDraw: The tvDraw object.
+;
+;       KEYWORD INPUT PARAMETERS:
+;
+;          Extra: Any extra stuff you want to pass in.
+;       ...
+;
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvPixtbl
+;
+; EXAMPLE:
+;
+;    pixobj = obj_new('tvPixtbl', parent, odraw)
+;
+; MODIFICATION HISTORY:
+;
+;    $Log$
+;    Revision 1.2  2002/01/26 21:57:14  nidhi
+;    This is the "All Purpose" box for use with general plugins that just need a selection tool. Also, I dont know how to word wrap this. sorry.
+;
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2001 Cornell University
+;
+;  This file is part of SMART.
+;
+;  SMART is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  SMART is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with SMART; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+;  02111-1307, USA.
+;
+;##############################################################################
+
+
+
+
 ;=============================================================================
 ;       RANDOM JUNK 
 ;=============================================================================
 
 
-function tvPixtbl::Icon2
-  return,[[  0b,  0b],[224b,  7b],[248b, 31b],[252b, 63b], $
-          [ 60b, 60b],[ 30b,120b],[142b,112b],[142b,115b], $
-          [206b,113b],[ 14b,113b],[ 30b,120b],[ 60b, 60b], $
-          [252b, 63b],[248b, 31b],[224b,  7b],[  0b,  0b]]
+function tvPixtbl::Icon
+  return, [                               $
+                [000B, 000B],                   $
+                [254B, 127B],                   $
+                [002B, 064B],                   $
+                [002B, 064B],                   $
+                [218B, 093B],                   $
+                [002B, 064B],                   $
+                [218B, 093B],                   $
+                [002B, 064B],                   $
+                [218B, 093B],                   $
+                [002B, 064B],                   $
+                [218B, 093B],                   $
+                [002B, 064B],                   $
+                [218B, 093B],                   $
+                [002B, 064B],                   $
+                [254B, 127B],                   $
+                [000B, 000B]                    $
+                ]
+
+
 end
 
 
@@ -19,6 +121,12 @@ pro tvPixtbl::Off
 
 end
 
+;pro tvPixtbl_killed, wid
+;  event = {id:wid}
+;  self->Off
+;end
+
+
 
 pro tvPixtbl::On
 
@@ -27,7 +135,8 @@ pro tvPixtbl::On
   tmptbl = intarr(self.tblsize(0), self.tblsize(1))
   self.tblptr = ptr_new(tmptbl) ;a new empty table
   self.wBase=widget_base(/COLUMN, SPACE=1, /FLOATING, $
-                         GROUP_LEADER=self.parent)
+                        GROUP_LEADER=self.parent);, $
+                        ;uvalue=self, kill_notify='tvPixtbl_killed')
 
   self.wTable = widget_table(self.wBase, value=*self.tblptr,/SCROLL, $
                             scr_xsize=425, scr_ysize=150)
@@ -119,24 +228,9 @@ end
 ;=============================================================================
 pro tvpixtbl_event, ev
   widget_control, ev.handler, get_uvalue=self
-
-  if TAG_NAMES(ev, /STRUCTURE_NAME) EQ $
-     'WIDGET_KILL_REQUEST' then begin
-     self->KillEvent, ev
-     print, "auuugh!"
-     return
-  endif
-
-
   self->Event,ev
 end
 
-pro tvPixtbl::KillEvent, ev
-  
-  widget_control, self.wBtn, set_value="PT  On"
-  self->wDestroy
-
-end 
 
 pro tvPixtbl::Event,ev
   widget_control, ev.handler, get_value=tmp
@@ -148,8 +242,8 @@ pro tvPixtbl::Event,ev
      self.tblptr = ptr_new(tmptbl) ;a new empty table
      self.wBase=widget_base(/COLUMN, SPACE=1, /FLOATING, $
                             GROUP_LEADER=self.parent ,$
-                            event_pro="tvpixtbl_event");, $
-                           ; /TLB_KILL_REQUEST_EVENTS)
+                            event_pro="tvpixtbl_event")
+
      self.wTable = widget_table(self.wBase, value=*self.tblptr,/SCROLL, $
                                scr_xsize=425, scr_ysize=150)
 
@@ -163,10 +257,6 @@ pro tvPixtbl::Event,ev
      self->wDestroy
      self.oDraw->MsgSignup,self,/NONE
 
-  ;endif else if TAG_NAMES(ev, /STRUCTURE_NAME) EQ $
-  ;   'WIDGET_KILL_REQUEST' then begin
-  ;   widget_control, self.wBtn, set_value="PT  On"
-  ;   self->wDestroy
   endif else begin
      print, "ERROR: Unknown value returned from tvpixtbl_wBtn"
   endelse
@@ -198,34 +288,12 @@ end
 ;       Init - Initialize the Pixtbl object.
 ;=============================================================================
 
-function tvPixtbl::Init,parent,oDraw,nbase=nbase,_EXTRA=e
+function tvPixtbl::Init,parent,oDraw,_EXTRA=e
   if (self->tvPlug::Init(oDraw, _EXTRA=e) ne 1) then return,0 ; chain up
   self.parent = parent
 
   ;set up table size
   self.tblsize = [5,5]
-  
-  ;if no icon, embed in parent
-  ;if n_elements(nbase) eq 0 then begin 
-
-     ;set up the table widget
-     ;tmptbl = intarr(self.tblsize(0), self.tblsize(1))
-     ;self.tblptr = ptr_new(tmptbl) ;a new empty table
-     ;self.wBase=widget_base(/COLUMN, SPACE=1, /FLOATING, $
-     ;                       GROUP_LEADER=self.parent)
-     ;self.wTable = widget_table(self.wBase, value=*self.tblptr, /SCROLL)
-
-     ;widget_control, self.wBase, /REALIZE
-  
-     ;specify draw_motion events. always on
-     ;self.oDraw->MsgSignup,self,/DRAW_MOTION
-
-  ;endif else begin
-     ;Create a toggle button
-     ;self.nbase = nbase
-     ;self.wBtn = widget_button(self.nbase, value="PT  On", $
-     ;                     event_pro='tvpixtbl_event', uvalue=self)
-  ;endelse
 
   return,1
 end
@@ -237,10 +305,8 @@ pro tvPixtbl__define
   struct={tvPixtbl, $
           INHERITS tvPlug, $    ;make it a plug-in
           parent:0L, $          ;the parent of the widget set
-          nbase:0L, $           ;the non-exclusive toolbar
           wBase:0L, $           ;a base to put the table in
           wTable:0L, $          ;the pixel table widget
-          wBtn:0L, $            ;the button widget
           savpoint: [0,0], $    ;point to save
           tblptr: ptr_new(), $  ;pointer to the data table
           tblsize: [0,0]}       ;columns x rows in table

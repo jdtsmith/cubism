@@ -1,3 +1,11 @@
+;;***************************************************************************
+pro tvSlice::GetProperty, opt=opt, ept=ept
+  if arg_present(ept) then ept=self.ept
+  if arg_present(opt) then opt=self.opt
+end
+
+
+
 ;;**************************OverRiding methods********************************
 ;; Motion and button messages expected
 pro tvSlice::Message,msg
