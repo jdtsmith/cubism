@@ -27,9 +27,6 @@
 ;    
 ; OPTIONAL OUTPUT KEYWORD PARAMETERS:
 ;
-;    HEADERS: If used, return the header variables set at the
-;       beginning of the table (\type key=value) as a structure.
-;
 ;    UNITS: The units for each data column, if available
 ;			
 ; OUTPUTS:
@@ -45,8 +42,8 @@
 ;
 ; NOTES:
 ;  
-;    See http://spider.ipac.caltech.edu/staff/tab/ipactables.help for
-;    format description
+;    See http://irsa.ipac.caltech.edu/applications/DDGEN/Doc/ipac_tbl.html
+;    for format description.
 ;
 ; EXAMPLE:
 ;
@@ -55,6 +52,8 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2005-03-25 (J.D. Smith): Brought into compliance with "new" IRSA
+;                             IPAC TABLE Format standard.
 ;    2005-02-25 (J.D. Smith): Pre-allocate return for speedup.
 ;    2003-11-24 (J.D. Smith): Better header keyword value treatment.
 ;    2002-08-27 (J.D. Smith): Initial migration from SMART codebase.
@@ -87,7 +86,7 @@
 ;
 ;##############################################################################
 
-function read_ipac_table,file, hdr,HEADERS=st_hdrs,UNITS=units
+function read_ipac_table,file, hdr,UNITS=units
   openr,un,file,/get_lun
   line=''
   line_cnt=0
@@ -103,22 +102,6 @@ function read_ipac_table,file, hdr,HEADERS=st_hdrs,UNITS=units
            '\': begin 
               if ~arg_present(hdr) then break
               if n_elements(hdr) eq 0 then hdr=[line] else hdr=[hdr,line]
-              parts=strtrim( $
-                    stregex(line, $
-                            '^\\(REAL|CHAR|INT) +([a-zA-Z0-9_ ]+)=(.*)$', $
-                            /SUBEXPR,/EXTRACT),2)
-              if strlen(parts[0]) eq 0 then break ;probably a comment
-              skip=0
-              case parts[1] of
-                 "REAL": val=double(parts[3])
-                 "CHAR": val=parts[3]
-                 "INT": val=long(parts[3])
-                 else: skip=1
-              endcase
-              if skip then break
-              if n_elements(st_hdrs) eq 0 then begin 
-                 st_hdrs=create_struct(parts[2],val) 
-              endif else st_hdrs=create_struct(st_hdrs,parts[2],val)
            end
            '|': begin
               line=strtrim(line) ;no trailing blanks, please
@@ -129,7 +112,8 @@ function read_ipac_table,file, hdr,HEADERS=st_hdrs,UNITS=units
                     tags=strarr(n_elements(tok))
                     ;; Remove disallowed characters from the tag
                     for i=0,n_elements(tok)-1 do $
-                       tags[i]=idl_validname(tok[i],/CONVERT_ALL)
+                       tags[i]=idl_validname(strjoin(strsplit($
+                               tok[i],'-',/EXTRACT),'_'), /CONVERT_ALL)
                  end
                  1: begin       ;format flags
                     got=bytarr(n_elements(tags))
