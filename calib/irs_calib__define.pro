@@ -586,7 +586,7 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
   ;; And add it to the cache for rapid recovery, unless asked not to
   if keyword_set(nc) eq 0 then begin 
      if ptr_valid(rec.WAVSAMPS) then begin 
-        ;; Only add it if it's a distinct wavesamp record
+        ;; Only add it if it's a distinct WAVSAMP record
         wh=where((*rec.WAVSAMPS).PR eq ws.PR,cnt)
         if cnt eq 0 then *rec.WAVSAMPS=[*rec.WAVSAMPS,ws] 
      endif else rec.WAVSAMPS=ptr_new(ws)
@@ -730,6 +730,9 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
         prs=[prs,pr]
      endelse 
   endfor 
+  
+  ;; ascending wavelength
+  prs=prs[sort(prs.lambda)]
   
   ;; Construct the WAVSAMP and set it into the record
   ws={IRS_WAVSAMP}
@@ -1089,8 +1092,22 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   
   if keyword_set(rcvfws) then $
      for i=0,n_elements(modules)-1 do self->RecoverPolynomials,modules[i]
+  
+  self->SortOrders
 end
 
+
+;=============================================================================
+;  SortOrders - Sort Orders according to minimum wavelength
+;=============================================================================
+pro IRS_Calib::SortOrders,module
+  if n_elements(module) ne 0 then modules=[irs_module(module)] $
+  else modules=indgen(4)        ;do them all, by default
+  for i=0,n_elements(modules)-1 do begin 
+     s=sort((*self.cal[modules[i]]).WAV_MIN)
+     *self.cal[modules[i]]=(*self.cal[modules[i]])[s]
+  endfor 
+end
 
 ;=============================================================================
 ;  Return - Latest calibration file, or requested version
@@ -1245,6 +1262,7 @@ pro IRS_Calib::ParseWAVSAMP,file,module
            transpose(data[wh].y2), $
            transpose(data[wh].y3)]
      pr.cen=[transpose(data[wh].x_center),transpose(data[wh].y_center)]
+     pr=pr[sort(pr.lambda)]
      ws={IRS_WAVSAMP, $
          0b,1b,0.0,irs_aperture(0.,1.),ptr_new(pr,/NO_COPY)}
      
@@ -1313,7 +1331,6 @@ end
 pro IRS_Calib::ParsePMASK,file,module
   m=irs_module(module)
   self.PMASK[m]=ptr_new(readfits(file,/SILENT))
-  (*self.cal[m]).PMASK=self.PMASK[m] ;set for each order
   self.PMASK_FILE[m]=file
 end
 
@@ -1489,7 +1506,7 @@ pro IRS_Calib__define
       FULL: 0b, $               ;is this the full (untrimmed) WAVSAMP?
       PR_WIDTH: 0.0, $          ;if PIXEL_BASED, the width of the PR
       Aperture:{IRS_APERTURE}, $ ;The IRS_APERTURE aperture used for this WS
-      PR: ptr_new()}            ;A list of IRS_WAVSAMP_PSEUDORECT structs
+      PR: ptr_new()}            ;Sorted list of IRS_WAVSAMP_PSEUDORECT structs
   
   ;; A single WAVSAMP pseudo-rectangle (PR), with pre-computed
   ;; full-slit overlap areas.  Vertices are listed counter-clockwise
