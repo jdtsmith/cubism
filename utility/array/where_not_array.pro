@@ -1,61 +1,79 @@
 ;+
-; NAME:
-;       WHERE_NOT_ARRAY
+; NAME:  
 ;
-; PURPOSE:
-; 	Return the indices of those elements in vector B which
-;       do not exist in vector A.  
+;    WHERE_NOT_ARRAY
 ;
+; DESCRIPTION:
+;    
+;    Find the indices of elements in a vector which are *not* present
+;    in another vector.
+;    
 ; CATEGORY:
-;       Array
 ;
+;    Array
+;    	
 ; CALLING SEQUENCE:
-;       result = WHERE_NOT_ARRAY(A,B)
 ;
-; INPUTS:
-;       A       vector that might contains elements of vector B
-;       B       vector wthat we would like to know which of its
-;               elements exist in A
+;    wh=where_not_array(A,B)
 ;
-; OPTIONAL INPUTS:
+; INPUT PARAMETERS:
 ;
-; KEYWORD PARAMETERS:
-;       iA_in_B         return instead the indices of A that are not in
-;                       (exist) in B
+;    A: A vector of values to test for precense in B.
+;    B: The vector in which elements not in A will be found.
+;			
+; INPUT KEYWORD PARAMETERS:
+;
+;    /SWITCHAB: Look for elements of A not in B instead of B not in A.
 ;
 ; OUTPUTS:
-;       Index into B of elements not found in vector A.  If no
-;       matches are found -1 is returned.  If the function is called
-;       with incorrect arguments, a warning is displayed, and -2 is
-;       returned (see SIDE EFFECTS for more info)
+;
+;    The locations in B (or A, if /SWITCHAB is used), which do not exist
+;    in A (or B, if /SWITCHAB is used.)
 ;
 ; OPTIONAL OUTPUTS:
 ;
-; COMMON BLOCKS:
-;               None
-;
-; SIDE EFFECTS:
-;       If the function is called incorrectly, a message is displayed
-;       to the screen, and the !ERR_STRING is set to the warning
-;       message.  No error code is set, because the program returns
-;       -2 already
-;
+;    cnt: The count of elements whose indices are returned.
+;    
 ; RESTRICTIONS:
-;       This should be used with only Vectors.  Matrices other then
-;       vectors will result in -2 being returned.  Also, A and B must
-;       be defined, and must not be strings!
 ;
-; PROCEDURE:
+;    Vectors only.
 ;
-; SEE ALSO:
-;       where
+; EXAMPLE:
+;
+;    a=[1,3,4,5] & b=[2,3,5,6]
+;    print,where_not_array(a,b)
 ;
 ; MODIFICATION HISTORY:
-;       Written by:     
-;                       Smith, JD 9/9/98
+;
+;       2002-08-02 (J.D. Smith): Updated documentation and changed
+;          keywords.
+;       1998-09-09 (J.D. Smith): Written
 ;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 1998-2002 JD Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;  
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with SMART; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+;  02111-1307, USA.
+;
+;##############################################################################
 
-function where_not_array,A,B,cnt,IA_IN_B=iA_in_B
+function where_not_array,A,B,cnt,SWITCHAB=sw
 
    Na = n_elements(a)
    Nb = n_elements(b)
@@ -63,10 +81,8 @@ function where_not_array,A,B,cnt,IA_IN_B=iA_in_B
    AA = A(l mod Na)
    BB = B(l / Na)
 
-   if keyword_set(iA_in_B) then wh = where(total(AA ne BB,2) eq Nb,cnt) $
+   if keyword_set(sw) then wh = where(total(AA ne BB,2) eq Nb,cnt) $
    else wh = where(total(AA ne BB,1) eq Na,cnt) 
    
    return,wh
-   
 end
-
