@@ -356,6 +356,7 @@ pro CubeProj::Exit
   endif 
   if self->isWidget() then if widget_info((*self.wInfo).SList,/VALID_ID) $
      then widget_control, (*self.wInfo).Base,KILL_NOTIFY='',/DESTROY
+  (*self.wInfo).showing=-1
   if self.Spawned then obj_destroy,self
 end
      
@@ -517,12 +518,14 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).list_size_diff=geom.SCR_YSIZE- $
      (widget_info(base,/GEOMETRY)).SCR_YSIZE
   
-  XManager,'CubeProj_Show:'+self.ProjectName, base,/JUST_REG
+  name='CubeProj_Show:'+self.ProjectName+self.savefile
+  XManager,name,(*self.wInfo).Base,/JUST_REG
   if keyword_set(spn) then $
      self->SetProjectName,TITLE='New Project Name'
   self->UpdateAll
-  XManager,'CubeProj_Show:'+self.ProjectName+self.savefile, base,/NO_BLOCK, $
-           EVENT_HANDLER='CubeProj_show_event',CLEANUP='CubeProj_show_kill'
+  XManager,name, base,/NO_BLOCK,EVENT_HANDLER='CubeProj_show_event', $
+           CLEANUP='CubeProj_show_kill'
+  (*self.wInfo).showing=1
 end
 
 ;=============================================================================
@@ -844,8 +847,11 @@ end
 ;  Showing - Is the project showing?
 ;=============================================================================
 function CubeProj::Showing
-  return, $
-     XRegistered('CubeProj_Show:'+self.ProjectName+self.savefile,/NOSHOW) gt 0
+  if ~ptr_valid(self.wInfo) then return,0
+  if (*self.wInfo).showing eq -1 then $
+     (*self.wInfo).showing=XRegistered('CubeProj_Show:'+self.ProjectName+ $
+                                       self.savefile,/NOSHOW) gt 0
+  return, (*self.wInfo).showing
 end
 
 ;=============================================================================
@@ -2277,7 +2283,7 @@ pro CubeProj::BuildCube
      ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
      ;; entering the cube
      if ptr_valid((*self.DR)[dr].BMASK) then $
-        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) eq 0 else bmask=[1.]
+        bmask=(*(*self.DR)[dr].BMASK AND 28928UL) eq 0L else bmask=[1.]
         
      ;; Use the reverse account to populate the cube
      for i=0L,(*self.DR)[dr].REV_CNT-1 do begin 
@@ -2291,9 +2297,11 @@ pro CubeProj::BuildCube
         cube[rev_min+i]=(finite(cube[rev_min+i])?cube[rev_min+i]:0.0) + $
                         total(bcd[these_accts.BCD_PIX] * $
                               these_accts.AREA * $
-                              bmask[[these_accts.BCD_PIX]])
+                              bmask[[these_accts.BCD_PIX]],/NAN)
         areas[rev_min+i]=areas[rev_min+i]+ $
-                         total(these_accts.AREA*bmask[[these_accts.BCD_PIX]])
+                         total(these_accts.AREA* $
+                               bmask[these_accts.BCD_PIX]* $
+                               finite(bcd[these_accts.BCD_PIX]))
      endfor
   endfor 
   
@@ -2416,7 +2424,7 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   if n_elements(plane) ne 0 then $
      z=pix+plane*self.CUBE_SIZE[0]*self.CUBE_SIZE[1] $
   else z=pix
-  show=keyword_set(follow) AND self->Showing()
+  show=keyword_set(follow) && self->Showing()
   if show then show_vec=bytarr(nrec)
   for i=0,nrec-1 do begin 
      if ~ptr_valid((*self.DR)[i].REV_ACCOUNT) then continue
@@ -2426,15 +2434,19 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
      if ri[thisz] eq ri[thisz+1] then continue
      if show then show_vec[i]=1b
      accs=(*(*self.DR)[i].ACCOUNT)[ri[ri[thisz]:ri[thisz+1]-1]]
-     ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,BCD_VAL:0.0,AREA:0.0}, $
-                   n_elements(accs))
+     ret=replicate({DR:i,ID:(*self.DR)[i].ID,BCD_PIX:0,BCD_VAL:0.0, $
+                    BACK_VAL:0.0,AREA:0.0},n_elements(accs))
      ret.BCD_PIX=accs.BCD_PIX 
      ret.BCD_VAL=(*(*self.DR)[i].BCD)[accs.BCD_PIX]
+     if ptr_valid(self.BACKGROUND) then $
+        ret.BACK_VAL=(*self.BACKGROUND)[accs.BCD_PIX]
      ret.AREA=accs.AREA
      if n_elements(all) eq 0 then all=[ret] else all=[all,ret]
   endfor 
-  if show then $
+  if show then begin 
      widget_control, (*self.wInfo).SList, SET_LIST_SELECT=where(show_vec)
+     self->UpdateButtons
+  endif 
   return,n_elements(all) ne 0?all:-1
 end
 
@@ -3060,6 +3072,7 @@ pro CubeProj__define
   
   ;; The widget info
   winfo={cubeProj_wInfo,$
+         showing:0, $           ;whether we're showing
          Base:0L, $             ;the Show Widget, DR list display base
          SList:0L, $            ;the Widget List for Show 
          wHead:lonarr(2), $     ;the widget heads
