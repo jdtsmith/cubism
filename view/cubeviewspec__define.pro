@@ -13,7 +13,7 @@ pro CubeViewSpec::Message, msg
      self->Plot
   endif else begin              ; A new spectrum
      self.Info=msg.Info
-     widget_control, self.wBase,TLB_SET_TITLE=self.Info
+     widget_control, self.wBase,TLB_SET_TITLE='CubeSpec: '+self.Info
      *self.lam=*msg.wavelength
      *self.sp=*msg.spec
      widget_control, self.wToggles,GET_VALUE=ren
@@ -817,7 +817,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   self.colors_base=!D.TABLE_SIZE-5 ;load colors in
   
   self.wBase=widget_base(/COLUMN,/TRACKING_EVENTS,SPACE=1, $
-                         TITLE='Extracted Spectrum') 
+                         TITLE='CubeSpec: Extracted Spectrum') 
   
   rowbase=widget_base(self.wBase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_BOTTOM) 
   colbase=widget_base(rowbase,/COLUMN) 
