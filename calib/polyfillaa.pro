@@ -22,7 +22,7 @@
 ;       polygon.  May be in fractional units.
 ;
 ;    sx,sy: The size of the pixel grid on which the polygon is
-;       superposed.
+;       superposed.  
 ;
 ; OUTPUT KEYWORD PARAMETERS:
 ;
@@ -87,11 +87,13 @@ function polyfillaa, x,y,sx,sy, AREAS=areas, POLYGONS=polys
         if px[0] ne -1 then begin
            a=abs(total(px*shift(py,-1) - py*shift(px,-1))/2.)
            if n_elements(ret) eq 0 then begin 
-              if arg_present(polys) then polys=[ptr_new(pc,/NO_COPY)]
+              if arg_present(polys) then $
+                 polys=[ptr_new([transpose(px),transpose(py)])]
               ret=[i+j*sx] 
               areas=[a]
            endif else begin
-              if arg_present(polys) then polys=[polys,ptr_new(pc,/NO_COPY)]
+              if arg_present(polys) then $
+                 polys=[polys,ptr_new([transpose(px),transpose(py)])]
               ret=[ret,i+j*sx]
               areas=[areas,a]
            endelse
