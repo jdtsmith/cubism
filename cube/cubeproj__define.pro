@@ -245,6 +245,7 @@ pro CubeProj::ShowEvent, ev
      
      'header-keyword': $
         begin 
+        self->RestoreData,sel
         if sel[0] eq -1 then return
         ;; The first header of the first selected is used
         keys=strmid(*(*self.DR)[sel[0]].HEADER,0,8)
@@ -314,7 +315,7 @@ pro CubeProj::ShowEvent, ev
         xpopdiag,modules,info,PARENT_GROUP=self->TopBase(), $
                  BUTTON_TEXT='  Done  ',LABEL='Module:', $
                  TITLE=self->ProjectName()+': Calibration Set <'+ $
-                 filestrip(self.cal_file)+'>',TSIZE=[80,15], $
+                 filestrip(self.cal_file)+'>',TSIZE=[94,15], $
                  DEFAULT=irs_module(self.MODULE),/FREE_POINTERS
      end
      
@@ -2522,7 +2523,7 @@ pro CubeProj::BuildCube
      if ptr_valid((*self.DR)[dr].BMASK) then begin 
         use_bmask=1
         bmask=(*(*self.DR)[dr].BMASK AND 29952UL) eq 0L 
-        if use_bpmask then bmask AND= bpmask
+        if use_bpmask then bmask OR= bpmask
      endif else if use_bpmask then begin 
         use_bmask=1
         bmask=bpmask
@@ -2679,6 +2680,10 @@ end
 function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   nrec=self->N_Records()
   if nrec eq 0 then return,-1
+  if self.accounts_valid eq 0 OR $
+     ~array_equal(ptr_valid((*self.DR).ACCOUNT),1) then $
+        self->Error,"Must rebuild cube to backtrack"
+  
   ;; At least one reverse account required
   if array_equal(ptr_valid((*self.DR).REV_ACCOUNT),0b) then self->BuildRevAcct
   if n_elements(pix) eq 2 then pix=pix[0]+pix[1]*self.CUBE_SIZE[0]
@@ -3193,7 +3198,7 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back
            if n_elements(unc) gt 0 then unc+=*rec[i].UNC^2 else $
               unc=*rec[i].UNC^2
         if ptr_valid(rec[i].BMASK) then $
-           if n_elements(mask) gt 0 then mask AND=*rec[i].BMASK else $
+           if n_elements(mask) gt 0 then mask OR=*rec[i].BMASK else $
               mask=*rec[i].BMASK ;accumulate mask flags
      endfor 
      bcd_p=ptr_new(bcd,/NO_COPY)
