@@ -76,9 +76,9 @@ pro tvHist::PlotHist,im
   min=self.min & max=self.max
   if min eq max then begin 
      self.oDraw->GetProperty,DRAWWIDGET=dw 
-     wmessage,PARENT_GROUP=dw,'Undefined Histogram, Aborting!',/ERROR
      self->Reset
-     return
+     message,'Undefined Histogram, Aborting!'
+    return
   endif 
   
   h=histogram(*im,MIN=bottom,MAX=top,BINSIZE=float(top-bottom)/self.nbins>1) 
