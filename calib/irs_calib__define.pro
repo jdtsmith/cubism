@@ -124,16 +124,11 @@
 ;
 ;       INPUT KEYWORD PARAMETERS:
 ;
-;          APERTURE: A structure of the form:
-;          
-;               {IRS_APERTURE, $
-;                  Low: [low_top,low_bottom], $
-;                  High:[high_top,high_bottom]}
-;             
-;             specifying the normalized coordinates along the slit for
-;             low and high aperture boundaries.  See
-;             IRS_Aperture__define for more information.  If
-;             omitted, the full slit aperture is used.
+;          APERTURE: A structure of type IRS_APERTURE.  See
+;             IRS_Aperture__define for more information, and
+;             irs_aperture for a convenient method to make such
+;             aperture.  If omitted, the full, constant length slit
+;             aperture is used.
 ;
 ;          FULL: If set, the full slit aperture is used no matter what
 ;             (if anything) is passed in APERTURE.
@@ -287,6 +282,8 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;       2004-03-12 (J.D. Smith): Fit ORDFIND,LINETILT polys from
+;          WAVSAMP.  Apertures can now be wavelength scaled.
 ;	2002-08-23 (J.D. Smith): Added variable-width pixel-based WAVSAMPs.
 ;	2002-04-30 (J.D. Smith): Added pixel-based WAVSAMPs.	
 ;       2001-12-08 (J.D. Smith): Written.
@@ -321,7 +318,8 @@
 ;=============================================================================
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
-                            PLATE_SCALE=ps,PMASK=pmask
+                            PLATE_SCALE=ps,PMASK=pmask,FLUXCON=fluxcon, $
+                            KEY_WAV=fluxcon_kw,TUNE=tune
   if arg_present(pmask) then begin 
      rec=self->GetRecord(module)
      pmask=rec.PMASK
@@ -334,6 +332,9 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   if arg_present(wmx) then  wmx=rec.WAV_MAX
   if arg_present(name) then name=self.name
   if arg_present(ps) then   ps=rec.PLATE_SCALE
+  if arg_present(fluxcon) then fluxcon=rec.FLUXCON
+  if arg_present(fluxcon_kw) then fluxcon_kw=rec.FLUXCON_KEY_WAV
+  if arg_present(tune) then tune=rec.TUNE
   ;;if arg_present(sz) then sz=self.detsize[*,0>irs_module(module)<5]
 end
 
@@ -386,6 +387,9 @@ function IRS_Calib::Info, modules, orders, SHORT=short
      if tif ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'TILT',tif)]
      pmf=self.PMASK_FILE[md]
      if pmf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'PMASK',pmf)]
+     fcf=self.FLUXCON_FILE[md]
+     if fcf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'FLUXCON',fcf)]
+     
      str=[str,'']
      for j=0,no-1 do begin 
         rec=(*self.cal[md])[ords[j]]
@@ -398,14 +402,19 @@ function IRS_Calib::Info, modules, orders, SHORT=short
              string(FORMAT='("         Position: Z: ",F8.3," Y:",' + $
                     'F8.3," Angle:",F8.3)',rec.TPF_Z,rec.TPF_Y,REC.TPF_ANGLE)]
         if rec.order eq 0 then continue ;just a stub order
+        if rec.RecoveredPolys then $
+           str=[str,"          Recovered from WAVSAMP:"]
         str=[str, $
-             "          A:"+strjoin(string(FORMAT='(G10.3)',rec.A)), $
-             "          B:"+strjoin(string(FORMAT='(G10.3)',rec.B)), $
-             "          C:"+strjoin(string(FORMAT='(G10.3)',rec.C)), $
+             "          A:"+strjoin(string(FORMAT='(G11.3)',rec.A)), $
+             "          B:"+strjoin(string(FORMAT='(G11.3)',rec.B)), $
+             "          C:"+strjoin(string(FORMAT='(G11.3)',rec.C)), $
              "          SLIT_LENGTH:"+string(FORMAT='(G10.3)', $
                                              rec.SLIT_LENGTH),$
              "          WAVELENGTH(min,center,max):" + $
-             string(FORMAT='(3F10.4)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX)]
+             string(FORMAT='(3F10.4)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX),$
+             "          FLUXCON:"+string(FORMAT='(G12.3)',rec.FLUXCON)+ $
+             " KEY WAVLENGTH: "+ string(FORMAT='(G8.3)',rec.FLUXCON_KEY_WAV),$
+             "          TUNE: "+strjoin(string(FORMAT='(G9.3)',rec.TUNE))]
         if nw gt 0 then $
            str=[str,"          Apertures:"] else $
            str=[str,"       No Apertures"]
@@ -415,13 +424,19 @@ function IRS_Calib::Info, modules, orders, SHORT=short
            nsamp=n_elements(*(*rec.WAVSAMPS)[k].PR)
            
            if ws.FULL then begin 
-              aps=string(FORMAT='(%"               FULL      %5.2f->%5.2f'+ $
+              aps=string(FORMAT='(%"            FULL         %5.2f->%5.2f'+ $
                          ' -- %03d samples")', $
                          ws.Aperture.low[0],ws.Aperture.high[0],nsamp)
            endif else begin 
-              aps=string(FORMAT='(%"            %5.2f->%5.2f:%5.2f->%5.2f'+ $
-                         ' -- %03d samples")', $
-                         ws.Aperture.low,ws.Aperture.high,nsamp) 
+              if ws.Aperture.wavscl eq 0 then begin 
+                 aps=string(FORMAT='(%"            %5.2f->%5.2f:' + $
+                            '%5.2f->%5.2f -- %03d samples")', $
+                            ws.Aperture.low,ws.Aperture.high,nsamp)
+              endif else begin 
+                 aps=string(FORMAT='(%"       WV %5.2f@%5.2fum ' + $
+                            'cen:%4.2f -- %03d samples")', $
+                            ws.Aperture.scale,nsamp)
+              endelse 
            endelse 
            if ws.PIXEL_BASED ne 0.0 then $
               flags=[string(FORMAT='("pixel-based, width=",F5.3)', $
@@ -455,33 +470,43 @@ end
 ;=============================================================================
 ;  FindWAVSAMP - Find and return the indices of WAVSAMPs matching the
 ;                criteria passed. The module and order arguments are
-;                required, but if APERTURE is omitted, and FULL isn't
-;                set, matching WAVSAMPs of any aperture in that record
-;                will be returned.  The default is non-pixelbased, or,
-;                when PIXEL_BASED is set, a PR_WIDTH of 1.  
+;                required, but if APERTURE, WAVELENGTH_SCALED, and
+;                FULL are omitted, matching WAVSAMPs of any aperture
+;                in that record will be returned.  The default is
+;                non-pixelbased, or, when PIXEL_BASED is set, a
+;                PR_WIDTH of 1.  If ALL is set, no defaults are put in
+;                place, only passed options specify find keys.
 ;=============================================================================
 function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
                                  COUNT=nsamp, PIXEL_BASED=pb, PR_WIDTH=width, $
-                                 FULL=full, RECORD=rec
+                                 FULL=full, RECORD=rec, $
+                                 WAVELENGTH_SCALED=wvscld,ALL=all
   rec=self->GetRecord(module,order,/MUST_EXIST)
-  if NOT ptr_valid(rec.WAVSAMPS) then begin 
+  if ~ptr_valid(rec.WAVSAMPS) then begin 
      nsamp=0
      return,-1
   endif 
   
-  if n_elements(pb) eq 0 then pb=0b ;default to non-pb
-  if n_elements(width) eq 0 then width=1.0 ;Default to 1xn PRs
-
+  if ~keyword_set(all) then begin 
+     if n_elements(pb) eq 0 then pb=0b ;default to non-pb
+     if n_elements(width) eq 0 then width=1.0 ;Default to 1xn PRs
+  endif 
+  
   ;; Find specified aperture, or any aperture
   if n_elements(aperture) ne 0 then aper=aperture
   
-  ;; Find WAVSAMPs of the right type (pixel-based or traditional)
-  wh_pix=where((*rec.WAVSAMPS).PIXEL_BASED eq keyword_set(pb),nsamp)
-  if nsamp eq 0 then return,-1
+  wh_pix=indgen(n_elements(*rec.WAVSAMPS))
+  
+  if n_elements(pb) gt 0 then begin 
+     ;; Find WAVSAMPs of the right type (pixel-based or traditional)
+     wh_pb=where((*rec.WAVSAMPS)[wh_pix].PIXEL_BASED eq keyword_set(pb),nsamp)
+     if nsamp gt 0 then wh_pix=wh_pix[wh_pb] else return,-1
+  endif
+  
+  eps=1.e-5                 ;match tolerance
   
   ;; Find WAVSAMP's with the right slit width (if pixel-based)
-  eps=1.e-5                 ;match tolerance
-  if keyword_set(pb) then begin 
+  if n_elements(width) gt 0 && keyword_set(pb) then begin 
      wh_width=where(abs((*rec.WAVSAMPS)[wh_pix].PR_WIDTH-width) $
                     le eps, nsamp)
      if nsamp gt 0 then wh_pix=wh_pix[wh_width] else return,-1
@@ -493,12 +518,20 @@ function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
      if nsamp gt 0 then return,wh_pix[wh_full] else return,-1
   endif 
 
-  ;; Search for one of this type already cached with this aperture
-  if n_elements(aper) ne 0 then begin 
+  ;; Find WAVSAMP's with matching wavelength scaling and reference, or
+  ;; search for one of this type already cached with this aperture
+  if keyword_set(wvscld) then begin 
+     wh_scale=where(total(abs((*rec.WAVSAMPS)[wh_pix].WAVE_SCALED- $
+                              rebin(wvsld,2,nsamp)) le eps,1) eq 2,nsamp)
+     if nsamp gt 0 then wh_pix=wh_pix[wh_scale] else return,-1
+  endif else if n_elements(aper) ne 0 then begin 
      aps=(*rec.WAVSAMPS)[wh_pix].Aperture
      wh_ap=where(total(abs(aps.low- rebin(aper.low,2,nsamp))  le eps AND $
-                       abs(aps.high-rebin(aper.high,2,nsamp)) le eps,1) $
-                 eq 2,nsamp)
+                       abs(aps.high-rebin(aper.high,2,nsamp)) le eps,1) eq 2 $
+                 AND $
+                 total(abs(aps.scale- $
+                           rebin(aper.scale,3,nsamp)) le eps,1) eq 3,nsamp)
+
      if nsamp gt 0 then wh_pix=wh_pix[wh_ap] else return,-1
   endif 
 
@@ -512,17 +545,25 @@ end
 ;               aperture), with the option for PIXEL_BASED WAVSAMPs.
 ;               If a PIXEL_BASED clip is requested, and the FULL
 ;               PIXEL_BASED WAVSAMP does not exist, it is created and
-;               cached.  The newly created WAVSAMP is cached for fast
-;               recovery, unless NO_CACHE is set.
+;               cached.
+;
+;               To return a wavsamp which scales in size with
+;               wavelength, use, e.g., WAVELENGTH_SCALED=[16.,4] for a
+;               four pixel width at 16um, scaling linearly with
+;               wavelength within the order.
+;  
+;               The newly created WAVSAMP is cached for fast recovery,
+;               unless NO_CACHE is set.
 ;=============================================================================
 function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
                                 PIXEL_BASED=pb, PR_WIDTH=width, $
-                                NO_CACHE=nc, SAVE_POLYGONS=sp
+                                NO_CACHE=nc, SAVE_POLYGONS=sp, $
+                                WAVELENGTH_SCALED=wvscld
   rec=self->GetRecord(module,order,/MUST_EXIST)
   ws=self->FindWAVSAMP(module,order,APERTURE=aperture,COUNT=nsamp,FULL=full, $
-                       PIXEL_BASED=pb, PR_WIDTH=width)
+                       PIXEL_BASED=pb, PR_WIDTH=width,WAVELENGTH_SCALED=wvscld)
   
-  if keyword_set(sp) eq 0 then begin ;no polygons requested
+  if ~keyword_set(sp) then begin ;no polygons requested
      ;; return the first match
      if nsamp gt 0 then return,*(*rec.WAVSAMPS)[ws[0]].PR 
   endif else begin 
@@ -556,26 +597,17 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
 end
 
 ;=============================================================================
-;  FreeWAVSAMP - Remove one or more WAVSAMPS from a record, optionally
-;                removing ALL of them, or those specified with indices
+;  FreeWAVSAMP - Remove one or more WAVSAMPS from a record, matching
+;                from FindWAVSAMP, or those specified with indices
 ;                provided by optional keyword INDEX.
 ;=============================================================================
-pro IRS_Calib::FreeWAVSAMP, module, order, APERTURE=aperture,RECORD=rec, $
-                            INDEX=inds, ALL=all,_EXTRA=e
+pro IRS_Calib::FreeWAVSAMP, module, order,RECORD=rec,INDEX=inds, _EXTRA=e
   if n_elements(rec) eq 0 then rec=self->GetRecord(module,order,/MUST_EXIST)
   if size(rec,/TYPE) ne 8 then return ;nothing to delete
   if NOT ptr_valid(rec.WAVSAMPS) then return
   
-  ;; Clean all of the records for this module and order
-  if keyword_set(all) then begin 
-     self->CleanWAVSAMP,*rec.WAVSAMPS
-     ptr_free,rec.WAVSAMPS
-     return
-  endif
-  
   if n_elements(inds) eq 0 then begin 
-     inds=self->FindWAVSAMP(module,order,APERTURE=aperture,COUNT=nsamp, $
-                            _EXTRA=e)
+     inds=self->FindWAVSAMP(module,order,COUNT=nsamp,_EXTRA=e)
      if nsamp eq 0 then return
   endif 
   
@@ -603,12 +635,12 @@ end
 ;
 ;                 This will add a full pixel-based WAVSAMP to all records:
 ;
-;                 for md=0,3 do begin & ords=i->Orders(md) &
+;                 for md=0,3 do begin & ords=c->Orders(md) &
 ;                 for ord=0,n_elements(ords)-1 do
-;                 i->PixelWAVSAMP,md,ords[ord] &
+;                 c->PixelWAVSAMP,md,ords[ord] &
 ;                 endfor
 ;
-;                 save,i,FILENAME='irs_2004_01_01-pb.cal',/COMPRESS
+;                 save,c,FILENAME='irs_2004_01_01-pb.cal',/COMPRESS
 ;=============================================================================
 pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   rec=self->GetRecord(module,order,/MUST_EXIST)
@@ -702,7 +734,7 @@ pro IRS_Calib::PixelWAVSAMP, module, order,PR_WIDTH=width, _EXTRA=e
   ws={IRS_WAVSAMP}
   ws.PIXEL_BASED=1b
   ws.PR_WIDTH=width
-  ws.Aperture={IRS_APERTURE,[0.,0.],[1.,1.]}
+  ws.Aperture=irs_aperture(0.,1.)
   ws.PR=ptr_new(prs,/NO_COPY)
   
   ws.FULL=1b
@@ -764,7 +796,7 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
   
   full=(*rec.WAVSAMPS)[wh_full[0]]
   new=full                      ;The new clip
-  if n_elements(aper) eq 0 then aper={IRS_APERTURE,[0.,0.],[1.,1.]}
+  if n_elements(aper) eq 0 then aper=irs_aperture(0.,1.)
   npr=n_elements(*new.PR)
   if ~keyword_set(clip_full) then begin
      new.PR=ptr_new(*full.PR)   ; Copy the psuedo-rects
@@ -781,7 +813,8 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
   if ~keyword_set(clip_full) then begin
      ;; Scale the aperture from low to high.
      x=(*new.PR).x & y=(*new.PR).y
-     self->Trim,x,y,APERTURE=aper
+     self->Trim,x,y,APERTURE=aper,LAMBDA=(*new.PR).lambda, $
+                SLIT_LENGTH=rec.SLIT_LENGTH
      (*new.PR).x=x & (*new.PR).y=y
   endif 
   
@@ -822,25 +855,45 @@ end
 ;=============================================================================
 ;  Trim - Trim a set of PRs to the aperture.  x,y are 4xn
 ;=============================================================================
-pro IRS_Calib::Trim,x,y,APERTURE=aper
-  ;; Scale each aperture linearly from low to high, preserving angle
-  n=(size(x,/DIMENSIONS))[1]
+pro IRS_Calib::Trim,x,y,APERTURE=aper,LAMBDA=lambda,SLIT_LENGTH=sl
+  ;; Scale each aperture linearly from low to high or with wavelength,
+  ;; preserving angle
   
-  low=(aper.low[0]+(aper.low[1]-aper.low[0])*findgen(n)/(n-1))
-  high=(aper.high[0]+(aper.high[1]-aper.high[0])*findgen(n)/(n-1))
-  
-  delx=(x[0,*]-x[1,*]) & dely=(y[0,*]-y[1,*])
-  x[0,*] = x[1,*]+high*delx
-  y[0,*] = y[1,*]+high*dely
-  x[1,*] = x[1,*]+low *delx
-  y[1,*] = y[1,*]+low *dely
-  
-  delx=(x[3,*]-x[2,*]) & dely=(y[3,*]-y[2,*])
-  x[3,*] = x[2,*]+high*delx
-  y[3,*] = y[2,*]+high*dely
-  x[2,*] = x[2,*]+low *delx
-  y[2,*] = y[2,*]+low *dely
-end
+  if aper.wavscl then begin 
+     ;; pos/wave/size scaling
+     width=aper.scale[0]*(lambda/aper.scale[1]) ;width, normalized to slit len
+     
+     pos=aper.scale[2]          ;center position, normalized to slit length
+     delx=(x[0,*]-x[1,*]) & dely=(y[0,*]-y[1,*])
+     
+     x[0,*]=x[1,*]+(pos+width/2)*delx
+     y[0,*]=y[1,*]+(pos+width/2)*dely
+     x[1,*]=x[1,*]+(pos-width/2)*delx
+     y[1,*]=y[1,*]+(pos-width/2)*dely
+     
+     delx=(x[3,*]-x[2,*]) & dely=(y[3,*]-y[2,*])
+     x[3,*] = x[2,*]+(pos+width/2)*delx
+     y[3,*] = y[2,*]+(pos+width/2)*dely
+     x[2,*] = x[2,*]+(pos-width/2)*delx
+     y[2,*] = y[2,*]+(pos-width/2)*dely
+  endif else begin 
+     n=(size(x,/DIMENSIONS))[1]
+     low=(aper.low[0]+(aper.low[1]-aper.low[0])*findgen(n)/(n-1))
+     high=(aper.high[0]+(aper.high[1]-aper.high[0])*findgen(n)/(n-1))
+     
+     delx=(x[0,*]-x[1,*]) & dely=(y[0,*]-y[1,*])
+     x[0,*] = x[1,*]+high*delx
+     y[0,*] = y[1,*]+high*dely
+     x[1,*] = x[1,*]+low *delx
+     y[1,*] = y[1,*]+low *dely
+     
+     delx=(x[3,*]-x[2,*]) & dely=(y[3,*]-y[2,*])
+     x[3,*] = x[2,*]+high*delx
+     y[3,*] = y[2,*]+high*dely
+     x[2,*] = x[2,*]+low *delx
+     y[2,*] = y[2,*]+low *dely
+  endelse 
+end 
 
 ;=============================================================================
 ;  TransformBoreSightCoords - Transform from a SIRTF-FOV-centric
@@ -974,17 +1027,23 @@ end
 ;              appropriate.
 ;=============================================================================
 pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
-                         TILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
-                         PLATESCALE_VERSION=psv,PMASK_VERSION=pmv,ONLY=only
-  cals=replicate({name:'', group:'', type:''},6)
-  cals.name=['WAVSAMP','ORDFIND','PMASK','LINETILT','FRAMETABLE','PLATESCALE']
-  cals.group=['single' ,'single' ,'single','single' ,'all',       'all']
-  cals.type= ['tbl'    ,'tbl'    ,'fits'  ,'tbl'    ,'tbl',       'tbl']
+                         LINETILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
+                         PLATESCALE_VERSION=psv,PMASK_VERSION=pmv, $
+                         FLUXCON_VERSION=fcv,ONLY=only, $
+                         RECOVER_FROM_WAVSAMP=rcvfws
+  cals=replicate({name:'', group:'', type:''},7)
+  cals.name=['WAVSAMP','ORDFIND','PMASK','LINETILT','FLUXCON', $
+             'FRAMETABLE','PLATESCALE']
+  cals.group=['single' ,'single' ,'single','single','single', $
+              'all',       'all']
+  cals.type= ['tbl'    ,'tbl'    ,'fits'  ,'tbl'   ,'tbl', $
+              'tbl',       'tbl']
 
   version=[n_elements(wv)  gt 0?fix(wv)>0:0,  $
            n_elements(orv) gt 0?fix(orv)>0:0, $
            n_elements(pmv) gt 0?fix(pmv)>0:0, $
            n_elements(tv)  gt 0?fix(tv)>0:0,  $
+           n_elements(fcv) gt 0?fix(fcv)>0:0, $
            n_elements(fv)  gt 0?fix(fv)>0:0,  $
            n_elements(psv) gt 0?fix(psv)>0:0]
   
@@ -1006,6 +1065,10 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
      for j=0,scnt-1 do begin 
+        ;; Skip ORDFIND and LINETILT if we are recovering from WS
+        if keyword_set(rcvfws) then $
+           if cals[singles[j]].name eq 'ORDFIND' || $
+              cals[singles[j]].name eq 'LINETILT' then continue
         base="irs_b"+strtrim(md,2)+"_"+ cals[singles[j]].name+"v"
         cfile=self->CalibrationFileVersion(base,version[singles[j]], $
                                            cals[singles[j]].name, $
@@ -1021,6 +1084,9 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                                         cals[alls[j]].name,cals[alls[j]].type)
      call_method,'Parse'+cals[alls[j]].name,self,cfile 
   endfor
+  
+  if keyword_set(rcvfws) then $
+     for i=0,n_elements(modules)-1 do self->RecoverPolynomials,modules[i]
 end
 
 
@@ -1055,6 +1121,103 @@ end
 
 
 ;=============================================================================
+;  RecoverPolynomials - Work around the limited (and braindead) lack
+;                       of access to the ORDFIND and LINETILT A,B,C
+;                       polynomial coefficient files by recovering
+;                       them by polynomial fitting the full WAVSAMP.
+;=============================================================================
+pro IRS_Calib::RecoverPolynomials,module,orders
+  if n_elements(module) ne 0 then begin 
+     need_orders=n_elements(orders) eq 0
+     modules=[irs_module(module)] 
+  endif else begin 
+     modules=indgen(4)          ;do them all, by default
+     need_orders=1
+  endelse 
+  
+  for md=0,n_elements(modules)-1 do begin  
+     if need_orders then orders=self->Orders(modules[md])
+     for i=0,n_elements(orders)-1 do begin 
+        rec=self->GetRecord(modules[md],orders[i],/MUST_EXIST)
+        ;; Get the full, original WAVSAMP
+        prs=self->GetWAVSAMP(modules[md],orders[i],/FULL)
+        rec.SLIT_LENGTH=mean([sqrt((prs.x[0,*]-prs.x[1,*])^2+ $
+                                   (prs.y[0,*]-prs.y[1,*])^2), $
+                              sqrt((prs.x[3,*]-prs.x[2,*])^2+ $
+                                   (prs.y[3,*]-prs.y[2,*])^2)])
+        rec.WAV_MIN=min(prs.lambda,MAX=mx)
+        rec.WAV_MAX=mx
+        x_cen=reform(prs.cen[0,*]) & y_cen=reform(prs.cen[1,*])
+        ymax=max(y_cen,MIN=ymin)
+        ymid=ymin+.5*(ymax-ymin)
+        rec.WAV_CENTER=interpol(prs.lambda,y_cen,ymid,/QUADRATIC)
+        
+        ;;print,rec.slit_length,rec.WAV_CENTER
+        
+        
+        ;; Fit a's => x(lam_norm) and b's=> y(lam_norm) to polynomials
+        lam_norm=(prs.lambda-rec.WAV_CENTER)/rec.WAV_CENTER
+        a_fit=svdfit(lam_norm,x_cen,6,YFIT=x_cen_fit,STATUS=stat)
+        b_fit=svdfit(lam_norm,y_cen,6,YFIT=y_cen_fit,STATUS=stat)
+        
+        ;; Check for constant angle first
+        if array_equal(prs.angle,prs[0].angle) then begin 
+           c_fit=[prs[0].angle,replicate(0.0,3)]
+        endif else begin 
+           ;; Start small and work your way up to avoid runaway fit
+           for polyord=2,4 do begin 
+              c_fit_try=svdfit(y_cen,prs.angle,polyord,YFIT=angle_fit_try, $
+                               CHISQ=chi_sq,STATUS=stat)
+              ;; If it got worse, abort and use the last one
+              if n_elements(old_chisq) gt 0 && chi_sq gt old_chisq then break
+              angle_fit=angle_fit_try 
+              c_fit=[c_fit_try,replicate(0.0,4-polyord)] & old_chisq=chi_sq
+              ;;print,'CHI_SQ:',chi_sq
+           endfor 
+        endelse 
+        rec.A=a_fit & rec.B=b_fit & rec.C=c_fit
+        rec.RecoveredPolys=1
+        self->FreeWAVSAMP,modules[md],orders[i],RECORD=rec,/ALL,/PIXEL_BASED
+        self->SetRecord,rec
+        ;; Plot Debug
+;         !P.MULTI=[0,3,3,0,1]
+;         plot,lam_norm,x_cen,PSYM=4,/YNOZERO,CHARSIZE=2
+;         x_cen_orig=poly(lam_norm,rec.A)
+;         print,'Original A: ',rec.A
+;         oplot,lam_norm,x_cen_orig,COLOR=2
+;         oplot,lam_norm,x_cen_fit,COLOR=1
+;         plot,lam_norm,x_cen-x_cen_fit,CHARSIZE=2
+;         plot,lam_norm,x_cen_fit-x_cen_orig,CHARSIZE=2
+;         print,"New A: ",a_fit
+        
+        
+;         plot,lam_norm,y_cen,PSYM=4,/YNOZERO,CHARSIZE=2
+;         y_cen_orig=poly(lam_norm,rec.B)
+;         print,'Original B: ',rec.B
+;         oplot,lam_norm,y_cen_orig,COLOR=2 ;old fit in blue
+;         oplot,lam_norm,y_cen_fit,COLOR=1 ;fit in red
+;         plot,lam_norm,y_cen-y_cen_fit,CHARSIZE=2
+;         plot,lam_norm,y_cen_fit-y_cen_orig,CHARSIZE=2
+;         print,"New B: ",b_fit
+        
+        
+;         plot,y_cen,prs.angle,PSYM=4,/YNOZERO,CHARSIZE=2
+;         angle_orig=poly(y_cen,rec.C)
+;         print,'Original C: ',rec.C
+;         oplot,y_cen,angle_orig,COLOR=2
+;         if n_elements(angle_fit) gt 0 then begin 
+;            oplot,y_cen,angle_fit,COLOR=1
+;            plot,y_cen,prs.angle-angle_fit,CHARSIZE=2
+;            plot,y_cen,angle_fit-angle_orig,CHARSIZE=2
+;         endif 
+;        print,"New C: ",c_fit
+        
+     endfor 
+  endfor 
+end
+
+
+;=============================================================================
 ;  ParseWAVSAMP - Read and parse the specified WAVSAMP file, clipping
 ;                 and caching the PSUEDO-RECT full-slit polygons for
 ;                 fast access.
@@ -1081,7 +1244,7 @@ pro IRS_Calib::ParseWAVSAMP,file,module
            transpose(data[wh].y3)]
      pr.cen=[transpose(data[wh].x_center),transpose(data[wh].y_center)]
      ws={IRS_WAVSAMP, $
-         0b,1b,0.0,{IRS_APERTURE,[0.,0.],[1.,1.]},ptr_new(pr,/NO_COPY)}
+         0b,1b,0.0,irs_aperture(0.,1.),ptr_new(pr,/NO_COPY)}
      
      ;; Clean out any old WAVSAMP's
      self->FreeWAVSAMP,RECORD=rec,/ALL
@@ -1150,6 +1313,25 @@ pro IRS_Calib::ParsePMASK,file,module
   self.PMASK[m]=ptr_new(readfits(file,/SILENT))
   (*self.cal[m]).PMASK=self.PMASK[m] ;set for each order
   self.PMASK_FILE[m]=file
+end
+
+
+;=============================================================================
+;  ParseFluxcon - Read and parse the specified FLUXCON file, saving
+;                 the data in the object.
+;=============================================================================
+pro IRS_Calib::ParseFluxcon,file,module
+  m=irs_module(module)
+  data=read_ipac_table(file)
+  for i=0,n_elements(data.ORDER)-1 do begin 
+     rec=self->GetRecord(m,data[i].ORDER)
+     rec.TUNE=[data[i].a0,data[i].a1,data[i].a2,data[i].a3, $
+               data[i].a4,data[i].a5]
+     rec.FLUXCON=data[i].fluxcon
+     rec.FLUXCON_KEY_WAV=data[i].key_wavelength
+     self->SetRecord,rec
+  endfor
+  self.FLUXCON_FILE[m]=file 
 end
 
 
@@ -1266,6 +1448,7 @@ pro IRS_Calib__define
          WAVSAMP_FILE:strarr(5), $ ;the names of the wavsamp files (WAVSAMP)
          TILT_FILE:strarr(5),$  ;the name of the LINETILT file (c)
          ORDER_FILE:strarr(5),$ ;the name of the ORDFIND file (a's & b's)
+         FLUXCON_FILE:strarr(5),$ ;the name of the FLUXCON coefficient file
          PMASK_FILE:strarr(5),$ ;the name of the pmask files   
          PMASK:ptrarr(5), $     ;the pmask, one for each order   
          cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
@@ -1290,6 +1473,10 @@ pro IRS_Calib__define
        A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
        C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
+       RecoveredPolys: 0,$      ;recovered ordfind/linetilt from WS
+       FLUXCON:0.0, $           ;the fluxcon value for this order e/s/Jy
+       FLUXCON_KEY_WAV:0.0,$    ;fluxcon reference wavelength
+       TUNE:fltarr(6),$         ;fluxcon tuning coefficients "a"
        WAVSAMPS: ptr_new()}     ;A list of IRS_WAVSAMP structs
   
   ;; A wavsamp set for a single order and a given aperture, either
