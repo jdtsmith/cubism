@@ -233,7 +233,7 @@ pro IRSMapSet::ReadMapSetFile,file,NAME=name,FORERANGES=fr,BACKRANGES=br, $
      cdir=strmid(cdir,0,strpos(cdir,path_sep(),/REVERSE_SEARCH))
      file=filepath(ROOT_DIR=cdir,SUBDIR='map_sets',file)
   endif 
-  if NOT file_test(file,/READ) then self->Error,"No such file found: ",file
+  if NOT file_test(file,/READ) then self->Error,"No such file found: "+file
   nf=(nb=(nw=0))
   openr,unit,file,/GET_LUN
   name=''
