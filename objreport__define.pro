@@ -285,7 +285,7 @@ function ObjReport::ReportWidget
               "Override the ReportWidget Method?"
   endif
   if ptr_valid(self.wInfo) then return,((*self.wInfo).Base)
-  return,-1L
+  return,0L
 end
 
 ;=============================================================================
