@@ -366,6 +366,7 @@ pro tvDraw::SetProperty, IMORIG=io,DISPSIZE=ds,OFFSET=off, $
   
   if n_elements(io) ne 0 then begin ; a new image
      pre=(draw=1)               ; Our plugins will want to have at it.
+     if size(io,/N_DIMENSIONS) eq 1 then io=reform(io,n_elements(io),1)
      s=size(io,/DIMENSIONS)
      ptr_free,self.imorig
      if size(io,/TYPE) eq 10 then begin ;a pointer, don't duplicate the space
