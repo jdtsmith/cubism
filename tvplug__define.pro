@@ -66,7 +66,7 @@ end
 ;=============================================================================
 pro tvPlug::Disable
   self.active=self.active OR 2b
-  if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,self.active}
+  if self.on_off then self->MsgSend,{TVPLUG_ENABLE_DISABLE,self,self.active}
 end
 
 ;=============================================================================
@@ -74,7 +74,7 @@ end
 ;=============================================================================
 pro tvPlug::Enable
   self.active=self.active AND NOT 2b ;take off the disable bit
-  if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,self.active}
+  if self.on_off then self->MsgSend,{TVPLUG_ENABLE_DISABLE,self,self.active}
 end
 
 ;=============================================================================
@@ -101,7 +101,6 @@ function tvPlug::On
 end
 
 pro tvPlug::Cleanup
-  obj_destroy,self.oDraw        ;all for one, and one for all
   self->OMArray::Cleanup
   self->tvPlug_lite::Cleanup    ;cleans up all subscribers
 end
@@ -113,7 +112,7 @@ function tvPlug::Init,oDraw,NO_ON_OFF=noo, _EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   if NOT keyword_set(noo) then begin 
      self.on_off=1b
-     self->MsgSetup,'TVPLUG_ON_OFF'
+     self->MsgSetup,['TVPLUG_ON_OFF','TVPLUG_ENABLE_DISABLE']
   endif
   return,1
 end
@@ -130,4 +129,5 @@ pro tvPlug__define
       on_off:0b, $              ;are we using on_off messages?
       active:0b}                ;flag: whether we're active (off,on,disabled)
   message={TVPLUG_ON_OFF, Object:obj_new(), Status:0b} ;an on or off message.
+  message={TVPLUG_ENABLE_DISABLE, Object:obj_new(), Status:0b}
 end
