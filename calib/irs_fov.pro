@@ -15,7 +15,7 @@
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    (fovid|fovid)=irs_fov((fovname|fovid),[MODULE=,ORDER=,POSITION=])
+;    (fovid|fovname)=irs_fov((fovname|fovid),[MODULE=,ORDER=,POSITION=])
 ;    
 ; INPUT PARAMETERS:
 ;
@@ -33,6 +33,14 @@
 ;       order (if relevant).  0 means the center position (unless
 ;       ORDER is 0 in which case the *module* center was targetted).
 ;			
+; INPUT KEYWORD PARAMETERS:
+;
+;    LOOKUP_MODULE: Lookup the module,order and position, returning
+;       the fovid (default), or fovname if /RETURN_NAME is set.
+;
+;    RETURN_NAME: Return the fovname.  Usually, the return type is
+;       defined by the type of the input.
+;
 ; OUTPUTS:
 ;
 ;    fovid|fovname: The integer id or string name of the IRS fov
@@ -40,7 +48,7 @@
 ;
 ; NOTES:
 ;  
-;    Additional description and other information which doesn't fit elsewhere.
+;    
 ;
 ; EXAMPLE:
 ;
@@ -55,7 +63,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002 J.D. Smith
+;  Copyright (C) 2002,2003 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -76,7 +84,8 @@
 ;
 ;##############################################################################
 
-function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos
+function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos, $
+                  LOOKUP_MODULE=lm, RETURN_NAME=nm
   
   void={IRS_FOV,ID:0,NAME:'',SHORT_NAME:'',MODULE:'',ORDER:0,POSITION:0}
   f=[{IRS_FOV,26,'IRS_Short-Lo_1st_Order_1st_Position',   'SL1_a',  'SL',1,1},$
@@ -98,14 +107,30 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md, ORDER=ord, POSITION=pos
      {IRS_FOV,52,'IRS_Short-Hi_Center_Position',          'SH_cen', 'SH',0,0},$
      {IRS_FOV,56,'IRS_Long-Hi_1st_Position',              'LH_a',   'LH',0,1},$
      {IRS_FOV,57,'IRS_Long-Hi_2nd_Position',              'LH_b',   'LH',0,2},$
-     {IRS_FOV,58,'IRS_Long-Hi_Center_Position',           'LH_cen', 'LH',0,0} ]
+     {IRS_FOV,58,'IRS_Long-Hi_Center_Position',           'LH_cen', 'LH',0,0}]
   
-  if size(fov,/type) eq 7 then begin 
+  if keyword_set(lm) then begin 
+     if n_elements(md) eq 0 OR n_elements(ord) eq 0 OR $
+        n_elements(pos) eq 0 then $
+        message,'Must specify Module,Order and Position'
+     
+     if ord eq 3 and strmid(strupcase(md),1) eq 'L' then ord=1
+     wh=where(f.module eq strupcase(md) AND $
+              (f.order eq long(ord) OR $
+               (strmid(f.module,1) eq 'H' AND f.order eq 0)) AND $
+              f.position eq long(pos),cnt)
+     if cnt eq 0 then return,-1
+     return,keyword_set(nm)? $
+            (keyword_set(sn)?f[wh[0]].SHORT_NAME:f[wh[0]].NAME): $
+            f[wh[0]].ID
+  endif 
+  
+  if size(fov,/type) eq 7 AND keyword_set(nm) eq 0 then begin
      wh=where(strupcase(f.NAME) eq strupcase(fov),cnt)
      if cnt eq 0 then return,-1
      ret=f[wh[0]].ID
   endif else begin 
-     wh=where(f.ID eq fov,cnt)
+     wh=where(f.ID eq long(fov),cnt)
      if cnt eq 0 then return,-1
      if keyword_set(sn) then ret=f[wh[0]].SHORT_NAME else ret=f[wh[0]].NAME
   endelse 
