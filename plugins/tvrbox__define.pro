@@ -278,10 +278,10 @@ end
 pro tvRBox::DrawCorners
   if self.snap_mode then self->SnapCoords
   x=self.boxoff[0]+[0,0,self.corlen] ;ll
-  y=self.boxoff[1]-self.boxsize[1]+1+[self.corlen,0,0]
+  y=self.boxoff[1]-self.boxsize[1]+[self.corlen,0,0]
   plots, x,y,COLOR=self.color, THICK=self.thick, /DEVICE
   
-  x=self.boxoff[0]+self.boxsize[0]-1+[0,0,-self.corlen] ;lr
+  x=self.boxoff[0]+self.boxsize[0]+[0,0,-self.corlen] ;lr
   plots, x,y,COLOR=self.color, THICK=self.thick, /DEVICE
   
   y=self.boxoff[1]+[-self.corlen,0,0] ;ur
