@@ -170,6 +170,8 @@ pro CubeProj::ShowEvent, ev
         widget_control, ev.id, SET_BUTTON=(self.SaveMethod AND 2b) ne 0b
      end 
      
+     'add-droop-aor': self->AddAOR,/DROOPRES
+     
      'setorder': begin 
         self->GetProperty,CALIB=cal
         ords=strtrim(cal->Orders(self.MODULE),2)
@@ -292,7 +294,8 @@ pro CubeProj::ShowEvent, ev
      end
      
      'sort': begin 
-        flags=bytarr(6)
+        widget_control,ev.id,get_value=v
+        flags=bytarr(n_elements(v))
         self.sort=ev.value
         flags[ev.value-(5*(ev.value ge 6))]=1b ;keep ID selected if set
         widget_control, (*self.wInfo).Base,UPDATE=0
@@ -430,9 +433,14 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   ;;*** Data Record menu
   rec=widget_button(mbar,VALUE='Record',/MENU)
   b1=widget_button(rec,VALUE='Add BCD Data...',UVALUE='adddata')
-  b2=widget_button(rec,VALUE='Import BCDs from AOR...',UVALUE='AddAOR') 
+  b2=widget_button(rec,VALUE='Import BCDs from AOR...',UVALUE='addaor') 
+  b3=widget_button(rec,VALUE='Import DroopRes from AOR...', $
+                   UVALUE='add-droop-aor',/SEPARATOR)
+  (*self.wInfo).MUST_UNRESTORED=widget_button(rec, UVALUE='restoreall',$
+                                              VALUE='Restore All Record Data')
   wMustSel=[wMustSel, $
-            widget_button(rec,VALUE='Delete',UVALUE='delete'),$
+            ;;-------------
+            widget_button(rec,VALUE='Delete',UVALUE='delete',/SEPARATOR),$
             widget_button(rec,VALUE='Rename',UVALUE='renamerecord'),$
             widget_button(rec,VALUE='Disable',UVALUE='disablerecord'),$
             widget_button(rec,VALUE='Enable',UVALUE='enablerecord'),$
@@ -503,20 +511,21 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).wHead[0]= $
      cw_bgroup(/NONEXCLUSIVE,headmap, $
                ['ID               ', $
-                'ITime  ', $
-                'Observed      ', $
+                'Exp   ', $
+                'Observed       ', $
                 'Added      ', $
                 'Type ',$
                 'Step '],UVALUE='sort',/ROW)
   (*self.wInfo).wHead[1]= $  
      cw_bgroup(/NONEXCLUSIVE,headmap, $
-               ['ID               ', $
+               ['ID                 ', $
                 'RA     ', $
-                'Dec      ', $
-                'Unc', $
-                'BMask',$
-                'Account'], $
-               BUTTON_UVALUE=[0,6,7,8,9,10],UVALUE='sort',/ROW,MAP=0)
+                'Dec   ', $
+                'UNC', $
+                'BM',$
+                'DATA',$
+                'ACC'], $
+               BUTTON_UVALUE=[0,6,7,8,9,10,11],UVALUE='sort',/ROW,MAP=0)
   
   b1=widget_button(headbase,VALUE='>',UVALUE='switchlist')
   
@@ -731,18 +740,15 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt
      
      ;; Optional BMASK, UNCERTAINTY
      ptr_free,(*self.DR)[which].BMASK,(*self.DR)[which].UNC
-     parts=stregex(file,'^(.*)bcd(_fp)?.fits$',/EXTRACT,/SUBEXPR)
-     root=parts[1]
-     unc_file=root+'func.fits'
-     bmask_file=root+'bmask.fits'
+     unc_file=self->FileBCD(file,/UNCERTAINTY)
+     bmask_file=self->FileBCD(file,/BMASK)
      
-     if file_test(bmask_file) then $
+     if size(bmask_file,/TYPE) eq 7 && file_test(bmask_file) then $
         (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
      
-     if file_test(unc_file) then $
+     if size(unc_file,/TYPE) eq 7 && file_test(unc_file) then $
         (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
   endfor
-  print, 'Restored: ',cnt
 end
 
 ;=============================================================================
@@ -945,7 +951,7 @@ pro CubeProj::ExportToMain, SPECTRUM=sp, MAP=mp, TYPE=map_type
    ;; Still here... we need to export to the main level
    void=call_function('routine_names',var_name,export,store=1)
    self.Spawned=0b              ;no longer spawned
-   spQ: print,' *** CUBISM ',title,' exported to variable: '
+   spQ: print,' *** CUBISM: ',title,' exported to variable: '
    print,'   ====> '+var_name+' <==='
 end
    
@@ -1038,6 +1044,7 @@ end
 pro CubeProj::UpdateList,CLEAR_SELECTION=cs
   self->Sort
   if NOT self->IsWidget() then return
+  widget_control, (*self.wInfo).Base,UPDATE=0
   if keyword_set(cs) then begin 
      widget_control, (*self.wInfo).SList, set_value=self->List(), $
                      SET_LIST_SELECT=-1,SET_LIST_TOP=t
@@ -1047,6 +1054,7 @@ pro CubeProj::UpdateList,CLEAR_SELECTION=cs
      widget_control, (*self.wInfo).SList, set_value=self->List(), $
                      SET_LIST_SELECT=ls,SET_LIST_TOP=t
   endelse
+  widget_control, (*self.wInfo).Base,/UPDATE
 end
 
 ;=============================================================================
@@ -1060,29 +1068,31 @@ function CubeProj::List
    
    for i=0,n-1 do begin 
       if which_list eq 0 then begin ;the standard list
-         s=string(FORMAT='(" ",A,T23,F7.2,T31,A,T50,A,T69,A7,T78,' + $
+         tchar=([" ","d","c"])[(*self.DR)[i].type]
+         s=string(FORMAT='(" ",A20,T23,F6.2,T30,A,T49,A,T68,A8,T78,' + $
                   'I3,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
                   (*self.DR)[i].TIME, $
                   jul2date((*self.DR)[i].DATE_OBS,FORM='D*T'), $
                   jul2date((*self.DR)[i].DATE,FORM='D*T'), $
-                  irs_fov((*self.DR)[i].FOVID,/SHORT_NAME), $
+                  tchar+irs_fov((*self.DR)[i].FOVID,/SHORT_NAME), $
                   (*self.DR)[i].EXP,(*self.DR)[i].ROW,(*self.DR)[i].COLUMN)
       endif else begin          ;the additional list
          if ptr_valid((*self.DR)[i].ACCOUNT) then begin 
             if self.ACCOUNTS_VALID then begin 
-               if ptr_valid((*self.DR)[i].REV_ACCOUNT) then acct="Yes (+rev)" $
-               else acct="Yes"
-            endif else acct="Invalid"
-         endif else acct="No"
+               if ptr_valid((*self.DR)[i].REV_ACCOUNT) then acct="Y(+R)" $
+               else acct="Y"
+            endif else acct="INV"
+         endif else acct="N"
          if self.reconstructed_pos then pos=(*self.DR).REC_POS else $
             pos=(*self.DR)[i].RQST_POS
-         
-         s=string(FORMAT='(" ",A,T23,A10,T34,A12,T48,A3,T59,A,T67,A)', $
+         s=string(FORMAT= $
+                  '(" ",A20,T23,A11,T34,A12,T49,A1,T56,A1,T63,A1,T69,A5)', $
                   (*self.DR)[i].ID, $
                   radecstring(pos[0],/RA),radecstring(pos[1]), $
-                  ptr_valid((*self.DR)[i].UNC)?'Yes':'No', $
-                  ptr_valid((*self.DR)[i].BMASK)?'Yes':'No', $
+                  ptr_valid((*self.DR)[i].UNC)?'Y':'N', $
+                  ptr_valid((*self.DR)[i].BMASK)?'Y':'N', $
+                  ptr_valid((*self.DR)[i].BCD)?'Y':'N', $
                   acct)
       endelse       
       if (*self.DR)[i].DISABLED then begin 
@@ -1103,7 +1113,7 @@ pro CubeProj::UpdateButtons
   sel=self->CurrentSelect()
   for i=0,n_elements((*self.wInfo).MUST_SELECT)-1  do  $
      widget_control,((*self.wInfo).MUST_SELECT)[i],  $
-                    SENSITIVE=ptr_valid(self.DR) AND sel[0] ne -1
+                    SENSITIVE=ptr_valid(self.DR) && sel[0] ne -1
   nsel=n_elements(sel) 
   if (nsel gt 1) ne ((*self.wInfo).nsel_sav gt 1)then begin 
      if nsel gt 1 then begin 
@@ -1146,6 +1156,10 @@ pro CubeProj::UpdateButtons
   
   widget_control, (*self.wInfo).MUST_SAVE_CHANGED,SENSITIVE= $
                   strlen(self.SaveFile) ne 0 AND keyword_set(self.Changed)
+  
+  widget_control, (*self.wInfo).MUST_UNRESTORED,SENSITIVE= $
+                  ptr_valid(self.DR) && $
+                  ~array_equal(ptr_valid((*self.DR).BCD),1b)
 end
 
 ;=============================================================================
@@ -1153,7 +1167,7 @@ end
 ;=============================================================================
 pro CubeProj::UpdateColumnHeads
   if NOT self->IsWidget() then return
-  flags=bytarr(11)
+  flags=bytarr(12)
   flags[self.sort]=1b
   if (*self.wInfo).which_list eq 0 then flags=flags[0:5] else $
      flags=[flags[0],flags[6:*]]
@@ -1349,7 +1363,7 @@ pro CubeProj::Sort,sort
      1: s=sort((*self.DR).TIME)
      2: s=sort((*self.DR).DATE_OBS)
      3: s=sort((*self.DR).DATE)
-     4: s=sort((*self.DR).FOVID)
+     4: s=sort(long((*self.DR).FOVID)+ishft(long((*self.DR).TYPE),16))
      5: s=sort((*self.DR).EXP)
      6: s=sort(self.reconstructed_pos?(*self.DR).REC_POS[0]: $
                (*self.DR).RQST_POS[0])
@@ -1357,7 +1371,8 @@ pro CubeProj::Sort,sort
                (*self.DR).RQST_POS[1])
      8: s=sort(ptr_valid((*self.DR).UNC))
      9: s=sort(ptr_valid((*self.DR).BMASK))
-     10: s=sort(ptr_valid((*self.DR).ACCOUNT))
+     10: s=sort(ptr_valid((*self.DR).BCD))
+     11: s=sort(ptr_valid((*self.DR).ACCOUNT))
   endcase
   *self.DR=(*self.DR)[s]        ;rearrange
   if self->IsWidget() then begin 
@@ -1438,6 +1453,24 @@ function CubeProj::Info,entries, NO_DATA=nd
                      rec.EXP,rec.CYCLE,rec.NCYCLES,rec.ROW,rec.COLUMN, ra,dec)]
   endfor 
   return,str
+end
+
+;=============================================================================
+;  FileBCD - Find the BCD version of any given fits file
+;=============================================================================
+function CubeProj::FileBCD,file,BMASK=bm,UNCERTAINTY=unc
+  if keyword_set(bm) then reg='bmask\.fits$' else $
+     if keyword_set(unc) then reg='func\.fits$' else $
+        reg='bcd(_fp)?\.fits$'
+  if stregex(file,reg,/BOOLEAN) then return,file
+  parts=stregex(file,'^(.*[0-9][._])[^.]+\.fits$',/EXTRACT,/SUBEXPR)
+  base=parts[1]
+  if strlen(base) eq 0 then return,-1
+  if keyword_set(bm) then filt='bmask' else $
+     if keyword_set(unc) then filt='func' else filt='bcd*'
+  f=file_search(base+filt+'.fits',COUNT=cnt)
+  if cnt eq 0 then return,-1
+  return,f[0]
 end
 
 ;=============================================================================
@@ -1635,8 +1668,10 @@ end
 ;=============================================================================
 function CubeProj::Cube,pln
   if NOT ptr_valid(self.CUBE) then return,-1
-  if n_elements(pln) ne 0 then return,(*self.CUBE)[*,*,pln]
-  return,*self.CUBE 
+  if n_elements(pln) ne 0 then begin 
+     pln=0>pln<((size(*self.CUBE,/DIMENSIONS))[2]-1)
+     return,(*self.CUBE)[*,*,pln]
+  endif else return,*self.CUBE 
 end
 
 ;=============================================================================
@@ -2944,21 +2979,37 @@ end
 ;  AddAOR - Add an entire AOR from a full AOR directory, with choice
 ;           of module(s) and observations.
 ;=============================================================================
-pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
+pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd,DROOPRES=dr
   if n_elements(dir) eq 0 then $
      xf,dir,/DIRECTORY,/RECENT,TITLE='Select AOR Directory', $
         PARENT_GROUP=self->TopBase(),/MODAL
   if size(dir,/TYPE) ne 7 then return
   
-  if ~file_test(dir,/DIRECTORY) || $
-     ~stregex(dir,'r?[0-9]{7,10}'+path_sep()+'?$',/BOOLEAN) then $
-     self->Error,'Must select AOR directory of form [r]0123456[789]'
-  if keyword_set(cd) then filt='*coa*2d.fits' else filt='*bcd{,_fp}.fits'
+  if ~file_test(dir,/DIRECTORY) then $
+     self->Error,'Must select directory containing AORs'
+  if keyword_set(cd) then begin 
+     type='Coadd' & filt='*coa*2d.fits' 
+  endif else if keyword_set(dr) then begin 
+     type='DroopRes' & filt='*droop{,res}.fits'
+  endif else begin 
+     type='BCD' & filt='*bcd{,_fp}.fits'
+  endelse 
+  
+  widget_control, /HOURGLASS
   files=file_search(dir,filt,/TEST_REGULAR,COUNT=cnt)
   if cnt eq 0 then $
      self->Error,['No data found in:',dir],TITLE='AOR Import Error'
+  if cnt gt 500 then begin 
+     ans=dialog_message(["Selected directory contains "+strtrim(cnt,2)+ $
+                         " data files. Continue?",dir],$
+                        /QUESTION,TITLE="Add AORs: "+self->ProjectName()+"?", $
+                        DIALOG_PARENT=self->TopBase())
+     if ans ne 'Yes' then return
+  endif 
+
   for i=0,n_elements(files)-1 do begin 
-     hdr=headfits(files[i])
+     file=self->FileBCD(files[i]) ;get the bcd header...
+     hdr=headfits(file)
      rec={FILE:files[i],OBJECT:strtrim(sxpar(hdr,'OBJECT'),2), $
           FOV:long(sxpar(hdr,'FOVID')), $
           NCYCLES:long(sxpar(hdr,'NCYCLES')), $
@@ -2988,18 +3039,18 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
         if n_elements(choices) eq 0 then choices=rec else begin 
            choices=[choices,rec]
            ;; The separate low-res slits are compatible with each other
-           if ord gt 0 and (md eq 'SL' or md eq 'LL') then begin
-              other=md+strtrim(ord eq 2?1:2,2)
-              whfov=where(choices.FOVNAME eq other,cnt)
-              if cnt gt 0 then begin 
-                 ;; both are present
-                 rec.FOVNAME=other+'+'+fovname
-                 rec.FILES=ptr_new([*rec.FILES,*choices[whfov[0]].FILES])
-                 rec.cnt+=choices[whfov[0]].CNT
-                 rec.MERGE=1b
-                 choices=[choices,rec]
-              endif 
-           endif
+;            if ord gt 0 and (md eq 'SL' or md eq 'LL') then begin
+;               other=md+strtrim(ord eq 2?1:2,2)
+;               whfov=where(choices.FOVNAME eq other,cnt)
+;               if cnt gt 0 then begin 
+;                  ;; both are present
+;                  rec.FOVNAME=other+'+'+fovname
+;                  rec.FILES=ptr_new([*rec.FILES,*choices[whfov[0]].FILES])
+;                  rec.cnt+=choices[whfov[0]].CNT
+;                  rec.MERGE=1b
+;                  choices=[choices,rec]
+;               endif 
+;            endif 
         endelse 
      endfor 
   endfor 
@@ -3017,11 +3068,13 @@ pro CubeProj::AddAOR,AOR=aor,DIR=dir,COADD=cd
      endelse 
   endfor 
   
-  choice=multchoice('Choose Data:',list,TITLE='Load AOR', $
-                    PARENT_GROUP=self->TopBase(),/MODAL)
+  ch=multchoice('Choose '+type+' Data:',list,TITLE='Load AOR', $
+                PARENT_GROUP=self->TopBase(),/MODAL,/NONEXCLUSIVE)
   
   widget_control, /HOURGLASS
-  if choice[0] ne -1 then self->AddData,*choices[choice[0]].FILES
+  
+  if ch[0] ne -1 then $
+     for i=0,n_elements(ch)-1 do self->AddData,*choices[ch[i]].FILES
   ptr_free,choices.FILES
 end
 
@@ -3043,10 +3096,15 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
   endif
   for i=0,n_elements(files)-1 do begin 
      bcd=readfits(files[i],header,/SILENT)
-     parts=stregex(files[i],'^(.*)bcd(_fp)?.fits$',/EXTRACT,/SUBEXPR)
-     root=parts[1]
-     bfile=root+'bmask.fits'
-     if file_test(bfile,/READ) then bmask=readfits(bfile,/SILENT)
+     if ~stregex(files[i],'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
+        bcdfile=self->FileBCD(files[i])
+        if size(bcdfile,/TYPE) eq 7 then header=headfits(bcdfile)
+     endif 
+     
+     bfile=self->FileBCD(files[i],/BMASK)
+     if size(bfile,/TYPE) eq 7 && file_test(bfile,/READ) then $
+        bmask=readfits(bfile,/SILENT) else bmask=0
+     
      self->AddBCD,bcd,header,FILE=files[i],BMASK=bmask,ERR=err,_EXTRA=e
      if keyword_set(err) then break
   endfor
@@ -3076,22 +3134,25 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
      rec.BCD=ptr_new(bcd)
   endif
   
-  if n_elements(bmask) ne 0 then rec.BMASK=ptr_new(bmask)
+  if n_elements(bmask) gt 1 then rec.BMASK=ptr_new(bmask)
   
   if size(unc,/N_DIMENSIONS) eq 2 then rec.UNC=ptr_new(unc)
   if size(header,/TYPE) ne 7 then self->Error,'Header must be a string array'
   rec.header=ptr_new(header)
   
   if n_elements(file) ne 0 then rec.file=file
+  if stregex(file,'droop(res)?\.fits$',/BOOLEAN) then rec.type=1 else $
+     if stregex(file,'coad[^.]*\.fits$',/BOOLEAN) then rec.type=2 else $
+        rec.type=0
   
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
      id=filestrip(rec.file)
      if stregex(id,'IRSX.*\.fits',/BOOLEAN) then begin ;Sandbox style names
         parts=strsplit(id,'.',/EXTRACT)
         id=parts[3]+'.'+parts[5]+'.'+parts[6]
-     endif else begin ; XXX also treat long archive names specially
+     endif else begin ; also treat long archive names specially
         suffix=strpos(id,".fits",/REVERSE_SEARCH)
-        if suffix[0] ne -1 then id=strmid(id,0,suffix)
+        if suffix[0] ne -1 then id=strmid(strmid(id,0,suffix),8)
      endelse 
      rec.id=id
   endif 
@@ -3352,6 +3413,7 @@ pro CubeProj__define
        RQST_POS: [0.0D,0.0D], $ ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
        FOVID: 0, $              ;The IRS Field of View ID
+       TYPE: 0, $               ;0- BCD, 1- Droopres, 2- Coad2d
        TARGET_ORDER: 0, $       ;which order was targetted by pointing
                                 ;  (or 0 for module center targetting)
        TARGET_POS: 0, $         ;For low-res: 0, 1, or 2 for centered on
@@ -3392,7 +3454,8 @@ pro CubeProj__define
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(3), $ ;background record must be set
-         MUST_BPL:lonarr(2)}    ;must have a list of bad pixels
+         MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
+         MUST_UNRESTORED:0L}    ;must have unrestored data
 
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
