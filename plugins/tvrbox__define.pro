@@ -307,7 +307,7 @@ end
 
 pro tvRBox::EraseBox
   ;if self.snap_mode then self->SnapCoords
-  if NOT array_equal(self.boxoff ge 0,1b) then return
+  ;if NOT array_equal(self.boxoff ge 0,1b) then return
   lr=self.boxoff+(self.boxsize)*[1,-1]
   ur=(self.boxoff>lr)+(self.thick+2.*self.hsize) > 0
   ll=(self.boxoff<lr)-(self.thick+2.*self.hsize) > 0
