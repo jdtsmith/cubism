@@ -41,10 +41,19 @@ pro tvRBox::Message, msg
                        if self.handcurs then hand_cursor,/CENTER
                     endif else return
                  endelse 
+                 if self.snap_mode then $
+                    self.save_coords=self.oDraw->Convert([msg.X,msg.Y])
               endif else begin  ; box not yet drawn: drawing a new one
+                 if self.snap_mode then begin 	
+                    coords=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
+                    if coords[0] eq -1 then return
+                    self.coords=coords
+                    self.save_coords=self.coords
+                    self.size=[1,1]
+                    self->DrawBox
+                 endif else self.boxoff=[msg.X,msg.Y]
                  self.boxflag=0b ;drawing new box, just like on knob
-                 self.boxoff=[msg.X,msg.Y]
-              endelse 
+              endelse
               
               ;;sign up for motion events.
               self.oDraw->MsgSignup,self,/DRAW_MOTION
@@ -81,19 +90,33 @@ pro tvRBox::Message, msg
      
      'TVKEY_ARROW': begin 
         if self->IsDrawn() eq 0 then return
-        self->EraseBox
-        self.boxoff=[0,self.boxsize[1]]>(self.boxoff+self.zoom*msg.move)< $
-           [self.winsize[0]-self.boxsize[0]-1,self.winsize[1]-1]
-        ;self.save=self.boxoff
-        self->SendBox
+        if self.snap_mode then begin 
+           self.oDraw->GetProperty,OFFSET=off, DISPSIZE=ds
+           new_coords=[off[0],off[1]+self.size[1]-1] > $
+                      (self.coords+msg.move) < $
+                      [off[0]+ds[0]-self.size[0],off[1]+ds[1]-1]
+           if array_equal(new_coords,self.coords) then return
+           self->EraseBox
+           self.coords=new_coords
+        endif else begin 
+           self->EraseBox
+           self.boxoff=[0,self.boxsize[1]] > $
+                       (self.boxoff+self.zoom*msg.move) < $
+                       [self.winsize[0]-self.boxsize[0]-1,self.winsize[1]-1]
+        endelse 
         self->DrawBox
+        self->SendBox
      end
      
      'TVDRAW_REDRAW': begin     ; the screen was clobbered
         if self->IsDrawn() then begin ; only if a box here
-           if self.active then self->DrawBox  $ ;currently on
-           else if self.corners then self->drawcorners ;currently not on
+           if self->On() then self->DrawBox  $ ;currently on
+           else if self.corners then self->DrawCorners ;currently not on
         endif 
+     end
+     
+     'TVDRAW_SNAPSHOT': begin 
+        if self.corners then self->DrawCorners
      end
   endcase 
 end
@@ -102,13 +125,14 @@ pro tvRBox::On
   self->tvPlug::On
   key=self.oDraw->GetMsgObjs(CLASS='tvKey')
   if obj_valid(key[0]) then key[0]->MsgSignup,self,/TVKEY_ARROW
+  ;; Button and redraw events, no more snapshots
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW, $
+     TVDRAW_SNAPSHOT=0
   if self->IsDrawn() then begin 
-     self->EraseBox             ;removes any drawn corners
+     if self.corners then self.oDraw->ReDraw,/SNAPSHOT ;remove bg corners
      self->DrawBox              ;just turned on
-  endif 
+  endif
   self->SetUpDisplay
-  ;; Button and redraw events
-  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW
 end
 
 pro tvRBox::Off 
@@ -119,9 +143,9 @@ pro tvRBox::Off
   if self->IsDrawn() then begin 
      self->EraseBox
      if self.corners then begin 
-        ;;corner redraws and box size changes needed
-        self.oDraw->MsgSignup,self,/NONE,/TVDRAW_POSTDRAW,/TVDRAW_REDRAW 
-        self->drawcorners
+        ;;corner redraws and new images needed
+        self.oDraw->MsgSignup,self,/NONE,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT
+        self.oDraw->ReDraw,/SNAPSHOT ;get our corners on the background
      endif 
   endif 
 end
@@ -134,10 +158,15 @@ end
 
 ;; Get the current box sides in pixel coordinates, truncated to actual sizes
 pro tvRBox::GetLRTB, l, r, t, b
-  tmp=self.oDraw->Convert(self.boxoff,/TRUNCATE)
-  l=tmp[0] & t=tmp[1]
-  tmp=self.oDraw->Convert(self.boxoff+[1,-1]*self.boxsize,/TRUNCATE)
-  r=tmp[0] & b=tmp[1]
+  if self.snap_mode eq 0 then begin 
+     tmp=self.oDraw->Convert(self.boxoff,/TRUNCATE)
+     l=tmp[0] & t=tmp[1]
+     tmp=self.oDraw->Convert(self.boxoff+[1,-1]*self.boxsize,/TRUNCATE)
+     r=tmp[0] & b=tmp[1]
+  endif else begin 
+     l=self.coords[0] & r=self.coords[0]+self.size[0]-1
+     t=self.coords[1] & b=self.coords[1]-(self.size[1]-1)
+  endelse 
 end
 
 pro tvRBox::SetProperty, CORNERS=cor, COLOR=col
@@ -167,40 +196,79 @@ end
 ;; box on the array.  Also mirror the zoom and winsize. 
 ;; Boxoff is the upper left of the box.
 pro tvRBox::SetUpDisplay
-  self.oDraw->GetProperty,ZOOM=zoom,WINSIZE=winsize,SIZE=sz
-  ;; Convert the saved pixel coordinate to device
-  self.boxoff=self.oDraw->Convert(self.coords,/DEVICE)
-  ;; Scale the box size, if necessary.
-  self.boxsize=fix(self.boxsize*(zoom/self.zoom))
+  self.oDraw->GetProperty,ZOOM=zoom,WINSIZE=winsize,SIZE=sz,DISPSIZE=ds
   ;; Update our internal mirror of tvDraw data
   self.zoom=zoom & self.winsize=winsize
-  ;; Setup the box limits, which can be negative or greater than
-  ;; winsize (i.e. offscreen).
-  self.low_limit=self.oDraw->Convert([0,0],/DEVICE,/FRACTIONAL)
-  self.high_limit=self.oDraw->Convert(sz,/DEVICE,/FRACTIONAL)
+  if self.snap_mode eq 0b then begin ;Draw does this for us in Snap mode
+     ;; Convert the saved pixel coordinate to device units
+     self.boxoff=self.oDraw->Convert(self.coords,/DEVICE,/SHOWING)
+     if self.boxoff[0] eq -1 then self.boxoff=[0,0]
+     ;; Scale the box size, if necessary.
+     self.boxsize=fix(self.size*zoom)<winsize
+     ;; Setup the box limits, which can be negative or greater than
+     ;; winsize (i.e. offscreen).
+     self.low_limit=self.oDraw->Convert([0,0],/DEVICE,/FRACTIONAL)
+     self.high_limit=self.oDraw->Convert(sz,/DEVICE,/FRACTIONAL)
+  endif else begin 
+;     self.coords=self.coords<(ds-1)
+     self.size=self.size<sz
+  endelse 
 end
 
 pro tvRBox::MoveBox,X,Y
   X=0>X<(self.winsize[0]-1)
   Y=0>Y<(self.winsize[1]-1)
-  self->erasebox 
-  case self.boxflag of
-     1b: begin                  ;inside of box, perform move
-        ;; we keep the box inside of the *array* not inside the window.
-        self.boxoff=[self.low_limit[0],self.low_limit[1]+self.boxsize[1]] > $
-           (self.boxoff+([X,Y]-self.save)) < $
-           [self.high_limit[0]-self.boxsize[0],self.high_limit[1]]
-     end
+  if self.snap_mode then begin 
+     new_coord=self.oDraw->Convert([X,Y])
+     self.oDraw->GetProperty,OFFSET=off, DISPSIZE=ds,SIZE=sz
      
-     0b: $                      ;on knob, or new box being drawn               
-        self.boxsize=[X-self.boxoff[0],self.boxoff[1]-Y]>1
-  endcase 
+     case self.boxflag of
+        1b: begin               ;inside of box, performing move     
+           if array_equal(new_coord,self.save_coords) then return
+           self->Erasebox
+           self.coords=[off[0],off[1]+self.size[1]-1] > $
+                       (self.coords+(new_coord-self.save_coords)) < $
+                       [off[0]+ds[0]-self.size[0],off[1]+ds[1]-1]
+           self.save_coords=new_coord
+        end
+        
+        0b: begin               ;on knob, or new box being drawn
+           new_size=[off[0]+ds[0]-self.coords[0],self.coords[1]-off[1]+1] < $
+                    [new_coord[0]-self.coords[0],self.coords[1]-new_coord[1]] $
+                    > 1
+           if array_equal(new_size,self.size) then return
+           self->EraseBox
+           self.size=new_size
+        end
+     endcase 
+  endif else begin    
+     self->EraseBox 
+     case self.boxflag of
+        1b: begin               ;inside of box, perform move
+           ;; we keep the box inside of the *array* not inside the window.
+           self.boxoff=[self.low_limit[0],self.low_limit[1]+self.boxsize[1]] >$
+                       (self.boxoff+([X,Y]-self.save)) <$
+                       [self.high_limit[0]-self.boxsize[0],self.high_limit[1]]
+        end
+        
+        0b: begin               ;on knob, or new box being drawn               
+           self.boxsize=[X-self.boxoff[0],self.boxoff[1]-Y]>1
+        end
+     endcase 
+     self.save=[X,Y]
+  endelse 
   self->Drawbox
-  self.save=[X,Y]
   if self.on_motion then self->SendBox
 end
 
+pro tvRBox::SnapCoords
+  self.boxoff=self.oDraw->Convert(self.coords+[0,1], $
+                                  /DEVICE,/FRACTIONAL)
+  self.boxsize=self.oDraw->Convert(self.size,/DEVICE,/DISTANCE)
+end
+
 pro tvRBox::DrawCorners
+  if self.snap_mode then self->SnapCoords
   x=self.boxoff[0]+[0,0,self.corlen] ;ll
   y=self.boxoff[1]-self.boxsize[1]+1+[self.corlen,0,0]
   plots, x,y,COLOR=self.color, THICK=self.thick, /DEVICE
@@ -216,6 +284,8 @@ pro tvRBox::DrawCorners
 end
 
 pro tvRBox::DrawBox
+  if self.snap_mode then self->SnapCoords
+  self.oDraw->SetWin
   plots, $
         [self.boxoff[0],self.boxoff[0],self.boxoff[0]+self.boxsize[0], $
          self.boxoff[0]+self.boxsize[0], self.boxoff[0]], $
@@ -228,21 +298,25 @@ pro tvRBox::DrawBox
 end
 
 pro tvRBox::EraseBox
+  ;if self.snap_mode then self->SnapCoords
+  if NOT array_equal(self.boxoff ge 0,1b) then return
   lr=self.boxoff+(self.boxsize)*[1,-1]
-  ll=(self.boxoff<lr)-(self.thick+2.*self.hsize) > 0
   ur=(self.boxoff>lr)+(self.thick+2.*self.hsize) > 0
-  dist=fix(ur-ll+1) < (self.winsize-ll) > 0 
+  ll=(self.boxoff<lr)-(self.thick+2.*self.hsize) > 0
+  dist=fix(ur-ll+1) < (self.winsize-ll) > 1
   self.oDraw->Erase,ll,dist
 end
 
 pro tvRBox::SendBox
-  ;; set up the data coordinate, for zooms, etc.
-  self->GetLRTB,l,r,t,b
-  size=[r-l,t-b]
-  if array_equal([l,t],self.coords) AND array_equal(size,self.size) $
-     then return                ;no message necessary
-  self.coords=[l,t]
-  self.size=size
+  if self.snap_mode eq 0 then begin 
+     ;; set up the data coordinate, for zooms, etc.
+     self->GetLRTB,l,r,t,b
+     size=[r-l,t-b]
+     if array_equal([l,t],self.coords) AND array_equal(size,self.size) $
+        then return             ;no message necessary
+     self.coords=[l,t]
+     self.size=size
+  endif ; we always send a message in snap mode.  
   ;; send out a BOX message to our recipients.
   self->MsgSend, {BOX, self.boxflag}
 end
@@ -260,30 +334,34 @@ pro tvRBox::Cleanup
 end
 
 ;=============================================================================
-;       Init.  Initialize the tvRBox object.
-;         OPTIONS:                                         -- Default 
-;         	COLOR:  Color index with which to draw box -- 0
-;         	THICK:  Thickness of box band              -- 1.2
-;         	HANDLE: Type of handle to draw             -- 0 (circle)
-;         	 	 0: circle
-;         		 1: triangle
-;         		 2: square
-;         	KNOBRAD: Radius around lower right point   -- 5 (device units)
-;         		 which defines the resize knob if
-;         		 clicked within.
-;         	HSIZE:   Size of handle knob (SYMSIZE)     -- 1.
-;         	CORLEN:	 Length of Corner brackets         -- 5 (device units)
-;         	BUTTON:  Which button to use to activate   -- 0b (left)
-;         		 either 0(left), 1(middle), 2(right)
-;               CORNERS: Whether to display corners when   -- 0 (no)
-;               	 turned off.
-;	   	HANDCURS:Whether to display a hand cursor  -- 1 (yes)
-;	   		 when moving the box.
+;  Init -  Initialize the tvRBox object.
+;    OPTIONS:                                          -- Default 
+;  	COLOR:     Color index with which to draw box  -- 0
+;  	THICK:     Thickness of box band               -- 1.2
+;  	HANDLE:    Type of handle to draw              -- 0 (circle)
+;  	 	     0: circle
+;  		     1: triangle
+;  		     2: square
+;  	KNOBRAD:   Radius around lower right point     -- 5 (device units)
+;  		   which defines the resize knob if  
+;  		   clicked within.  
+;  	HSIZE:     Size of handle knob (SYMSIZE)       -- 1.
+;  	CORLEN:	   Length of Corner brackets           -- 5 (device units)
+;  	BUTTON:    Which button to use to activate     -- 0b (left)
+;  		   either 0(left), 1(middle), 2(right)
+;       CORNERS:   Whether to display corners when     -- 0 (no)
+;        	   turned off.  
+;   	HANDCURS:  Whether to display a hand cursor    -- 0 (no)
+;   		   when moving the box.  
+;       ON_MOTION: Deliver box motion events           -- 0 (no)
+;                  (not just release).  
+;       SNAP:      Whether to snap to pixel            -- 0 (no)
+;                  boundaries.
 ;=============================================================================
 function tvRBox::Init,oDraw,COLOR=color,THICK=thick,HANDLE=handle,KNOBRAD=kr,$
                       HSIZE=hs,CORLEN=cl,BUTTON=but,CORNERS=co,HANDCURS=hc, $
-                      ON_MOTION=om,_EXTRA=e
-  if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0
+                      ON_MOTION=om,SNAP=snap,_EXTRA=e
+  if (self->tvPlug::Init(oDraw,/NO_ON_OFF,_EXTRA=e) ne 1) then return,0
   if n_elements(but) eq 0 then but=0b
   self.button=2b^fix(but)       ;assign which button
   if n_elements(color) eq 0 then self.color=0 else self.color=color
@@ -291,6 +369,7 @@ function tvRBox::Init,oDraw,COLOR=color,THICK=thick,HANDLE=handle,KNOBRAD=kr,$
   if n_elements(hs) eq 0 then self.hsize=1. else self.hsize=hs
   if n_elements(cl) eq 0 then self.corlen=5. else self.corlen=ol
   if n_elements(kr) eq 0 then self.knobrad=5 else self.knobrad=kr
+  if keyword_set(snap) then self.snap_mode=1
   self.corners=keyword_set(co)  ;whether to draw outline corners when off
   self.handcurs=keyword_set(hc) ;whether to show a hand cursor on movement
   self.on_motion=keyword_set(om) ;whether to send messages for box moves.
@@ -321,12 +400,14 @@ function tvRBox::Init,oDraw,COLOR=color,THICK=thick,HANDLE=handle,KNOBRAD=kr,$
   self.pixwin=pixwin & self.winsize=winsize
   if n_elements(thick) eq 0 then $
      self.thick=1.5*float(max(winsize))/256<2 else self.thick=thick
+  self->MsgSetup,'BOX'
   return,1
 end
 
 pro tvrbox__define
   struct={tvRBox, $
           INHERITS tvPlug, $    ;make it a tvDraw plug-in
+          snap_mode:0, $        ;using snap mode?
           on_motion: 0, $       ;whether to send Box messages on box motion
           color:0, $            ;color to draw it.
           thick:0., $           ;thickness of box line
@@ -338,9 +419,12 @@ pro tvrbox__define
           boxoff:[0,0], $       ;offset of top-left of box (device units)
           low_limit:[0,0], $    ;the lower limit for box
           high_limit:[0,0], $   ;the upper limit for box
+          ;; For snap mode
           coords:[0,0], $       ;the saved upper left coord (data pixel units)
           size:[0,0], $         ;the saved box size (data pixel units)
-          save:[0,0], $         ;a saved device coordinate box       
+          save:[0,0], $         ;a saved device coordinate
+          save_coords:[0,0], $  ;a saved pixel coordinate (for snap mode)
+          ;; Flags
           boxflag:0, $          ;whether box is drawn, -1=never drawn
           knobrad:0, $          ;radius around lr to count as knob
           corners:0b, $         ;whether to display corners when turned off
@@ -353,3 +437,4 @@ pro tvrbox__define
           winsize:[0,0]}        ;size of the window displayed in
   st={BOX,flag:0}
 end
+ 
