@@ -470,8 +470,8 @@ function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
   
   ;; If looking for full, return it...
   if keyword_set(full) then begin 
-     wh_full=where((*rec.WAVSAMPS).FULL,cnt)
-     if cnt gt 0 then return,wh_pix[wh_full] else return,-1
+     wh_full=where((*rec.WAVSAMPS)[wh_pix].FULL,nsamp)
+     if nsamp gt 0 then return,wh_pix[wh_full] else return,-1
   endif 
 
   ;; Search for one of this type already cached with this aperture
