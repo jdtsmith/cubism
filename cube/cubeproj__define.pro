@@ -1711,6 +1711,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
         prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
                                  /PIXEL_BASED, /SAVE_POLYGONS, $
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
+        ;; XXX offset along PA, not along +x
         offset=[basic_offset[0]+ap_offset,basic_offset[1]]
         
         ;; Pre-allocate an account list 
@@ -1724,7 +1725,14 @@ pro CubeProj::BuildAccount,_EXTRA=e
         acc_ind=0L
         
         for j=prmin,prmax do begin ; iterate over all the PRs
-           ;; Setup the rotation matrix to rotate back to the +x direction
+           ;; Setup the rotation matrix to rotate back to the +x
+           ;; direction
+           ;;
+           ;; XXX pa_delta should remain, yes?  I.e. we should take
+           ;; out "false" rotation via optical distortion (slit
+           ;; rotation), but *put in* the correct delta(PA) between
+           ;; BCD and PA_0 as chosen for the cube.  Ensure this works
+           ;; correctly, i.e. in the correct sense.
            angle=prs[j].angle+pa_delta
            if angle ne 0.0D then begin 
               ct=cos(angle/!radeg) & st=sin(angle/!radeg)
@@ -1737,7 +1745,10 @@ pro CubeProj::BuildAccount,_EXTRA=e
               ;; associated polygon (2xn list) this pixel got clipped to
               ;; by the PR on the detector grid
               poly=*(*prs[j].POLYGONS)[k]
-              ;; Offset to poly's center
+              ;; Offset to poly's center 
+              
+              ;; XXX Should rotate about canonical slit center, not
+              ;; arbitrary aperture center.  Offsets then won't require
               poly=poly-rebin(prs[j].cen,size(poly,/DIMENSIONS))
               ;; Rotate this polygon to the cube sky grid, if necessary
               if angle ne 0.0 then poly=rot#poly
