@@ -141,19 +141,23 @@ pro tvSlice::ShowIndicator, IMONLY=il
   endif else wset,self.plotwin
 end
 
+;=============================================================================
+;       tvSlice::EraseIndicator -  Erase the plot point indicators
+;=============================================================================
 pro tvSlice::EraseIndicator
+  ;; Erase indicator + vertical line on the plot window
   wset,self.plotwin
   low=(convert_coord([self.plotpt[0],!Y.CRANGE[0]],/DATA,/TO_DEVICE))[0:1]-5
   high=(convert_coord([self.plotpt[0],!Y.CRANGE[1]], $
                       /DATA,/TO_DEVICE))[0:1]+5
   dist=high-low+1
   device,copy=[low,dist,low,self.plotpixwin]
-  self.oDraw->GetProperty,DRAWWIN=win
-  wset, win
-  low=self.ImCoords-5>0
-  dist=[11,11]<(self.imwinsize-low)>1
-  device,copy=[low,dist,low,self.impixwin]
-  wset,self.plotwin
+  
+  ;; Erase indicator on the image window
+  self.oDraw->GetProperty,WINSIZE=winsize
+  low=self.ImCoords-6>0
+  dist=[13,13]<(winsize-low)>1
+  self.oDraw->Erase,low,dist
 end
 
 pro tvSlice::PlotWin
@@ -235,10 +239,11 @@ end
 pro tvSlice::EraseLine
   bg=self.oDraw->Convert(self.opt,/DEVICE)
   en=self.oDraw->Convert(self.ept,/DEVICE)
+  self.oDraw->GetProperty,WINSIZE=winsize
   high=bg>en+1
   low=(en<bg-1)>0
-  dist=(high-low+1) < (self.imwinsize-low) > 1
-  device,copy=[low,dist,low,self.impixwin]
+  dist=(high-low+1) < (winsize-low) > 1
+  self.oDraw->Erase,low,dist
 end
 
 pro tvSlice::Cleanup
@@ -261,9 +266,7 @@ function tvSlice::Init,oDraw,COLOR=color
   
   if n_elements(color) eq 0 then self.color=!D.TABLE_SIZE/2 else  $
      self.color=color
-
-  self.oDraw->GetProperty,PIXWIN=pixwin,WINSIZE=winsize
-  self.impixwin=pixwin & self.imwinsize=winsize
+  ;; Get a pixmap for the plot window
   window,/Free,XSIZE=512,YSIZE=384,/PIXMAP 
   self.plotpixwin=!D.Window
   self->Off
@@ -287,7 +290,5 @@ pro tvSlice__define
           buttondown:0, $       ;is the button held down
           opt:[0,0],$           ;original point (pixel coordinates)
           ept:[0,0], $          ;end point of line (pixel coordinates)
-          constrain:0b, $       ;with right button, constrain to up-down/l-r
-          impixwin:0L, $        ;The pixmap window for the Draw Object
-          imwinsize:[0,0]}      ;size of the oDraw window image is in
+          constrain:0b}         ;with right button, constrain to up-down/l-r
 end
