@@ -35,6 +35,7 @@
 ;               and the user is asked to select another.
 ;               This allows the same widget to function as both an open and
 ;               save dialog.
+;         DIRECTORY - If set, select a directory, not a file.
 ;	  NO_UPDATE - If RECENT is set, and this keyword is also set, the
 ;               recent menu will be displayed, but the .cw_xf_*_recent
 ;              	files will not be automatically updated. To save these files,
@@ -101,9 +102,8 @@
 ;=========================================================================
 ;      xf_getrecent = Get recent files.
 ;=========================================================================
-
 pro xf_getrecent ,flim,flist,dlim,dlist,filtlim,filtlist
-   common cw_xfblock, sep, recfile, allfilt,filtpref
+   common cw_xfblock, sep, recfile
    on_ioerror,bad
    openr, un,/get_lun,recfile, ERROR=err
    if err ne 0 then begin
@@ -146,7 +146,6 @@ end
 ;      no_update not set). Add also the filter save.  More than one file
 ;      can be specified, and all will be added (except duplicates).
 ;=========================================================================
-
 pro xf_addrecent, state,addfile,adddir
   adddir=strtrim(adddir[0],2)
   ;;--- get the list out of the widget
@@ -189,7 +188,7 @@ end
 ;      xf_recent_update = Update the recent files and/or dirs.
 ;=========================================================================
 pro xf_recent_update,flist,dlist, filtlist
-   common cw_xfblock, sep, recfile,allfilt,filtpref
+   common cw_xfblock, sep, recfile
    widget_control,/HOURGLASS
    openw, un,/get_lun,recfile
    if filtlist(0) eq '' then nfilt=0 else nfilt=n_elements(filtlist)
@@ -206,9 +205,8 @@ end
 ;      xf_strip = strips off last filename or directory in file or
 ;      directory path
 ;=========================================================================
-
 function  xf_strip, filepath
-   common cw_xfblock, sep ,recfile,allfilt,filtpref
+   common cw_xfblock, sep ,recfile
 
    len=strlen(filepath)
    ;; Lop off final '/' (or '\')i.e. for directories
@@ -228,9 +226,8 @@ end
 ;	xf_getdir = Get directory from supplied filename
 ;	 (use current directory if filepath has no directory part)
 ;=====================================================================
-
 function xf_getdir,filepath,FULL=full
-   common cw_xfblock, sep, recfile,allfilt,filtpref
+   common cw_xfblock, sep, recfile
    ;; Parse out the directory from the supplied value
    dir=xf_strip(filepath)
    if dir eq '' then begin      ;value entered is only filename
@@ -244,9 +241,8 @@ end
 ;=========================================================================
 ;      cw_xf_event= Event handler function for the cw_xf compound widget
 ;=========================================================================
-
 function cw_xf_event, ev
-   common cw_xfblock, sep, recfile,allfilt,filtpref
+   common cw_xfblock, sep, recfile
                                 ;--- get stashed state info
    Stash=widget_info(ev.handler,/CHILD)
    widget_control, stash, get_uvalue=state, /NO_COPY
@@ -299,10 +295,15 @@ function cw_xf_event, ev
        begin
          ;;--- get the path
          dir=xf_getdir(ev.value)
+         
+         if state.sd then begin 
+            if file_test(ev.value,/DIRECTORY) then selection=ev.value $
+            else selection=dir
+         endif else selection=ev.value
          ;;--- put menu selection into selection field
          if widget_info(state.selection_id,/VALID) then $
-          widget_control, state.selection_id,set_value=ev.value, $
-          /INPUT_FOCUS, SET_TEXT_SELECT=strlen(ev.value)
+          widget_control, state.selection_id,set_value=selection, $
+          /INPUT_FOCUS, SET_TEXT_SELECT=strlen(selection)
          ;;--- update path and files
          ;; get old directory -- change things only if dir is different
          widget_control,state.path_id,get_value=olddir
@@ -313,10 +314,7 @@ function cw_xf_event, ev
          
          if state.sf then begin 
             ;;we're going to return.. test first if saving
-            ;; NOTE: Finds directories too on unix.
-            rettxt=findfile(ev.value)
-            sr=size(rettxt)
-            if sr(0) ne 0 then begin ;it is already a file
+            if file_test(ev.value) then begin ;it is already a file
                ret=widget_message('Overwrite '+ev.value+'?',/question, $
                                   /DEFAULT_NO,TITLE='Overwrite?', $
                                   DIALOG=ev.top)
@@ -333,7 +331,7 @@ function cw_xf_event, ev
          widget_control, stash, set_uvalue=state, /NO_COPY
          ;;--- construct return event and return
          retevent={CW_XF_EVENT, ID:ev.handler, TOP:ev.top,HANDLER:0L,$
-                   FILE:ptr_new(ev.value)}
+                   FILE:ptr_new(selection)}
          return,retevent
       end
 
@@ -374,14 +372,14 @@ function cw_xf_event, ev
 
       state.dirs_id: $          ;***subdirectory was clicked
        begin
-         if ev.clicks eq 2 then begin 
-            widget_control, state.dirlist, get_uvalue=dirlist
-            widget_control, state.path_id, get_value=path ;get path
-            path=path(0)
-            dir=dirlist(ev.index)
-            IF dir EQ '..'+sep THEN begin
-               dir=xf_getdir(path) ; lop off last dir in path
-            endif else dir=path+dir
+         widget_control, state.dirlist, get_uvalue=dirlist
+         widget_control, state.path_id, get_value=path ;get path
+         path=path[0]
+         dir=dirlist[ev.index]
+         if strmid(dir,0,2) eq '..' then begin
+            dir=xf_getdir(path) ; lop off last dir in path
+         endif else dir=filepath(ROOT_DIR=path,dir)
+         if ev.clicks eq 2 then begin ;; cd to it
             widget_control, state.path_id,set_value=dir
             ;;Catch errors -- e.g. no cd permission
             catch, error_stat
@@ -396,6 +394,13 @@ function cw_xf_event, ev
             state.savepath=dir  ; No errors occured in xf_list's
                                 ; and we can safely save this path
          endif 
+         
+         if state.sd then begin ;selecting directory, update selection
+            if widget_info(state.selection_id,/VALID) then $
+               widget_control, state.selection_id,SET_VALUE=dir[0],$
+                               INPUT_FOCUS=1-state.keep_focus, $
+                               SET_TEXT_SELECT=strlen(dir[0])
+         endif 
       end
 
       state.files_id: $         ;***filename was clicked
@@ -404,14 +409,18 @@ function cw_xf_event, ev
          widget_control, state.path_id, get_value=path
          widget_control, state.filelist, get_uvalue=filelist
          
-         list=widget_info(state.files_id,/LIST_SELECT) 
-         
-         nli=n_elements(list) 
-         if nli eq 1 then begin 
-            selection=path[0]+filelist[list[0]] 
+         if state.sd then begin 
+            selection=path[0] 
          endif else begin 
-            selection=replicate(path,nli)+filelist[list]
+            list=widget_info(state.files_id,/LIST_SELECT) 
+            nli=n_elements(list) 
+            if nli eq 1 then begin 
+               selection=path[0]+filelist[list[0]] 
+            endif else begin 
+               selection=replicate(path,nli)+filelist[list]
+            endelse 
          endelse 
+         
          ;;--- put (first) selection into selection field
          if widget_info(state.selection_id,/VALID) then $
           widget_control, state.selection_id,set_value=selection[0], $
@@ -483,13 +492,13 @@ function cw_xf_event, ev
 
          ;; we've made it past the directory listing so directory is valid
          ;; ... now check if file exists...
-         rettxt=findfile(selection)
-         sr=size(rettxt)        ;
          if state.sf eq 0 then begin
-            if sr(0) eq 0 then begin ; file is not valid
-               ret=widget_message([selection+' is not an existing file.',  $
-                                   ' Please select another.'], $
-                                  TITLE='File Error',/ERROR, DIALOG=ev.top)
+               if ~file_test(selection[0],DIRECTORY=state.sd) then begin 
+                  type=state.sd?'directory':'file'
+                  ret=widget_message([selection[0]+ $
+                                      ' is not an existing '+type+'.',  $
+                                      ' Please select another.'],$
+                                     Title='File Error',/ERR)
                widget_control, state.selection_id,set_value=dir
                ;;--- put state back into stash before swallowing event
                widget_control, stash, set_uvalue=state, /NO_COPY
@@ -497,7 +506,7 @@ function cw_xf_event, ev
                return,0
             endif
          endif else begin ; for saving, a nonexistant file is NOT and error.
-            if sr(0) ne 0 then begin ; file is valid--ask to overwrite
+            if file_test(selection) then begin ; file is valid
                ret=widget_message('Overwrite '+selection+'?',/question, $
                                   /DEFAULT_NO,TITLE='Overwrite?',DIALOG=ev.top)
                if ret eq 'No' then begin ;no overwrite
@@ -559,7 +568,7 @@ function cw_xf_event, ev
                              DIALOG=ev.top)
          end
 
-         'O': $                   ;Ok pushed
+         'O': $                   ;OK pushed
           begin
             if widget_info(state.selection_id,/VALID) then begin 
                widget_control, state.selection_id, get_value=selection 
@@ -582,17 +591,20 @@ function cw_xf_event, ev
             ;; test final file for validity
             selection=strtrim(selection,2)
             if selection[0] eq '' then begin
-               ;;--- put state back into stash before swallowing event
-               widget_control, stash, set_uvalue=state, /NO_COPY
-               ;; swallow event, forcing user to choose another file
-               return,0
+               if state.sd then begin 
+                  widget_control, state.path_id,GET_VALUE=selection 
+               endif else begin
+                  ;;--- put state back into stash before swallowing event
+                  widget_control, stash, set_uvalue=state, /NO_COPY
+                  ;; swallow event, forcing user to choose another file
+                  return,0
+               endelse 
             endif
-            rettxt=findfile(selection[0])
-            sr=size(rettxt)     ;
             if state.sf eq 0 then begin
-               if sr(0) eq 0 then begin ; file is not valid
+               if ~file_test(selection[0],DIRECTORY=state.sd) then begin 
+                  type=state.sd?'directory':'file'
                   ret=widget_message([selection[0]+ $
-                                      ' is not an existing file.',  $
+                                      ' is not an existing '+type+'.',  $
                                       ' Please select another.'], $
                                      TITLE='File Error',/ERROR,DIALOG=ev.top)
                   ;;--- put state back into stash before swallowing event
@@ -602,7 +614,7 @@ function cw_xf_event, ev
                endif
             endif else begin    ; for saving, a nonexistant file is NOT
                                 ; an error.
-               if sr(0) ne 0 then begin ; file *is* valid--ask to overwrite
+               if file_test(selection[0]) then begin ; file *is* valid
                   ret=widget_message('Overwrite '+selection[0]+'?',/question, $
                                      /DEFAULT_NO,TITLE='Overwrite?', $
                                      DIALOG=ev.top)
@@ -640,9 +652,8 @@ end
 ;	Use FILEONLY to update only file list (if directory didn't
 ;	change ... e.g All files button pressed, or filter changed.
 ;=====================================================================
-
 pro xf_list, state,FILESONLY=fo
-   common cw_xfblock, sep, recfile,allfilt,filtpref
+   common cw_xfblock, sep, recfile
 
    nfoQ=n_elements(fo) eq 0 ;not just files only -- dirs too
    widget_control,/HOURGLASS
@@ -650,74 +661,17 @@ pro xf_list, state,FILESONLY=fo
     widget_control, state.filt_id,get_val=filt ; Get filter
    if nfoQ then begin
       widget_control, state.path_id,get_val=dir ; Get directory.
-      dir=dir(0)
+      dir=dir[0]
       cd, dir                   ; Change to directory
    endif
-   filt=strtrim(filt(0),2)      ; remove unused blanks in filter
+   filt=strtrim(filt[0],2)      ; remove unused blanks in filter
    if filt eq '' then filt='*'  ; defaults to all
-   if (state.butval and 1B) ne 0 then thefilt=allfilt else $
-    thefilt=filtpref+filt
+   if (state.butval and 1B) ne 0 then $
+      filetxt=file_search(/TEST_REGULAR) else $
+         filetxt=file_search(filt,/TEST_REGULAR)
+   if nfoQ then $         ;get directories ... new list possibly needed.
+      subdirtxt=['..',file_search(/TEST_DIRECTORY)]
 
-   list=findfile(thefilt)       ; get the list for files
-   files=where(strpos(list,sep )-strlen(list)+1 ne 0,cnt )
-   if cnt ne 0 then begin
-      filetxt=list(files)
-      if !VERSION.OS_FAMILY eq 'Windows' then $
-       filetxt=filetxt[sort(filetxt)]
-   endif else filetxt=['']
-
-   if nfoQ then begin         ;get directories ... new list possibly needed.
-      if thefilt ne allfilt then list=findfile(allfilt)
-      dirs=where(strpos(list,sep)-strlen(list)+1 eq 0) ; direcs
-      subdirtxt=list(dirs)
-      wh=where(subdirtxt ne '.'+sep)
-      subdirtxt=subdirtxt(wh)
-   endif
-   if !VERSION.OS_FAMILY eq 'Windows' then begin
-      if n_elements(subdirtxt) gt 0 then $
-      if subdirtxt[0] ne '' then $
-       subdirtxt=subdirtxt[sort(subdirtxt)]
-   endif
-
-   ;; list all command
-;         if nfoQ then begin     ;get both in one spawn -- special case
-;            filecmd = ls+' -paL'
-;            spawn, filecmd, filetxt, /sh
-;            s=strpos(filetxt,'/')-strlen(filetxt)+1
-;            wh=where(s eq 0)
-;            subdirtxt=filetxt(wh)
-;            wh=where(s ne 0,cnt)
-;            if cnt gt 0 then filetxt=filetxt(wh) else filetxt=['']
-;            wh=where(subdirtxt ne './')
-;            subdirtxt=subdirtxt(wh)
-;            goto, FINISH        ;get out... we need only one spawn
-;         endif else $           ;need two separate commands
-;          filecmd = '( '+ls+' -paL | egrep -v / ) 2>/dev/null'
-;      endif else begin ; no all-files selected
-;         filecmd= '( '+ls+' -pdF '+filt+' | egrep -v / ) 2>/dev/null'
-;      endelse
-;      spawn, filecmd, filetxt,/sh
-;      if nfoQ then begin
-;         subdircmd = "( "+ls+" -paL  | egrep '[^.][^.]*/' ) 2>/dev/null"
-;         spawn, subdircmd, subdirtxt,/sh ; Find subdirectories.
-;         if n_elements(subdirtxt) eq 1 and subdirtxt(0) eq '' then  $
-;          subdirtxt=['../'] else subdirtxt = ['../',subdirtxt]
-;      endif
-
-;     list=findfile(filt) ; get the list for files
-;      wh=where(strpos(list,"\" )-strlen(list)+1 ne 0,cnt ) ;"
-;      if cnt gt 0 then filetxt=list(wh)
-;      if nfoQ then begin         ;get directories ... new list possibly needed.
-;         if filt ne '*' then list=findfile('*')
-;         wh=where(strpos(list,"\" )-strlen(list)+1 eq 0,cnt ) ;"
-;         if cnt gt 0 then subdirtxt=list(wh)
-;         wh=where(subdirtxt ne '.\') ;'
-;         subdirtxt=subdirtxt(wh)
-;      endif
-;   endif
-
-
-   FINISH:
    if state.filtfunc ne '-1' then begin ;;apply filt_function to list
       if (state.butval and 2B) ne 0 then begin  ;;custom filt_func button on
          ;; desensitise filt menu to ensure not input to screw it up
@@ -726,11 +680,11 @@ pro xf_list, state,FILESONLY=fo
          widget_control, state.filtmenu_id,/SENSITIVE
       endif
    endif
-   widget_control, state.files_id, set_val=filetxt ; display list
-   widget_control, state.filelist, set_uval=filetxt ; record list
+   widget_control, state.files_id, SET_VALUE=filetxt ; display list
+   widget_control, state.filelist, SET_UVALUE=filetxt ; record list
    if nfoQ then begin           ; directories were updated...
       ;; Display list.
-      widget_control, state.dirs_id, set_val=subdirtxt,set_list_select=0
+      widget_control, state.dirs_id, set_val=subdirtxt,SET_LIST_SELECT=0
       widget_control,state.dirlist, set_uval=subdirtxt ; Record list.
    endif
 end
@@ -738,7 +692,6 @@ end
 ;=====================================================================
 ;	cw_xf_get_value = Get value
 ;=====================================================================
-
 FUNCTION cw_xf_get_value, id
 
    ON_ERROR, 2
@@ -753,7 +706,6 @@ END
 ;=====================================================================
 ;	cw_xf_set_value = Set value
 ;=====================================================================
-
 pro cw_xf_set_value, id, value
 
    ON_ERROR, 2
@@ -791,7 +743,6 @@ end
 ;=====================================================================
 ;	cw_xf_start.pro = Initialization routine on realization
 ;=====================================================================
-
 pro cw_xf_start,id
    stash = WIDGET_INFO(id, /CHILD) ; Retrieve the state
    WIDGET_CONTROL, stash, GET_UVALUE=state, /NO_COPY
@@ -804,14 +755,14 @@ end
 ;=====================================================================
 ;	cw_xf.pro = Compound Widget file selection tool
 ;=====================================================================
-
 FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
                RECENT=recent,FLIMIT=flim,DLIMIT=dlim,FLTLIMIT=fltlim, $
                NO_SHOW_ALL=nsha, NO_HELP=nh, NO_BUTTONS=nb, SELECT=sel,  $
                SAVEFILE=sf,NO_UPDATE=nu, ON_CLICK=oc,OK_BUTTON=okbut, $
-               FILT_FUNC=ff, FFNAME=ffname, KEEP_FOCUS=kf, MULTIPLE=mlt
+               FILT_FUNC=ff, FFNAME=ffname, KEEP_FOCUS=kf, MULTIPLE=mlt, $
+               DIRECTORY=sd
 
-   common cw_xfblock, sep, recfile,allfilt,filtpref
+   common cw_xfblock, sep, recfile
 
 ;------ Keyword Defaults and actions ---------
    IF (N_ELEMENTS(uval) EQ 0)  THEN uval = 0L
@@ -819,7 +770,9 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    if n_elements(flim) eq 0 then flim=20 ;set default number of files limit
    if n_elements(dlim) eq 0 then dlim=7 ; and directories limit
    if n_elements(fltlim) eq 0 then fltlim=4 ;recent filters
-   sf=keyword_set(sf)           ;set up for testing the file for save
+   sd=keyword_set(sd) 
+   sf=keyword_set(sf) AND NOT sd ;set up for testing the file for save
+   
    mlt=keyword_set(mlt) AND (sf eq 0)
    if n_elements(nu) eq 0 then nu=0 ;set up for updating "recent" files
    if n_elements(oc) eq 0 then oc=0 ;set up for events "on-click"
@@ -830,43 +783,27 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
 
    ;;--- Set up OS dependent stuff -- put in common block
    case !VERSION.OS_FAMILY of
-      'unix': $
-       begin
+      'Windows': $
+         begin
+         rootlim=3
+         recfile=!DIR+'\cwxfrec'
+         device,get_current_font=cfont
+         dispfont=cfont+'*14'
+      end
+
+      else: $
+         begin
          rootlim=1
-         sep="/"
          recfile=getenv('HOME')+'/.cw_xf_recent'
          window,/PIXMAP,/FREE,xsize=1,ysize=1
          device,get_fontnames=df,font='*cour*bold-r-normal*--14*'
          wdelete
          if n_elements(df) ne 0 then dispfont=df[0] else $ 
-          dispfont= $
-          '-adobe-courier-medium-r-normal--14-140-75-75-m-90-iso8859-1'
-         if !VERSION.OS eq 'linux' then begin
-            allfilt='-paL' & filtpref='-dpL '
-         endif else begin
-            allfilt='-FaL' & filtpref='-dFL '
-         endelse
-   
-      end
-
-      'Windows': $
-       begin
-         rootlim=3
-         recfile=!DIR+'\cwxfrec'
-         sep="\"                ;"
-         device,get_current_font=cfont
-         dispfont=cfont+'*14'
-         allfilt='*' & filtpref=''
-      end
-
-      else: $
-       begin
-         message,'This tool is not currently supported on '+ $
-          !VERSION.OS_FAMILY+' platforms.',/INFO
-         return,-1
+            dispfont= $
+               '-adobe-courier-medium-r-normal--14-140-75-75-m-90-iso8859-1'
       end
    endcase
-
+   sep=path_sep()
 
    ;;--- if RECENT was given, set up recent file menu
    nrec=n_elements(recent)
@@ -942,6 +879,7 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
             nu:nu,$             ;whether to update the recent lists for every
             $                   ;  file selected.
             oc:oc, $            ;whether to return on click or on Ok
+            sd:sd, $            ;whether we're selecting a directory
             keep_focus:kf, $    ;whether to keep the focus in the list
             recdirs_id:0L,$     ;id of button for recent directories
             selection_id:0L,$   ;id of the selection text box
@@ -1056,4 +994,3 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
 
    return,base
 end
-
