@@ -1468,7 +1468,7 @@ pro IRS_Calib__define
        WAV_MIN: 0.0, $          ;[um] the minimum order wavelength
        WAV_MAX: 0.0, $          ;[um] the maximum order wavelength
        SLIT_LENGTH: 0.0, $      ;[pix] the length of the slit
-       PlATE_SCALE: 0.0, $      ;[deg/pix] the plate scale along the slit
+       PLATE_SCALE: 0.0, $      ;[deg/pix] the plate scale along the slit
        PMASK:ptr_new(), $
        A:fltarr(6), $           ;x(lambda)=sum_i a_i lambda^i
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
