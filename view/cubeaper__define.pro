@@ -166,20 +166,29 @@ pro CubeAper::Message, msg
            return
         endif 
         self.cube=msg.cube
-        self.cube->GetProperty,APERTURE=aps,CALIB=cal,PR_SIZE=prs
-        if ptr_valid(self.prs) then $
+        self.cube->GetProperty,APERTURE=aps,CALIB=cal,SLIT_LENGTH=sl
+        if ptr_valid(self.prs) then begin 
+           if ptr_valid(self.orders) then ords_old=*self.orders
            ptr_free,*self.prs,self.prs,self.orders
-        self.slit_length=prs[0]
+        endif
+        self.slit_length=sl
         nords_old=self->NOrds()
         self.prs=ptr_new(self.cube->PRs(ORDERS=ords,/FULL))
         nords=n_elements(ords) 
-        self.orders=ptr_new(ords,/NO_COPY)
         if nords ne nords_old then begin 
            ptr_free,self.bottom_corners,self.top_corners,self.sides
            self.bottom_corners=ptr_new(fltarr(4,nords,/NOZERO))
            self.top_corners=ptr_new(fltarr(4,nords,/NOZERO))
            self.sides=ptr_new(fltarr(4,nords,/NOZERO))
+        endif            
+        if nords_old gt 0 && ~array_equal(ords_old,ords) then $
+           begin 
+           ;; A new order, set wavelength and wavescl position to something
+           ;; sensible
+           lambda=(*(*self.prs)[0]).lambda
+           self.wavscl_pos=n_elements(lambda)/2
         endif 
+        self.orders=ptr_new(ords,/NO_COPY)
         ptr_free,self.aps
         widget_control, self.wWSBut,GET_VALUE=val
         val[2]=n_elements(aps) eq 1 ;should lock be an option?
@@ -279,7 +288,7 @@ pro CubeAper::Event,ev
            ap=(*self.aps)[i]
            ;; Make wavscal match in the center
            if wavscl && array_equal(ap.scale,0.0) then begin 
-              len=(mean(ap.high)-mean(ap.low))*self.slit_length
+              len=(mean(ap.high)-mean(ap.low))
               lambda=(*(*self.prs)[i]).lambda
               nlam=n_elements(lambda) 
               wav=lambda[nlam/2]
