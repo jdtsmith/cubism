@@ -9,12 +9,13 @@ pro CubeViewSpec::Message, msg
   type=tag_names(msg,/STRUCTURE_NAME)
   if type eq 'CUBEREC_FULL' then begin 
      self.wavelength=msg.wavelength      
-     if self.mode ne 0 then self->SwitchMode
+     self->SwitchMode,/FULL
      self->Plot
   endif else begin              ; A new spectrum
      self.Info=msg.Info
      widget_control, self.wBase,TLB_SET_TITLE='CubeSpec: '+self.Info
      *self.lam=*msg.wavelength
+     self.upgoing=((*self.lam)[n_elements(*self.lam)-1]-(*self.lam)[0]) gt 0.0
      *self.sp=*msg.spec
      widget_control, self.wToggles,GET_VALUE=ren
      if n_elements(ren) eq 2 then begin ; if auto-renorm'ing
@@ -25,6 +26,14 @@ pro CubeViewSpec::Message, msg
      self->Plot
   endelse
 end 
+
+;=============================================================================
+;  ReportWidget - Where to position error and other messages
+;=============================================================================
+function CubeViewSpec::ReportWidget
+  return,self.wBase
+end
+
 ;;*************************End OverRiding methods******************************
   
 pro CubeViewSpec_kill,id
@@ -35,6 +44,11 @@ end
 pro CubeViewSpec_event, ev
   widget_control,ev.top,get_uvalue=self
   self->Event,ev
+end
+
+pro CubeViewSpec_map_event, ev
+  widget_control,ev.top,get_uvalue=self
+  self->MapEvent,ev
 end
 
 ;=============================================================================
@@ -50,26 +64,27 @@ pro CubeViewSpec::Event,ev
      return
   endif 
   case ev.id of 
+     self.wQuit: widget_control, ev.top,/DESTROY
      self.wHotKey: begin 
         case type of
            ;; Key Presses
            'WIDGET_TEXT_CH': $
               case strupcase(ev.ch[0]) of 
               'C': begin
-                 if self.mode eq 0 then self->SwitchMode
+                 self->SwitchMode,/MAP
                  widget_control, self.wDo, SET_VALUE=2
                  widget_control, self.wRType, SET_DROPLIST_SELECT=0,/SENSITIVE
               end
-              'U': self->SwitchMode,0
+              'U': self->SwitchMode,/FULL
               'P': begin
-                 if self.mode eq 0 then self->SwitchMode
+                 self->SwitchMode,/MAP
                  widget_control, self.wDo, SET_VALUE=2
                  widget_control, self.wRType, SET_DROPLIST_SELECT=1,/SENSITIVE
               end
               'R': self->Reset
               'L': if self.mode eq 0 then widget_control, self.wDo,SET_VALUE=2
               'D': self->Delete
-              'M': self->SwitchMode,1
+              'M': self->SwitchMode,/MAP
               'F': self->Fit
               'V': begin        ;value line
                  widget_control, self.wToggles, GET_VALUE=tog
@@ -120,8 +135,8 @@ pro CubeViewSpec::Event,ev
                  1: begin       ;up
                     range[0]=range[0]-1 & range[1]=range[1]+1
                  end
-                 3: range=range+1 ;left
-                 5: range=range-1 ;right
+                 3: range=range+(self.upgoing?-1:1) ;left
+                 5: range=range+(self.upgoing?1:-1) ;right
                  7: begin       ;down
                     range[0]=range[0]+1 & range[1]=range[1]-1
                  end
@@ -236,8 +251,9 @@ pro CubeViewSpec::Event,ev
                  range[1]=range[1] < (nl-1) > delta
                  (*self.reg[self.seltype])[*,self.selected]=range
                  self->MergeRegs
-              endif 
-              self->Plot
+                 if n_elements(*self.fit) eq 0 then self->Send
+                 self->Plot
+              endif else if self->ShowingValueLine() then self->Plot
            end
            
         endcase 
@@ -262,34 +278,118 @@ pro CubeViewSpec::Event,ev
 end
 
 ;=============================================================================
+;  Map Event - Handle map selection events.
+;=============================================================================
+pro CubeViewSpec::MapEvent,ev
+  widget_control, ev.id,get_uvalue=uval
+  oMap=IRSMapSet(self)
+  
+  if n_elements(uval) eq 0 then begin 
+     ;; A specific map choice selected
+     self->SwitchMode,/MAP
+     for i=0,n_elements(*self.wMapSets)-1 do $
+        widget_control, (*self.wMapSets)[i], $
+                        SET_BUTTON=(*self.wMapSets)[i] eq ev.id
+     widget_control, ev.id,get_value=name
+     oMap->GetMap,name,BACKRANGES=br,FORERANGES=fr,WEIGHTS=weights, $
+                  WAVELENGTH_CONVERT=*self.lam,/NO_WEIGHT_CONVERT
+     ptr_free,self.reg,self.weights
+     if n_elements(br)/2 gt 0 then self.reg[0]=ptr_new(br,/NO_COPY)
+     if n_elements(fr)/2 gt 0 then self.reg[1]=ptr_new(fr,/NO_COPY)
+     if n_elements(weights)/2 gt 0 then $
+        self.weights=ptr_new(weights,/NO_COPY)
+     widget_control, self.wReplace,/SENSITIVE ;we have one
+     self.selected=-1
+     self->Plot
+     self->Send,MAP_NAME=name
+     return
+  endif 
+  
+  ;; Load & Save
+  case uval of 
+     'save': begin              ;save the current
+        oMap->SaveMap,name,CANCELED=cncld,WEIGHTS=self.weights, $
+                      FORERANGES=self.reg[1], $
+                      BACKRANGES=self.reg[0],WAVELENGTH_CONVERT=*self.lam
+        if cncld then return
+        if name then self->Send,MAP_NAME=name ;it's now this name
+     end
+     'load': oMap->LoadSets
+     'replace': begin 
+        replid=0L
+        for i=0,n_elements(*self.wMapSets)-1 do begin 
+           if widget_info((*self.wMapSets)[i],/BUTTON_SET) then begin 
+              replid=(*self.wMapSets)[i]
+              break
+           endif 
+        endfor 
+        if NOT widget_info(replid,/VALID_ID) then return
+        widget_control, replid, get_value=name
+        oMap->SaveMap,name,CANCELED=cncld,/FORCE,WEIGHTS=self.weights, $
+                      FORERANGES=self.reg[1], $
+                      BACKRANGES=self.reg[0],WAVELENGTH_CONVERT=*self.lam
+        if cncld then return
+     end
+  endcase 
+  
+  ;; Rebuild the menu
+  menu=widget_info((*self.wMapSets)[0],/PARENT)
+  for i=0,n_elements(*self.wMapSets)-1 do $
+     widget_control, (*self.wMapSets)[i],/DESTROY
+  self->BuildMapMenu,menu
+end
+
+;=============================================================================
+;  BuildMapMenu - Build the menu with all current maps
+;=============================================================================
+pro CubeViewSpec::BuildMapMenu,menu
+  oMap=IRSMapSet(self)
+  ptr_free,self.wMapSets
+  names=oMap->Names()
+  nn=n_elements(names) 
+  if nn gt 0 then begin 
+     buts=lonarr(nn)
+     for i=0,nn-1 do $
+        buts[i]=widget_button(menu,value=names[i],/CHECKED_MENU, $
+                              EVENT_PRO='CubeViewSpec_map_event', $
+                              SEPARATOR=i eq 0)
+     self.wMapSets=ptr_new(buts,/NO_COPY)
+  endif
+  widget_control, self.wReplace,SENSITIVE=0
+end
+
+;=============================================================================
 ;  Send - Send the currently selected set of regions as a stack, or
 ;         just the wavelength if in full mode.
 ;=============================================================================
-pro CubeViewSpec::Send
+pro CubeViewSpec::Send,MAP_NAME=mn
   free_back=0
   if self.mode eq 0L then begin ;full mode
      if self.wavelength eq 0.0 then return
      msg={CUBEVIEWSPEC_FULL,self.wavelength}
-  endif else begin 
-     free=1
-     if NOT ptr_valid(self.reg[1]) then return ;need a peak region
+  endif else begin ;; map mode
      msg={CUBEVIEWSPEC_STACK}
-     lams=(*self.lam)[*self.reg[1]]
-     msg.info=string(FORMAT='(%"Stack: %5.2fum - %5.2fum")', $
-                     min(lams),max(lams))
-     if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
-     msg.foreground=self.reg[1]
-     msg.background=self.reg[0]
-     msg.weights=self.weights
-     ;; Send either the fit, or the background regions themselves.
-     if n_elements(*self.fit) gt 0 AND self.medlam ne 0. then begin 
-        msg.bg_fit=ptr_new(*self.fit*10.^self.renorm)
-        msg.info=msg.info+' -- Fit'
-        free_back=1
-     endif 
-     if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
-     if ptr_valid(self.reg[0]) then msg.info=msg.info+')'
-     if self.reg_name then msg.info=msg.info+' <'+self.reg_name+'>'
+     if n_elements(mn) ne 0 then begin ;named set, just pass it along
+        msg.name=mn
+        msg.info=string(FORMAT='(%"Map Set: %s")',mn)
+     endif else begin 
+        if NOT ptr_valid(self.reg[1]) then return ;need a peak region
+        lams=(*self.lam)[*self.reg[1]]
+        msg.info=string(FORMAT='(%"Stack: %5.2fum - %5.2fum")', $
+                        min(lams),max(lams))
+        if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
+        msg.foreground=self.reg[1]
+        msg.background=self.reg[0]
+        msg.weights=self.weights
+        ;; Send either the fit, or the background regions themselves.
+        if n_elements(*self.fit) gt 0 AND self.medlam ne 0. then begin 
+           msg.bg_fit=ptr_new(*self.fit*10.^self.renorm)
+           msg.info=msg.info+' -- Fit'
+           free_back=1
+        endif 
+        ;;if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
+        if ptr_valid(self.reg[0]) then msg.info=msg.info+')'
+     endelse 
   endelse 
   self->MsgSend,msg
   
@@ -297,15 +397,18 @@ pro CubeViewSpec::Send
 end
 
 ;=============================================================================
-;  SwitchMode - Switch between full and stacked mode, and tell
-;               subscribers about it.
+;  SwitchMode - Switch between full(0) and map(1) mode, and tell
+;               subscribers about it.  Use FULL or MAP mode if these
+;               keywords are set.
 ;=============================================================================
-pro CubeViewSpec::SwitchMode,mode
+pro CubeViewSpec::SwitchMode,mode,FULL=full,MAP=map
+  if keyword_set(full) then mode=0
+  if keyword_set(map) then mode=1
   if n_elements(mode) ne 0 then begin 
      if mode eq self.mode then return
      self.mode=mode
   endif else self.mode=1-self.mode
-  widget_control, self.wMode,SET_VALUE=self.mode
+  widget_control, self.wMode,SET_VALUE=self.mode ;de-sen in full mode
   for i=0,n_elements(self.wGray)-1  do $
      widget_control, self.wGray[i],SENSITIVE=self.mode
   widget_control, self.wReg_or_Wav,set_value=(['Lambda','Region:'])[self.mode]
@@ -424,7 +527,7 @@ pro CubeViewSpec::Fit
      wh=where(imaginary(roots) eq 0. and float(roots) ge 0.,cnt)
      no_pos=0
      if cnt eq 0 then begin 
-        self->Warn,'No positive real width found!'
+        self->Warning,'No positive real width found!'
         self.ew=-.999999999999999e6
      endif else if cnt gt 1 then begin 
         ;;find the closest one to our approximation
@@ -473,6 +576,7 @@ end
 ;  ShowFit - Draw the continuum fit.
 ;=============================================================================
 pro CubeViewSpec::ShowFit
+  if NOT (ptr_valid(self.reg[0])) then return
   ;; mark the max and median positions
   if self.medlam ne 0 then begin 
      plots,self.medlam,self.medpeak,PSYM=7,SYMSIZE=2
@@ -633,15 +737,22 @@ end
 ;=============================================================================
 pro CubeViewSpec::ShowValueLine
   if self.press or self.movestart eq -1 then return
-  widget_control, self.wToggles, GET_VALUE=tog
-  if n_elements(tog) eq 2 then vl=tog[1]
-  if vl eq 0 then return
+  if self->ShowingValueLine() eq 0 then return
   x=(*self.lam)[self.movestart]
   plots,x,!Y.CRANGE
 end
 
 ;=============================================================================
-;  ShowValueLine - Draw the moving current value line.
+;  ShowingValueLine - Is the value line showing
+;=============================================================================
+function CubeViewSpec::ShowingValueLine
+  widget_control, self.wToggles, GET_VALUE=tog
+  if n_elements(tog) eq 2 then vl=tog[1] else vl=0
+  return,vl ne 0 
+end
+
+;=============================================================================
+;  HighlightPeak - Color the spectrum inside of the peak region.
 ;=============================================================================
 pro CubeViewSpec::HighlightPeak
   if NOT ptr_valid(self.reg[1]) then return
@@ -662,7 +773,18 @@ pro CubeViewSpec::ShowRegions
      plots,self.wavelength,y,COLOR=self.colors_base,THICK=2
      return
   endif
-  for j=1,0,-1 do begin
+  
+  do_weights=ptr_valid(self.weights) AND not ptr_valid(self.reg[1])
+  
+  ;; Plot the weight vector instead of foreground region
+  if do_weights then begin 
+     wlam=(*self.weights)[0,*] 
+     wght=y[0]+(*self.weights)[1,*]*(y[1]-y[0])
+     polyfill,wlam,wght,COLOR=self.colors_base+2
+  endif 
+  
+  ;; Plot the two region types
+  for j=do_weights?0:1,0,-1 do begin
      ptr=self.reg[j]
      if ptr_valid(ptr) then begin
         for i=0,n_elements(*ptr)/2-1 do begin
@@ -681,6 +803,7 @@ pro CubeViewSpec::ShowRegions
               COLOR=self.colors_base+1,/DATA
   endfor 
 end
+
 
 ;=============================================================================
 ;  Outline - Draw outline highlight around the selected region.
@@ -801,7 +924,7 @@ end
 ;=============================================================================
 pro CubeViewSpec::Cleanup
   wdelete,self.pixwin
-  ptr_free,self.lam,self.sp,self.fit,self.reg,self.weights
+  ptr_free,self.lam,self.sp,self.fit,self.reg,self.weights,self.wMapSets
   self->ObjMsg::Cleanup
 end
 
@@ -817,26 +940,46 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   self.colors_base=!D.TABLE_SIZE-5 ;load colors in
   
   self.wBase=widget_base(/COLUMN,/TRACKING_EVENTS,SPACE=1, $
-                         TITLE='CubeSpec: Extracted Spectrum') 
+                         TITLE='CubeSpec: Extracted Spectrum',MBAR=mbar) 
   
   rowbase=widget_base(self.wBase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_BOTTOM) 
   colbase=widget_base(rowbase,/COLUMN) 
-  self.wMode=cw_bgroup(colbase,/EXCLUSIVE,/ROW,['Full Cube','Map'], $
+  
+  subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER,SPACE=1) 
+  self.wMode=cw_bgroup(subrowbase,/EXCLUSIVE,/ROW,['Full Cube','Map'], $
                        SET_VALUE=0,/NO_RELEASE)
+  
+  file=widget_button(mbar,value='File',/MENU)
+  self.wQuit=widget_button(file,value='Quit')
+  maps=widget_button(mbar,value='Maps',/MENU)
+  but=widget_button(maps, value='Save Current Map...', $
+                    EVENT_PRO='CubeViewSpec_map_event',UVALUE='save')
+  self.wGray[0]=but
+  
 
-  subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER,/FRAME) 
-  pbase=widget_base(subrowbase) 
+  self.wReplace=widget_button(maps, value='Replace Current Map...', $
+                              EVENT_PRO='CubeViewSpec_map_event', $
+                              UVALUE='replace', SENSITIVE=0)
+  
+  but=widget_button(maps, value='Load Maps...', $
+                    EVENT_PRO='CubeViewSpec_map_event',UVALUE='load')
+ ;;sets=widget_button(maps,value='Map Sets',/MENU)
+  
+  self->BuildMapMenu,maps
+  
+  subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER,/FRAME)
+  pbase=widget_base(subrowbase)
   self.wDo=cw_bgroup(pbase,/EXCLUSIVE,/ROW,SET_VALUE=2,/NO_RELEASE,$
                      ['XZoom','YZoom','Lambda'],IDS=ids) ;
   self.wReg_or_Wav=ids[2]
   self.wRType=widget_droplist(subrowbase,VALUE=['Continuum','Peak'])
-  self.wGray[0]=self.wRType
+  self.wGray[1]=self.wRType
   
   subrowbase=widget_base(colbase,/ROW,/ALIGN_LEFT,/BASE_ALIGN_CENTER, $
                          SPACE=1,XPAD=0,/FRAME) 
   self.wOrder=widget_droplist(subrowbase,TITLE='Fit Order:', $
                               VALUE=string(FORMAT='(I0)',indgen(5)+1))
-  self.wGray[1]=self.wOrder
+  self.wGray[2]=self.wOrder
   if NOT keyword_set(rn) then buttons=['Auto Renorm','Value line'] $
   else buttons=['Value line']
   
@@ -845,7 +988,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   
   self.wFit=cw_bgroup(rowbase,IDS=ids,/COLUMN, $
                       ['Reset Plot','Remove Fit','Fit'],/NO_RELEASE)
-  self.wGray[2:3]=ids[1:2]
+  self.wGray[3:4]=ids[1:2]
   for i=0,n_elements(self.wGray)-1  do $
      widget_control, self.wGray[i],SENSITIVE=0
 
@@ -898,7 +1041,6 @@ pro CubeViewSpec__define
       lam:ptr_new(), $          ;The spectral data
       sp:ptr_new(), $
       fit:ptr_new(), $          ;the continuum fit
-      reg_name:'', $            ;Name of the current region set (if any)
       reg:ptrarr(2),$           ;2 ptrs each to a 2xn array of
                                 ; continuum([0])/peak([1]) index ranges
       weights:ptr_new(), $      ;the weights vector for the foreground
@@ -929,13 +1071,17 @@ pro CubeViewSpec__define
       got: 0, $                 ;how many of a click pair we've gotten 
       wav_ind:0, $              ;the index of the current wavelength
       wavelength:0.0, $         ;the current wavelength (if full mode)
+      upgoing:0b, $             ;whether the wavelength is increasing or not
       ;; Widget/Window/ColorMap ID's
       wBase:0L, $               ;the window base
-      wFit:0L, $                ;load,save,reset,fit
+      wMapSets:ptr_new(), $     ;point to map set buttons
+      wQuit:0L, $               ;quit button
+      wReplace:0L, $            ;the replace button
+      wFit:0L, $                ;reset,remove fit, fit
       wDo:0L, $                 ;Exclusive action... region_select,xclip,yclip
       wReg_or_Wav:0L, $         ;button with either Regions: or Wave
       wMode:0L, $               ;The Mode selector
-      wGray:lonarr(4), $;
+      wGray:lonarr(5), $        ;things to de-sensitize
       wRType:0L, $              ;peak or continuum being selected
       wDraw:0L, $               ;drawing canvas
       wLine: 0L, $              ;the status line id
@@ -951,9 +1097,10 @@ pro CubeViewSpec__define
   ;; The messages we send
   msg={CUBEVIEWSPEC_STACK, $    ;send a selected stack set
        info:'', $               ;the info on this map stack specification
+       name:'', $               ;the map set name, if any
        foreground:ptr_new(), $  ;a 2xn list of foreground wavelength index
                                 ; ranges over which to average
-       weights:ptr_new(), $     ;a list of n pointers to weight vectors [0-1]
+       weights:ptr_new(), $     ;a 2xn list of weights
        background:ptr_new(),$   ;a 2xn list of continuum wavelength ranges to
                                 ; average
        bg_fit:ptr_new()}        ;a list of n parameters in an

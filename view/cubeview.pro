@@ -4,8 +4,12 @@ pro cubeview_cleanup,id
 end
 
 pro cubeview_event,ev
-  ;; Only quit.
-  widget_control, ev.top, /DESTROY
+  if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_TRACKING' then begin 
+     if ev.enter then begin 
+        widget_control, ev.id, get_uvalue=oDraw
+        oDraw->Focus
+     endif 
+  endif else widget_control, ev.top, /DESTROY ;quit
 end
 
 pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
@@ -15,13 +19,14 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   if n_elements(xn) eq 0 then xn='CubeView'
   if n_elements(ttl) eq 0 then ttl='CubeView'
 
-  base=widget_base(/COLUMN,SPACE=1,/BASE_ALIGN_CENTER,TITLE=ttl,MBAR=mbar)
+  base=widget_base(/COLUMN,SPACE=1,/BASE_ALIGN_CENTER,TITLE=ttl,MBAR=mbar, $
+                   /TRACKING_EVENTS)
   
   ;; a base for all our buttons, at top
   sbase=widget_base(base,/COLUMN,/ALIGN_LEFT)
   
   ;; a color bar canvas, for later use by the color tool
-  cbar=widget_draw(base,xsize=sz[0],ysize=sz[1]/12,/FRAME,_EXTRA=e)
+  cbar=widget_draw(base,xsize=sz[0],ysize=sz[1]/10,/FRAME,_EXTRA=e)
   
   ;; the tvDraw object and draw canvas, and message-passer extraordinaire
   oDraw=obj_new('tvDraw',base,TVD_XSIZE=sz[0],TVD_YSIZE=sz[1], $
@@ -48,7 +53,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
                     USE_COLORMAPS=[0,1,3,4,6,8,13,32],_EXTRA=e, $
                     TOP=!D.TABLE_SIZE-6)
   
-  ;; A slicer object, cyan
+  ;; a slicer object, cyan
   slicer=obj_new('tvSlice',oDraw,COLOR=stretcher->GetColor('Cyan'))
   
   ;; a histogram tool, red, with stretcher as its color object.
@@ -69,24 +74,25 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=rec,XNAME=xn, $
   ;; a Cube record tool for extracting and stacking cubes
   cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube,APER_OBJECT=aper, $
                   COLOR=stretcher->GetColor('Magenta'),_EXTRA=e)
-  ;; make sure the display line gets updates
+  ;; make sure the display line gets CubeRec updates
   cuberec->MsgSignup,line,/CUBEREC_UPDATE
   
+  ;; a cube backtrack tool, green, with updates from cuberec
+  cubeback=obj_new('CubeBackTrack',base,oDraw, $
+                   COLOR=stretcher->GetColor('Green'),_EXTRA=e)
+  cuberec->MsgSignup,cubeback,/CUBEREC_UPDATE,/CUBEREC_FULL
+
   ;; a pixel table tool (non-exclusive)
   pxtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
   
-  ;; A cube backtrack tool (non-exclusive), with updates from cuberec
-  cubeback=obj_new('CubeBackTrack',base,oDraw,_EXTRA=e)
-  cuberec->MsgSignup,cubeback,/CUBEREC_UPDATE,/CUBEREC_FULL
-  
   ;;**********************************************************************
-  exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},8)
-  exc_list.Obj= [zoomer,hist,stretcher,slicer,stats,phot,cuberec,aper] 
-  exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'x'    ,'']
+  exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},9)
+  exc_list.Obj=[zoomer,hist,stretcher,slicer,stats,phot,cuberec,cubeback,aper] 
+  exc_list.keys=['z',   'h', 'c',      'l',   's',  'p', 'x'    ,'', '']
 
-  tog_list=replicate({Obj:obj_new(), keys:'',Exclusive:0b},2)
-  tog_list.Obj= [cubeback,pxtbl]
-  tog_list.keys=['','t']
+  tog_list=replicate({Obj:obj_new(), keys:'',Exclusive:0b},1)
+  tog_list.Obj= [pxtbl]
+  tog_list.keys=['t']
 
   ;; a switcher for switching among the tools using icons or keypresses
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $

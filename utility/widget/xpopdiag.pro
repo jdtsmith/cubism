@@ -35,10 +35,10 @@ pro xpopdiag, poplist, ptrlist, PARENT_GROUP=parent, _EXTRA=e, DEFAULT=def,  $
       b2=widget_base(base,/ROW)
       l=widget_label(b2,value=lbl)
    endif else b2=base
-   list=widget_droplist(b2,value=poplist)
+   list=widget_combobox(b2,value=poplist)
    text=widget_list(base,value=*ptrlist[def],/FRAME,XSIZE=TS[0],YSIZE=TS[1])
    button=widget_button(base,value=bv)
-   widget_control, list, set_droplist_select=def
+   widget_control, list, set_combobox_select=def
    widget_control, base,set_uvalue={wText:text,Ptr:ptrlist, $
                                     Free:keyword_set(fp)},/REALIZE
    XManager, 'xpopdiag', base,CLEANUP='xpopdiag_kill',/NO_BLOCK

@@ -64,8 +64,9 @@
 ;	        arrow keys, e.g.
 ;	  MULTIPLE - Allow multiple selected files via the platforms native
 ;	  	mechanism (usually shift or command click). The select box
-;	  	does not exist in this case.  THIS IS ONLY VALID SAVEFILE IS
+;	  	does not exist in this case.  THIS IS ONLY VALID IF SAVEFILE IS
 ;	  	NOT SET, SINCE YOU CANNOT SAVE TO MULTIPLE FILES AT ONCE.
+;
 ; OUTPUTS:
 ;       The ID of the created widget is returned.
 ;

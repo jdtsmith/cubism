@@ -21,15 +21,20 @@ pro CubeRec::Message, msg
         self->EnsureCube
         widget_control, self.wStackInfo,SET_VALUE=msg.info
         ptr_free,self.stack
-        if ptr_valid(msg.background) then begin
-           type=size(*msg.background,/TYPE)
-           if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
-              self.stack=ptr_new(self.cube->Stack(*msg.foreground, $
-                                                  BG_VALS=*msg.background))
-           endif else $
-              self.STACK=ptr_new(self.cube->Stack(*msg.foreground,$
-                                                  BACKRANGES=*msg.background)) 
-        endif else self.STACK=ptr_new(self.cube->Stack(*msg.foreground))
+        if msg.name then $
+           self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name)) $
+        else begin 
+           if ptr_valid(msg.background) then begin
+              type=size(*msg.background,/TYPE)
+              if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
+                 self.stack=ptr_new(self.cube->Stack(*msg.foreground, $
+                                                     BG_VALS=*msg.background))
+              endif else $      ;background index ranges
+                 self.STACK=ptr_new(self.cube-> $
+                                    Stack(*msg.foreground,$
+                                          BACKRANGES=*msg.background)) 
+           endif else self.STACK=ptr_new(self.cube->Stack(*msg.foreground))
+        endelse 
         self->SwitchMode,/STACK
      end
      'CUBEPROJ_RECORD': begin 
@@ -160,9 +165,9 @@ end
 pro CubeRec::UpdateView
   case self.mode of
      0: begin                   ;full cube, show the correct plane
-        widget_control, self.wLambda,SET_DROPLIST_SELECT=self.cur_wav
+        widget_control, self.wLambda,SET_COMBOBOX_SELECT=self.cur_wav
         self.oDraw->SetProperty,/NO_RESIZE, $
-           IMORIG=self.cube->Cube(self.cur_wav)
+                                IMORIG=self.cube->Cube(self.cur_wav)
      end
      1: begin                   ;show the stack
         if ptr_valid(self.stack) then $
@@ -196,13 +201,17 @@ end
 pro CubeRec::FullEvent,ev
   case ev.id of
      self.wLambda: begin
-        sel=widget_info(self.wLambda,/DROPLIST_SELECT)
-        self.cur_wav=sel
+        self.cur_wav=ev.index
      end
-     
+
+     self.wSlider: begin 
+        self.delay=(10.-ev.value)/4.+.1
+        return
+     end
+
      self.wBrowse: begin 
         if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_TIMER' then begin 
-           if self.playing then widget_control, ev.id,TIMER=.5
+           if self.playing then widget_control, ev.id,TIMER=self.delay
            value=1              ;just increment
         endif else value=ev.value
         case value of 
@@ -213,7 +222,7 @@ pro CubeRec::FullEvent,ev
                           n_elements(*self.wavelength) 
            2: begin             ;Play or Stop
               self.playing=1-self.playing
-              if self.playing then widget_control, ev.id,TIMER=1.
+              if self.playing then widget_control, ev.id,TIMER=self.delay
               widget_control, self.wPlayStop, $
                               SET_VALUE=(["Play","Stop"])[self.playing]
            end
@@ -245,12 +254,11 @@ pro CubeRec::Extract
   spec=self.cube->Extract([l,b],[r,t])
   info=string(FORMAT='(%"Extracted from %s, [%d,%d]->[%d,%d]")', $
               self.cube->ProjectName(),l,b,r,t)
-  if XRegistered("CubeViewSpec") eq 0 then begin 
-     o=obj_new('CubeViewSpec',PARENT_GROUP=self.wBase[0])
+  if obj_valid(self.oView) eq 0 then begin 
+     self.oView=obj_new('CubeViewSpec',PARENT_GROUP=self.wBase[0])
      ;; Set up messages between us
-     self->MsgSignup,o,/CUBEREC_SPEC,/CUBEREC_FULL
-     o->MsgSignup,self,/CUBEVIEWSPEC_STACK
-     o->MsgSignup,self,/CUBEVIEWSPEC_FULL
+     self->MsgSignup,self.oView,/CUBEREC_SPEC,/CUBEREC_FULL
+     self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL
      if self.mode eq 0 then $
         self->MsgSend, $
            {CUBEREC_FULL,self.cur_wav,(*self.wavelength)[self.cur_wav]}
@@ -273,45 +281,52 @@ end
 ;=============================================================================
 function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
-  
+
   if n_elements(color) eq 0 then color=!D.TABLE_SIZE-1
-  
+
   ;; Get a tvrbox object, signing ourselves up for box messages from it.
   self.Box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,COLOR=color,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
   
-  if obj_valid(cube) then cube->MsgSignup,self ;listen for this cube's messages
-  
+  ;; listen for this cube's messages
+  if obj_valid(cube) then cube->MsgSignup,self 
+
   ;; set up the different bases
   b=widget_base(parent,/COLUMN,/FRAME,/BASE_ALIGN_LEFT,SPACE=1, $
                 UNAME='CubeRec',UVALUE=self)
-  
+
   ;; A common line showing information on which cube or record we've got
   self.wInfoLine=widget_label(b,/FRAME,/ALIGN_LEFT, $
                               value=STRING(FORMAT='(A,T62)', $
                                            'No Cube or Record'))
-  
+
   ;; A bulletin board to hold the three separate bases
   mapbase=widget_base(b)
-  
+
   ;; Populate the first base: the full cube
-  self.wBase[0]=widget_base(mapbase,/ROW,MAP=0, $
+  self.wBase[0]=widget_base(mapbase,/COLUMN,MAP=0, $
                             UVALUE={self:self,method:'FullEvent'}, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
-  
-  self.wLambda=widget_droplist(self.wBase[0],Title="Wavelength", $
-                               VALUE=[string(0.0)])
-  self.wBrowse=cw_bgroup(self.wBase[0],['Prev','Next','Play'],/ROW, $
+
+  base=widget_base(self.wBase[0],/ROW,SPACE=1,/BASE_ALIGN_LEFT) 
+  b1=widget_base(base,/ROW,SPACE=1) 
+  lab=widget_label(b1,value='Wave:')
+  self.wLambda=widget_combobox(b1,/DYNAMIC_RESIZE,XSIZE=80)
+  b2=widget_base(base,/COLUMN,SPACE=1,/BASE_ALIGN_CENTER,/FRAME)
+  self.wBrowse=cw_bgroup(b2,['Prev','Next','Play'],/ROW, $
                          /NO_RELEASE,IDS=ids)
   self.wPlayStop=ids[2]
+  self.wSlider=widget_slider(b2,MINIMUM=0,MAXIMUM=10, $
+                             TITLE="Play Speed",/SUPPRESS_VALUE,VALUE=6)
+  self.delay=1.1
   
   ;; Populate the second base: the stacked cube
   self.wBase[1]=widget_base(mapbase,/ROW,MAP=0, $
                             UVALUE={self:self,method:'StackEvent'}, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
-  self.wStackInfo=widget_label(self.wBase[1],VALUE=string(FORMAT='(A,T40)',''))
-  ;self.wFull=widget_button(self.wBase[1],value='Full Cube')
-  
+  self.wStackInfo=widget_label(self.wBase[1], $
+                               VALUE=string(FORMAT='(A,T40)',''))
+
   ;; Populate the third base: for the BCD's
   self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
   self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
@@ -331,20 +346,23 @@ pro CubeRec__define
       wavelength:ptr_new(), $   ;the wavelength planes of our cube
       cur_wav:0L,$              ;the index of wavelength plane being viewed
       playing:0, $              ;whether we're "playing" the full cube
+      delay:0.0, $              ;the play speed delay
       spec:obj_new(), $         ;our CubeSpec tool
       box:obj_new(), $          ;our extraction box object
       oAper: obj_new(), $       ;our aperture viewing/editing tool
+      oView: obj_new(), $       ;our viewing tool
       STACK:ptr_new(), $        ;the stacked image
       BCD:ptr_new(), $          ;the BCD data
       BCD_ERR:ptr_new(), $      ;the BCD error
       MODULE:'',$               ;the modules for cube or rec
-      cal:obj_new(), $          ;the object
+      cal:obj_new(), $          ;the calibration object
       ;; Widget ID's
       wBase:lonarr(3), $        ;the three bases (full/stack/rec)
       wInfoLine:0L, $           ;A line of info on the current stack/etc.
       wLambda:0L, $             ;the wavelength choose list
       wBrowse:0L, $             ;wavelength browser buttons
       wPlayStop:0L,$            ;the play/stop button
+      wSlider:0L, $             ;play speed slider
       wStackInfo:0L, $          ;The stack information
       wFull:0L}                 ;The "Switch to Full mode" button
   
