@@ -365,8 +365,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
   self.oRose=obj_new('CubeRose',oDraw,_EXTRA=e)
   self->MsgSignup,self.oRose,/CUBEREC_UPDATE ;give them our message
-  self.wStackInfo=widget_label(self.wBase[1], $
-                               VALUE=string(FORMAT='(A,T40)',''))
+  self.wStackInfo=widget_label(self.wBase[1],VALUE=' ',/DYNAMIC_RESIZE)
 
   ;; Populate the third base: for the BCD's
   self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
