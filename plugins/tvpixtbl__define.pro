@@ -51,6 +51,10 @@
 ; MODIFICATION HISTORY:
 ;
 ;    $Log$
+;    Revision 1.4  2002/06/19 16:33:11  devost
+;    Changed the icons to context labels. The placing of the buttons and the
+;    label put there will have to be revisited.
+;
 ;    Revision 1.3  2002/01/30 03:34:21  nidhi
 ;    The table is now "all that it can be" given IDL's limited implementation of the table widget. There is that annoying space on the bottom and left sides, but there is no known fix to that problem. Its either that or have scroll bars there for effect, just to fill in the space. Right now, I've left out the scrollers.
 ;
@@ -91,24 +95,27 @@
 
 
 function tvPixtbl::Icon
-  return, [                               $
-                [000B, 000B],                   $
-                [254B, 127B],                   $
-                [002B, 064B],                   $
-                [002B, 064B],                   $
-                [218B, 093B],                   $
-                [002B, 064B],                   $
-                [218B, 093B],                   $
-                [002B, 064B],                   $
-                [218B, 093B],                   $
-                [002B, 064B],                   $
-                [218B, 093B],                   $
-                [002B, 064B],                   $
-                [218B, 093B],                   $
-                [002B, 064B],                   $
-                [254B, 127B],                   $
-                [000B, 000B]                    $
-                ]
+
+return,'PixetTable'
+
+;  return, [                               $
+;                [000B, 000B],                   $
+;                [254B, 127B],                   $
+;                [002B, 064B],                   $
+;                [002B, 064B],                   $
+;                [218B, 093B],                   $
+;                [002B, 064B],                   $
+;                [218B, 093B],                   $
+;                [002B, 064B],                   $
+;                [218B, 093B],                   $
+;                [002B, 064B],                   $
+;                [218B, 093B],                   $
+;                [002B, 064B],                   $
+;                [218B, 093B],                   $
+;                [002B, 064B],                   $
+;                [254B, 127B],                   $
+;                [000B, 000B]                    $
+;                ]
 
 
 end
