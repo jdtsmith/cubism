@@ -756,7 +756,7 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
   new=full                      ;The new clip
   if n_elements(aper) eq 0 then aper={IRS_APERTURE,[0.,0.],[1.,1.]}
   npr=n_elements(*new.PR)
-  if keyword_set(clip_full) eq 0 then begin
+  if ~keyword_set(clip_full) then begin
      new.PR=ptr_new(*full.PR)   ; Copy the psuedo-rects
      new.FULL=0b
      (*new.PR).POLYGONS=ptrarr(npr) ;In case these aren't asked for
@@ -768,7 +768,7 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
      new.FULL=1b                ;pure pedantry
   endelse 
   
-  if keyword_set(clip_full) eq 0 then begin
+  if ~keyword_set(clip_full) then begin
      ;; Scale the aperture from low to high.
      x=(*new.PR).x & y=(*new.PR).y
      self->Trim,x,y,APERTURE=aper
@@ -833,18 +833,39 @@ pro IRS_Calib::Trim,x,y,APERTURE=aper
 end
 
 ;=============================================================================
-;  TransformCoords - Transform from a SIRTF-FOV-centric coordinate set
-;                    to one centered on a given module/order.
+;  TransformBoreSightCoords - Transform from a SIRTF-FOV-centric
+;                             coordinate set (including PA) to one
+;                             centered on a given module/order.
 ;=============================================================================
-pro IRS_Calib::TransformCoords,module,coords,pa,ORDER=ord,outcoords,outpa
+pro IRS_Calib::TransformBoreSightCoords,module,coords,pa, $
+                                        ORDER=ord,outcoords,outpa
   ;; XXX CHECK THIS
   rec=self->GetRecord(module,ord,/MUST_EXIST)
-  ang=pa/!RADEG
+  RADEG = 180.0d/!DPI           ; preserve double
+  ang=pa/RADEG
   c=cos(ang) & s=sin(ang)
-  outcoords=coords + [[c,s],[-s,c]] ## [rec.TPF_Y,rec.TPF_Z]
+  outcoords=coords + rebin(reform([[c,s],[-s,c]] ## [rec.TPF_Y,rec.TPF_Z]), $
+                           size(coords,/DIMENSIONS),/SAMPLE)
   outpa=pa+(360.0D - rec.TPF_ANGLE)
 end
 
+;=============================================================================
+;  TransformCoords - Transform coords/pa from one FOV to another
+;=============================================================================
+pro IRS_Calib::TransformCoords,module1,coords1,pa1, $
+                               ORDER1=ord1,module2,ORDER2=ord2, coords2,pa2
+  rec1=self->GetRecord(module1,ord1,/MUST_EXIST)
+  rec2=self->GetRecord(module2,ord2,/MUST_EXIST)
+  pa2=(pa1+rec1.TPF_ANGLE-rec2.TPF_ANGLE) mod 360.0d
+  pa_bs=(pa1+rec1.TPF_ANGLE)    ;infer the spacecraft PA from the slit PA
+  RADEG = 180.0d/!DPI           ; preserve double
+  ang=pa_bs/RADEG
+  c=cos(ang) & s=sin(ang)
+  coords2=coords1 + $
+          rebin(reform([[c,s],[-s,c]] ## $
+                       ([rec2.TPF_Y,rec2.TPF_Z]-[rec1.TPF_Y,rec1.TPF_Z])), $
+                size(coords1,/DIMENSIONS),/SAMPLE)
+end
 
 ;=============================================================================
 ;  DeOverlap - Renormalize fractional areas for any areas of overlap
@@ -933,7 +954,7 @@ end
 
 ;=============================================================================
 ;  ReadCalib - Read (up to) all three calibration files for a given
-;              module or modules, and record in the object.  Also
+;              module or modules, and record in the object.  Also read
 ;              module-inspecific calibration files and add data as
 ;              appropriate.
 ;=============================================================================
@@ -941,7 +962,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
                          TILT_VERSION=tv,FRAMETABLE_VERSION=fv, $
                          PLATESCALE_VERSION=psv,ONLY=only
   cals=replicate({name:'', type:''},5)
-  cals.name=['ORDFIND', 'LINETILT','WAVSAMP','FRAMETABLE','PLATESCALE']
+  cals.name=['WAVSAMP', 'ORDFIND', 'LINETILT','FRAMETABLE','PLATESCALE']
   cals.type='single' & cals[[3,4]].type='all'
 
   version=[n_elements(wv)  gt 0?fix(wv)>0:0, $
@@ -992,9 +1013,9 @@ function IRS_Calib::CalibrationFileVersion,base,version,name,md
   @cubism_dir                    ;get irs_calib_dir
   ;; A specific version was requested, check it
   if version gt 0 then begin 
-     cfile=base+strtrim(version,2)+'.tbl'
-     if file_test(filepath(ROOT=irs_calib_dir,SUBDIR="ssc", $
-                           cfile),/READ,/REGULAR) eq 0 then $
+     cfile=filepath(ROOT_DIR=irs_calib_dir,SUBDIRECTORY='ssc', $
+                    base+strtrim(version,2)+'.tbl')
+     if ~file_test(cfile,/READ,/REGULAR) then $
         message,'No such calibration file: '+cfile
   endif 
         
@@ -1085,9 +1106,10 @@ pro IRS_Calib::ParseLineTilt,file,module
   m=irs_module(module)
   data=read_ipac_table(file)
   
-  ;; set all of them at once (usually to 0)
-  if (data.order)[0] eq 9999 then begin 
+  ;; set all of them at once 
+  if data[0].ORDER eq 9999 then begin 
      if NOT ptr_valid(self.cal[m]) then return
+     ;; Set all by hand
      for i=0,n_elements(*self.cal[m])-1 do begin 
         (*self.cal[m])[i].c=[data[0].c0,data[0].c1,data[0].c2,data[0].c3]
      endfor 
@@ -1117,9 +1139,9 @@ pro IRS_Calib::ParseFrameTable,file
                       POSITION=0)
         wh=where(names eq strupcase(mname),cnt)
         if cnt eq 0 then message,'No frame table entry found for: '+mname
-        (*self.cal[i]).TPF_Z= data[wh[0]].brown_theta_Y/60.D
-        (*self.cal[i]).TPF_Y=-data[wh[0]].brown_theta_Z/60.D
-        (*self.cal[i]).TPF_ANGLE=data[wh[0]].angle
+        (*self.cal[i])[j].TPF_Z= data[wh[0]].brown_theta_Y/60.D
+        (*self.cal[i])[j].TPF_Y=-data[wh[0]].brown_theta_Z/60.D
+        (*self.cal[i])[j].TPF_ANGLE=data[wh[0]].angle
      endfor 
   endfor 
   self.FRAMETABLE_FILE=file
@@ -1140,15 +1162,15 @@ pro IRS_Calib::ParsePlateScale,file
 end
 
 ;=============================================================================
-;  CleanupWAVSAMP - Delete the contents of one or more WAVSAMP records
-;                   by freeing the internal pointers, or just clear
-;                   the PIXELS and AREAS (and optionally POLYGONS) if
-;                   PA_ONLY set.
+;  CleanWAVSAMP - Delete the contents of one or more WAVSAMP records
+;                 by freeing the internal pointers, or just clear the
+;                 PIXELS and AREAS (and optionally POLYGONS) if
+;                 PA_ONLY set.
 ;=============================================================================
 pro IRS_Calib::CleanWAVSAMP, ws,PA_ONLY=pao
   for i=0,n_elements(ws)-1 do begin
      pr=ws[i].PR
-     if ptr_valid(pr) then begin 
+     if ptr_valid(pr) && n_elements(*pr) gt 0 then begin 
         ptr_free,(*pr).PIXELS,(*pr).AREAS
         for j=0,n_elements(*pr)-1 do begin 
            if ptr_valid((*pr)[j].POLYGONS) then $
@@ -1209,8 +1231,8 @@ pro IRS_Calib__define
        MODULE: 0, $             ;which module 0:LH, 1:LL, 2:SH, 3:SL, 4:MSED
        ORDER: 0, $              ;the order number this data corresponds to.
        Date:0.0D, $             ;Date First constructed
-       TPF_Z:0.0D, $            ;[deg] Offset of slit center in Z
-       TPF_Y:0.0D, $            ;[deg] Offset of slit center in Y
+       TPF_Z:0.0D, $            ;[deg] Offset of slit center in +Z
+       TPF_Y:0.0D, $            ;[deg] Offset of slit center in +Y
        TPF_ANGLE:0.0D, $        ;[deg] angle of FOV +w C.W. from TPF +Z
        WAV_CENTER: 0.0, $       ;[um] the central order wavelength
        WAV_MIN: 0.0, $          ;[um] the minimum order wavelength
