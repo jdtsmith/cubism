@@ -10,7 +10,7 @@ pro tvPick::Message, msg
         self.size=msg.zoom/7
         self->MarkAll           ;put them back on
      end
-     'WIDGET_DRAW': begin       ;a button event
+     'DRAW_BUTTON': begin       ;a button event
         ;; we require a first or third button *press*
         if msg.press ne 1b and msg.press ne 4b then return
         ;; convert to showing pixels only
