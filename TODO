@@ -1,3 +1,8 @@
+- Implement a spacebar scale freeze on CubeViewSpec (hmmm... change to
+  < and > for peak region select?).
+
+- Multi-FOV builds using "_cen" positions too (e.g. LL_cen, LL1_cen).
+  Currently no IRS_Calib record for the full-slit _cen positions.
 
 - Visualizer with per-order low-res vis options (dotted line for the
   other sub-slit).  Selected files are highlit via line-weight.
