@@ -2,27 +2,25 @@
 ;; Exclusive, motion, and button messages expected
 pro tvSlice::Message,msg
   self->tvPlug::Message,msg,TYPE=type
-  switch type of 
-     'WIDGET_DRAW': begin 
-        ;; Must be a motion or button event
+  case type of 
+     'DRAW_MOTION': begin 
+        if self.buttondown ne 0b then begin 
+           pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
+           if pt[0] eq -1 then return
+           if total(self.ept eq pt) eq 2. then return
+           self->EraseLine
+           if self.constrain then begin 
+              if abs(pt[1]-self.opt[1]) gt abs(pt[0]-self.opt[0]) then $
+                 pt[0]=self.opt[0] $ ; up-down 
+              else pt[1]=self.opt[1] ;left-right
+           endif 
+           self.ept=pt
+           self->DrawLine
+        endif
+     end 
+     
+     'DRAW_BUTTON': begin 
         case msg.type of
-           2: $                 ;motion event
-              begin 
-              if self.buttondown ne 0b then begin 
-                 pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
-                 if pt[0] eq -1 then return
-                 if total(self.ept eq pt) eq 2. then return
-                 self->EraseLine
-                 if self.constrain then begin 
-                    if abs(pt[1]-self.opt[1]) gt abs(pt[0]-self.opt[0]) then $
-                       pt[0]=self.opt[0] $ ; up-down 
-                    else pt[1]=self.opt[1] ;left-right
-                 endif 
-                 self.ept=pt
-                 self->DrawLine
-              endif
-           end 
-           
            0: $                 ;button press
               begin  
               if self.opt[0] ne -1 then self->EraseLine 
@@ -30,7 +28,7 @@ pro tvSlice::Message,msg
               pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
               if pt[0] eq -1 then return
               self.opt=pt       ;the original point
-              self->Update,/MOTION ;ask for motion events
+              self.oDraw->MsgSignup,self,/DRAW_MOTION ;ask for motion events
               self.buttondown=1b
            end
            
@@ -38,7 +36,8 @@ pro tvSlice::Message,msg
               begin 
               if self.buttondown eq 0b then return
               self.buttondown=0b
-              self->Update,MOTION=0 ;we need no more motion events
+              ;; we need no more motion events
+              self.oDraw->MsgSignup,self,DRAW_MOTION=0 
               if self.constrain then begin 
                  self.constrain=0b ;reset for next round
               endif else begin 
@@ -51,18 +50,17 @@ pro tvSlice::Message,msg
            end
         endcase 
         break
-     end         
+     end 
      
      'TVDRAW_POSTDRAW':  begin 
-        self.oDraw->GetProperty,IMORIG=io
-        self.io=io
         if NOT ptr_valid(self.plotvec) then return
         self->PlotSlice         ;we'll draw it when the redraw arrives.
         break
      end
      
      'TVDRAW_REDRAW': if ptr_valid(self.plotvec) then self->DrawLine
-  endswitch
+     else:
+  endcase
 end
 
 ;=============================================================================
@@ -74,7 +72,8 @@ pro tvSlice::On
      return
   endif
   self->tvPlug::On
-  self->Update,/BUTTON,/MOTION,/REDRAW,/POSTDRAW
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/DRAW_MOTION,/TVDRAW_REDRAW, $
+     /TVDRAW_POSTDRAW
 end
 
 ;=============================================================================
@@ -86,7 +85,7 @@ pro tvSlice::Off
   self.plotpt=[-1,-1]           ;no longer plotting it
   if widget_info(self.wBase,/VALID) then  $
      widget_control, self.wBase,/DESTROY
-  self->Update,/ALL_OFF,/EXCLUSIVE
+  self.oDraw->MsgSignup,self,/NONE,/TVDRAW_EXCLUSIVE
 end
 
 
@@ -116,15 +115,15 @@ pro tvSlice::PlotEvent,ev
      endif 
      return
   endif 
-  ;; Motion events -- convert to data coords to nearest index (our abscissa)
+  ;; Motion events -- convert to data coords, nearest index
+  self.oDraw->GetProperty,IMORIG=io
   c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
   c[0]=round((0>c[0])<(n_elements(*self.plotvec)-1))
   if self.plotpt[0] eq c[0] then return
-  c[1]=(*self.io)[(*self.plotvec)[c[0]]] ;the data value there
+  c[1]=(*io)[(*self.plotvec)[c[0]]] ;the data value there
   if self.plotpt[0] ne -1 then self->EraseIndicator ;Erase old one
   self.plotpt=c
   self->ShowIndicator           ;Draw the symbols
-  
 end
 
 pro tvSlice::ShowIndicator, IMONLY=il
@@ -214,7 +213,6 @@ pro tvSlice::PlotSlice
              x[0],y[0],x[n-1],y[n-1])
   plot,indgen(n),(*io)[*self.plotvec],xtitle="Slice Index",ytitle='Value',$
        TITLE=ttl,xstyle=17,XMINOR=n lt 10?-1:0
-  self.io=io
   wset,self.plotpixwin
   device,copy=[0,0,512,384,0,0,self.plotwin] ;save it for redrawing
   wset,dwin
@@ -254,24 +252,23 @@ end
 ;=============================================================================
 ;       tvSlice::Init.  Initialize the slicer object
 ;=============================================================================
-function tvSlice::Init,oDraw,EXCLUSIVE=exc,COLOR=color
+function tvSlice::Init,oDraw,COLOR=color
   self.opt=[-1,-1]
   self.ept=[-1,-1]
   self.plotpt=[-1,-1]
   
   if (self->tvPlug::Init(oDraw) ne 1) then return,0 ;chain up
   
-  if n_elements(color) eq 0 then self.color=!D.N_COLORS/2 else  $
+  if n_elements(color) eq 0 then self.color=!D.TABLE_SIZE/2 else  $
      self.color=color
 
   self.oDraw->GetProperty,PIXWIN=pixwin,WINSIZE=winsize
   self.impixwin=pixwin & self.imwinsize=winsize
   window,/Free,XSIZE=512,YSIZE=384,/PIXMAP 
   self.plotpixwin=!D.Window
-
+  self->Off
   return,1
 end
-
 
 ;=============================================================================
 ;       tvSlice__define.  Prototype the tvSlice class.
@@ -286,7 +283,6 @@ pro tvSlice__define
           plotpt:[0.0,0.0], $   ;x device coordinate of cursor on plot
           plotvec:ptr_new(), $  ;the indices into image plotted
           ImCoords:[0,0], $     ;Device coords on image of displayed symbol
-          io:ptr_new(), $       ;the image (orignal) the slice is from
           color:0, $            ;what color to draw in
           buttondown:0, $       ;is the button held down
           opt:[0,0],$           ;original point (pixel coordinates)
@@ -295,5 +291,3 @@ pro tvSlice__define
           impixwin:0L, $        ;The pixmap window for the Draw Object
           imwinsize:[0,0]}      ;size of the oDraw window image is in
 end
-
-
