@@ -18,13 +18,19 @@
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    cal=irs_restore_calib(file)
+;    cal=irs_restore_calib(file,[/NON_CACHED])
 ;
 ; INPUT PARAMETERS:
 ;
 ;    file: The calibration file containing the IRS_Calib object to
 ;       restore.
 ;			
+; INPUT KEYWORD PARAMETERS:
+;
+;    NON_CACHED: If set, don't recover from the cache, read from disk.
+;       Can create multiple copies of the same basic object in the
+;       session.
+;
 ; OUTPUTS:
 ;
 ;    cal: The IRS_Calib object (see irs_calib__define.pro).
@@ -44,7 +50,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002 J.D. Smith
+;  Copyright (C) 2001,2002,2004 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -62,9 +68,11 @@
 ;  Boston, MA 02111-1307, USA.
 ;
 ;##############################################################################
-function irs_restore_calib, cfile
+function irs_restore_calib, cfile,NON_CACHED=nc,RECENT=recent
   common irs_calib_store, irs_calib_store_files, irs_calib_store_objects
   @cubism_dir
+  if keyword_set(recent) || n_elements(cfile) eq then $
+     cfile=irs_recent_calib()
   if file_test(cfile,/READ,/REGULAR) then file=cfile else begin 
      file=filepath(ROOT=irs_calib_dir,SUBDIR="sets",cfile)
      if file_test(file,/READ,/REGULAR) eq 0 then $
@@ -72,7 +80,7 @@ function irs_restore_calib, cfile
   endelse 
   
   ;; Recover from the stored object cache
-  if n_elements(irs_calib_store_files) ne 0 then begin 
+  if ~keyword_set(nc) && n_elements(irs_calib_store_files) ne 0 then begin 
      keep=where(obj_valid(irs_calib_store_objects),keep_cnt,NCOMPLEMENT=reject)
      if keep_cnt ne 0 then begin 
         if reject gt 0 then begin 
@@ -84,15 +92,17 @@ function irs_restore_calib, cfile
      endif 
   endif else keep_cnt=0
   
-  cal=restore_object(file,'IRS_Calib')
+  cal=restore_object(file,'IRS_Calib',OTHER_CLASSES='irs_aperture')
   
   ;; Store to the cache
-  if keep_cnt eq 0 then begin
-     irs_calib_store_files=[file] & irs_calib_store_objects=[cal] 
-  endif else begin 
-     irs_calib_store_files=[irs_calib_store_files,file] 
-     irs_calib_store_objects=[irs_calib_store_objects,cal]
-  endelse 
+  if ~keyword_set(nc) then begin 
+     if keep_cnt eq 0 then begin
+        irs_calib_store_files=[file] & irs_calib_store_objects=[cal] 
+     endif else begin 
+        irs_calib_store_files=[irs_calib_store_files,file] 
+        irs_calib_store_objects=[irs_calib_store_objects,cal]
+     endelse 
+  endif 
                                                             
   return,cal
 end
