@@ -276,7 +276,7 @@ pro OMArray::MsgSignup, objs, ALL=all_on,NONE=all_off,_EXTRA=set_source
   if ptr_valid(self.MsgNames) eq 0 then return
   all_off=keyword_set(all_off) 
   all_on=keyword_set(all_on) 
-  
+
   if n_elements(set_source) ne 0 then begin 
      tags=tag_names(set_source)
      nt=n_tags(set_source)
