@@ -783,6 +783,7 @@ pro CubeProj::LoadBadPixels,file,ERROR=err
   free_lun,un
   self.bad_pixel_list=ptr_new(bp,/NO_COPY)
   self->UpdateButtons
+  self->Send,/UPDATE
 end
 
 
@@ -811,6 +812,7 @@ end
 pro CubeProj::ClearBadPixels, file
   ptr_free,self.bad_pixel_list
   self->UpdateButtons
+  self->Send,/UPDATE
 end
 
 ;=============================================================================
@@ -3243,7 +3245,7 @@ end
 ;=============================================================================
 ;  Send - Send One of our messages
 ;=============================================================================
-pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back
+pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update
   if keyword_set(cube) then begin 
      self->MsgSend,{CUBEPROJ_CUBE, $
                     self,$
@@ -3251,14 +3253,16 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back
                            self.NSTEP,jul2date(self.CUBE_DATE)), $
                     self.MODULE,self.WAVELENGTH}
      return
-  endif
-  if keyword_set(back) then begin 
+  endif else if keyword_set(back) then begin 
      self->MsgSend,{CUBEPROJ_RECORD, $
                     self,self->ProjectName()+' Background',self.MODULE, $
                     self.ORDER,self.CAL,self.BACKGROUND,self.BACKGROUND_UNC, $
                     ptr_new(),ptr_new()}
      return
-  endif
+  endif else if keyword_set(update) then begin 
+     self->MsgSend,{CUBEPROJ_UPDATE,self.BAD_PIXEL_LIST}
+     return
+  endif 
   
   nrec=n_elements(record) 
   if nrec eq 0 then return
@@ -3475,6 +3479,7 @@ pro CubeProj__define
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),BCD:ptr_new(),UNC:ptr_new(),BMASK:ptr_new(), $
        BACKGROUND:ptr_new()}    ;XXX UNC
+  msg={CUBEPROJ_UPDATE, BAD_PIXEL_LIST:ptr_new()}
 end
 
 
