@@ -99,9 +99,9 @@ pro IRS_Region::ParseRegion,hdr,file,IPAC_TABLE=ipac_table
      got_box=0
      for i=0,n_elements(hdr)-1 do begin 
         line=strmid(hdr[i],1)
-        if strmid(line,0,1) ne '#' then continue
+        if strmid(line,1,1) ne '#' then continue
         if ~got_box then begin 
-           if strmid(line,2,4) eq 'Box:' then begin 
+           if strmid(line,3,4) eq 'Box:' then begin 
               ext=stregex(line,match+','+match+' ; '+match+','+match, $
                           /EXTRACT,/SUBEXPR)
               if n_elements(ext) lt 5 then return
