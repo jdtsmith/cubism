@@ -21,7 +21,7 @@ end
 ;	On:  Get all our messages.
 ;=============================================================================
 pro tvPhot::On
-  if self.active then begin     ;if turned on *again* .. means turn *off*!
+  if self->On() then begin      ;if turned on *again* .. means turn *off*!
      self.Box->Reset
      self->Off
      return
@@ -45,15 +45,15 @@ pro tvPhot::Off
 end
 
 function tvPhot::Icon
-
-return,'Phot'
-
-;  return,[[  0b,  0b],[224b,  7b],[248b, 31b],[252b, 63b], $
-;          [ 60b, 60b],[ 30b,120b],[142b,112b],[142b,115b], $
-;          [206b,113b],[ 14b,113b],[ 30b,120b],[ 60b, 60b], $
-;          [252b, 63b],[248b, 31b],[224b,  7b],[  0b,  0b]]
+  return,[[  0b,  0b],[224b,  7b],[248b, 31b],[252b, 63b], $
+          [ 60b, 60b],[ 30b,120b],[142b,112b],[142b,115b], $
+          [206b,113b],[ 14b,113b],[ 30b,120b],[ 60b, 60b], $
+          [252b, 63b],[248b, 31b],[224b,  7b],[  0b,  0b]]
 end
 
+function tvPhot::Description
+  return,'Aperture Photometry'
+end
 ;;************************End OverRiding methods*******************************
 
 pro tvPhot::GetProperty, Phot=phot, Rad=rad, SkyWidth=sw, SKY=sky
@@ -101,37 +101,141 @@ pro tvPhot::Draw
   endif 
 end
 
+function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
+  if n_elements(fwhm) eq 0 then fwhm=5
+  if n_elements(tr) eq 0 then tr=.2 else tr=0.>tr<1.
+  err=0b
+  
+  s=size(im,/DIMENSION)
+  
+  ;; regular centroid
+  tm=total(im,2) & x=total(tm*(findgen(s[0])+.5))/total(tm)
+  tm=total(im,1) & y=total(tm*(findgen(s[1])+.5))/total(tm)
+  
+  ;; daophot-style spatial derivative centroid
+  x2=round(x) & y2=round(y)     ;central pixel for centroid box (derivatives)
+  
+  nhalf =  fix(0.637*fwhm) > 2  ;
+  nbox = 2*nhalf+1              ;Width of box to be used to compute centroid
+  
+  l=(x2-nhalf) & r=(x2+nhalf)
+  b=(y2-nhalf) & t=(y2+nhalf)
+  if l lt 1. or r gt s[0]-2. or b lt 1. or t gt s[1]-2. then begin
+     if keyword_set(silent) eq 0b then  $
+        message,/INFO,'The standard centroid falls too far from the center.'
+     err=1b
+     return,[-1.,-1.]
+  endif 
+  
+  cbox=im[l:r,b:t]
+  pos= findgen(nbox-1) + 0.5 - nhalf ;we truncate the last column/row
+  
+  ;; Weighting factor W unity in center, 0.5 at end, and linear in between 
+  w=1.-0.5*(abs(pos)-0.5)/(nhalf-1.) 
+  sumc=total(w)
+  
+  ;; compute x centroid
+  d=shift(cbox,-1,0)-cbox       ;derivative in x direction
+  d=d[0:nbox-2,*]               ;don't take the last edge
+  d=total(d,2)
+  sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
+  dx=sumxsq*sumd/(sumc*sumxd)
+  if ( abs(dx) GT nhalf ) then begin ;Reject if centroid outside box
+     err=2b
+     if not keyword_set(silent) then $
+        message,/INF,'Derivative X centroid out of range, using standard only.'
+  endif else begin
+     x2=x2+.5-dx & x=tr*x+(1.-tr)*x2
+  endelse 
+  
+  ;; compute y centroid
+  d=shift(cbox,0,-1)-cbox       ;derivative in x direction
+  d=d[*,0:nbox-2]               ;don't take the last edge
+  d=total(d,1)
+  sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
+  
+  dy=sumxsq*sumd/(sumc*sumxd)
+  if ( abs(dy) GT nhalf ) then begin ;Reject if centroid outside box
+     err=2b
+     if not keyword_set(silent) then $
+        message,/INF,'Derivative Y centroid out of range, using standard only.'
+  endif else begin
+     y2=y2+.5-dy & y=tr*y+(1.-tr)*y2
+  endelse 
+  
+  if x lt 0. or x ge (r-1.) or y lt 0. or y ge (t-1.) then begin 
+     if not keyword_set(silent) then $
+        message,/INF,'Centroid lies outside of sub-array.'
+     err=1b
+     return,[-1.,-1.]
+  endif 
+  
+  return,[x,y]
+end
+
+pro tvPhot::ApPhot, image, cntrd,SILENT=silent,ERROR=err
+  srad=self.Rad+self.SkyWidth
+  rad=self.Rad  
+  err=0b
+  
+  ;; form an array which is the distance at each pixel from the centroid
+  n=size(image,/DIMENSIONS)
+  r=lindgen(n)
+  r=sqrt((r mod n[0]+.5-cntrd[0])^2+(r/n[0]+.5-cntrd[1])^2)
+  incircle=where(r le rad,cnt)  ;where we're in the circle
+  insky=where(r le srad and r gt rad,scnt) ;where we're in the sky
+  if cnt eq 0 or scnt eq 0 then begin
+     err=1b
+     return
+  endif 
+  
+  ;; approximate the fraction of edge pixels.
+  fractn= 0.0 > rad-r[incircle] < 1.0
+  fractnsky= 0.0 > srad-r[insky] < 1.0
+
+  ;; Compute the trimmed average sky background
+  sky=image[insky]
+  s=sort(sky)
+  s=s[scnt/20:19*scnt/20]       ;remove top and bottom 5% from the sort
+  sky=sky[s] 
+  fractnsky=fractnsky[s]
+  
+  self.Sky=total(sky*fractnsky)/total(fractnsky)
+  self.Phot=total(image[incircle]*fractn)-self.Sky*total(fractn)
+end
+
 pro tvPhot::Phot
   self.Box->Getlrtb,l,r,t,b
-  self.oDraw->GetProperty,imorig=io ;get the image pointer
+  self.oDraw->GetProperty,imorig=io,SIZE=sz ;get the image pointer
   if NOT ((l le r) and (b le t)) then return
+  if r ge sz[0] OR t ge sz[1] then begin
+     self->Off                  ;panic
+     return
+  endif
   take=(*io)[l:r,b:t]
   
   ;;take as fwhm either half the geometric mean of box sides or the 
   ;;radius of the circle, whichever is smaller, or 4 if both smaller
-  fw=self.rad<sqrt((r-l+1.)*(t-b+1.))/2.> 4
+  fw=self.rad<sqrt((r-l+1.)*(t-b+1.))/2.> 4.
   ;; the image centroid
-  self.cntrd=sm_centroid(take,ERROR=cerr, FWHM=fw,TRUST=0.,/SILENT)
-  if cerr eq 1b then begin      ;no good centroid
-     str=string(FORMAT='("CENT:  [",2A6,"] PHOT:",A12," SKY:",A12)', $
+  self.cntrd=self->Centroid(take,ERROR=cerr,FWHM=fw,TRUST=0.,/SILENT)
+  if cerr eq 1b then begin      ;no good centroid found
+     str=string(FORMAT='("CEN:  [",2A6,"] PHOT:",A12," SKY:",A12)', $
                 '***','***', '***','***')
   endif else begin 
-     self.cntrd=self.cntrd+[l,b] ;in real terms
-     skyrad=self.Rad+self.SkyWidth
-     low=(floor(self.cntrd-SkyRad)-1)>0
-     high=(ceil(self.cntrd+SkyRad)+1)<(size(*io,/DIMENSIONS)-1)[0]
+     self.cntrd=self.cntrd+[l,b] ;offset into the full array
+     low=(floor(self.cntrd-self.Rad-self.SkyWidth)-1)>0
+     high=(ceil(self.cntrd+self.Rad+self.SkyWidth)+1)< $
+          (size(*io,/DIMENSIONS)-1)[0]
      take=(*io)[low[0]:high[0],low[1]:high[1]]
-     photcen=self.cntrd-low     ;in terms of our new take
-     phot=sm_ap_phot(take,photcen,ERROR=err,SKYRADIUS=SkyRad, $
-                     RADIUS=self.rad,/SILENT,SKYVAL=sky)
+     photcen=self.cntrd-low     ;relative to our new piece of the image
+     self->ApPhot,take,photcen,ERROR=err,/SILENT
      self.photgood=(1b-err)+2b*(cerr eq 2b)
      if self.photgood then begin 
-        self.phot=phot
-        self.sky=sky
-        str=string(FORMAT='("CENT:[",2F6.2,"]  PHOT:",G12.6," SKY:",G12.6)', $
+        str=string(FORMAT='("CEN:[",2F6.2,"]  PHOT:",G12.6," SKY:",G12.6)', $
                    self.cntrd,self.phot,self.sky )
      endif else $ 
-        str=string(FORMAT='("CENT:[",2F6.2,"]  PHOT:",A12," SKY:",A12)', $
+        str=string(FORMAT='("CEN:[",2F6.2,"]  PHOT:",A12," SKY:",A12)', $
                    self.cntrd,'***','***') 
   endelse 
   widget_control, self.wSlab, set_value=str
@@ -238,8 +342,8 @@ function tvPhot::Init,parent,oDraw,HIDE=hide,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
   if n_elements(sw) ne 0 then self.SkyWidth=sw else self.SkyWidth=2.5
   self.cntrd=[-1.,-1.]          ;no centroid yet!
   ;; Get a tvrbox object, signing *ourself* up for box messages.
-  self.Box=obj_new('tvrbox', oDraw,_EXTRA=e)
-  self.Box->MsgSignup,self,/ALL
+  self.Box=obj_new('tvrbox', oDraw,/CORNERS,_EXTRA=e)
+  self.Box->MsgSignup,self,/BOX
   self->Off
   return,1
 end
