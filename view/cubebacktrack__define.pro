@@ -104,8 +104,8 @@ pro CubeBackTrack::On
   self.wLabel=widget_label(self.wBase,value=msg,/ALIGN_LEFT, $
                            /DYNAMIC_RESIZE)
   if self.list_size gt 0 then $
-     self.wList=widget_list(self.wBase,XSIZE=52,SCR_YSIZE=self.list_size) $
-  else self.wList=widget_list(self.wBase,XSIZE=52,YSIZE=8) 
+     self.wList=widget_list(self.wBase,XSIZE=54,SCR_YSIZE=self.list_size) $
+  else self.wList=widget_list(self.wBase,XSIZE=54,YSIZE=8) 
   widget_control, self.wBase, SET_UVALUE=self,/REALIZE
   make_widget_adjacent,self.wBase,self.parent
   
@@ -197,9 +197,9 @@ pro CubeBackTrack::UpdateList
                       list[i].BCD_PIX/self.bcd_size[0], $
                       list[i].BCD_VAL, list[i].BACK_VAL, list[i].AREA)
         if list[i].ID eq oldid then begin 
-           str[i]=string(FORMAT='(21X,A)',str[i])
+           str[i]=string(FORMAT='(23X,A)',str[i])
         endif else begin 
-           str[i]=string(FORMAT='(A19,2X,A)',list[i].ID, $
+           str[i]=string(FORMAT='(A21,2X,A)',list[i].ID, $
                          str[i])
            oldid=list[i].ID
         endelse 
