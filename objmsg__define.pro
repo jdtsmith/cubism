@@ -11,8 +11,7 @@
 ; DESCRIPTION:
 ;    
 ;    Superclass providing generic framework for inter-object
-;    messaging.  Derived directly from the messaging class of the same
-;    name by J.D. Smith.  This documentation covers details relevant
+;    messaging.  This documentation covers details relevant
 ;    only to programmers.
 ;
 ;    The message specified in the call to "MsgSend" is delivered to
@@ -223,6 +222,9 @@
 ;
 ; NOTES:
 ;
+;    Derived directly from the object messaging class of the same name
+;    by J.D. Smith.
+;
 ;    ObjMsg defines a common framework for event-driven object
 ;    communication.  The events will include those which arise from
 ;    widget activity within the objects, but the formalism is
@@ -255,6 +257,9 @@
 ;
 ; MODIFICATION HISTORY:
 ;    $Log$
+;    Revision 1.4  2001/07/31 20:30:26  jdsmith
+;    	Minor Doc Change
+;
 ;    Revision 1.3  2001/07/30 21:26:07  jdsmith
 ;    	Changed download and info URL
 ;
