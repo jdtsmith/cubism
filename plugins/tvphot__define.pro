@@ -257,11 +257,11 @@ pro tvPhot::Event,ev
         newrad=float(tmp[0])
         catch,/CANCEL
         if newrad le 1.5 then begin
-           widget_control, ev.handler, set_value=string(self.rad, $
-                                                        FORMAT='(F5.2)')
+           widget_control, ev.id, set_value=string(self.rad, $
+                                                   FORMAT='(F5.2)')
            return
         endif else  $
-           widget_control, ev.handler, set_value=string(newrad,FORMAT='(F5.2)')
+           widget_control, ev.id, set_value=string(newrad,FORMAT='(F5.2)')
         if newrad ne self.rad then new=1   
      end
      
@@ -277,11 +277,11 @@ pro tvPhot::Event,ev
         newwidth=float(tmp[0])
         catch,/CANCEL
         if newwidth lt 1.0 then begin 
-           widget_control, ev.handler, set_value=string(self.SkyWidth, $
+           widget_control, ev.id, set_value=string(self.SkyWidth, $
                                                         FORMAT='(F5.2)')
            return
         endif else $
-           widget_control, ev.handler, $
+           widget_control, ev.id, $
                            set_value=string(newwidth,FORMAT='(F5.2)')
         if newwidth ne self.SkyWidth then new=2
      end
