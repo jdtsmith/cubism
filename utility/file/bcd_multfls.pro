@@ -24,7 +24,7 @@ end
 
 function bcd_multfls,_EXTRA=e
   filt=['*','*.fits']
-  s=string(FORM='(T7,A,T24,A,T36,A,T48,A,T59,A,T67,A,T76)', $
+  s=string(FORM='(T7,A,T24,A,T36,A,T48,A,T59,A,T67,A,T77)', $
            'File','RA','Dec','Date','Step','FOV')
   return, multfls(TITLE='Select BCDs',_EXTRA=e, $
                   LISTFUNC='bcd_mult_showfits', TOPLABEL=s,/NO_SHOW_ALL, $
