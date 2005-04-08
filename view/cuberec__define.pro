@@ -17,7 +17,7 @@ pro CubeRec::Message, msg
      'CUBEVIEWSPEC_SAVE': begin 
         method=self.region_file?"ExtractFileRegion":"Extract"
         if msg.export then $
-           call_method,method,self,/EXPORT $
+           call_method,method,self,/EXPORT,FILE=self.region_file $
         else call_method,method,self,/SAVE,FILE=self.region_file
         return
      end
@@ -30,27 +30,9 @@ pro CubeRec::Message, msg
      end
      'CUBEVIEWSPEC_STACK': begin
         self->EnsureCube
+        *self.stack_msg=msg
+        self->BuildStack
         widget_control, self.wStackInfo,SET_VALUE=msg.info
-        ptr_free,self.stack
-        if msg.name then $      ; A named map
-           self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name, $
-                                               WAVELENGTH_WEIGHTED= $
-                                               msg.weight_cont)) $
-        else begin 
-           if ptr_valid(msg.background) then begin
-              type=size(*msg.background,/TYPE)
-              if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
-                 self.stack=ptr_new(self.cube-> $
-                                    Stack(*msg.foreground, $
-                                          WAVELENGTH_WEIGHTED=msg.weight_cont,$
-                                          BG_VALS=*msg.background))
-              endif else $      ;background index ranges
-                 self.STACK=ptr_new(self.cube-> $
-                                    Stack(*msg.foreground, $
-                                          WAVELENGTH_WEIGHTED=msg.weight_cont,$
-                                          BACKRANGES=*msg.background))
-           endif else self.STACK=ptr_new(self.cube->Stack(*msg.foreground))
-        endelse 
         self->SwitchMode,/STACK
      end
      'CUBEPROJ_RECORD': begin 
@@ -164,6 +146,37 @@ pro CubeRec::GetProperty,BCD_MODE=bcd_mode,CUBE=cube
   if arg_present(bcd_mode) then bcd_mode=self.mode eq 2
   if arg_present(cube) then cube=self.cube
 end
+
+;=============================================================================
+;  BuildStack
+;=============================================================================
+pro CubeRec::BuildStack,_EXTRA=e
+  if ~ptr_valid(self.stack_msg) then $
+     self->Error,'No stack yet received.'
+  msg=*self.stack_msg
+  ptr_free,self.stack
+  if msg.name then begin        ; A named map
+     self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name, $
+                                         WAVELENGTH_WEIGHTED= $
+                                         msg.weight_cont,_EXTRA=e)) 
+  endif else begin 
+     if ptr_valid(msg.background) then begin
+        type=size(*msg.background,/TYPE)
+        if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
+           self.stack=ptr_new(self.cube-> $
+                              Stack(*msg.foreground, $
+                                    WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                    BG_VALS=*msg.background,_EXTRA=e))
+        endif else $            ;background index ranges
+           self.STACK=ptr_new(self.cube-> $
+                              Stack(*msg.foreground, $
+                                    WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                    BACKRANGES=*msg.background,_EXTRA=e))
+     endif else self.STACK=ptr_new(self.cube->Stack(*msg.foreground, $
+                                                    _EXTRA=e))
+  endelse 
+end
+
 
 ;=============================================================================
 ;  SwitchMode - Switch among full, stacked and record mode.  To switch
@@ -342,8 +355,9 @@ end
 ;=============================================================================
 pro CubeRec::SaveMapEvent,ev
   self->CheckCube
-  if NOT ptr_valid(self.STACK) then self->Error,'No valid map to save.'
-  self.cube->SaveMap,*self.STACK
+  if ~ptr_valid(self.STACK) || ~ptr_valid(self.stack_msg) then $
+     self->Error,'No valid map to save.'
+  self->BuildStack,/SAVE
 end
 
 
@@ -416,7 +430,7 @@ end
 ;=============================================================================
 pro CubeRec::Cleanup
   ;; bcd,wavelength, and error are not ours to destroy
-  ptr_free,self.STACK,self.rec_set
+  ptr_free,self.STACK,self.stack_msg,self.rec_set
   self->tvPlug::Cleanup
 end
 
@@ -504,6 +518,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
                                                   method:'ExtractFileRegion', $
                                                   event:0},/SEPARATOR)
   endif
+  self.stack_msg=ptr_new(/ALLOCATE_HEAP)
   return,1
 end
 
@@ -527,6 +542,7 @@ pro CubeRec__define
       oView: obj_new(), $       ;our ViewSpec tool
       oRose: obj_new(), $       ;our compass rose drawing tool
       STACK:ptr_new(), $        ;the stacked image
+      stack_msg: ptr_new(), $   ;cache the stack message
       BCD:ptr_new(), $          ;the BCD data
       BCD_UNC:ptr_new(), $      ;the BCD error
       BCD_BMASK:ptr_new(), $    ;the BCD mask data
