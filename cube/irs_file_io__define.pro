@@ -95,6 +95,7 @@ function IRS_File_IO::ReadFile,sf
         TITLE='Read '+self.file_title+' from File',/NO_SHOW_ALL,SELECT=0, $
         PARENT_GROUP=self.parent_group,/MODAL
      if size(file,/TYPE) ne 7 then return,-1
+     sf=file
   endif
   if size(sf,/TYPE) eq 7 then self.fits=stregex(sf,'\.fits\$',/BOOLEAN)
   return,sf
