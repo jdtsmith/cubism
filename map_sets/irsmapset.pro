@@ -81,11 +81,13 @@ pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
   if cnt eq 0 then return
   map=(*self.map_sets)[wh[0]]
   
+  redQ=n_elements(redshift) ne 0 && redshift ne 0.0
+  
   if ptr_valid(map.weights) then begin 
      weights=*map.weights
      if n_elements(wc) ne 0 and keyword_set(nwc) eq 0 then begin 
         wlam=weights[0,*]
-        if n_elements(redshift) ne 0 then wlam*=1.+redshift/299792.458
+        if redQ then wlam*=1.+redshift/299792.458
         
         minlam=min(wlam,MAX=maxlam)
                 
@@ -99,7 +101,7 @@ pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
   
   if ptr_valid(map.foreranges) then begin 
      fr=*map.foreranges
-     if n_elements(redshift) ne 0 then fr*=1.+redshift/299792.458
+     if redQ then fr*=1.+redshift/299792.458
      if n_elements(wc) ne 0 then begin 
         foreranges=make_array(/LONG,size(fr,/DIMENSIONS))
         for i=0,n_elements(fr)/2-1 do begin 
@@ -115,7 +117,7 @@ pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
      
   if ptr_valid(map.backranges) then begin
      br=*map.backranges
-     if n_elements(redshift) ne 0 then br*=1.+redshift/299792.458
+     if redQ then br*=1.+redshift/299792.458
      if n_elements(wc) ne 0 then begin 
         backranges=make_array(/LONG,size(br,/DIMENSIONS))
         for i=0,n_elements(br)/2-1 do begin 
