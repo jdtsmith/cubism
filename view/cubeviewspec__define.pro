@@ -322,7 +322,6 @@ end
 ;=============================================================================
 pro CubeViewSpec::MapEvent,ev
   widget_control, ev.id,get_uvalue=uval
-  oMap=IRSMapSet(self)
   widget_control, self.wDraw,/INPUT_FOCUS
   
   if n_elements(uval) eq 0 then begin 
@@ -332,21 +331,12 @@ pro CubeViewSpec::MapEvent,ev
         widget_control, (*self.wMapSets)[i], $
                         SET_BUTTON=(*self.wMapSets)[i] eq ev.id
      widget_control, ev.id,get_value=name
-     oMap->GetMap,name,BACKRANGES=br,FORERANGES=fr,WEIGHTS=weights, $
-                  WAVELENGTH_CONVERT=*self.lam,/NO_WEIGHT_CONVERT
-     ptr_free,self.reg,self.weights
-     if n_elements(br)/2 gt 0 then self.reg[0]=ptr_new(br,/NO_COPY)
-     if n_elements(fr)/2 gt 0 then self.reg[1]=ptr_new(fr,/NO_COPY)
-     if n_elements(weights)/2 gt 0 then $
-        self.weights=ptr_new(weights,/NO_COPY)
-     self.selected=-1
-     self->Plot
-     self->UpdateButtons
-     self.map_name=name
-     self->Send
+     self->ApplyMap,name
      return
   endif 
   
+  oMap=IRSMapSet(self)
+
   ;; Load & Save
   case uval of 
      'save': begin              ;save the current
@@ -372,6 +362,23 @@ pro CubeViewSpec::MapEvent,ev
      end
      'load': oMap->LoadSets
      'reset': oMap->LoadDefaultSets
+     'redshift': begin
+        redshift=getinp('Redshift (cz -- km/s):', $
+                        string(FORMAT='(F0.1)',self.redshift), $
+                        TITLE='Set Redshift', $
+                        PARENT_GROUP=self.wBase, /MODAL)
+        if redshift then begin 
+           redshift=float(redshift)
+           if redshift ne self.redshift then begin 
+              self.redshift=redshift
+              self->ApplyMap
+           endif 
+        endif
+     end 
+     'clear-redshift': begin 
+        self.redshift=0.0
+        self->ApplyMap
+     end 
   endcase 
 
   ;; Rebuild the menu
@@ -410,6 +417,31 @@ end
 
 
 ;=============================================================================
+;  ApplyMap - Reset the map set
+;=============================================================================
+pro CubeViewSpec::ApplyMap,map_name
+  if n_elements(map_name) eq 0 then map_name=self.map_name
+  if ~map_name then return
+  
+  oMap=IRSMapSet(self)
+
+  oMap->GetMap,map_name,BACKRANGES=br,FORERANGES=fr,WEIGHTS=weights, $
+               WAVELENGTH_CONVERT=*self.lam,/NO_WEIGHT_CONVERT, $
+               REDSHIFT=self.redshift
+  ptr_free,self.reg,self.weights
+  if n_elements(br)/2 gt 0 then self.reg[0]=ptr_new(br,/NO_COPY)
+  if n_elements(fr)/2 gt 0 then self.reg[1]=ptr_new(fr,/NO_COPY)
+  if n_elements(weights)/2 gt 0 then $
+     self.weights=ptr_new(weights,/NO_COPY)
+  self.selected=-1
+  self.map_name=map_name
+  self->Plot
+  self->UpdateButtons
+  self->Send
+end 
+
+
+;=============================================================================
 ;  ResetMap - Reset the map set
 ;=============================================================================
 pro CubeViewSpec::ResetMap
@@ -444,7 +476,6 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
         msg.info="Stack: "+strjoin(string(FORMAT='(F5.2,"-",F5.2)',lams),", ")
         msg.foreground=self.reg[1]
         msg.weights=self.weights
-        
      endelse 
      
      if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
@@ -457,12 +488,14 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
         msg.info=msg.info+' -- Fit'
      endif else begin 
         if self.weight_cont && ptr_valid(self.reg[0]) then $
-           msg.info+=' -- Lambda-Weighted'
+           msg.info+=' -- Lam-Weight'
         if n_elements(mn) eq 0 then msg.background=self.reg[0]
      endelse 
+     
      ;;if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
      if ptr_valid(self.reg[0]) then msg.info+=')'
-     
+     if n_elements(mn) ne 0 && self.redshift then $
+        msg.info+=string(FORMAT='(" [cz=",F0.1,"km/s]")',self.redshift)
   endelse 
   self->MsgSend,msg
   if keyword_set(js) eq 0 then self->SetWin ;in case it was taken away
@@ -733,6 +766,7 @@ pro CubeViewSpec::Reset,KEEP=k
      self.selected=-1
   endif                         ;Sets up axes for region drawing
   self.medlam=0                 ;This signals no fit.
+  self.redshift=0.0
   self->ResetFit
   self->UpdateParams
   self->UpdateButtons
@@ -806,7 +840,16 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,/NOERASE, $
        CHARSIZE=1.3,POSITION=[.06,.06,.99,.95]
   self.x_s=!X.S & self.y_s=!Y.S
-  if self.Info then xyouts,.2,.97,/NORMAL,self.Info,CHARSIZE=1.2
+  
+  if self.Info then xyouts,.12,.97,/NORMAL,self.Info,CHARSIZE=1.2
+  
+  if self.mode eq 1 && self.map_name then begin 
+     add=' [Map: '+self.map_name+']'+ $
+         (self.redshift?string(FORMAT='(" cz=",F0.1,"km/s")',self.redshift):"")
+     xyouts,.99,.97,add,/NORMAL,ALIGNMENT=1.0,CHARSIZE=1.2, $
+            COLOR=self.colors_base+3
+  endif 
+  
   if self.renorm ne 0 then $
      xyouts,.05,.96,/NORMAL,'!MX!X10!U'+strtrim(self.renorm,2),CHARSIZE=1.25
   if self.mode ne 0 then begin 
@@ -1069,7 +1112,11 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='load')
   but=widget_button(maps,value='Reset to Default Maps', $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='reset')
-
+  
+  but=widget_button(maps,value='Set Redshift...', $
+                    EVENT_PRO='CubeViewSpec_map_event',UVALUE='redshift')
+  but=widget_button(maps,value='Clear Redshift', $
+                    EVENT_PRO='CubeViewSpec_map_event',UVALUE='clear-redshift')
  ;;sets=widget_button(maps,value='Map Sets',/MENU)
   self->BuildMapMenu,maps
   
@@ -1173,6 +1220,7 @@ pro CubeViewSpec__define
       reg:ptrarr(2),$           ;2 ptrs each to a 2xn array of
                                 ; continuum([0])/peak([1]) index ranges
       weights:ptr_new(), $      ;the weights vector for the foreground
+      redshift:0.0, $           ;any redshift as cz in km/s
       ;; Data of the fit and peak
       renorm:0, $               ;power 10^n to renormalize all data with
       ew: 0.0, $                ;Equivalent Width
