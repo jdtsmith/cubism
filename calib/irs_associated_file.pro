@@ -26,7 +26,7 @@ function irs_associated_file,file,BMASK=bm,UNCERTAINTY=unc,FLATAP=f2ap, $
   ret=strarr(nb)
   for i=0,nb-1 do begin 
      if stregex(file[i],reg,/BOOLEAN) then begin 
-        ret[i]=file
+        ret[i]=file[i]
         continue
      endif 
      if ~base[i] then continue
