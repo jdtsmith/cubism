@@ -359,8 +359,6 @@ pro CubeProj::ShowEvent, ev
         widget_control, (*self.wInfo).Base,/UPDATE
      end 
      
-     'delete': if sel[0] ne -1 then self->RemoveBCD,sel
-     
      'phist': self->Info,self->Info(/NO_DATA), $
                          TITLE=self->ProjectName()+': Parameters'
      
@@ -508,6 +506,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   tmp=widget_button(b3,VALUE='DroopRes...',UVALUE='add-droop-module')
   tmp=widget_button(b3,VALUE='FlatAp...',UVALUE='add-flatap-module')
   
+  wMustSel=[wMustSel, $
+            widget_button(rec,VALUE='Switch Record Data Type...', $
+                          UVALUE='switchrecorddatatype')]
+  
   
   (*self.wInfo).MUST_UNRESTORED=widget_button(rec, UVALUE='restoreall',$
                                               VALUE='Restore All Record Data')
@@ -519,7 +521,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
               widget_button(rec,VALUE='View Record (new viewer)...', $
                             UVALUE='viewrecord-new')]), $
             ;;-------------
-            widget_button(rec,VALUE='Delete',UVALUE='delete',/SEPARATOR),$
+            widget_button(rec,VALUE='Delete',UVALUE='removebcd',/SEPARATOR),$
             widget_button(rec,VALUE='Rename',UVALUE='renamerecord'),$
             widget_button(rec,VALUE='Disable',UVALUE='disablerecord'),$
             widget_button(rec,VALUE='Enable',UVALUE='enablerecord'),$
@@ -594,7 +596,9 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
       widget_button(background,VALUE='View Background (new viewer)..', $
                     UVALUE='viewbackground-new'), $
       widget_button(background,VALUE='Remove Background', $
-                    UVALUE='remove-background')]
+                    UVALUE='remove-background'), $
+      widget_button(background,Value='Rebuild Background', $
+                    UVALUE='RebuildBackground')]
   ;;-------------
   but=widget_button(background,VALUE='Load Background Spectrum...', $
                     /SEPARATOR, UVALUE='readbackgroundfromfile')
@@ -659,7 +663,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                 ['Enable','Disable','Delete','Header', $
                  'View Record','View Cube','Import AOR','Save','Close'],$
                 BUTTON_UVALUE= $
-                ['enablerecord','disablerecord','delete','headers', $
+                ['enablerecord','disablerecord','removebcd','headers', $
                  'viewrecord','viewcube','addgroup','save','exit'])
   ;; list of buttons that require a selection to be meaningful
   (*self.wInfo).MUST_SELECT=[wMustSel,ids[0:4]]
@@ -804,7 +808,8 @@ pro CubeProj::Initialize
   self->ObjReport::SetProperty,TITLE_BASE='CUBISM Project'
   self->MsgSetup,['CUBEPROJ_CUBE','CUBEPROJ_RECORD','CUBEPROJ_UPDATE', $
                   'CUBEPROJ_CALIB_UPDATE']
-  self->SetProperty,FEEDBACK=0  ;Show will change this
+  ;; Show will change this
+  if ~self->IsWidget() then self->SetProperty,FEEDBACK=0  
   
   ;; Look for old-style saved Reverse Accounts: rebuild if necessary.
   if ptr_valid(self.DR) && self.ACCOUNTS_VALID then begin 
@@ -970,33 +975,34 @@ end
 pro CubeProj::ReplaceFilenameSubstring,from,to,recs,_EXTRA=e
   self->RecOrSelect,recs,_EXTRA=e
   if recs[0] eq -1 then return
-  
+  do_it=1
   if n_elements(from) eq 0 then begin 
      f=(*self.DR)[recs].FILE
      cnt=0
-     nf=n_elements(f) 
+     nf=n_elements(f)
      if nf gt 1 then begin 
         lab='Replacing text of '+strtrim(nf,2)+' files:'
         wh=where(total(byte(f) eq shift(byte(f),0,1),2) ne nf,cnt)
         def=strmid(f[0],0,wh[0])
-        t=twoin(from,to,def,def,LABEL=lab, $
-                TEXT1='Replace Substring (regexp):', $
-                TEXT2='With:',PARENT_GROUP=self->TopBase(),/SCROLL, $
-                TITLE='Replace File Substring',TEXT_LAB=f,YSIZE=nf<6)
+        do_it=twoin(from,to,def,def,LABEL=lab, $
+                    TEXT1='Replace Substring (regexp):', $
+                    TEXT2='With:',PARENT_GROUP=self->TopBase(),/SCROLL, $
+                    TITLE='Replace File Substring',TEXT_LAB=f,YSIZE=nf<6)
      endif else begin
-        t=twoin(from,to,f[0],f[0],TEXT1='Replace Substring (regexp):', $
-                TEXT2='With:',PARENT_GROUP=self->TopBase(), $
-                TITLE='Replace File Substring')
+        do_it=twoin(from,to,f[0],f[0],TEXT1='Replace Substring (regexp):', $
+                    TEXT2='With:',PARENT_GROUP=self->TopBase(), $
+                    TITLE='Replace File Substring')
      endelse 
   endif 
-  if n_elements(t) gt 0 && t then begin 
-     for i=0,n_elements(recs)-1 do begin
-        file=(*self.DR)[recs[i]].FILE
-        pos=stregex(file,from,length=len)
-        (*self.DR)[recs[i]].FILE= $
-           strmid(file,0,pos)+to+strmid(file,pos+len)
-     endfor
-  endif
+  if ~do_it then return
+  
+  for i=0,n_elements(recs)-1 do begin
+     file=(*self.DR)[recs[i]].FILE
+     pos=stregex(file,from,length=len)
+     if pos eq -1 then self->Error,['No match for '+from+' in: ',file]
+     (*self.DR)[recs[i]].FILE= $
+        strmid(file,0,pos)+to+strmid(file,pos+len)
+  endfor
 end
 
 
@@ -1720,8 +1726,8 @@ end
 ;=============================================================================
 ;  ViewRecord - View the record(s) in an existing or new viewer
 ;=============================================================================
-pro CubeProj::ViewRecord,rec,NEW_VIEWER=new
-  self->RecOrSelect,rec
+pro CubeProj::ViewRecord,rec,NEW_VIEWER=new,_EXTRA=e
+  self->RecOrSelect,rec,_EXTRA=e
   self->RestoreData,rec
   self->FindViewer,NEW_VIEWER=new
   self->Send,RECORD=rec
@@ -1738,10 +1744,10 @@ end
 ;  DisableRecord - Set the records disable flag, so that it doesn't
 ;                  get used when building the cube.
 ;=============================================================================
-pro CubeProj::DisableRecord,recs,DISABLE=dis
+pro CubeProj::DisableRecord,recs,DISABLE=dis,_EXTRA=e
   if NOT ptr_valid(self.DR) then return
   if n_elements(dis) eq 0 then dis=1b
-  self->RecOrSelect,recs
+  self->RecOrSelect,recs,_EXTRA=e
   (*self.DR)[recs].DISABLED=dis
   self.Changed=1b
   self->UpdateAll
@@ -1766,10 +1772,55 @@ pro CubeProj::RenameRecord,rec,name
 end
 
 ;=============================================================================
+;  SwitchRecordDataType - Switch the data type of a set of records,
+;                         without losing any account information, etc.
+;=============================================================================
+pro CubeProj::SwitchRecordDataType,r,FLATAP=f2ap,BCD=bcd,DROOPRES=dr,_EXTRA=e
+  if ~ptr_valid(self.DR) then return
+  self->RecOrSelect,r,_EXTRA=e
+  
+  recs=(*self.DR)[r]
+  
+  all_types=["BCD","DroopRes","Coad2d","FlatAp"]
+  if ~array_equal(recs.type ne 2,1b) then self->Error,'Cannot convert Coad2d'
+
+  if array_equal(recs.type,recs[0].type) then begin 
+     all_type=recs[0].type
+     types=all_types[where(indgen(4) ne all_type AND all_types ne "Coad2d")]
+  endif 
+  
+  if keyword_set(f2ap) then new_type=3
+  if keyword_set(bcd) then new_type=0
+  if keyword_set(dr) then new_type=1
+  
+  if n_elements(new_type) eq 0 then begin 
+     which=popup('Switch Records to Type:',types,TITLE='Switch Record Type', $
+                 PARENT_GROUP=self->TopBase(),/MODAL,SELECT=all_type)
+     if which eq "Coad2d" then self->Error,'Cannot convert Coad2d'
+     new_type=where(all_types eq which)
+  endif 
+  
+  if n_elements(all_type) gt 0 && new_type eq all_type then return
+  
+  new_files=irs_associated_file(recs.file,FLATAP=new_type eq 3, $
+                                DROOPRES=new_type eq 1)
+  (*self.DR)[r].FILE=new_files
+  (*self.DR)[r].TYPE=new_type[0]
+  
+  self->RestoreData,r
+  if self.BACK_DATE then begin 
+     self->Info,'Rebuilding background from '+jul2date(self.BACK_DATE)
+     self->RebuildBackground,/NO_UPDATE
+  endif 
+  self.Changed=1b
+  self->UpdateAll
+end
+
+;=============================================================================
 ;  SetBackgroundFromRecs - Set the BCD background from selected recs.
 ;=============================================================================
-pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm
-  self->RecOrSelect,recs
+pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm,_EXTRA=e
+  self->RecOrSelect,recs,_EXTRA=e
   if recs[0] eq -1 then return
   self->RestoreData,recs
   n=n_elements(recs) 
@@ -1794,6 +1845,7 @@ pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm
   if n le 2 && choice eq 1 then $
      self->Warning,'Fewer than 3 BG records -- reverting to average.'
   back=imcombine(bcds,/AVERAGE,REJECT_MINMAX=n gt 2 && choice eq 1)
+  ptr_free,self.BACKGROUND
   self.BACKGROUND=ptr_new(back,/NO_COPY)
   self.BACK_DATE=systime(/JULIAN)
   self.Changed=1b
@@ -1804,6 +1856,17 @@ pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm
   self->UpdateButtons
 end
 
+;=============================================================================
+;  RebuildBackground - Rebuild Background from records
+;=============================================================================
+pro CubeProj::RebuildBackground,NO_UPDATE=noupdate
+  if ~ptr_valid(self.BACK_EXP_LIST) then return
+  list=self->DCEIDtoRec(*self.BACK_EXP_LIST)
+  self->SetListSelect,list
+  self->SetBackgroundFromRecs,list
+  self.changed=1b
+  if ~keyword_set(noupdate) then self->UpdateTitle
+end
 
 ;=============================================================================
 ;  ReadBackgroundFromFile - Read in a background spectrum file
@@ -1860,9 +1923,11 @@ end
 ;  DCEIDtoRec - Convert a list of DCEIDs back to a record
 ;                 selection list.
 ;=============================================================================
-function CubeProj::DCEIDtoRec,dceid,cnt
+function CubeProj::DCEIDtoRec,dceid,cnt,RECORDS=recs
   if ~ptr_valid(self.DR) then return,-1
-  return,where_array([dceid],(*self.DR).DCEID,cnt)
+  if n_elements(recs) ne 0 then $
+     return,where_array([dceid],(*self.DR)[recs].DCEID,cnt) $
+  else return,where_array([dceid],(*self.DR).DCEID,cnt)
 end
 
 ;=============================================================================
@@ -2145,21 +2210,26 @@ end
 ;  GetProperty - Get properties, as a pointer to the original data if
 ;                appropriate and keyword POINTER is set.
 ;=============================================================================
-pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
-                           UNCERTAINTY_CUBE=err, PR_SIZE=prz, PR_WIDTH=prw, $ $
-                           SLIT_LENGTH=sl, CALIB=calib, CAL_FILE=cf, $
-                           MODULE=module, ORDER=order, APERTURE=ap, $
-                           PROJECT_NAME=pn,DR=dr, FLUXCON=fc, SLCF=slcf, $ $
-                           PIXEL_OMEGA=po, BACK_DATE=bdate, CUBE_SIZE=cs,$
-                           TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, $
-                           VERSION=version, ASTROMETRY=astr,POSITION=pos, $
-                           POSITION_ANGLE=pa, BACKGROUND=bg, WAVECUT=wavecut, $
-                           GLOBAL_BAD_PIXEL_LIST=gbpl, PMASK=pmask, $
-                           RECONSTRUCTED_POSITIONS=rp, SAVE_DATA=sd, $
-                           SAVE_ACCOUNT=sa, DATE_OBS=dobs, BAD_PIXEL_LIST=bpl,$
-                           FILENAMES=fn, ALL_RECORDS=all_recs, RECORDS=recs, $
-                           RECORD_SET=rec_set, POINTER=ptr
+pro CubeProj::GetProperty, $ 
+   ;; Pointer or data, depending on POINTER
+   POINTER=ptr,ACCOUNT=account,WAVELENGTH=wave, CUBE=cube, $
+   UNCERTAINTY_CUBE=unc, DR=dr, BACKGROUND=bg, PMASK=pmask, $  
+   ;; Global or AS_BUILT options
+   AS_BUILT=as_built, GLOBAL_BAD_PIXEL_LIST=gbpl,APERTURE=ap, MODULE=module, $
+   ORDER=order, BACK_DATE=bdate, FLUXCON=fc, SLCF=slcf, PIXEL_OMEGA=po, $
+   RECONSTRUCTED_POSITIONS=rp,WAVECUT=wavecut, USE_BG=use_bg, CAL_FILE=cf, $
+   PR_SIZE=prz, PR_WIDTH=prw, $
+   ;; Global non-record based options
+   SLIT_LENGTH=sl, CALIB=calib, PROJECT_NAME=pn, CUBE_SIZE=cs,$
+   TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
+   ASTROMETRY=astr,POSITION=pos, POSITION_ANGLE=pa, SAVE_DATA=sd, $
+   SAVE_ACCOUNT=sa, CUBE_DATE=cdate, $
+   ;; Record based options
+   ALL_RECORDS=all_recs,RECORDS=recs, RECORD_SET=rec_set, DATE_OBS=dobs, $
+   BAD_PIXEL_LIST=bpl, FILENAMES=fn
+   
                            
+  ;;--- Global, potentially pointer-based data
   ptr=keyword_set(ptr)
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
      account=ptr?self.account:*self.account
@@ -2167,9 +2237,46 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      wave=ptr?self.WAVELENGTH:*self.WAVELENGTH
   if arg_present(cube) && ptr_valid(self.CUBE) then $
      cube=ptr?self.CUBE:*self.CUBE
-  if arg_present(unc) && ptr_valid(self.CUBE_UNC) then unc=*self.CUBE_UNC
-  if arg_present(prz) then prz=self.PR_SIZE
-  if arg_present(prw) then prw=self.PR_SIZE[1]
+  if arg_present(unc) && ptr_valid(self.CUBE_UNC) then begin
+     if ptr then unc=self.CUBE_UNC else unc=*self.CUBE_UNC
+  endif 
+  if arg_present(dr) then begin 
+     if ~ptr then begin 
+        if ptr_valid(self.DR) then dr=*self.DR 
+     endif else dr=self.DR
+  endif 
+  if arg_present(bg) && ptr_valid(self.BACKGROUND) then $
+     bg=ptr?self.BACKGROUND:*self.BACKGROUND
+  if arg_present(pmask) then begin 
+     self->LoadCalib
+     self.cal->GetProperty,self.module,PMASK=pmask
+     if ~ptr && ptr_valid(pmask) then pmask=*pmask
+  endif
+ 
+  
+  ;;--- AS_BUILT or current global settings
+  this=keyword_set(as_built)?self.AS_BUILT:self
+  if arg_present(gbpl) && ptr_valid(this.GLOBAL_BAD_PIXEL_LIST) then $
+     gbpl=ptr?this.GLOBAL_BAD_PIXEL_LIST:*this.GLOBAL_BAD_PIXEL_LIST 
+  if arg_present(ap) then begin
+     self->NormalizeApertures
+     ap=ptr?this.APERTURE:*this.APERTURE
+  endif  
+  if arg_present(module) then module=this.MODULE
+  if arg_present(order) then order=this.order  
+  if arg_present(bdate) then bdate=this.BACK_DATE
+  if arg_present(fc) then fc=this.fluxcon
+  if arg_present(slcf) then slcf=this.slcf
+  if arg_present(po) then po=this.pix_omega
+  if arg_present(rp) then rp=this.reconstructed_pos
+  if arg_present(wavecut) then wavecut=this.wavecut
+  if arg_present(use_bg) then use_bg=this.use_bg
+  if arg_present(cf) then cf=this.cal_file
+  if arg_present(prz) then prz=this.PR_SIZE
+  if arg_present(prw) then prw=this.PR_SIZE[1]
+  
+  
+  ;;---  Global, non-build related properties
   if arg_present(sl) then begin 
      self->LoadCalib
      self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
@@ -2178,19 +2285,7 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
      self->LoadCalib            ;ensure it's loaded
      calib=self.cal
   endif 
-  if arg_present(cf) then cf=self.cal_file
-  if arg_present(module) then module=self.MODULE
-  if arg_present(order) then order=self.order
-  if arg_present(ap) then begin
-     self->NormalizeApertures
-     ap=ptr?self.APERTURE:*self.APERTURE
-  endif 
   if arg_present(pn) then pn=self->ProjectName()
-  if arg_present(dr) then begin 
-     if ~ptr then begin 
-        if ptr_valid(self.DR) then dr=*self.DR 
-     endif else dr=self.DR
-  endif 
   if arg_present(tboff) OR arg_present(tbsize) then begin 
      if NOT ptr_valid(self.wInfo) then begin 
         tboff=(tbsize=-1)
@@ -2204,34 +2299,19 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
         endelse 
      endelse 
   endif
-  if arg_present(fc) then fc=self.fluxcon
-  if arg_present(slcf) then slcf=self.slcf
-  if arg_present(po) then po=self.pix_omega
   if arg_present(cs) then cs=self.CUBE_SIZE
   if arg_present(tbsize) then begin 
-     if NOT ptr_valid(self.wInfo) then tbsize=-1 else $
+     if ~ptr_valid(self.wInfo) then tbsize=-1 else $
         if widget_info((*self.wInfo).Base,/VALID_ID) then $
-        widget_control, (*self.wInfo).Base,TLB_GET_SIZE=tbsize else tbsize=-1
+           widget_control, (*self.wInfo).Base,TLB_GET_SIZE=tbsize $
+        else tbsize=-1
   endif
   if arg_present(version) then version=self.version
   if arg_present(astr) then astr=self->CubeAstrometryRecord()
   if arg_present(pos) then pos=self.POSITION
   if arg_present(pa) then pa=self.PA
-  if arg_present(bg) && ptr_valid(self.BACKGROUND) then $
-     bg=ptr?self.BACKGROUND:*self.BACKGROUND
-  if arg_present(bdate) then bdate=self.BACK_DATE
-  if arg_present(gbpl) && ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then $
-     gbpl=ptr?self.GLOBAL_BAD_PIXEL_LIST:*self.GLOBAL_BAD_PIXEL_LIST 
-  if arg_present(pmask) then begin 
-     self->LoadCalib
-     self.cal->GetProperty,self.module,PMASK=pmask
-     if ~ptr && ptr_valid(pmask) then pmask=*pmask
-  endif
   if arg_present(sd) then sd=(self.SaveMethod AND 1b) ne 0b
   if arg_present(sa) then sd=(self.SaveMethod AND 2b) ne 0b
-  if arg_present(rp) then rp=self.reconstructed_pos
-  
-  
   if arg_present(bcdsz) then begin 
      ;; Assume all the same BCD sizes
      if ~ptr_valid(self.DR) || $
@@ -2242,10 +2322,10 @@ pro CubeProj::GetProperty, ACCOUNT=account, WAVELENGTH=wave, CUBE=cube, $
            bcdsz=size(*(*self.DR)[wh[0]].BCD,/DIMENSIONS)
      endelse 
   endif 
+  if arg_present(cdate) then cdate=self.CUBE_DATE
   
-  if arg_present(wavecut) then wavecut=self.wavecut
   
-  ;;--- Record based properties
+  ;;--- Record-based properties
   if ~ptr_valid(self.DR) then return
   if n_elements(recs) eq 0 then begin 
      if keyword_set(all_recs) then recs=lindgen(self->N_Records()) $
@@ -2271,8 +2351,8 @@ end
 ;  GetKeyword - Return the keyword values of a given keyword for the
 ;               specified recs.
 ;=============================================================================
-function CubeProj::GetKeyword,keyword,recs,ALL=all
-  self->RecOrSelect,recs,ALL=all
+function CubeProj::GetKeyword,keyword,recs,_EXTRA=e
+  self->RecOrSelect,recs,_EXTRA=e
   self->RestoreData,recs
   val=sxpar(*(*self.DR)[recs[0]].HEADER,keyword,/SILENT,COUNT=cnt)
   if cnt eq 0 then self->Error,"No matching keyword found: "+keyword
@@ -2362,7 +2442,7 @@ end
 ;=============================================================================
 ;  LoadCalib - Ensure the calibration object is loaded and available.
 ;=============================================================================
-pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,_EXTRA=e
+pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,SILENT=silent
   @cubism_dir
   if keyword_set(sel) then begin 
      cd,filepath(ROOT_DIR=irs_calib_dir,"sets")
@@ -2385,16 +2465,17 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,_EXTRA=e
   if ~file_test(filepath(ROOT=irs_calib_dir, $
                          SUBDIR="sets",self.cal_file),/READ) $
   then begin  
-     self->Warning,["Can't locate calibration file: ",'  '+self.cal_file, $
-                    "Loading most recent"],TITLE='IRS Calibration'
+     if ~keyword_set(silent) then $
+        self->Warning,["Can't locate calibration file: ",'  '+self.cal_file, $
+                       "Loading most recent"],TITLE='IRS Calibration'
      self.cal_file=""
      specified=1
   endif
   if ~self.cal_file || keyword_set(force) then begin 
-     self.cal_file=filestrip(irs_recent_calib(_EXTRA=e)) ;use the most recent
+     self.cal_file=filestrip(irs_recent_calib()) ;use the most recent
      if ~keyword_set(nr) then self->ResetAccounts,/NO_UPDATE
      self.changed=1b            
-     if n_elements(specified) eq 0 then $
+     if n_elements(specified) eq 0 && ~keyword_set(silent) then $
         self->Info,['Calibration set unspecified, loading most recent: ', $
                     '  '+self.cal_file],TITLE='IRS Calibration'
   endif
@@ -2473,10 +2554,13 @@ end
 ;=============================================================================
 ;  FluxUnits - Return the currently set flux units
 ;=============================================================================
-function CubeProj::FluxUnits,AS_BUILT=as_built
+function CubeProj::FluxUnits,AS_BUILT=as_built,INTEGRATE=int
   this=keyword_set(as_built)?self.AS_BUILT:self
   if this.fluxcon then begin
-     units=this.pix_omega?'MJy/sr':'Jy/pix'
+     if keyword_set(int) then $
+        units=this.pix_omega?'W/m^2/sr':'W/m^2' $
+     else $
+        units=this.pix_omega?'MJy/sr':'Jy/pix'
   endif else units='e/s/pix'
   return,units
 end
@@ -2911,7 +2995,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
   endfor
   self->BuildRevAcct            ;we need these too...
   if self.feedback then wset,save_win
-  self.ACCOUNTS_VALID=7b        ;everything is now valid
+  self->ResetAccounts,/VALID
 end
 
 ;=============================================================================
@@ -2952,8 +3036,8 @@ end
 ;  ResetAccounts - Remove all accounting info, so a cube build will
 ;                  proceed anew.
 ;=============================================================================
-pro CubeProj::ResetAccounts,NO_UPDATE=no
-  self.ACCOUNTS_VALID=0b
+pro CubeProj::ResetAccounts,NO_UPDATE=no,VALID=valid
+  self.ACCOUNTS_VALID=keyword_set(valid)?7b:0b
   if ~keyword_set(no) then self->UpdateButtons
 end
 
@@ -3667,13 +3751,16 @@ end
 ;                      performed, with more weight given to planes
 ;                      according to their proximity by in wavelength.
 ;
+;             INTEGRATE: Integrate over the map, rather than
+;                      averaging.  Changes units from flux density to
+;                      flux.
+;
 ;=============================================================================
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                          BG_VALS=bg_vals,MAP_NAME=mname, SAVE=save, $
-                         CONTINUUM_SAVE=save_c, $
-                         CONTINUUM_IMAGE=background, WAVELENGTH_WEIGHTED=ww, $
-                         ALL=all, TEMP_STACK=ts,COMMENTS=comm,_EXTRA=e
-  
+                         CONTINUUM_SAVE=save_c,CONTINUUM_IMAGE=background, $
+                         WAVELENGTH_WEIGHTED=ww, ALL=all, TEMP_STACK=ts, $
+                         COMMENTS=comm, INTEGRATE=int,_EXTRA=e
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   ;; Get a map set by name
   wl=*self.WAVELENGTH
@@ -3707,16 +3794,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      ;; Wavelength weighted Backrounds
      if nbr eq 0 then $
         self->Error,'Must select continuum regions for wavelength weighting.'
-
-     ;; Collect the cube planes and associated wavelengths
-     fore_wav=fltarr(fore_cnt) & fore_planes=lonarr(fore_cnt)
-     cnt=0
-     for i=0,nfr-1 do begin 
-        this_cnt=foreranges[1,i]-foreranges[0,i]+1
-        fore_wav[cnt]=wl[foreranges[0,i]:foreranges[1,i]]
-        fore_planes[cnt]=foreranges[0,i]+lindgen(this_cnt)
-        cnt+=this_cnt
-     endfor
+     
      back_wav=fltarr(back_cnt) & back_planes=lonarr(back_cnt)
      cnt=0
      for i=0,nbr-1 do begin 
@@ -3726,25 +3804,70 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
         cnt+=this_cnt
      endfor
      
-     fore_cube=(*self.CUBE)[*,*,fore_planes]
-     stack=total(fore_cube,/NAN,3)/(total(finite(fore_cube),3)>1.e-15)* $
-           fore_cnt
-     
      back_cube=(*self.CUBE)[*,*,back_planes]
      back_finite=finite(back_cube)
      
-     background=fltarr(self.CUBE_SIZE[0:1])
-     for i=0,fore_cnt-1 do begin 
-        ;;print,1./(1.+abs(fore_wav[i]-back_wav))
-        back_weights=rebin(reform(1./(1.+abs(fore_wav[i]-back_wav)), $
-                                  [1,1,back_cnt]), $
-                           [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
-        ;; Remove the weighted average background for this foreground plane
-        background+=total(back_cube*back_weights,3,/NAN)/ $
-                    total(back_weights*back_finite>1.e-15,3)
-     endfor 
-     stack-=background
-     stack/=fore_cnt
+     if keyword_set(int) then begin 
+        if ~self.as_built.fluxcon then $
+           self->Error,'Integrated maps for fluxed cubes only'
+        delta_nu=(wl[1:*]-wl)
+        conv=(self.as_built.pix_omega?2.9979246e-6: $ ;Jy->W/m^2
+              2.9979246e-12)/wl^2 ;MJy->W/m^2
+        delta_nu=conv*[delta_nu[0], $
+                       (delta_nu[1:*]+delta_nu)/2., $
+                       delta_nu[n_elements(wl)-2]]
+        stack=fltarr(self.CUBE_SIZE[0:1])
+        background=fltarr(self.CUBE_SIZE[0:1])
+        fore_cnt=0
+        for i=0,nfr-1 do begin 
+           this_cnt=foreranges[1,i]-foreranges[0,i]+1
+           fore_cnt+=this_cnt
+           fore_cube=(*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]]
+           fore_wav=wl[foreranges[0,i]:foreranges[1,i]]
+           for j=0,this_cnt-1 do begin ;background value for each plane
+              back_weights=rebin(reform(1./(1.+abs(fore_wav[j]-back_wav)), $
+                                        [1,1,back_cnt]), $
+                                 [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
+              back=total(back_cube*back_weights,3,/NAN)/ $
+                   total(back_weights*back_finite>1.e-25,3)
+              background+=back  ;background not integrated.
+              fore_cube[*,*,j]-=back
+           endfor 
+           fore_dnu=rebin(reform(delta_nu[foreranges[0,i]:foreranges[1,i]], $
+                                 1,1,this_cnt),size(fore_cube,/DIMENSIONS))
+           ;; Integral f_nu dnu.
+           stack+=total(fore_cube*fore_dnu,/NAN,3)/ $
+                  (total(finite(fore_cube),3)>1)*this_cnt
+        endfor
+        background/=fore_cnt
+     endif else begin 
+        ;; Collect the cube planes and associated wavelengths
+        fore_wav=fltarr(fore_cnt) & fore_planes=lonarr(fore_cnt)
+        cnt=0
+        for i=0,nfr-1 do begin 
+           this_cnt=foreranges[1,i]-foreranges[0,i]+1
+           fore_wav[cnt]=wl[foreranges[0,i]:foreranges[1,i]]
+           fore_planes[cnt]=foreranges[0,i]+lindgen(this_cnt)
+           cnt+=this_cnt
+        endfor
+        
+        fore_cube=(*self.CUBE)[*,*,fore_planes]
+        stack=total(fore_cube,/NAN,3)/ $
+              (total(finite(fore_cube),3)>1)*fore_cnt
+        background=fltarr(self.CUBE_SIZE[0:1])
+        for i=0,fore_cnt-1 do begin 
+           ;;print,1./(1.+abs(fore_wav[i]-back_wav))
+           back_weights=rebin(reform(1./(1.+abs(fore_wav[i]-back_wav)), $
+                                     [1,1,back_cnt]), $
+                              [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
+           ;; Remove the weighted average background for this foreground plane
+           background+=total(back_cube*back_weights,3,/NAN)/ $
+                       total(back_weights*back_finite>1.e-25,3)
+        endfor 
+        stack-=background
+        stack/=fore_cnt
+        background/=fore_cnt
+     endelse 
   endif else begin 
      ;; Non wavelength-weighted
      nbgv=n_elements(bg_vals)
@@ -3830,7 +3953,8 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      else comm=[comm,reg_comm]
   endif 
   
-  if keyword_set(save) then self->SaveMap,stack,save,COMMENTS=comm
+  if keyword_set(save) then self->SaveMap,stack,save,COMMENTS=comm, $
+                                          INTEGRATE=int
   if keyword_set(save_c) && n_elements(background) gt 0 $
   then self->SaveMap,background,save_c,COMMENTS=back_comm
   return,stack
@@ -3839,7 +3963,7 @@ end
 ;=============================================================================
 ;  SaveMap - Save a Stacked Map to FITS 
 ;=============================================================================
-pro CubeProj::SaveMap,map,sf,COMMENTS=comm
+pro CubeProj::SaveMap,map,sf,COMMENTS=comm,_EXTRA=e
   ;; XXX break out to IRS_Map...
   if size(sf,/TYPE) ne 7 then begin 
      xf,sf,/SAVEFILE, /RECENT, $
@@ -3860,7 +3984,7 @@ pro CubeProj::SaveMap,map,sf,COMMENTS=comm
 
   fxhmake,hdr,/date
   putast,hdr,self->CubeAstrometryRecord()
-  self->AddHeaderInfo,hdr
+  self->AddHeaderInfo,hdr,_EXTRA=e
   
   m=min((*self.DR).DCEID,pos)
   self->RestoreData,pos
@@ -3886,13 +4010,14 @@ end
 ;=============================================================================
 ;  AddHeaderInfo - Add the header information only we know
 ;=============================================================================
-pro CubeProj::AddHeaderInfo,hdr
+pro CubeProj::AddHeaderInfo,hdr,_EXTRA=e
   fullname=irs_fov(MODULE=self.MODULE,ORDER=self.ORDER,POSITION=0,/SLIT_NAME, $
                    /LOOKUP_MODULE)
   fxaddpar,hdr,'APERNAME',fullname,' IRS module and order'
   fxaddpar,hdr,'SOFTWARE','CUBISM',' Spectral Cube Assembly Software'
   fxaddpar,hdr,'CUBS_VER',self.version,' CUBISM version used'
-  fxaddpar,hdr,'BUNIT',self->FluxUnits(/AS_BUILT),' Units of map data'
+  fxaddpar,hdr,'BUNIT',self->FluxUnits(/AS_BUILT,_EXTRA=e), $
+           ' Units of map data'
   self->LoadCalib
   name=self.cal->Name()
   if name eq '' then name=self.cal_file
@@ -3951,18 +4076,19 @@ pro CubeProj::CheckModules,id,ERROR=err
                   "   "+strjoin(modules[u],",")],/RETURN_ONLY
   self.module=modules[u[0]]
   
-  if (self.module eq 'LL' || self.module eq 'SL') then begin 
+  if (self.module eq 'LL' || self.module eq 'SL') && self.ORDER eq 0 $
+  then begin 
      if array_equal(orders,0) then begin 
+        ;; Just a default order
         self.ORDER=(self.cal->Orders(self.module))[0]
      endif else if array_equal(orders,orders[0]) then $
+        ;; All orders the same
         self.ORDER=orders[0] $
      else begin 
-        ;; Only change if it's not yet set
-        if self.ORDER eq 0 then begin 
-           h=histogram(BINSIZE=1,orders,OMIN=om)
-           mx=max(h,mpos)
-           self.ORDER=om+mpos
-        endif 
+        ;; Pick the most represented order
+        h=histogram(BINSIZE=1,orders,OMIN=om)
+        mx=max(h,mpos)
+        self.ORDER=om+mpos
      endelse 
   endif 
 end
@@ -4208,11 +4334,33 @@ end
 ;=============================================================================
 ;  RemoveBCD - Remove one or more BCD's
 ;=============================================================================
-pro CubeProj::RemoveBCD,recs
+pro CubeProj::RemoveBCD,recs,_EXTRA=e
+  self->RecOrSelect,recs,_EXTRA=e
+  
+  keep=where(histogram([recs],MIN=0,MAX=self->N_Records()-1) eq 0,keepcnt)
+  if ptr_valid(self.BACK_EXP_LIST) then begin 
+     if keepcnt ne 0 then begin 
+        brecs=self->DCEIDtoRec(*self.BACK_EXP_LIST,RECORDS=keep,newcnt)
+     endif else newcnt=0
+     if newcnt ne n_elements(*self.BACK_EXP_LIST) then begin 
+        if self->IsWidget() then begin 
+           ans=dialog_message( $
+               ['Removing these BCDs invalidates the background', $
+                'saved '+jul2date(self.BACK_DATE)+ '.  Continue?'], $
+               /QUESTION,TITLE='Background Warning', $
+               DIALOG_PARENT=self->TopBase(),/DEFAULT_NO)
+           if ans eq 'No' then return
+        endif 
+        if self.BACK_EXP_LIST ne self.AS_BUILT.BACK_EXP_LIST then $
+           ptr_free,self.BACK_EXP_LIST else self.BACK_EXP_LIST=ptr_new()
+        ptr_free,self.BACKGROUND
+        self.BACK_DATE=0.0D
+     endif 
+  endif 
+  
   heap_free,(*self.DR)[recs]
-  keep=where(histogram([recs],MIN=0,MAX=self->N_Records()-1) eq 0,cnt)
-  if cnt ne 0 then (*self.DR)=(*self.DR)[keep] $
-  else ptr_free,self.DR
+  if keepcnt ne 0 then (*self.DR)=(*self.DR)[keep] else ptr_free,self.DR
+  
   self.Changed=1b               ;but accounts remain valid!
   self->UpdateList,/CLEAR_SELECTION & self->UpdateButtons & self->UpdateTitle
 end
@@ -4356,7 +4504,6 @@ pro CubeProj__define
                                 ; orders in the module)
       APERTURE:ptr_new(), $     ;The aperture of the clip, or one
                                 ; for each order
-      CUBE_DATE: 0.0D, $        ;date the cube was assembled (JULIAN)
       BACK_DATE: 0.0D, $        ;date background created
       BACK_EXP_LIST: ptr_new(),$ ;list of expids used for the background
       BG_SP_FILE:'', $          ;file used for 1D BG subtraction
@@ -4394,6 +4541,7 @@ pro CubeProj__define
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      CUBE_UNC:  ptr_new(),$     ;a pointer to the nxmxl uncertainty cube
      CUBE_SIZE: [0L,0L,0L],$    ;the size of the cube, (n,m,l)
+     CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
      WAVELENGTH: ptr_new(), $   ;the cube's wavelength list
      AS_BUILT: {CUBE_PARAMETERS}, $ ;the as-built cube parameters
      BACKGROUND: ptr_new(),$    ;the background image (if any) to subtract
@@ -4440,7 +4588,7 @@ pro CubeProj__define
        RQST_POS: [0.0D,0.0D], $ ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
        FOVID: 0, $              ;The IRS Field of View ID
-       TYPE: 0, $               ;0- BCD, 1- Droopres, 2- Coad2d
+       TYPE: 0, $               ;0- BCD, 1- Droopres, 2- Coad2d 3- Flatap
        TARGET_ORDER: 0, $       ;which order was targetted by pointing
                                 ;  (or 0 for module center targetting)
        TARGET_POS: 0, $         ;For low-res: 0, 1, or 2 for centered on
@@ -4476,12 +4624,12 @@ pro CubeProj__define
          feedback_window: 0, $  ;window id of feedback
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
-         MUST_SELECT:lonarr(16),$ ;the SW buttons which require any selected
+         MUST_SELECT:lonarr(17),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
          MUST_PROJ:lonarr(5), $ ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
-         MUST_BACK:lonarr(4), $ ;background record must be set
+         MUST_BACK:lonarr(5), $ ;background record must be set
          MUST_ANY_BACK: 0L, $   ;either BCD or 1D BG required
          MUST_BG_SP:0L, $       ;required background spectrum
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
