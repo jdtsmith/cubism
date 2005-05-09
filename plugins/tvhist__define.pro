@@ -171,6 +171,7 @@ pro tvHist::Histo,im
      2: begin                   ;99%,95% linear
         if self.non_finite then begin 
            wh=where(finite,nt)
+           if nt eq 0 then return
            s=take[wh[sort(take[wh])]]
         endif else begin 
            s=take[sort(take)]
