@@ -862,7 +862,6 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the widgets
   detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
   detCal=self.cal & self.cal=obj_new() ;or the calibration object
-  detCubeRecs=self.cuberecs & self.cuberecs=ptr_new() ; or the viewer obj list
   
   nr=self->N_Records()
   
@@ -902,7 +901,6 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   self.wInfo=detInfo           
   self.MsgList=detMsgList   
   self.cal=detCal
-  self.cuberecs=detCubeRecs
   if ptr_valid(self.DR) then begin 
      (*self.DR).REV_ACCOUNT=detRevAccts
      if keyword_set(nodata) then begin 
@@ -1009,7 +1007,7 @@ end
 ;=============================================================================
 ;  ToggleBadPixel - Toggle the given bad pixel
 ;=============================================================================
-pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset
+pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset,UPDATE=ud
   if n_elements(rset) ne 0 then rec=self->DCEIDtoRec(rset)
   if n_elements(rec) ne 0 then $
      list=(*self.DR)[rec[0]].BAD_PIXEL_LIST $
@@ -1054,6 +1052,7 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset
      self.Changed=1b
      self->UpdateButtons & self->UpdateTitle
   endif 
+  if keyword_set(ud) then self->Send,/UPDATE
 end
 
 ;=============================================================================
@@ -1374,7 +1373,6 @@ pro CubeProj::Revert
   msav=self.MsgList             ;to the transmogrified self.
   nsav=self.ProjectName
   self.wInfo=ptr_new() & self.MsgList=ptr_new() ;the detachment
-  crsav=self.cuberecs & self.cuberecs=ptr_new()
   
   oldchange=self.Changed
   self.Changed=0b               ;to ensure we won't try to save ourselves 
@@ -1387,7 +1385,6 @@ pro CubeProj::Revert
   
   self.wInfo=wsav 
   self.MsgList=msav 
-  self.cuberecs=crsav
 
   if rerr eq 0 then begin 
      ;; Self has been overwritten by restore.... destroy our old self.
@@ -1631,18 +1628,15 @@ end
 ;=============================================================================
 pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
   FORWARD_FUNCTION LookupManagedWidget
-  pvcr=ptr_valid(self.cuberecs)
-  ;; clean list
-  if pvcr then begin 
-     wh=where(obj_valid(*self.cuberecs),NCOMPLEMENT=nc,cnt)
-     if cnt eq 0 then begin 
-        ptr_free,self.cuberecs
-        pvcr=0 
-     endif else if nc gt 0 then *self.cuberecs=(*self.cuberecs)[wh]
-  endif 
   
-  ;; First look for a pre-existing, unassociated viewer
-  if ~keyword_set(new_viewer) && ~pvcr then begin 
+  recs=self->GetMsgObjs(CLASS='CubeRec')
+  got_viewers=obj_valid(recs[0])
+  
+  if got_viewers then $ ;; Just send normal updates by default.
+     self->MsgSignup,recs,/NONE,/CUBEPROJ_UPDATE,/CUBEPROJ_CALIB_UPDATE
+
+  ;; None set?  First look for an existing, unassociated viewer
+  if ~keyword_set(new_viewer) && ~got_viewers then begin
      catch, err                 ;Make sure we have LookUpManagedWidget.
      if err ne 0 then begin 
         resolve_routine,'XManager',/COMPILE_FULL_FILE
@@ -1664,43 +1658,29 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
      endfor 
      if n_elements(free_rec) ne 0 then begin 
         self->MsgSignup,free_rec,/ALL
-        self.cuberecs=ptr_new([rec])
         return
      endif 
   endif 
      
-  
-  ;; Do we need a new viewer, spawn one if necessary
-  if keyword_set(new_viewer) || ~pvcr then begin 
-     if pvcr then self->MsgListRemove,*self.cuberecs
-     cubeview,CUBE=self,RECORD=rec ;have them sign up for our messages     
-     if pvcr then *self.cuberecs=[*self.cuberecs,rec] else $
-        self.cuberecs=ptr_new([rec])
+  ;; Do we need a new viewer?  Spawn one if necessary (i.e. if requested).
+  if keyword_set(new_viewer) then begin 
+     cubeview,CUBE=self     ;have them sign up for all our messages, by default
      return
   endif
   
-  ;; Pick the best match among the viewers we're communicating with
-  recs=self->GetMsgObjs(CLASS='CubeRec')
-  talking=obj_valid(recs[0])
-  
-  for r=0,n_elements(*self.cuberecs)-1 do begin 
-     rec=(*self.cuberecs)[r]
-     rec->GetProperty,BCD_MODE=bcd_mode
-     if bcd_mode eq ~keyword_set(cube_mode) then begin ;the right mode
-        ;; Not already talking to him?
-        if ~talking || rec ne recs[0] then begin 
-           if talking then self->MsgListRemove,recs
+  ;; Pick the first match among the viewers we're communicating with
+  if got_viewers then begin 
+     for r=0,n_elements(recs)-1 do begin 
+        rec=recs[r]
+        rec->GetProperty,BCD_MODE=bcd_mode
+        if bcd_mode eq ~keyword_set(cube_mode) then begin ;the right mode
            self->MsgSignup,rec,/ALL ;sign up the correct one
-        endif                   ;else we've already got the right one
-        return
-     endif 
-  endfor 
-  
-  ;; Didn't find one with the right mode... just take the first one
-  if size(recs[0],/TYPE) ne 11 || recs[0] ne (*self.cuberecs)[0] then begin 
-     self->MsgListRemove,recs
-     self->MsgSignup,(*self.cuberecs)[0],/ALL
-  endif 
+           return
+        endif 
+     endfor 
+     ;; Didn't find one with the right mode... just take the first one
+     self->MsgSignup,recs[0],/ALL 
+  end else cubeview,CUBE=self
 end
 
 ;=============================================================================
@@ -3504,6 +3484,22 @@ end
 ;  BackTrackPix - Find the BCDs, pixels, and overlap fractions
 ;                 influencing the specified full cube pixel.  If
 ;                 FOLLOW is set, highlight the indicated BCDs too.
+;                 The returned structure has the
+;                 format:
+;
+;                     {DR:0,ID:O,BCD_PIX:0,BCD_VAL:0.0, $
+;                      BACK_VAL:0.0,AREA:0.0,BAD:0b,FLAGS:' '}
+;
+;                 where DR is the record number, ID is the record
+;                 DCDID.  BCD_PIX is the 1D bcd pixel referenced,
+;                 BCD_VAL is the value of that pixel, BACK_VAL is the
+;                 value of that pixel in the currently set background
+;                 (if any), AREA is the area of overlap the BCD pixels
+;                 has in the cube pixel being tracked, BAD is
+;                 bit-combination of 0: for no bad pix, 1: for global
+;                 bad pix and 2: for BCD-specific bad pix.  Flags
+;                 contain the mask flags along with "BP(1)" for bad
+;                 pixel.
 ;=============================================================================
 function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
   nrec=self->N_Records()
@@ -3558,7 +3554,7 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
      accs=(*rec.ACCOUNT)[ri[ri[ind]:ri[ind+1]-1]]
      naccs=n_elements(accs) 
      ret=replicate({DR:i,ID:rec.ID,BCD_PIX:0,BCD_VAL:0.0, $
-                    BACK_VAL:0.0,AREA:0.0,FLAGS:' '},naccs)
+                    BACK_VAL:0.0,AREA:0.0,BAD:0b,FLAGS:' '},naccs)
      ret.BCD_PIX=accs.BCD_PIX 
      ret.BCD_VAL=(*rec.BCD)[accs.BCD_PIX]
      if ptr_valid(self.BACKGROUND) then $
@@ -3572,7 +3568,8 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
            wh=where(*self.GLOBAL_BAD_PIXEL_LIST eq ret[0].BCD_PIX,cnt)
            if cnt gt 0 then wh=0
         endelse 
-        if cnt gt 0 then begin 
+        if cnt gt 0 then begin
+           ret[wh].BAD=1b
            ret[wh].FLAGS='BP'
         endif else begin 
            if ptr_valid(rec.BAD_PIXEL_LIST) then begin 
@@ -3582,7 +3579,10 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
                  wh=where(*rec.BAD_PIXEL_LIST eq ret[0].BCD_PIX,cnt)
                  if cnt gt 0 then wh=0
               endelse 
-              if cnt gt 0 then ret[wh].FLAGS='BP'
+              if cnt gt 0 then begin 
+                 ret[wh].BAD OR=2b
+                 ret[wh].FLAGS='BP(1)'
+              endif 
            endif 
         endelse 
      endif 
@@ -4461,7 +4461,7 @@ pro CubeProj::Cleanup
   heap_free,self.AS_BUILT
   ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC, $
            self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
-           self.BACK_EXP_LIST,self.cuberecs,self.wInfo,self.WAVELENGTH
+           self.BACK_EXP_LIST,self.wInfo,self.WAVELENGTH
   ;if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->OMArray::Cleanup
   self->ObjMsg::Cleanup
@@ -4560,7 +4560,6 @@ pro CubeProj__define
      SaveMethod:0b, $           ;bit 1: data, bit 2: accounts
      sort:0b, $                 ;our sorting order
      version:'', $              ;the Cubism version of this cube
-     cuberecs:ptr_new(), $      ;a list of cubeview records's we've spawned
      wInfo:ptr_new()}           ;the widget info struct.... a diconnectable ptr
       
   
