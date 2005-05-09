@@ -327,9 +327,11 @@ pro ObjMsg::MsgSend,msg
   
   ;; Compile something in here like this to debug...
 ;   if tag_names(msg,/STRUCTURE_NAME) eq 'TLB_WIDGET_TRACKING' then begin 
-;      print,obj_class(self),': sending to: ',sendlist, ' message'
-;      help,/st,msg
-;      help, /TRACEBAC
+;   if stregex(tag_names(msg,/STRUCTURE_NAME),'cube',/BOOLEAN,/FOLD_CASE) $
+;   then begin 
+;       print,obj_class(self),': sending to: ',sendlist, ' message'
+;       help,/st,msg
+;       help, /TRACEBAC
 ;  endif 
                                 ;send all the messages
   for i=0,n_elements(sendlist)-1 do if obj_valid(sendlist[i]) then $
