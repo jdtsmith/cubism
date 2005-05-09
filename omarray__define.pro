@@ -285,15 +285,15 @@ pro OMArray::MsgSignup, objs, ALL=all_on,NONE=all_off,_EXTRA=set_source
   endif else nt=0
   
   ;; Construct the message list elements from the keywords passed.
-  for i=0,n_elements(objs)-1  do begin
+  for i=0,n_elements(objs)-1 do begin
      in_list=0
      if ptr_valid(self.MsgList) then rec=self->GetMsgListRecord(objs[i])
      if size(rec,/TYPE) ne 8 then $ ; No record, make one
         rec={Obj:objs[i],recip:bytarr(n_elements(*self.MsgNames))} $
      else in_list=1
      if all_on then rec.recip=1b else if all_off then rec.recip=0b
-     for i=0,nt-1 do $
-        if loc[i] ne -1 then rec.recip[loc[i]]=keyword_set(set_source.(i))
+     for j=0,nt-1 do $
+        if loc[j] ne -1 then rec.recip[loc[j]]=keyword_set(set_source.(j))
      if n_elements(recs) eq 0 then recs=[rec] else recs=[recs,rec]
   endfor
   if n_elements(recs) eq 0 then return
