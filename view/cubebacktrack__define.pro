@@ -105,8 +105,14 @@ pro CubeBackTrack::On
   self.wLabel=widget_label(self.wBase,value=msg,/ALIGN_LEFT, $
                            /DYNAMIC_RESIZE)
   if self.list_size gt 0 then $
-     self.wList=widget_list(self.wBase,XSIZE=87,SCR_YSIZE=self.list_size) $
-  else self.wList=widget_list(self.wBase,XSIZE=87,YSIZE=8) 
+     self.wList=widget_list(self.wBase,XSIZE=87,SCR_YSIZE=self.list_size, $
+                            /CONTEXT_EVENTS) $
+  else self.wList=widget_list(self.wBase,XSIZE=87,YSIZE=8,/CONTEXT_EVENTS)
+  
+  self.wMenu=widget_base(self.wList,/CONTEXT_MENU)
+  self.wCBut_mark=widget_button(self.wMenu,VALUE='Mark as Bad Pixel')
+  self.wCBut_unmark=widget_button(self.wMenu,VALUE='Mark as Good Pixel')
+  
   widget_control, self.wBase, SET_UVALUE=self,/REALIZE
   make_widget_adjacent,self.wBase,self.parent
   
@@ -173,10 +179,38 @@ end
 ;  Event
 ;=============================================================================
 pro CubeBackTrack::Event,ev
-  if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_BASE' then begin ;size
-     self.list_size=ev.Y+self.list_size_diff
-     widget_control, self.wList, SCR_YSIZE=self.list_size
-  endif 
+  tn=tag_names(ev,/STRUCTURE_NAME)
+  case tn of
+     'WIDGET_BASE': begin       ;size
+        self.list_size=ev.Y+self.list_size_diff
+        widget_control, self.wList, SCR_YSIZE=self.list_size
+     end 
+     
+     'WIDGET_CONTEXT': begin 
+        if ~ptr_valid(self.list) then return
+        item=widget_info(self.wList,/LIST_SELECT)
+        if item lt 0 then return
+        item=(*self.list)[item]
+        pix=item.bcd_pix
+        widget_control, self.wCBut_mark, SENSITIVE=item.bad?0:1
+        widget_control, self.wCBut_unmark, SENSITIVE=item.bad?1:0
+        widget_displaycontextmenu,ev.id,ev.x,ev.y,self.wMenu
+     end
+     
+     'WIDGET_BUTTON': begin ;context menus
+        item=widget_info(self.wList,/LIST_SELECT)
+        if item lt 0 then return
+        item=(*self.list)[item]
+        case ev.id of
+           self.wCBut_mark: $
+              self.cube->ToggleBadPixel,item.bcd_pix,/SET,/UPDATE
+           self.wCBut_unmark: $
+              self.cube->ToggleBadPixel,item.bcd_pix,SET=0,/UPDATE
+        endcase 
+        self->UpdateList
+     end 
+     else: ; Flush all other events
+  endcase 
 end
 
 ;=============================================================================
@@ -216,8 +250,8 @@ pro CubeBackTrack::UpdateList
      endfor
   endelse 
   widget_control, self.wList,SET_VALUE=str
-  ;ptr_free,self.list
-  ;self.list=ptr_new(list,/NO_COPY)
+  ptr_free,self.list
+  self.list=ptr_new(list,/NO_COPY)
 end
 
 ;=============================================================================
@@ -272,10 +306,13 @@ pro CubeBackTrack__define
       msg_head:'', $            ;the header message
       ;; Widget 
       color:0, $                ;the color to draw ourselves with
-      list_size:0, $            ;size of the list
+      list_size:0, $            ;pixel size of the list
       list_size_diff:0, $       ;for resizing the list
       parent:0L, $
       wBase:0L, $
       wLabel:0L, $
-      wList:0L}
+      wList:0L, $               ;list widget
+      wMenu:0L, $               ;context menu
+      wCBut_mark: 0L, $         ;mark button
+      wCBut_unmark: 0L}         ;unmark button
 end
