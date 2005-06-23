@@ -136,6 +136,10 @@ pro CubeProj::ShowEvent, ev
   if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_BASE' then begin ;size
      widget_control, (*self.wInfo).SList, $
                      SCR_YSIZE=ev.Y+(*self.wInfo).list_size_diff
+     ;; Workaround v6.1 resize offset bug:
+     widget_control, ev.top, TLB_GET_OFFSET = offset
+     widget_control, ev.top, TLB_SET_XOFFSET = offset[0], $
+                     TLB_SET_YOFFSET = offset[1]
      return
   endif 
   sel=widget_info((*self.wInfo).SList,/LIST_SELECT)
@@ -147,7 +151,11 @@ pro CubeProj::ShowEvent, ev
      if ev.clicks eq 2 then begin 
         self->SetListSelect,sel[0],/NO_PRESERVE_TOP
         action='viewrecord' 
-     endif else return 
+     endif else begin 
+        if n_sel eq 1 then self->Send,/SELECT,SINGLE_SELECT=sel[0] else $
+           self->Send,/SELECT
+        return 
+     endelse 
   endif else widget_control, ev.id, get_uvalue=action
   if action eq 'bargroup' then action=ev.value
   
@@ -155,8 +163,11 @@ pro CubeProj::ShowEvent, ev
   case action of
      'save-as': self->Save,/AS
      
-     'viewrecord-new': self->ViewRecord,/NEW
-     'viewbackground-new': self->ViewBackground,/NEW
+     'viewrecord-new': self->ViewRecord,/NEW_VIEWER
+     'visaors-new': self->VisualizeAORs,/NEW_VIEWER
+     'loadvisimage': self->LoadVisualize,/SELECT
+     
+     'viewbackground-new': self->ViewBackground,/NEW_VIEWER
      'remove-background': begin 
         ptr_free,self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
                  self.BACK_EXP_LIST
@@ -532,6 +543,15 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
             widget_button(rec,VALUE='Show Keyword Value(s)...', $
                           UVALUE='header-keyword')]
   
+   ;;-------------
+  b1=widget_button(rec,VALUE='Visualize AORs...',UVALUE='VisualizeAORs', $
+                   /SEPARATOR)
+  b1=widget_button(rec,VALUE='Visualize AORs (new viewer)...', $
+                   UVALUE='visaors-new')
+  (*self.wInfo).MUST_VIS= $
+     widget_button(rec,VALUE='Load New Visualization Image...', $
+                   UVALUE='loadvisimage')
+  
   ;;*** Cube menu  
   cube=widget_button(mbar,VALUE='Cube',/MENU)
   (*self.wInfo).MUST_PROJ[4]= $
@@ -623,7 +643,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   ;;*** Info menu
   info=widget_button(mbar,VALUE='Info',/MENU)
   b1=widget_button(info,VALUE='Project Parameters...',UVALUE='phist')
-  b2=widget_button(info,VALUE='As-Built Parameters..',UVALUE='pasbuilt')
+  b2=widget_button(info,VALUE='As-Built Parameters...',UVALUE='pasbuilt')
   (*self.wInfo).MUST_CAL= $
      [wMustCal, $
       widget_button(info,VALUE='Calibration Set Details...',UVALUE='calset')]
@@ -789,7 +809,7 @@ function CubeProj::Load,file,ERROR=err
                  /RETURN_ONLY
      return,-1
   endif
-  widget_control,/HOURGLASS
+  if self->IsWidget() then widget_control,/HOURGLASS
   obj=restore_object(file,obj_class(self),OTHER_CLASSES='irs_aperture')
   if obj_valid(obj) then begin 
      if ~obj_isa(obj,obj_class(self)) then $
@@ -806,8 +826,9 @@ end
 ;=============================================================================
 pro CubeProj::Initialize
   self->ObjReport::SetProperty,TITLE_BASE='CUBISM Project'
-  self->MsgSetup,['CUBEPROJ_CUBE','CUBEPROJ_RECORD','CUBEPROJ_UPDATE', $
-                  'CUBEPROJ_CALIB_UPDATE']
+  self->MsgSetup,['CUBEPROJ_CUBE','CUBEPROJ_RECORD','CUBEPROJ_VISUALIZE', $
+                  'CUBEPROJ_UPDATE', 'CUBEPROJ_SELECT', $
+                  'CUBEPROJ_RECORD_UPDATE','CUBEPROJ_CALIB_UPDATE']
   ;; Show will change this
   if ~self->IsWidget() then self->SetProperty,FEEDBACK=0  
   
@@ -857,7 +878,7 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
         return                
      endif 
   endif else if size(file,/TYPE) ne 7 then file=self.SaveFile
-  widget_control, /HOURGLASS
+  if self->IsWidget() then  widget_control, /HOURGLASS
   ;; Detach the stuff we don't want to save!
   detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the widgets
   detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
@@ -927,7 +948,7 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,_EXTRA=e
   self->RecOrSelect,sel,_EXTRA=e
   wh=where(~ptr_valid((*self.DR)[sel].BCD),cnt)
   if cnt eq 0 then return
-  widget_control, /HOURGLASS
+  if self->IsWidget() then widget_control, /HOURGLASS
   
   for i=0,cnt-1 do begin 
      which=sel[wh[i]]
@@ -1007,7 +1028,8 @@ end
 ;=============================================================================
 ;  ToggleBadPixel - Toggle the given bad pixel
 ;=============================================================================
-pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD=rec,RECORD_SET=rset,UPDATE=ud
+pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
+                             UPDATE=ud
   if n_elements(rset) ne 0 then rec=self->DCEIDtoRec(rset)
   if n_elements(rec) ne 0 then $
      list=(*self.DR)[rec[0]].BAD_PIXEL_LIST $
@@ -1462,11 +1484,15 @@ end
 ;=============================================================================
 ;  SetListSelect - Set the list selection
 ;=============================================================================
-pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv
+pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv, $
+                            NONE=none,NO_UPDATE=nu
+  
   if ~ptr_valid(self.wInfo) then return
   
   if keyword_set(all) then begin 
      recs=lindgen(self->N_Records()) 
+  endif else if keyword_set(none) then begin 
+     recs=-1                    ;clear selection
   endif else if keyword_set(inv) then begin 
      inds=bytarr(self->N_Records())
      sel=widget_info((*self.wInfo).SList, /LIST_SELECT)
@@ -1481,6 +1507,11 @@ pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv
   
   if ~keyword_set(npt) then $
      widget_control, (*self.wInfo).SList,SET_LIST_TOP=top
+  self->UpdateButtons
+  if keyword_set(nu) then return
+  if n_elements(recs) eq 1 && recs[0] ne -1 then begin 
+     self->Send,/SELECT,SINGLE_SELECT=recs[0]
+  endif else self->Send,/SELECT
 end
 
 ;=============================================================================
@@ -1568,6 +1599,9 @@ pro CubeProj::UpdateButtons
   
   widget_control, (*self.wInfo).MUST_MODULE,SENSITIVE=self.MODULE ne ''
   
+  widget_control, (*self.wInfo).MUST_VIS, $
+                  SENSITIVE=ptr_valid(self.VISUALIZE_IMAGE)
+  
   for i=0,n_elements((*self.wInfo).MUST_CUBE)-1 do $
      widget_control, ((*self.wInfo).MUST_CUBE)[i], $
                      SENSITIVE=ptr_valid(self.CUBE)
@@ -1626,7 +1660,8 @@ end
 ;               cube of the same type (bcd or cube, bcd by default) as
 ;               indicated by the CUBE keyword (default to BCD mode)
 ;=============================================================================
-pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
+pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode, $
+                         VISUALIZE_MODE=vmode
   FORWARD_FUNCTION LookupManagedWidget
   
   recs=self->GetMsgObjs(CLASS='CubeRec')
@@ -1657,7 +1692,8 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
         endif 
      endfor 
      if n_elements(free_rec) ne 0 then begin 
-        self->MsgSignup,free_rec,/ALL
+        self->MsgSignup,free_rec,/ALL,CUBEPROJ_SELECT=0, $
+                        CUBEPROJ_RECORD_UPDATE=0
         return
      endif 
   endif 
@@ -1672,14 +1708,17 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode
   if got_viewers then begin 
      for r=0,n_elements(recs)-1 do begin 
         rec=recs[r]
-        rec->GetProperty,BCD_MODE=bcd_mode
-        if bcd_mode eq ~keyword_set(cube_mode) then begin ;the right mode
-           self->MsgSignup,rec,/ALL ;sign up the correct one
+        rec->GetProperty,BCD_MODE=bcd_mode,VISUALIZE_MODE=rvmode
+        if (keyword_set(vmode) && rvmode) || $
+           bcd_mode eq ~keyword_set(cube_mode) then begin ;the right mode
+           ;; sign up the correct one
+           self->MsgSignup,rec,/ALL,CUBEPROJ_SELECT=0, $
+                           CUBEPROJ_RECORD_UPDATE=0 
            return
         endif 
      endfor 
      ;; Didn't find one with the right mode... just take the first one
-     self->MsgSignup,recs[0],/ALL 
+     self->MsgSignup,recs[0],/ALL,CUBEPROJ_SELECT=0,CUBEPROJ_RECORD_UPDATE=0
   end else cubeview,CUBE=self
 end
 
@@ -1714,6 +1753,49 @@ pro CubeProj::ViewRecord,rec,NEW_VIEWER=new,_EXTRA=e
 end
 
 ;=============================================================================
+;  VisualizeAORs - View the AORs on top of a vis image, with select
+;=============================================================================
+pro CubeProj::VisualizeAORs,NEW_VIEWER=new
+  self->LoadVisualize
+  if ~ptr_valid(self.visualize_image) then return
+  self->FindViewer,/VISUALIZE_MODE,NEW_VIEWER=new
+  self->Send,/VISUALIZE
+end
+  
+;=============================================================================
+;  LoadVisualize - Ensure a visualization image is loaded
+;=============================================================================
+pro CubeProj::LoadVisualize,SELECT=sel
+  if ~keyword_set(sel) then begin 
+     if ptr_valid(self.visualize_image) then return
+     if ~file_test(self.visualize_file) then sel=1
+  endif
+  
+  if keyword_set(sel) then begin 
+     xf,vis_file,/RECENT,FILTERLIST=['*.fits{,.gz}'], $
+        TITLE='Load Visualization Image',/NO_SHOW_ALL,SELECT=0,/MODAL, $
+        PARENT_GROUP=self->TopBase()
+     if size(vis_file,/TYPE) ne 7 then return
+     if vis_file ne self.visualize_file then begin 
+        self.visualize_file=vis_file
+        self.changed=1b
+     endif 
+  endif 
+  
+  catch,err
+  if ~file_test(self.visualize_file) || err then $
+     self->Error,["Couldn't load visualization image:",self.visualize_file]
+  im=readfits(self.visualize_file,hdr)
+  extast,hdr,astr
+  catch,/cancel
+  
+  ptr_free,self.visualize_image,self.visualize_astrometry
+  self.visualize_image=ptr_new(im,/NO_COPY)
+  self.visualize_astrometry=ptr_new(astr,/NO_COPY)
+  self->UpdateTitle & self->UpdateButtons
+end  
+  
+;=============================================================================
 ;  EnableRecord - Remove the records disable flag
 ;=============================================================================
 pro CubeProj::EnableRecord,recs
@@ -1730,6 +1812,7 @@ pro CubeProj::DisableRecord,recs,DISABLE=dis,_EXTRA=e
   self->RecOrSelect,recs,_EXTRA=e
   (*self.DR)[recs].DISABLED=dis
   self.Changed=1b
+  self->Send,/REC_UPDATE
   self->UpdateAll
 end
 
@@ -1879,16 +1962,19 @@ end
 ;=============================================================================
 ;  CurrentSelect - Return the currently selected records (if any).
 ;=============================================================================
-function CubeProj::CurrentSelect
+function CubeProj::CurrentSelect,DCEID=dceid
   if ~ptr_valid(self.wInfo) then return,-1
-  return,widget_info((*self.wInfo).SList, /LIST_SELECT)
+  sel=widget_info((*self.wInfo).SList, /LIST_SELECT)
+  if keyword_set(dceid) && sel[0] ne -1 then $
+     sel=self->DCEIDs(sel)
+  return,sel
 end
 
 ;=============================================================================
 ;  RecOrSelect - Convenience routine: use specified records, or take
 ;                from the GUI selection.
 ;=============================================================================
-pro CubeProj::RecOrSelect,recs,ALL=all
+pro CubeProj::RecOrSelect,recs,ALL=all,DCEID=dceid
   if keyword_set(all) then begin 
      recs=lindgen(self->N_Records())
   endif else if n_elements(recs) eq 0 then begin 
@@ -1898,6 +1984,15 @@ pro CubeProj::RecOrSelect,recs,ALL=all
   endif   
 end
 
+;=============================================================================
+;  DCEIDs - Give the DCEID of the given recs
+;=============================================================================
+function CubeProj::DCEIDs,recs,_EXTRA=e
+  self->RecOrSelect,recs,_EXTRA=e
+  if ~ptr_valid(self.DR) then return,-1
+  if n_elements(recs) eq 0 then return,-1
+  return,(*self.DR)[recs].DCEID
+end
 
 ;=============================================================================
 ;  DCEIDtoRec - Convert a list of DCEIDs back to a record
@@ -2206,7 +2301,7 @@ pro CubeProj::GetProperty, $
    SAVE_ACCOUNT=sa, CUBE_DATE=cdate, $
    ;; Record based options
    ALL_RECORDS=all_recs,RECORDS=recs, RECORD_SET=rec_set, DATE_OBS=dobs, $
-   BAD_PIXEL_LIST=bpl, FILENAMES=fn
+   BAD_PIXEL_LIST=bpl, FILENAMES=fn, DCEID=dceid, DISABLED=dis
    
                            
   ;;--- Global, potentially pointer-based data
@@ -2295,8 +2390,9 @@ pro CubeProj::GetProperty, $
   if arg_present(bcdsz) then begin 
      ;; Assume all the same BCD sizes
      if ~ptr_valid(self.DR) || $
-        array_equal(ptr_valid((*self.DR).BCD),0b) then self->RestoreData,0
-     if ~ptr_valid(self.DR) then bcdsz=-1 else begin 
+        array_equal(ptr_valid((*self.DR).BCD),0b) then begin 
+        bcdsz=-1
+     endif else begin 
         wh=where(ptr_valid((*self.DR).BCD),cnt)
         if cnt eq 0 then bcdsz=-1 else $
            bcdsz=size(*(*self.DR)[wh[0]].BCD,/DIMENSIONS)
@@ -2324,7 +2420,8 @@ pro CubeProj::GetProperty, $
   endif 
   
   if arg_present(fn) then fn=(*self.DR)[recs].file
-  
+  if arg_present(dis) then dis=(*self.DR)[recs].DISABLED
+  if arg_present(dceid) then dceid=(*self.DR)[recs].DCEID
 end
 
 ;=============================================================================
@@ -2809,6 +2906,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
           POSITION=[15,15,xsize-15,ysize-4],/DEVICE, $
           yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
+     xsave=!X.S & ysave=!Y.S
      ;; The grid
      for i=0,self.cube_size[0] do plots,i,!Y.CRANGE
      for i=0,self.cube_size[1] do plots,!X.CRANGE,i
@@ -2854,11 +2952,11 @@ pro CubeProj::BuildAccount,_EXTRA=e
 ;                   self.PR_SIZE/2.
      
      pos=self.reconstructed_pos?(*self.DR)[i].REC_POS:(*self.DR)[i].RQST_POS
-     
+     pa=self.reconstructed_pos?(*self.DR)[i].PA:(*self.DR)[i].PA_RQST
      ;; Building in another order?  Transform coordinates over.
      if (*self.DR)[i].TARGET_ORDER ne self.ORDER AND $
         self.ORDER ne 0 then begin
-        self.cal->TransformCoords,self.MODULE,pos,(*self.DR)[i].PA_RQST, $
+        self.cal->TransformCoords,self.MODULE,pos,pa, $
                                   ORDER1=(*self.DR)[i].TARGET_ORDER, $
                                   self.MODULE,ORDER2=self.ORDER,newpos
         pos=newpos
@@ -2869,7 +2967,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      
      ;; (Probably small) difference between PA of this BCD and the
      ;; mean map PA
-     delta_PA=(*self.DR)[i].PA_RQST-self.PA
+     delta_PA=pa-self.PA
      
      for ord=0,n_elements(ords)-1 do begin
         aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
@@ -2889,23 +2987,16 @@ pro CubeProj::BuildAccount,_EXTRA=e
         acc_ind=0L
         ;; iterate over all the adjacent PRs in the order 
         
+        ;; Collate all of order's PR info into reverse-indexed lists,
+        ;; and pass en mass to multi_polyclip.  Re-design internal
+        ;; account data layout to match?  Still per-BCD, per-ORDER for
+        ;; easy disable/enable caching.
+        
+        ;; Need an expanded IDL-only version for failed C compilation.
+        
         for j=prmin,prmax do begin 
            ;; Setup the rotation matrix to rotate back to the +x
            ;; direction
-           ;;
-           ;; XXX pa_delta should remain, yes?  I.e. we should take
-           ;; out the "false" rotation of optical distortion (slit
-           ;; rotation), but *put in* the correct delta(PA) between
-           ;; BCD and PA_0 as chosen for the cube.  Ensure this works
-           ;; correctly, i.e. in the correct sense.
-           
-           ;; Another option: de-rotate the collection of clipped
-           ;; polygons to take out optical slit rotation, setup a
-           ;; slit-centered gnomic coordinate system, convert each
-           ;; vertex of each polygon into ra,dec, and then project
-           ;; this ra,dec onto the gnomic cube coordinate system.
-           ;; Test for perceivable difference first?
-           
            angle=-prs[j].angle+delta_PA
            if angle ne 0.0D then begin 
               ct=cos(angle/RADEG) & st=sin(angle/RADEG)
@@ -2913,8 +3004,12 @@ pro CubeProj::BuildAccount,_EXTRA=e
                              [ st, ct]])
            endif
            
-           if self.feedback && j eq 1L && self->Showing() then $
+           ;; Set list select
+           if self.feedback && j eq 1L && self->Showing() then begin 
               self->SetListSelect,i,/NO_PRESERVE_TOP
+              wset,(*self.wInfo).feedback_window
+              !X.S=xsave & !Y.S=ysave
+           endif 
               
            ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
@@ -2929,6 +3024,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
               ;; Offset the polygon correctly into the sky grid
               poly=poly+rebin(offset,size(poly,/DIMENSIONS))
               if self.feedback AND j eq 1L then begin
+                 
                  plots,[reform(poly[0,*]),poly[0,0]], $
                        [reform(poly[1,*]),poly[1,0]], $
                        COLOR=color
@@ -3177,35 +3273,15 @@ pro CubeProj::ConvertCoords,ra,dec,x,y,TO_RA_DEC=trd,TO_X_Y=txy
 end
 
 ;=============================================================================
-;  LayoutBCDs - Define the cube astrometry and determine the BCD
-;               layout on the sky grid based on positions and PA's.
+;  BCDBounds - Return the bounds of all BCD record slits (in the
+;              appropriate sub-slit) in celestial coordinates.
 ;=============================================================================
-pro CubeProj::LayoutBCDs
-  self->LoadCalib
-  
-  ;; Find the PA of the most populated AOR
-  aorids=(*self.DR).AORKEY
-  uniqids=aorids[uniq(aorids,sort(aorids))]
-  cnt=0
-  RADEG = 180.0d/!DPI           ; preserve double
-  
-  for i=0,n_elements(uniqids)-1 do begin 
-     wh=where(aorids eq uniqids[i],thiscnt)
-     if thiscnt gt cnt then begin
-        cnt=thiscnt
-        use=wh
-     endif
-  endfor
-  self.PA=mean((*self.DR)[use].PA_RQST) ;match our PA to the most numerous
-  ;; Approximate cube center (pos average), for now (not critical)
-  pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR).RQST_POS
-  self.POSITION=total(pos,2)/self->N_Records()
-  cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
-  
+function CubeProj::BCDBounds,recs,_EXTRA=e
+  ;self->Normalize
+  self->RecOrSelect,recs,_EXTRA=e
+  ;; Construct the bounding aperture for all orders being combined into cube
   ords=self->BuildOrders()
   nap=n_elements(*self.APERTURE)
-  
-  ;; Construct the bounding aperture for all orders being combined into cube
   for i=0,n_elements(ords)-1 do begin 
      ap=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[i]
      left=min(ap.low)           ;The bounding aperture for this order
@@ -3219,21 +3295,22 @@ pro CubeProj::LayoutBCDs
      endelse 
   endfor 
   
-;  skyc=dblarr(2,n_elements(*self.DR))
-;  prsAD=(prs=dblarr(8,n_elements(*self.DR)))
-  
   ;; Rotate and offset final bounding polygon for each DR.
-  pr_half=self.PR_SIZE[1]/2 ;pr width
+  pr_half=self.PR_SIZE[1]/2     ;pr width
   pr_rect=[[final_off[0],-pr_half], $
            [final_off[0], pr_half], $
            [final_off[1], pr_half], $
            [final_off[1],-pr_half]]-.5 ;nasalib standard: 0,0: center of pix
-
-  for i=0,n_elements(*self.DR)-1 do begin 
-     if (*self.DR)[i].DISABLED then continue
-     pa_rqst=(*self.DR)[i].PA_RQST
-     c_pa=cos((270.0D - pa_rqst)/RADEG) ;WCS uses CROTA = N CCW from +y 
-     s_pa=sin((270.0D - pa_rqst)/RADEG)
+  
+  nr=n_elements(*self.DR)
+  bounds=fltarr(8,nr)
+  
+  pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR).RQST_POS
+  RADEG = 180.0d/!DPI           ; preserve double
+  for i=0,nr-1 do begin 
+     pa=self.reconstructed_pos ? (*self.DR)[i].PA : (*self.DR)[i].PA_RQST
+     c_pa=cos((270.0D - pa)/RADEG) ;WCS uses CROTA = N CCW from +y 
+     s_pa=sin((270.0D - pa)/RADEG)
      cd_pa=self.PLATE_SCALE*[[-c_pa,-s_pa],[-s_pa,c_pa]]
      
      ;; Compute the RA/DEC of the 4 corners.
@@ -3245,17 +3322,54 @@ pro CubeProj::LayoutBCDs
      
      ;; Offset to the correct order: account for building a cube using
      ;; data targeted at another order.
-     if (*self.DR)[i].TARGET_ORDER ne self.ORDER AND $
+     if (*self.DR)[i].TARGET_ORDER ne self.ORDER && $
         self.ORDER ne 0 then begin
-        self.cal->TransformCoords,self.MODULE,[1.#a_rect,1.#d_rect],pa_rqst, $
+        self.cal->TransformCoords,self.MODULE,[1.#a_rect,1.#d_rect],pa, $
                                   ORDER1=(*self.DR)[i].TARGET_ORDER, $
                                   self.MODULE,ORDER2=self.ORDER,newcoords,newpa
-        a_rect=newcoords[0,*] & d_rect=newcoords[1,*]
+        a_rect=reform(newcoords[0,*]) & d_rect=reform(newcoords[1,*])
      endif 
-        
-     ;; Compute corner celestial positions in cube frame
-     ad2xy,a_rect,d_rect,cubeastr,x,y ;x,y in 0,0 pixel-centered
-     x+=0.5 & y+=0.5            ;back to normal pixel convention (.5-centered)
+     bounds[0,i]=reform(a_rect) & bounds[4,i]=reform(d_rect)
+  endfor 
+  return,bounds
+end
+
+
+;=============================================================================
+;  LayoutBCDs - Define the cube astrometry and determine the BCD
+;               layout on the sky grid based on positions and PA's.
+;=============================================================================
+pro CubeProj::LayoutBCDs
+  self->LoadCalib
+  
+  ;; Find the PA of the dominant AOR
+  aorids=(*self.DR).AORKEY
+  uniqids=aorids[uniq(aorids,sort(aorids))]
+  cnt=0
+  
+  for i=0,n_elements(uniqids)-1 do begin 
+     wh=where(aorids eq uniqids[i],thiscnt)
+     if thiscnt gt cnt then begin
+        cnt=thiscnt
+        use=wh
+     endif
+  endfor
+  pa=self.reconstructed_pos?(*self.DR)[use].PA:(*self.DR)[use].PA_RQST
+  self.PA=mean(pa)              ;match our PA to the most numerous
+  ;; Approximate cube center (pos average), for now (not critical)
+  pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR).RQST_POS
+  self.POSITION=total(pos,2)/self->N_Records()
+  cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
+  
+  ;; Compute the region bounds
+  bounds=self->BCDBounds(/ALL)
+  for i=0,n_elements(*self.DR)-1 do begin 
+     if (*self.DR)[i].DISABLED then continue
+     
+     ;; Compute corner celestial positions in the cube frame
+     ad2xy,bounds[0:3,i],bounds[4:7,i],cubeastr,x,y 
+                                ;x,y in 0,0 pixel-centered coords
+     x+=0.5 & y+=0.5            ;back to normal pixel convention (0.5-centered)
 
      ;; Accumulate pixel bounding rectangle
      if n_elements(x_min) ne 0 then begin 
@@ -3347,7 +3461,6 @@ pro CubeProj::BuildCube
   endif else use_bpmask=0
   
   if self.feedback then begin 
-     if ptr_valid(self.wInfo) then wset,(*self.wInfo).feedback_window
      csz=self.cube_size[0]*self.cube_size[1]
      ctarg=self.cube_size[2]/2
   endif 
@@ -3442,6 +3555,7 @@ pro CubeProj::BuildCube
               pix=pix mod csz
               x=pix mod self.cube_size[0]
               y=pix/self.cube_size[0]
+              if ptr_valid(self.wInfo) then wset,(*self.wInfo).feedback_window
               plots,[x,x,x+1,x+1,x],[y,y+1,y+1,y,y],THICK=2
            endif 
         endif 
@@ -3616,8 +3730,10 @@ end
 ;             FROM_FILE - Load extraction region from spectrum file
 ;=============================================================================
 function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
-                           OUTPUT_POLY=op,_EXTRA=e
+                           OUTPUT_POLY=op,REGION=oReg,PACKAGE_STRUCT=pkg, $
+                           OVERLAP_ERROR=err,_EXTRA=e
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to extract'
+  
   if keyword_set(rff) then begin
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
                  self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
@@ -3627,18 +3743,22 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      if ~obj_valid(oReg) then return,-1
   endif
   
-  if n_elements(oReg) ne 0 then begin 
+  if n_elements(oReg) ne 0 && n_elements(low) eq 0 then begin 
      ;; Celestial coords: convert ra,dec to x,y
      r=oReg->Region()           ;first region
      self->ConvertCoords,r[0,*],r[1,*],x,y,/TO_X_Y 
      if arg_present(op) then op=[x,y]
      overlap_pix=polyfillaa(x,y,self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
                             AREAS=areas)
-     if overlap_pix[0] eq -1 then $
-        self->Error,'Selected aperture does not overlap cube' $
-     else if min(x,MAX=mxx) lt 0 or mxx gt self.CUBE_SIZE[0] or $
-        min(y,MAX=mxy) lt 0 or mxy gt self.CUBE_SIZE[1] then $
-           self->Warning,'Aperture lies partially outside of cube.'
+     err=0b
+     if overlap_pix[0] eq -1 then begin 
+        err=1b
+        self->Error,'Selected aperture does not overlap cube' 
+     endif else if min(x,MAX=mxx) lt 0 or mxx gt self.CUBE_SIZE[0] or $
+        min(y,MAX=mxy) lt 0 or mxy gt self.CUBE_SIZE[1] then begin 
+        err=2b
+        self->Warning,'Aperture lies partially outside of cube.'
+     endif 
      nover=n_elements(overlap_pix)
      pix=rebin(self.CUBE_SIZE[0]*self.CUBE_SIZE[1]* $
                transpose(findgen(self.CUBE_SIZE[2])), $
@@ -3659,21 +3779,32 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
          [low[0],h[1]], $
          [h[0],h[1]], $
          [h[0],low[1]]]
+     
+     ;; Output region, from polygon
+     if arg_present(oReg) then begin 
+        oReg=obj_new('IRS_Region')
+        oReg->SetRegion,op,ASTROMETRY=self->CubeAstrometryRecord()
+     endif 
   endelse 
   
-  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP,REGION=op,_EXTRA=e
+  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP,POLYGON=op,_EXTRA=e
 
   if keyword_set(exp) then $
      self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
   if n_elements(oSP) ne 0 then obj_destroy,oSP
-  return,sp
+  if keyword_set(pkg) then begin 
+     ret=replicate({WAVELENGTH:0.0,FLUX:0.0},n_elements(sp))
+     ret.WAVELENGTH=*self.WAVELENGTH
+     ret.FLUX=sp
+     return,ret
+  endif else return,sp
 end
 
 
 ;=============================================================================
 ;  SaveSpectrum - Save a Spectrum using a spectrum object
 ;=============================================================================
-pro CubeProj::SaveSpectrum,file,sp,oSP,REGION=op,COMMENTS=comm
+pro CubeProj::SaveSpectrum,file,sp,oSP,POLYGON=op,COMMENTS=comm
   if ~obj_valid(oSP) then begin 
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
                  self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
@@ -4366,74 +4497,91 @@ pro CubeProj::RemoveBCD,recs,_EXTRA=e
 end
 
 ;=============================================================================
-;  Send - Send One of our messages
+;  Send - Send one of our messages
 ;=============================================================================
 pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
-                   NEW_CUBE=ncm,CALIB_UPDATE=cal_update
-  if keyword_set(cube) then begin 
-     self->MsgSend,{CUBEPROJ_CUBE, $
-                    self,$
-                    string(FORMAT='(%"%s [%dx%d], %s")',self->ProjectName(), $
-                           self.NSTEP,jul2date(self.CUBE_DATE)), $
-                    self.MODULE,self.WAVELENGTH}
-     return
-  endif else if keyword_set(back) then begin 
-     self->MsgSend,{CUBEPROJ_RECORD, $
-                    self,self->ProjectName()+' Background',self.MODULE, $
-                    self.ORDER,self.CAL,ptr_new(),self.BACKGROUND, $
-                    self.BACKGROUND_UNC, ptr_new(),ptr_new()}
-     return
-  endif else if keyword_set(update) then begin 
-     self->MsgSend,{CUBEPROJ_UPDATE,self,self.GLOBAL_BAD_PIXEL_LIST, $
-                    keyword_set(nc)}
-     return
-  endif else if keyword_set(cal_update) then begin 
-     self->MsgSend,{CUBEPROJ_CALIB_UPDATE,self}
-     return
-  endif 
+                   NEW_CUBE=nc,SELECT=sel,SINGLE_SELECT=ss, $
+                   REC_UPDATE=rec_update,CALIB_UPDATE=cal_update, VISUALIZE=vis
+  case 1b of
+     keyword_set(sel): begin 
+        if n_elements(ss) ne 0 && ptr_valid(self.DR) then $
+           ss=(*self.DR)[ss[0]].DCEID else ss=-1
+        self->MsgSend,{CUBEPROJ_SELECT,self,ss}
+     end 
+     keyword_set(rec_update): self->MsgSend,{CUBEPROJ_RECORD_UPDATE,self}
+     keyword_set(vis): $
+        self->MsgSend, {CUBEPROJ_VISUALIZE, self, $
+                        self->ProjectName() + ': ' + $
+                        file_basename(self.visualize_file), $
+                        self.MODULE,self.VISUALIZE_IMAGE, $
+                        self.VISUALIZE_ASTROMETRY}
+     
+     keyword_set(cube): $
+        self->MsgSend,{CUBEPROJ_CUBE, $
+                       self,$
+                       string(FORMAT='(%"%s [%dx%d], %s")', $
+                              self->ProjectName(), $
+                              self.NSTEP,jul2date(self.CUBE_DATE)), $
+                       self.MODULE,self.WAVELENGTH}
+     
+     keyword_set(back): $
+        self->MsgSend,{CUBEPROJ_RECORD, $
+                       self,self->ProjectName()+' Background',self.MODULE, $
+                       self.ORDER,self.CAL,ptr_new(),self.BACKGROUND, $
+                       self.BACKGROUND_UNC, ptr_new(),ptr_new()}
+     
+     keyword_set(update): $
+        self->MsgSend,{CUBEPROJ_UPDATE,self,self.GLOBAL_BAD_PIXEL_LIST, $
+                       keyword_set(nc)}
+
+     keyword_set(cal_update): $
+        self->MsgSend,{CUBEPROJ_CALIB_UPDATE,self}
+     
+     else: begin 
+        ;; Otherwise send the record or stacked record set
+        nrec=n_elements(record) 
+        if nrec eq 0 then return
   
-  ;; Otherwise send the record or stacked record set
-  nrec=n_elements(record) 
-  if nrec eq 0 then return
-  
-  stackQ=nrec gt 1
-  rec=(*self.DR)[record]
-  if stackQ then begin 
-     bcd=*rec[0].BCD
-     if ptr_valid(rec[0].UNC) then unc=*rec[0].UNC^2 ;add in quadrature
-     if ptr_valid(rec[0].BMASK) then mask=*rec[0].BMASK
-     for i=1,nrec-1 do begin 
-        bcd+=*rec[i].BCD
-        if ptr_valid(rec[i].UNC) then $
-           if n_elements(unc) gt 0 then unc+=*rec[i].UNC^2 else $
-              unc=*rec[i].UNC^2
-        if ptr_valid(rec[i].BMASK) then $
-           if n_elements(mask) gt 0 then mask OR=*rec[i].BMASK else $
-              mask=*rec[i].BMASK ;accumulate mask flags
-     endfor 
-     bcd_p=ptr_new(bcd,/NO_COPY)
-     unc_p=n_elements(unc) gt 0?ptr_new(sqrt(unc)):ptr_new()
-     mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
-     str=string(FORMAT='(%"%s <Stack of %d recs>")', $
-                self->ProjectName(),nrec)
-     if ptr_valid(self.BACKGROUND) then begin 
-        ptr_free,self.SCALED_BACK
-        self.SCALED_BACK=ptr_new(nrec * *self.BACKGROUND)
-     endif
-  endif else begin 
-     bcd_p=rec.BCD
-     unc_p=rec.UNC
-     mask_p=rec.BMASK
-     str=string(FORMAT='(%"%s <%s> %s")', $
-                self->ProjectName(),rec.ID, $
-                irs_fov(rec.FOVID,/SHORT_NAME))
-  endelse 
-  rec_set=ptr_new(rec.DCEID)
-  self->MsgSend,{CUBEPROJ_RECORD, $
-                 self,str,self.MODULE,self.ORDER,self.CAL, $
-                 rec_set,bcd_p,unc_p,mask_p, $
-                 stackQ?self.SCALED_BACK:self.BACKGROUND}
-  ptr_free,rec_set
+        stackQ=nrec gt 1
+        rec=(*self.DR)[record]
+        if stackQ then begin 
+           bcd=*rec[0].BCD
+           if ptr_valid(rec[0].UNC) then unc=*rec[0].UNC^2 ;add in quadrature
+           if ptr_valid(rec[0].BMASK) then mask=*rec[0].BMASK
+           for i=1,nrec-1 do begin 
+              bcd+=*rec[i].BCD
+              if ptr_valid(rec[i].UNC) then $
+                 if n_elements(unc) gt 0 then unc+=*rec[i].UNC^2 else $
+                    unc=*rec[i].UNC^2
+              if ptr_valid(rec[i].BMASK) then $
+                 if n_elements(mask) gt 0 then mask OR=*rec[i].BMASK else $
+                    mask=*rec[i].BMASK ;accumulate mask flags
+           endfor 
+           bcd_p=ptr_new(bcd,/NO_COPY)
+           unc_p=n_elements(unc) gt 0?ptr_new(sqrt(unc)):ptr_new()
+           mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
+           str=string(FORMAT='(%"%s <Stack of %d recs>")', $
+                      self->ProjectName(),nrec)
+           if ptr_valid(self.BACKGROUND) then begin 
+              ptr_free,self.SCALED_BACK
+              self.SCALED_BACK=ptr_new(nrec * *self.BACKGROUND)
+           endif
+        endif else begin 
+           bcd_p=rec.BCD
+           unc_p=rec.UNC
+           mask_p=rec.BMASK
+           str=string(FORMAT='(%"%s <%s> %s")', $
+                      self->ProjectName(),rec.ID, $
+                      irs_fov(rec.FOVID,/SHORT_NAME))
+        endelse 
+        rec_set=ptr_new(rec.DCEID)
+        self->MsgSend,{CUBEPROJ_RECORD, $
+                       self,str,self.MODULE,self.ORDER,self.CAL, $
+                       rec_set,bcd_p,unc_p,mask_p, $
+                       stackQ?self.SCALED_BACK:self.BACKGROUND}
+        ptr_free,rec_set
+     end 
+  endcase 
 end
 
 ;=============================================================================
@@ -4461,7 +4609,8 @@ pro CubeProj::Cleanup
   heap_free,self.AS_BUILT
   ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC, $
            self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
-           self.BACK_EXP_LIST,self.wInfo,self.WAVELENGTH
+           self.BACK_EXP_LIST,self.wInfo,self.WAVELENGTH, $
+           self.VISUALIZE_ASTROMETRY,self.VISUALIZE_IMAGE
   ;if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->OMArray::Cleanup
   self->ObjMsg::Cleanup
@@ -4550,6 +4699,9 @@ pro CubeProj__define
      BG_SP: ptr_new(), $        ;2xn background spectrum for 1D subtractions
      POSITION:[0.0D,0.0D], $    ;optimized position of the cube center
      PA:0.0D, $                 ;optimized position angle of the cube
+     VISUALIZE_FILE:'',$        ;file for visualization image
+     VISUALIZE_IMAGE:ptr_new(),$ ;image for AOR visulization
+     VISUALIZE_ASTROMETRY:ptr_new(), $ ;astrometry record for vis_image
      MERGE:ptr_new(),$          ;a set of records to aid merging the orders
                                 ;  ptr to list of {offset,inds,wave,to,frac}
      cal:obj_new(), $           ;the irs_calib object.
@@ -4629,6 +4781,7 @@ pro CubeProj__define
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(5), $ ;background record must be set
+         MUST_VIS: 0L, $        ;must have a visualization object loaded
          MUST_ANY_BACK: 0L, $   ;either BCD or 1D BG required
          MUST_BG_SP:0L, $       ;required background spectrum
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
@@ -4640,7 +4793,11 @@ pro CubeProj__define
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),RECORD_SET:ptr_new(), BCD:ptr_new(),UNC:ptr_new(), $
        BMASK:ptr_new(), BACKGROUND:ptr_new()}    ;XXX UNC
+  msg={CUBEPROJ_VISUALIZE,CUBE:obj_new(),INFO:'',MODULE:'', $
+       IMAGE:ptr_new(),ASTROMETRY:ptr_new()}
   msg={CUBEPROJ_UPDATE, CUBE:obj_new(), BAD_PIXEL_LIST:ptr_new(), NEW_CUBE:0b}
+  msg={CUBEPROJ_SELECT, CUBE:obj_new(),SINGLE_SELECT: 0L}
+  msg={CUBEPROJ_RECORD_UPDATE, CUBE:obj_new()}
   msg={CUBEPROJ_CALIB_UPDATE, CUBE:obj_new()}
 end
 
