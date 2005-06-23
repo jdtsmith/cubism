@@ -49,7 +49,7 @@ pro CubeBackTrack::Message, msg
                                 self.wBase
               self.wavelength=wave[msg.plane]
               self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
-              if bcdsz[0] ne 0 then self.bcd_size=bcdsz
+              if bcdsz[0] ne -1 then self.bcd_size=bcdsz
            endif 
            self->Enable 
         endif else begin 
