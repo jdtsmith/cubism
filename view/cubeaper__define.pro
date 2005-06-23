@@ -169,8 +169,8 @@ pro CubeAper::Message, msg
            self.cube=msg.cube
            self.cube->GetProperty,WAVECUT=wc
            self.wavecut=wc
-           self->UpdatePRInfo
-        endif else if msg.calib_update then self->UpdatePRInfo
+        endif 
+        self->UpdatePRInfo
      end
   endcase 
 end
@@ -225,7 +225,7 @@ end
 ;  On - Editing on
 ;============================================================================
 pro CubeAper::On
-  if (self.mode AND 1b) eq 0b then return ;not display
+  if (self.mode AND 1b) eq 0b then return ;not displaying anything
   self->tvPlug::On
   self.oDraw->MsgSignup,self,/TVDRAW_SNAPSHOT,/DRAW_BUTTON
   self.oDraw->ReDraw,/SNAPSHOT     
