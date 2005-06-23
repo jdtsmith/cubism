@@ -22,6 +22,14 @@ pro IRS_Region::UpdateAstrometry,astr
   *self.astr=astr
 end
 
+;=============================================================================
+;  GetProperty
+;=============================================================================
+pro IRS_Region::GetProperty,REGION=reg,ASTROMETRY=astr
+  if arg_present(reg) && ptr_valid(self.region) then reg=*self.region
+  if arg_present(astr) && ptr_valid(self.astr) then astr=*self.astr
+  return
+end
 
 ;=============================================================================
 ;  Region -- Return specified region as 2xn list of celestial coords
@@ -33,7 +41,8 @@ function IRS_Region::Region
   if ptr_valid(self.astr) then begin 
      x=reg[0,*] & y=reg[1,*]
      xy2ad,x-0.5,y-0.5,*self.astr,ra,dec
-     reg=transpose([[ra],[dec]])
+     if size(ra,/N_DIMENSIONS) eq 1 then reg=transpose([[ra],[dec]]) $
+     else reg=[ra,dec]
   endif
   return,reg
   
