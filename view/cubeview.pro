@@ -8,7 +8,7 @@ pro cubeview_event,ev
   if size(uv,/TYPE) eq 7 && uv eq "quit" then begin 
      widget_control, ev.top, /DESTROY ;quit
      return
-  endif 
+  endif
   
   ;; Just hand off the rest of our events to tvDraw
   tvDraw_Event,ev
@@ -76,8 +76,15 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
                /HIDE,_EXTRA=e)
 
   ;; a Cube record tool for extracting and stacking cubes: adds to base
+  ;; and creates aperture and visualize tools as well
   cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube,APER_OBJECT=aper, $
-                  COLOR=stretcher->GetColor('Magenta'),MENU=file_menu,_EXTRA=e)
+                  COLOR=stretcher->GetColor('Magenta'), $
+                  VISUALIZE_OBJECT=irsmapviz, $
+                  VISUALIZE_COLOR=stretcher->GetColor(['goldenrod', $
+                                                       'charcoal','white']), $
+                  MENU=file_menu,_EXTRA=e)
+  
+    
   ;; make sure the display line gets CubeRec updates
   cuberec->MsgSignup,line,/CUBEREC_UPDATE
   
@@ -89,13 +96,17 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   ;; a bad pixel selector tool, with updates from cuberec
   cubebadpix=obj_new('CubeBadPix',base,oDraw,_EXTRA=e)
   cuberec->MsgSignup,cubebadpix,/CUBEREC_UPDATE
-  
+    
   ;; a pixel table tool (non-exclusive)
   pixtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
   
-  ;; a WavSamp masker (non exclusive)
+  ;; a WavSamp masker (non-exclusive)
   wsmask=obj_new('WSMask',oDraw,_EXTRA=e)
   cuberec->MsgSignup,wsmask,/CUBEREC_UPDATE
+  
+  ;; a Compass rose (non-exclusive)
+  rose=obj_new('CubeRose',oDraw,COLOR=stretcher->GetColor('Magenta'),_EXTRA=e)
+  cuberec->MsgSignup,rose,/CUBEREC_UPDATE ;give them our message
   
   ;;**********************************************************************
   
@@ -107,13 +118,15 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
             {Obj:stats,      keys:'s',Exclusive:1b}, $
             {Obj:phot,       keys:'p',Exclusive:1b}, $
             {Obj:cuberec,    keys:'x',Exclusive:1b}, $
-            {Obj:cubeback,   keys:'t', Exclusive:1b}, $
+            {Obj:cubeback,   keys:'t',Exclusive:1b}, $
             {Obj:cubebadpix, keys:'b',Exclusive:1b}, $
-            {Obj:aper,       keys:'', Exclusive:1b}]
+            {Obj:aper,       keys:'', Exclusive:1b}, $
+            {Obj:irsmapviz,  keys:'v',Exclusive:1b}]
   
   ;; Toggle-able, non-exclusive list, to the right in toolbar
-  tog_list=[{Obj:pixtbl,     keys:'',Exclusive:0b}, $
-            {Obj:wsmask,     keys:'w',Exclusive:0b}]
+  tog_list=[{Obj:pixtbl,     keys:'', Exclusive:0b}, $
+            {Obj:wsmask,     keys:'w',Exclusive:0b}, $
+            {Obj:rose,       keys:'', Exclusive:0b}]
 
   ;; a switcher for switching among the tools using icons or keypresses
   switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
