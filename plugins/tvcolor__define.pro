@@ -89,8 +89,10 @@
 ;	   RESERVE: Load reserve colors in the colormap.  One of:
 ;
 ;             *  1: Load standard set of colors (charcoal, cyan,
-;                yellow, magenta, red, green, blue) into the reserve
-;                space at the top of our colormap.
+;                yellow, magenta, red, green, blue, goldenrod, white
+;                and a 40% darkened version of the same with names
+;                "dark yellow", etc.) into the reserve space at the
+;                top of our colormap.
 ;
 ;             *  A vector of structures of the form:
 ;                {color:'colname',r:0b,g:0b,b:0b} where colname is the
@@ -487,17 +489,24 @@ function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
      tvlct, rsrv.red, rsrv.green, rsrv.blue, (top-self.nreserve+1) > 0
   endif else if keyword_set(rsrv) then begin ; make our own color table,
      ;; construct standards
-     names = ['charcoal','cyan','yellow','magenta','red','green','blue']
-     red  =  [ 70b,       0b,    255b,    255b,     255b, 0b,     0b   ]
-     green=  [ 70b,       255b,  255b,    0b,       0b,   255b,   0b   ]
-     blue =  [ 70b,       255b,  0b,      255b,     0b,   0b,     255b ]
-     names= [names, 'goldenrod', 'white']
-     red=   [red,    218b,        255b  ]
-     green= [green,  165b,        255b  ]
-     blue=  [blue,   32b,         255b  ]      
-     self.nreserve=n_elements(names) 
-     tvlct,red,green,blue,(top-self.nreserve+1) > 0
-     self.colnames=ptr_new(names,/NO_COPY)
+     cols=[{name: 'charcoal', red:   70b,green:   70b,blue:   70b}, $
+           {name: 'cyan',     red:    0b,green:  255b,blue:  255b}, $
+           {name: 'yellow',   red:  255b,green:  255b,blue:    0b}, $
+           {name: 'magenta',  red:  255b,green:    0b,blue:  255b}, $
+           {name: 'red',      red:  255b,green:    0b,blue:    0b}, $
+           {name: 'green',    red:    0b,green:  255b,blue:    0b}, $
+           {name: 'blue',     red:    0b,green:    0b,blue:  255b}, $
+           {name: 'goldenrod',red:  218b,green:  165b,blue:   32b}, $
+           {name: 'white',    red:  255b,green:  255b,blue:  255b}]
+     
+     cols2=cols[1:n_elements(cols)-2]
+     cols2.name="dark "+cols2.name
+     cols2.red*=.6 & cols2.green*=.6 & cols2.blue*=.6
+     cols=[cols,cols2]
+     
+     self.nreserve=n_elements(cols) 
+     tvlct,cols.red,cols.green,cols.blue,(top-self.nreserve+1) > 0
+     self.colnames=ptr_new(cols.name)
   endif 
   
   ;; set up the color range for our tvDraw object to use
