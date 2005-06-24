@@ -1,4 +1,5 @@
 ;;**************************OverRiding methods********************************
+
 ;=============================================================================
 ;  Message - tvDraw and CubeRec messages
 ;=============================================================================
@@ -8,11 +9,12 @@ pro CubeRose::Message, msg
      'TVDRAW_SNAPSHOT': self->DrawRose
      'CUBEREC_UPDATE': begin 
         if msg.bcd_mode then begin 
-           self->Off            ;no longer relevant
+           self->Off,/DISABLE   ;no longer relevant
            return
-        endif
+        endif else self->Enable
         self.cube=msg.cube
-        self.cube->GetProperty,ASTROMETRY=astr
+        if ptr_valid(msg.astrometry) then astr=*msg.astrometry else $
+           self.cube->GetProperty,ASTROMETRY=astr
         self.angle=atan(-astr.cd[1,0],-astr.cd[0,0])
         ;if self->On() then self.oDraw->ReDraw,/SNAPSHOT
      end
@@ -20,22 +22,42 @@ pro CubeRose::Message, msg
 end
 
 ;=============================================================================
-;  On - Display on
+;  On - Dislay on
 ;============================================================================
-pro CubeRose::On
+pro CubeRose::On, NO_REDRAW=nrd
   self->tvPlug::On
   self.oDraw->MsgSignup,self,/TVDRAW_SNAPSHOT
-  if obj_valid(self.cube) then self.oDraw->ReDraw,/SNAPSHOT     
+  if obj_valid(self.cube) && ~keyword_set(nrd) then $
+     self.oDraw->ReDraw,/SNAPSHOT     
 end
 
 ;=============================================================================
 ;  Off - Display off
 ;============================================================================
-pro CubeRose::Off,RESET=reset,NO_REDRAW=nrd
+pro CubeRose::Off,RESET=reset,NO_REDRAW=nrd,_EXTRA=e
   self.oDraw->MsgSignup,self,/NONE
-  if self->On() AND ~keyword_set(nrd) then self.oDraw->ReDraw,/SNAPSHOT,/ERASE
-  self->tvPlug::Off
+  was_on=self->On()
+  self->tvPlug::Off,_EXTRA=e
+  if was_on && ~keyword_set(nrd) then self.oDraw->ReDraw,/SNAPSHOT,/ERASE
 end
+
+;=============================================================================
+;  Icon
+;=============================================================================
+function CubeRose::Icon
+  return, [[128B, 001B],[128B, 001B],[240B, 015B],[152B, 025B],$
+           [188B, 061B],[052B, 044B],[004B, 032B],[159B, 249B],$
+           [159B, 249B],[004B, 032B],[052B, 044B],[188B, 061B], $
+           [152B, 025B],[240B, 015B],[128B, 001B],[128B, 001B]]
+end
+
+;=============================================================================
+;  Description
+;=============================================================================
+function CubeRose::Description
+  return,'Draw a Compass Rose'
+end
+
 ;;*************************End OverRiding methods******************************
 
 
