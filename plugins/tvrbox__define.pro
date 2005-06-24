@@ -237,7 +237,7 @@ pro tvRBox::MoveBox,X,Y
         1b: begin               ;inside of box, performing move     
            nc=floor(new_coord)
            if array_equal(nc,self.save_coords) then return
-           self->Erasebox
+           self->Erasebox,/DOUBLE,CACHE=bounds_cache
            self.coords=[off[0],off[1]+self.size[1]-1] > $
                        (self.coords+(nc-self.save_coords)) < $
                        [off[0]+ds[0]-self.size[0],off[1]+ds[1]-1]
@@ -250,12 +250,12 @@ pro tvRBox::MoveBox,X,Y
                     [nc[0]-self.coords[0],self.coords[1]-nc[1]+1] $
                     > 1
            if array_equal(new_size,self.size) then return
-           self->EraseBox
+           self->EraseBox,/DOUBLE,CACHE=bounds_cache
            self.size=new_size
         end
      endcase 
   endif else begin    
-     self->EraseBox 
+     self->EraseBox,/DOUBLE,CACHE=bounds_cache
      case self.boxflag of
         1b: begin               ;inside of box, perform move
            ;; we keep the box inside of the *array* not inside the window.
@@ -270,7 +270,7 @@ pro tvRBox::MoveBox,X,Y
      endcase 
      self.save=[X,Y]
   endelse 
-  self->Drawbox
+  self->Drawbox,/DOUBLE,CACHE=bounds_cache,/EXPAND
   if self.on_motion then self->SendBox
 end
 
@@ -296,9 +296,9 @@ pro tvRBox::DrawCorners
   plots, x,y,COLOR=self.color, THICK=self.thick, /DEVICE
 end
 
-pro tvRBox::DrawBox
+pro tvRBox::DrawBox,DOUBLE=dbl,_REF_EXTRA=e
   if self.snap_mode then self->SnapCoords
-  self.oDraw->SetWin
+  self.oDraw->SetWin,DOUBLE=dbl
   plots, $
         [self.boxoff[0],self.boxoff[0],self.boxoff[0]+self.boxsize[0], $
          self.boxoff[0]+self.boxsize[0], self.boxoff[0]], $
@@ -308,17 +308,33 @@ pro tvRBox::DrawBox
   ;;knob
   plots,self.boxoff[0]+self.boxsize[0],self.boxoff[1]-self.boxsize[1], $
         PSYM=8, SYMSIZE=self.hsize,color=self.color,/DEVICE
+  if keyword_set(dbl) then begin 
+     self->Bounds,ll,dist,_EXTRA=e
+     self.oDraw->DBRefresh,ll,dist
+  endif 
 end
 
-pro tvRBox::EraseBox
+pro tvRBox::EraseBox,_REF_EXTRA=e
   ;if self.snap_mode then self->SnapCoords
   ;if NOT array_equal(self.boxoff ge 0,1b) then return
+  self->Bounds,ll,dist,_EXTRA=e
+  if dist[0] ne 0 then self.oDraw->Erase,ll,dist,_EXTRA=e
+end
+
+pro tvRBox::Bounds,ll,dist,CACHE=c,EXPAND=exp
   lr=self.boxoff+(self.boxsize)*[1,-1]
   ur=(self.boxoff>lr)+(self.thick+2.*self.hsize) > 0
   ll=(self.boxoff<lr)-(self.thick+2.*self.hsize) > 0
-  if NOT array_equal(ll lt self.winsize,1b) then return
+  
+  if n_elements(exp) ne 0 then begin 
+     ur=ur>c[2:3] & ll=ll<c[0:1]
+  endif else if arg_present(c) then c=[ll,ur]
+  
+  if ~array_equal(ll lt self.winsize,1b) then begin 
+     dist=0
+     return
+  endif 
   dist=fix(ur-ll+1) < (self.winsize-ll) > 1
-  self.oDraw->Erase,ll,dist
 end
 
 pro tvRBox::SendBox
