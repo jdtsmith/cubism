@@ -419,6 +419,14 @@ pro tvDraw::GetProperty, IMORIG=io,IMMOD=im, IMSCL=is, IMDISP=id, PAN=pn, $
   if arg_present(disp) then disp=self.dispsize
 end
 
+;=============================================================================
+;  IsDrawn - Is an image drawn
+;=============================================================================
+function tvDraw::IsDrawn
+  return,ptr_valid(self.imdisp) && n_elements(*self.imdisp) gt 0
+end
+
+
 ;;*************************End OverRiding methods******************************
 
 ;=============================================================================
@@ -513,6 +521,11 @@ pro tvDraw::Resize,x,y
   ;;Keep central pixel and zoom the same if possible
   self.dispsize=0>fix(self.winsize/self.zoom)<(self.size-self.offset)
   widget_control, self.wDraw,SCR_XSIZE=x, SCR_YSIZE=y
+  ;; Workaround v6.1 resize offset bug:
+  widget_control, self.wTLB, TLB_GET_OFFSET = offset
+  widget_control, self.wTLB, TLB_SET_XOFFSET = offset[0], $
+                  TLB_SET_YOFFSET = offset[1]
+
   self->CreatePixmaps
   self->MsgSend,/RESIZE
 end
@@ -545,13 +558,13 @@ end
 ;          erase to the Double-Buffer window (for later updating using
 ;          DBRefresh).
 ;=============================================================================
-pro tvDraw::Erase,ll,dist,FULL=full,DOUBLE=dbl
+pro tvDraw::Erase,ll,dist,FULL=full,DOUBLE=dbl,FROM_SCREEN=fs
   ;oldwin=!D.WINDOW
   self->SetWin,DOUBLE=dbl
   if keyword_set(full) then begin 
      ll=[0,0] & dist=self.winsize
   endif
-  device,copy=[ll,dist,ll,self.pixwin]
+  device,copy=[ll,dist,ll,keyword_set(fs)?self.drawwin:self.pixwin]
   ;wset,oldwin
 end
 
@@ -572,6 +585,8 @@ end
 pro tvDraw::Snapshot
   self->MsgSend,/SNAPSHOT       ;see who wants to get in on the background
   wset,self.pixwin
+  device,copy=[0,0,self.winsize,0,0,self.drawwin]
+  wset,self.dbwin
   device,copy=[0,0,self.winsize,0,0,self.drawwin]
   wset,self.drawwin
 end
