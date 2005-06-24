@@ -140,7 +140,7 @@ function tvStats::Init,parent,oDraw,FORMAT=form, _EXTRA=e
   if n_elements(form) eq 0 then $
      self.form='("[",I3,",",I3,"]","(",I3," x",I3,")"," MAX:",G11.5,' + $
         '"  MIN:",G11.5,/,"AVG:",G11.5,"  MEDIAN:",G11.5, "  STDEV:",G10.5,' +$
-        '/,"3SIG CLIPPED  CNT:",I5," AVG:",G11.5,"  STDEV:",G11.5)'  $
+        '/,"3SIG CLIP -  CNT:",I6," AVG:",G11.5,"  STDEV:",G11.5)'  $
   else self.form=form
   
   ;; Get a tvrbox object, signing *ourself* up for box messages.
