@@ -47,7 +47,7 @@ end
 function tvLine::Init,parent,oDraw,FORMAT=form,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   ;; set up the format for printing x,y, value
-  if n_elements(form) eq 0 then self.form='("(",I3,",",I3,") ",G14.8)' else $
+  if n_elements(form) eq 0 then self.form='("(",I4,",",I4,") ",G14.8)' else $
      self.form=form
   self.wLine=widget_label(parent,value=' ',/dynamic_resize)
   
