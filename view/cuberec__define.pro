@@ -60,11 +60,23 @@ pro CubeRec::Message, msg
            mn=min(abs(*self.wavelength-cur_wav),pos)
            self.cur_wav=pos
         endif
+        self.cube->GetProperty,ASTROMETRY=astr
         widget_control, self.wLambda,SET_VALUE= $
                         string(*msg.wavelength,FORMAT='(F7.4)'),/CLEAR_EVENTS
-        ;; we don't want BCD mode, but either cube mode will do
+        ;; we don't want BCD mode, but either cube mode (full or stack) will do
+        
         self->SwitchMode,BCD=0
      end
+     'CUBEPROJ_VISUALIZE': begin 
+        if ptr_valid(msg.ASTROMETRY) then astr=*msg.ASTROMETRY
+        self.oDraw->SetTitle,'CubeView: '+msg.INFO
+        widget_control, self.wInfoLine,set_value='Visualizing '+msg.INFO
+        self.cube=msg.CUBE
+        self.module=msg.MODULE
+        self.visualize_image=msg.IMAGE
+        self->SwitchMode,/VISUALIZE
+     end
+     
      'CUBEPROJ_UPDATE': begin 
         if msg.new_cube && self.mode ge 2 then return
         self.cube=msg.cube
@@ -73,9 +85,13 @@ pro CubeRec::Message, msg
      end 
      'CUBEPROJ_CALIB_UPDATE': cal_update=1b
   endcase
-  self->MsgSend,{CUBEREC_UPDATE,self.mode eq 2b,self.mode eq 0b, $
+  if n_elements(astr) ne 0 then astr=ptr_new(astr,/NO_COPY) else $
+     astr=ptr_new()
+  self->MsgSend,{CUBEREC_UPDATE, $
+                 self.mode eq 2b,self.mode eq 0b,self.mode eq 3b,$
                  self.cur_wav, self.cube,self.MODULE,self.bcd,self.bcd_BMASK, $
-                 self.rec_set,cal_update}
+                 astr,self.rec_set,cal_update}
+  ptr_free,astr
   self->UpdateView
 end
 
@@ -101,6 +117,9 @@ pro CubeRec::Off,_EXTRA=e
   self.Region->Off
 end
 
+;=============================================================================
+;  Reset
+;=============================================================================
 pro CubeRec::Reset,_EXTRA=e
   self.Box->Reset
   self.Region->Reset
@@ -142,9 +161,10 @@ end
 ;=============================================================================
 ;  GetProperty
 ;=============================================================================
-pro CubeRec::GetProperty,BCD_MODE=bcd_mode,CUBE=cube
+pro CubeRec::GetProperty,BCD_MODE=bcd_mode,CUBE=cube,VISUALIZE_MODE=vm
   if arg_present(bcd_mode) then bcd_mode=self.mode eq 2
   if arg_present(cube) then cube=self.cube
+  if arg_present(vm) then vm=self.mode eq 3
 end
 
 ;=============================================================================
@@ -179,14 +199,15 @@ end
 
 
 ;=============================================================================
-;  SwitchMode - Switch among full, stacked and record mode.  To switch
-;               out of BCD mode to one of the cube modes (unless
-;               already set), specify BCD=0.
+;  SwitchMode - Switch among full, stacked, record, and visualization
+;               modes. To switch out of BCD mode to one of the cube
+;               modes (unless already set), specify BCD=0.
 ;=============================================================================
-pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
+pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
   if keyword_set(full) then mode=0
   if keyword_set(stack) then mode=1
   if keyword_set(bcd) then mode=2
+  if keyword_set(viz) then mode=3
   ;; BCD=0 was passed
   if n_elements(mode) eq 0 AND n_elements(bcd) ne 0 then begin 
      if self.mode eq 2 then self.mode=0 ;go to full by default
@@ -200,18 +221,23 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
      self.mode=mode
   endif
   
-  if self.mode eq 2 then begin  ;bcd mode
+  if self.mode ge 2 then begin  ;bcd or vis
      self->Reset,/DISABLE       ;no need for our extraction tool.
      if obj_valid(self.oView) then $
         self.oView->MsgSignup,self,/NONE ;not listening to the view tool
-     self.oRose->Off,/NO_REDRAW & self.oAper->On 
+     if self.mode eq 2 then begin ;bcd mode
+        self.oAper->On 
+        self.oVis->Off,/RESET,/NO_REDRAW,/DISABLE
+     endif else begin           ;visualize mode
+        self.oAper->Off,/RESET,/NO_REDRAW
+        self.oVis->On
+     endelse 
   endif else begin              ; A cube mode
-     if NOT self->Enabled() then self->Enable
+     if ~self->Enabled() then self->Enable ;need the extraction tool
      if obj_valid(self.oView) then $
         self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL, $
                               /CUBEVIEWSPEC_SAVE
      self.oAper->Off,/RESET,/NO_REDRAW 
-     if widget_info(self.wCompass,/BUTTON_SET) then self.oRose->On
   endelse 
   
   ;; The menu buttons
@@ -219,12 +245,13 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd
      widget_control, self.wMapSaveBut,SENSITIVE=self.mode eq 1
   endif 
   if widget_info(self.wExtractRegionBut,/VALID_ID) then begin 
-     widget_control, self.wExtractRegionBut,SENSITIVE=self.mode ne 2
+     widget_control, self.wExtractRegionBut,SENSITIVE=self.mode lt 2
   endif 
   
   ;;Switch the base showing
-  others=where(indgen(3) ne self.mode)
-  for i=0,1 do widget_control, self.wBase[others[i]],MAP=0
+  others=where(indgen(4) ne self.mode)
+  for i=0,n_elements(others)-1 do $
+     widget_control, self.wBase[others[i]],MAP=0
   widget_control, self.wBase[self.mode],/MAP,/SENSITIVE
 end
 
@@ -251,6 +278,10 @@ pro CubeRec::UpdateView
                                    (*self.BCD - *self.BCD_BACKGROUND) : $
                                    *self.BCD
      end
+     3: begin 
+        if ptr_valid(self.VISUALIZE_IMAGE) then $
+           self.oDraw->SetProperty,IMORIG=*self.VISUALIZE_IMAGE,/NO_RESIZE
+     end 
   endcase 
 end
 
@@ -308,13 +339,7 @@ pro CubeRec::FullEvent,ev
         self.delay=(10.-ev.value)/4.+.1
         return
      end
-     
-     self.wCompass: begin
-        sel=widget_info(self.wCompass,/BUTTON_SET)
-        if sel then self.oRose->On else self.oRose->Off
-        return
-     end
-     
+          
      self.wBrowse: begin 
         if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_TIMER' then begin 
            if self.playing then widget_control, ev.id,TIMER=self.delay
@@ -437,8 +462,9 @@ end
 ;=============================================================================
 ;  Init -  Initialize the CubeRec object
 ;=============================================================================
-function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
-                       _EXTRA=e
+function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper, $
+                       VISUALIZE_OBJECT=vis,MENU=menu, $
+                       VISUALIZE_COLOR=vis_color,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
 
   self->MsgSetup,['CUBEREC_SPEC','CUBEREC_FULL','CUBEREC_UPDATE']
@@ -450,7 +476,9 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
   self.Region=obj_new('tvFixedRegion',oDraw,_EXTRA=e)
   
   ;; listen for this cube's messages
-  if obj_valid(cube) then cube->MsgSignup,self,/ALL
+  if obj_valid(cube) then $
+     cube->MsgSignup,self,/CUBEPROJ_RECORD,/CUBEPROJ_CUBE,/CUBEPROJ_VISUALIZE,$
+                     /CUBEPROJ_UPDATE,/CUBEPROJ_CALIB_UPDATE
 
   ;; set up the different bases
   b=widget_base(parent,/COLUMN,/FRAME,/BASE_ALIGN_LEFT,SPACE=1, $
@@ -461,7 +489,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
                               value=STRING(FORMAT='(A,T62)', $
                                            'No Cube or Record'))
 
-  ;; A bulletin board to hold the three separate bases
+  ;; A bulletin board to hold the 4 separate bases
   mapbase=widget_base(b)
 
   ;; Populate the first base: the full cube
@@ -480,18 +508,15 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
   self.wSlider=widget_slider(b2,MINIMUM=0,MAXIMUM=10, $
                              TITLE="Play Speed",/SUPPRESS_VALUE,VALUE=6)
   self.delay=1.1
-  b3=widget_base(base,/NONEXCLUSIVE,/ROW) 
-  self.wCompass=widget_button(b3,VALUE='Compass')
-  widget_control, self.wCompass,/SET_BUTTON
+  
   
   ;; Populate the second base: the stacked cube
   self.wBase[1]=widget_base(mapbase,/ROW,MAP=0, $
                             UVALUE={self:self,method:'StackEvent',event:1}, $
                             /BASE_ALIGN_CENTER,EVENT_PRO='cuberec_event')
-  self.oRose=obj_new('CubeRose',oDraw,_EXTRA=e)
-  self->MsgSignup,self.oRose,/CUBEREC_UPDATE ;give them our message
   self.wStackInfo=widget_label(self.wBase[1],VALUE=' ',/DYNAMIC_RESIZE)
-
+  
+  
   ;; Populate the third base: for the BCD's
   self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
   self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
@@ -500,6 +525,13 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper,MENU=menu, $
   self.wBGsub=widget_button(b3,VALUE='BGSub', $
                             /FRAME,EVENT_PRO='cuberec_event', $
                             UVALUE=[{self:self,method:'UpdateView',event:0}])
+  
+  
+  ;; Populate the fourth base: visualization
+  self.wBase[3]=widget_base(mapbase,/COLUMN,MAP=0,/BASE_ALIGN_CENTER)
+  self.oVis=(vis=obj_new('IRSMapVisualize',self.wBase[3], $
+                         oDraw,COLOR=vis_color))
+  self->MsgSignup,self.oVis,/CUBEREC_UPDATE
   
   ;; Add a menu items if allowed
   if n_elements(menu) ne 0 then if widget_info(menu,/VALID_ID) then begin 
@@ -529,7 +561,7 @@ pro CubeRec__define
   st={CubeRec, $
       INHERITS tvPlug,$         ;it's a tvDraw plugin
       cube:obj_new(), $         ;the cube project we're servicing
-      mode:0, $                 ;full (=0),stacked (=1), bcd (=2)
+      mode:0, $                 ;full (=0),stacked (=1), bcd (=2), viz (=3)
       wavelength:ptr_new(), $   ;the wavelength planes of our cube
       cur_wav:0L,$              ;the index of wavelength plane being viewed
       playing:0, $              ;whether we're "playing" the full cube
@@ -540,24 +572,24 @@ pro CubeRec__define
       region_file:'', $         ;file from which region recovered
       oAper: obj_new(), $       ;our aperture viewing/editing tool
       oView: obj_new(), $       ;our ViewSpec tool
-      oRose: obj_new(), $       ;our compass rose drawing tool
+      oVis: obj_new(), $        ;the visualization tool
       STACK:ptr_new(), $        ;the stacked image
       stack_msg: ptr_new(), $   ;cache the stack message
       BCD:ptr_new(), $          ;the BCD data
       BCD_UNC:ptr_new(), $      ;the BCD error
       BCD_BMASK:ptr_new(), $    ;the BCD mask data
       BCD_BACKGROUND:ptr_new(),$ ;the BCD background to subtract (togglable)
+      VISUALIZE_IMAGE: ptr_new(), $ ;the vis image
       MODULE:'',$               ;the modules for cube or rec
       cal:obj_new(), $          ;the calibration object
       rec_set:ptr_new(), $      ;the record(s) being examined
       ;; Widget ID's
-      wBase:lonarr(3), $        ;the three bases (full/stack/rec)
+      wBase:lonarr(4), $        ;the four bases (full/stack/rec/vis)
       wInfoLine:0L, $           ;A line of info on the current stack/etc.
       wLambda:0L, $             ;the wavelength choose list
       wBrowse:0L, $             ;wavelength browser buttons
       wPlayStop:0L,$            ;the play/stop button
       wSlider:0L, $             ;play speed slider
-      wCompass:0L, $            ;compass button
       wBGSub:0L, $              ;background subtract button
       wStackInfo:0L, $          ;The stack information
       wFull:0L,$                ;The "Switch to Full mode" button
@@ -574,7 +606,7 @@ pro CubeRec__define
   msg={CUBEREC_FULL,plane:0L,wavelength:0.0}
   
   ;; General update
-  msg={CUBEREC_UPDATE,BCD_MODE:0,FULL_MODE:0,PLANE:0L, $
+  msg={CUBEREC_UPDATE,BCD_MODE:0b,FULL_MODE:0b,VISUALIZE_MODE:0b,PLANE:0L, $
        CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new(), $
-       RECORD_SET: ptr_new(), CALIB_UPDATE:0b}
+       ASTROMETRY: ptr_new(), RECORD_SET: ptr_new(), CALIB_UPDATE:0b}
 end
