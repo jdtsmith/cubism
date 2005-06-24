@@ -128,22 +128,22 @@ pro tvHist::Histo,im
   
   if self.freeze then begin ;self.min and self.max are frozen
      switch self.scale_mode of
-        0:
-        1:
+        0:                      ; linear
+        1:                      ;99%,95% linear
         2:
-        5: begin 
+        5: begin                ;histeq
            self.oDraw->SetDrawMinMax,MIN=self.min,MAX=self.max
            break
         end 
-        3: begin 
+        3: begin                ;sqrt
            *im=sqrt(*im-self.min>0)
            self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(self.max-self.min)
            break
         end
-        4: begin 
-           *im=alog10((*im - self.min)>0. + (self.max-self.min)*1.e-6)
-           self.oDraw->SetDrawMinMax,MIN=alog10((self.max-self.min)*1.e-6), $
-                                     MAX=alog10((self.max-self.min)*(1.+1.e-6))
+        4: begin                ;logarithm
+           *im=alog10((*im - self.min)>0. + (self.max-self.min)*.05)
+           self.oDraw->SetDrawMinMax,MIN=alog10((self.max-self.min)*.05), $
+                                     MAX=alog10((self.max-self.min)*(1.+.05))
            break
         end
      endswitch
@@ -192,9 +192,9 @@ pro tvHist::Histo,im
      
      4: begin                   ;logarithm
         mx=max(take,min=mn,NAN=self.non_finite)
-        *im=alog10((mn>*im)-mn+(mx-mn)*1.e-6)
-        self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*1.e-6), $
-                                  MAX=alog10((mx-mn)*(1.+1.e-6))
+        *im=alog10((mn>*im)-mn+(mx-mn)*.05)
+        self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*.05), $
+                                  MAX=alog10((mx-mn)*(1.+.05))
         break
      end
      
