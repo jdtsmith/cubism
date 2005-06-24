@@ -82,7 +82,10 @@ pro tvSwitcher::Exclusive, keep
   if cnt eq 0 then return
   wh=where(wh ne keep,cnt)
   if cnt eq 0 then return
-  for i=0,cnt-1 do (self->GetMsgListObj((*self.MsgList)[wh[i]]))->Off
+  for i=0,cnt-1 do begin 
+     obj=self->GetMsgListObj((*self.MsgList)[wh[i]])
+     if obj->On() then obj->Off
+  endfor
 end
 
 ;=============================================================================
