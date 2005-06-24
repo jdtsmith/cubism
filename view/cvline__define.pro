@@ -1,6 +1,6 @@
 ;=============================================================================
 ;  Message - Display the values.  We have signed up for motion and
-;            tracking messages, and will hear from the CubeRec widget
+;            tracking messages, and will hear from the CubeRec 
 ;            on changes in mode, etc.
 ;=============================================================================
 pro cvLine::Message,msg
@@ -13,7 +13,12 @@ pro cvLine::Message,msg
         if self.bcd_mode then begin 
            self.mask=msg.bmask
            self->UpdateWAVSAMP 
-        endif else self->UpdateAstrometry
+        endif else begin 
+           if ptr_valid(msg.astrometry) then begin 
+              ptr_free,self.astrometry
+              self.astrometry=ptr_new(*msg.astrometry)
+           endif 
+        endelse 
      end
      
      'DRAW_MOTION': begin 
@@ -142,15 +147,6 @@ pro cvLine::UpdateWAVSAMP,MODULE=md
      (*self.PRs)[ord].MAX=[maxx,maxy]
      (*self.PRs)[ord].ORDER=ords[ord]
   endfor
-end
-
-;=============================================================================
-;  UpdateAstrometry - Get the cube astrometry record
-;=============================================================================
-pro cvLine::UpdateAstrometry
-  ptr_free,self.astrometry
-  self.cube->GetProperty,ASTROMETRY=astr
-  self.astrometry=ptr_new(astr,/NO_COPY)
 end
 
 ;=============================================================================
