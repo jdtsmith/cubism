@@ -548,7 +548,6 @@ pro CubeViewSpec::Fit
   
   ;; Do the fit -- Wants number of terms (not order)...2 minimum (a line)
   *self.fit=svdfit((*self.lam)[whcont],(*self.sp)[whcont],d+2) 
-  
   if ptr_valid(self.reg[1]) then begin 
      ;;collect the peak bits (we allow overlap in continuum and peak)
      whpeak=self->RegionIndices(*self.reg[1])
