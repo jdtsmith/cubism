@@ -1756,6 +1756,7 @@ end
 ;  VisualizeAORs - View the AORs on top of a vis image, with select
 ;=============================================================================
 pro CubeProj::VisualizeAORs,NEW_VIEWER=new
+  self->Normalize
   self->LoadVisualize
   if ~ptr_valid(self.visualize_image) then return
   self->FindViewer,/VISUALIZE_MODE,NEW_VIEWER=new
@@ -3155,12 +3156,29 @@ pro CubeProj::Normalize
 ;   if (NOT array_equal(stepsper,stepsper[0])) or $
 ;      (NOT array_equal(stepspar,stepspar[0])) then $
 ;      self->Error,"BCD's have unequal map size"
-   self.NSTEP=[stepsper[0],stepspar[0]]
+  self.NSTEP=[stepsper[0],stepspar[0]]
 ;   if (NOT array_equal(stepszper,stepszper[0])) or $
 ;      (NOT array_equal(stepszpar,stepszpar[0])) then $
 ;      self->Error,"BCD's have unequal step size"
-   self.STEP_SIZE=[stepszper[0],stepszpar[0]]/3600.D ; in degrees
+  self.STEP_SIZE=[stepszper[0],stepszpar[0]]/3600.D ; in degrees
   
+  ;; Check to ensure all steps are present and accounted for
+  self->CheckSteps
+  
+  ;; Ensure the pseudo-rect size is set up.
+  self->NormalizePRSize
+  
+  ;; Normalize the build aperture(s)
+  self->NormalizeApertures
+  
+  ;; And the cube size and center
+  self->LayoutBCDs
+end
+
+;=============================================================================
+;  NormalizePRSize - Make sure the apertures are all something useful
+;=============================================================================
+pro CubeProj::NormalizePRSize
   ;; Normalize the slit length
   if self.ORDER gt 0 then begin
      self.cal->GetProperty,self.module,self.order,SLIT_LENGTH=sl
@@ -3174,10 +3192,6 @@ pro CubeProj::Normalize
      endfor
      self.PR_SIZE[0]=slmax
   endelse
-  
-  ;; Check to ensure all steps are present and accounted for
-  self->CheckSteps
-  
   len=0.                        ;adjust for a non-full aperture
   if ptr_valid(self.APERTURE) then begin 
      for i=0,n_elements(*self.APERTURE)-1 do begin 
@@ -3192,18 +3206,12 @@ pro CubeProj::Normalize
      self->ResetAccounts,/NO_UPDATE
      self.PR_SIZE[1]=1.D        ;the default, 1xn XXX
   endif 
-  
-  ;; Normalize the build aperture(s)
-  self->NormalizeApertures
-  
-  ;; And the cube size and center
-  self->LayoutBCDs
 end
 
 ;=============================================================================
 ;  NormalizeApertures - Make sure the apertures are all something useful
 ;=============================================================================
-pro CubeProj::NormalizeApertures
+pro CubeProj::NormalizeApertures  
   ;; Normalize the build aperture(s)
   if ptr_valid(self.APERTURE) then begin 
      for i=0,n_elements(*self.APERTURE)-1 do begin 
@@ -3277,7 +3285,6 @@ end
 ;              appropriate sub-slit) in celestial coordinates.
 ;=============================================================================
 function CubeProj::BCDBounds,recs,_EXTRA=e
-  ;self->Normalize
   self->RecOrSelect,recs,_EXTRA=e
   ;; Construct the bounding aperture for all orders being combined into cube
   ords=self->BuildOrders()
