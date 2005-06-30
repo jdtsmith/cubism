@@ -896,8 +896,6 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
      if keyword_set(nodata) then begin 
         detBCD=(*self.DR).BCD
         (*self.DR).BCD=stub
-        detHEADER=(*self.DR).HEADER
-        (*self.DR).HEADER=stub
         detUNC=(*self.DR).UNC
         (*self.DR).UNC=stub
         detBMASK=(*self.DR).BMASK
@@ -926,7 +924,6 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
      (*self.DR).REV_ACCOUNT=detRevAccts
      if keyword_set(nodata) then begin 
         (*self.DR).BCD=detBCD
-        (*self.DR).HEADER=detHEADER        
         (*self.DR).UNC=detUNC
         (*self.DR).BMASK=detBMASK
      endif 
@@ -3143,24 +3140,14 @@ pro CubeProj::Normalize
   enabled=where((*self.DR).DISABLED eq 0,good_cnt)
   if good_cnt eq 0 then return
   
-  stepsper=(stepspar=lonarr(good_cnt))
-  stepszper=(stepszpar=dblarr(good_cnt))
-  for i=0,good_cnt-1 do begin 
-     stepsper[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'STEPSPER')
-     stepspar[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'STEPSPAR')
-     stepszpar[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'SIZEPAR')
-     stepszper[i]=sxpar(*(*self.DR)[enabled[i]].HEADER,'SIZEPER')
-  endfor 
-  
-  ;; XXX No longer necessary with pos-based layout: can have arbitrary steps
-;   if (NOT array_equal(stepsper,stepsper[0])) or $
-;      (NOT array_equal(stepspar,stepspar[0])) then $
-;      self->Error,"BCD's have unequal map size"
-  self.NSTEP=[stepsper[0],stepspar[0]]
-;   if (NOT array_equal(stepszper,stepszper[0])) or $
-;      (NOT array_equal(stepszpar,stepszpar[0])) then $
-;      self->Error,"BCD's have unequal step size"
-  self.STEP_SIZE=[stepszper[0],stepszpar[0]]/3600.D ; in degrees
+  if ptr_valid((*self.DR)[enabled[0]].HEADER) then begin 
+     stepsper=sxpar(*(*self.DR)[enabled[0]].HEADER,'STEPSPER')
+     stepspar=sxpar(*(*self.DR)[enabled[0]].HEADER,'STEPSPAR')
+     stepszpar=sxpar(*(*self.DR)[enabled[0]].HEADER,'SIZEPAR')
+     stepszper=sxpar(*(*self.DR)[enabled[0]].HEADER,'SIZEPER')
+     self.NSTEP=[stepsper[0],stepspar[0]]
+     self.STEP_SIZE=[stepszper[0],stepszpar[0]]/3600.D ; in degrees
+  endif 
   
   ;; Check to ensure all steps are present and accounted for
   self->CheckSteps
