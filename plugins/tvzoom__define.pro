@@ -7,6 +7,13 @@
 pro tvZoom::Message, msg
   self->tvPlug::Message,msg,TYPE=type ;pass it up to tvPlug
   case type of 
+     'TVDRAW_PREDRAW': begin 
+        s=size(*msg.im,/DIMENSIONS)
+        if ~array_equal(s,self.imsize) then begin 
+           self.imsize=s
+           ptr_free,self.zoomlist ;new image
+        endif 
+     end 
      'DRAW_MOTION': begin 
         if self.buttondwn eq 0b then return
         if self.buttondwn AND 1b then self->ZoomBox,msg.X,msg.Y $
@@ -58,12 +65,12 @@ end
 pro tvZoom::On
   if self->On() then self->Off ;already on
   self->tvPlug::On
-  self.oDraw->MsgSignup,self,/DRAW_BUTTON
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_PREDRAW
 end
 
 pro tvZoom::Off
   self->tvPlug::Off
-  self.oDraw->MsgSignup,self,/NONE
+  self.oDraw->MsgSignup,self,DRAW_BUTTON=0,/TVDRAW_PREDRAW
 end
 
 function tvZoom::Icon
@@ -201,7 +208,8 @@ pro tvZoom__define
           save:[0,0], $         ;the last saved coordinates
           thick:0.0, $          ;width of the drawing line
           color:0, $            ;the color index for the band  
-          winsize:[0,0], $      ;size of the window displayed
+          winsize:[0L,0L], $    ;size of the window displayed
+          imsize:[0L,0L], $     ;image size of displayed image
           zoomlist:ptr_new()}   ;a list of previous zooms and positions  
   struct={ZoomBox,Off:[0,0],Size:[0,0]}
   return
