@@ -1538,7 +1538,8 @@ function CubeProj::List
                else acct="Y"
             endif else acct="INV"
          endif else acct="N"
-         pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR)[i].RQST_POS
+         pos=self.reconstructed_pos?(*self.DR)[i].REC_POS: $
+             (*self.DR)[i].RQST_POS
          s=string(FORMAT= $
                   '(" ",A20,T23,A11,T34,A12,T50,3(A1,7X),A,T83,A1)', $
                   (*self.DR)[i].ID, $
@@ -1868,6 +1869,7 @@ pro CubeProj::SwitchRecordDataType,r,FLATAP=f2ap,BCD=bcd,DROOPRES=dr,_EXTRA=e
   (*self.DR)[r].FILE=new_files
   (*self.DR)[r].TYPE=new_type[0]
   
+  ptr_free,(*self.DR)[r].BCD
   self->RestoreData,r
   if self.BACK_DATE then begin 
      self->Info,'Rebuilding background from '+jul2date(self.BACK_DATE)
@@ -4505,7 +4507,9 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
      keyword_set(rec_update): self->MsgSend,{CUBEPROJ_RECORD_UPDATE,self}
      keyword_set(vis): $
         self->MsgSend, {CUBEPROJ_VISUALIZE, self, $
-                        self->ProjectName() + ': ' + $
+                        self->ProjectName() + ' '+ $
+                        irs_fov(MODULE=self.module,ORDER=self.order, $
+                                POSITION=0,/SLIT_NAME,/LOOKUP_MODULE) + ': ' +$
                         file_basename(self.visualize_file), $
                         self.MODULE,self.VISUALIZE_IMAGE, $
                         self.VISUALIZE_ASTROMETRY}
