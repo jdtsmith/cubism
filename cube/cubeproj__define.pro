@@ -143,7 +143,7 @@ pro CubeProj::ShowEvent, ev
      return
   endif 
   sel=widget_info((*self.wInfo).SList,/LIST_SELECT)
-  n_sel=n_elements(sel) 
+  if sel[0] eq -1 then n_sel=0 else n_sel=n_elements(sel)
   nr=self->N_Records()
   if ev.id eq (*self.wInfo).SList then begin ;somebody clicked
      self->UpdateButtons
@@ -169,13 +169,19 @@ pro CubeProj::ShowEvent, ev
      
      'viewbackground-new': self->ViewBackground,/NEW_VIEWER
      'remove-background': begin 
-        ptr_free,self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
-                 self.BACK_EXP_LIST
+        ptr_free,self.BACKGROUND,self.BACKGROUND_UNC
+        if self.BACK_RECS eq self.AS_BUILT.BACK_RECS then $
+           self.BACK_RECS=ptr_new() else heap_free,self.BACK_RECS 
         self.BACK_DATE=0.0D
         self.ACCOUNTS_VALID AND=NOT 4b ;bg's no longer valid
         self.Changed=1b
         self->UpdateButtons & self->UpdateTitle
      end 
+     'setbackgroundfromrecsa': self->SetBackgroundFromRecs,BLEND=0
+     'setbackgroundfromrecsb': self->SetBackgroundFromRecs,BLEND=1
+     'viewbackgrounda': self->ViewBackground,BLEND=0
+     'viewbackgroundb': self->ViewBackground,BLEND=1
+     
      'remove-bg-sp': begin 
         ptr_free,self.BG_SP
         self.BG_SP_FILE=''
@@ -363,7 +369,7 @@ pro CubeProj::ShowEvent, ev
         widget_control,ev.id,get_value=v
         flags=bytarr(n_elements(v))
         self.sort=ev.value
-        flags[ev.value-(5*(ev.value ge 6))]=1b ;keep ID selected if set
+        flags[ev.value-(6*(ev.value ge 6))]=1b
         widget_control, (*self.wInfo).Base,UPDATE=0
         widget_control,ev.id,SET_VALUE=flags
         self->UpdateList
@@ -603,20 +609,38 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Background menu    
   background=widget_button(mbar,VALUE='Background',/MENU)
+  (*self.wInfo).background_menu=background
   wMustSel=[wMustSel,$
             widget_button(background,VALUE='Set Background from Rec(s)...', $
                           UVALUE='setbackgroundfromrecs')]
   but=widget_button(background,VALUE='Load Background Rec(s)...', $
                     UVALUE='loadbackgroundlist')
+  
+  bcomb=widget_button(background,VALUE='Background Blend',/MENU)
+  wMustSel=[wMustSel, $
+            widget_button(bcomb,VALUE='Set and Scale Background A...', $
+                          UVALUE='setbackgroundfromrecsa'), $
+            widget_button(bcomb,VALUE='Set and Scale Background B...', $
+                          UVALUE='setbackgroundfromrecsb')]
+  (*self.wInfo).MUST_BACK_AB= $
+     widget_button(bcomb,VALUE='Blend A & B Backgrounds...', $
+                   UVALUE='blendbackgrounds')
+  ;;-------------
+  (*self.wInfo).MUST_BACK_A=widget_button(bcomb,VALUE='View Background A...', $
+                                          UVALUE='viewbackgrounda',/SEPARATOR)
+  (*self.wInfo).MUST_BACK_B=widget_button(bcomb,VALUE='View Background B...', $
+                                          UVALUE='viewbackgroundb')
+  
+  ;;-------------
   (*self.wInfo).MUST_BACK= $
      [widget_button(background,VALUE='Save Background Rec(s)...', $
-                    UVALUE='savebackgroundlist'), $
+                    UVALUE='savebackgroundlist',/SEPARATOR), $
       widget_button(background,VALUE='View Background...', $
                     UVALUE='viewbackground'), $
       widget_button(background,VALUE='View Background (new viewer)..', $
                     UVALUE='viewbackground-new'), $
       widget_button(background,VALUE='Remove Background', $
-                    UVALUE='remove-background'), $
+                    UVALUE='remove-background',/SEPARATOR), $
       widget_button(background,Value='Rebuild Background', $
                     UVALUE='RebuildBackground')]
   ;;-------------
@@ -663,15 +687,15 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                 'Step '],UVALUE='sort',/ROW)
   (*self.wInfo).wHead[1]= $  
      cw_bgroup(/NONEXCLUSIVE,headmap, $
-               ['ID                 ', $
+               ['Target            ', $
                 'RA     ', $
-                'Dec   ', $
+                'Dec  ', $
                 'DATA',$
                 'UNC', $
                 'BMSK',$
                 'ACCT', $
                 'BPL'], $
-               BUTTON_UVALUE=[0,6,7,8,9,10,11,12],UVALUE='sort',/ROW,MAP=0)
+               BUTTON_UVALUE=6+indgen(8),UVALUE='sort',/ROW,MAP=0)
   
   b1=widget_button(headbase,VALUE='>',UVALUE='switchlist')
   
@@ -841,16 +865,19 @@ pro CubeProj::Initialize
      endif 
   endif
   
-  ;; Look for missing DCEIDs
+  ;; Look for missing headers/DCEIDs, from older versions of the cubes.
   if ptr_valid(self.DR) then begin 
+     wh=where(~ptr_valid((*self.DR).HEADER),nohdrcnt)
+     if nohdrcnt gt 0 then self->RestoreData,wh
      wh=where((*self.DR).DCEID eq 0L,cnt)
-     if cnt gt 0 then begin 
-        self->RestoreData,wh
-        for i=0,n_elements(*self.DR)-1 do $
-           if (*self.DR)[i].DCEID eq 0L then $
-              (*self.DR)[i].DCEID=sxpar(*(*self.DR)[i].HEADER,'DCEID')
-        self->Warning,"Missing DCEIDs: restored"
-     endif 
+     for i=0,cnt-1 do $
+        (*self.DR)[wh[i]].DCEID=sxpar(*(*self.DR)[wh[i]].HEADER,'DCEID')
+     if cnt gt 0 then self->Warning,"Missing DCEIDs: restored"
+     wh=where(~(*self.DR).OBJECT,noobjectcnt)
+     for i=0,noobjectcnt-1 do $
+        (*self.DR)[wh[i]].OBJECT=sxpar(*(*self.DR)[wh[i]].HEADER,'OBJECT')
+     if noobjectcnt gt 0 then $
+        self->Warning,'Missing OBJECT tags: restored'
   endif 
   
   ;; Default cube build parameters for older versions of cubes
@@ -1204,15 +1231,47 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err,_EXTRA=e
   catch,/cancel
   if size(file,/TYPE) ne 7 then return ;cancelled
   openr,un,file,/GET_LUN
-  bg=lonarr(file_lines(file),/NOZERO)
-  readf,un,bg
+  catch,type
+  if type then begin 
+     catch,/cancel 
+     point_lun,un,0
+     bglist=lonarr(file_lines(file),/NOZERO)
+     readf,un,bglist
+     wh=self->DCEIDtoRec(bglist,goodcnt)
+     if goodcnt lt n_elements(bglist) then $
+        self->Warning,[strtrim(n_elements(bglist)-goodcnt,2)+ $
+                       ' specified background record(s)', $
+                       'not present in project']
+     self->SetBackgroundFromRecs,wh,_EXTRA=e
+  end else begin 
+     line=''
+     readf,un,line
+     afrac=0.0 & acnt=0L
+     reads,line,afrac,acnt,FORMAT='(F0,I0)'
+     alist=lonarr(acnt)
+     readf,un,alist
+     bfrac=0.0 & bcnt=0L
+     readf,un,bfrac,bcnt,FORMAT='(F0,I0)'
+     blist=lonarr(bcnt)
+     readf,un,blist
+     
+     wha=self->DCEIDtoRec(alist,agoodcnt)
+     whb=self->DCEIDtoRec(blist,bgoodcnt)
+     if agoodcnt eq 0 then $
+        self->Error,'Project missing all records for combine set A.'
+     if bgoodcnt eq 0 then $
+        self->Error,'Project missing all records for combine set B.'
+          
+     if agoodcnt lt acnt || bgoodcnt lt bcnt then $
+        self->Warning,[strtrim(acnt+bcnt-agoodcnt-bgoodcnt,2)+ $
+                       ' specified background record(s)', $
+                       'not present in project']
+     self->SetBackgroundFromRecs,wha,BLEND=0,/SET_ONLY
+     self->SetBackgroundFromRecs,whb,BLEND=1,/SET_ONLY
+     self->BlendBackgrounds,ASCALE=afrac,BSCALE=bfrac, $
+                            /USE_EXISTING_SCALES
+  endelse 
   free_lun,un
-       
-  wh=self->DCEIDtoRec(bg,cnt)
-  if cnt lt n_elements(bg) then $
-     self->Warning,strtrim(n_elements(bg)-cnt,2)+ $
-                   ' record(s) not present in project'
-  self->SetBackgroundFromRecs,wh,_EXTRA=e
 end
 
 
@@ -1220,7 +1279,7 @@ end
 ;  SaveBackGroundList - Save list of background records to file
 ;=============================================================================
 pro CubeProj::SaveBackGroundList,file
-  if ~ptr_valid(self.BACK_EXP_LIST) then return
+  if ~ptr_valid(self.BACK_RECS) then return
   if size(file,/TYPE) ne 7 then begin 
      start=self->FileBaseName()+".bgl"
      xf,file,/RECENT,FILTERLIST=['*.bgl','*.*','*'],/SAVEFILE, $
@@ -1229,7 +1288,13 @@ pro CubeProj::SaveBackGroundList,file
   endif 
   if size(file,/TYPE) ne 7 then return ;cancelled
   openw,un,file,/GET_LUN
-  printf,un,1#(*self.BACK_EXP_LIST)
+  if size(*self.BACK_RECS,/TYPE) eq 8 then begin 
+     for i=0,1 do begin 
+        printf,un,(*self.BACK_RECS)[i].SCALE, $
+               n_elements(*(*self.BACK_RECS)[i].DCEIDs)
+        printf,un,transpose(*(*self.BACK_RECS)[i].DCEIDs)
+     endfor 
+  endif else printf,un,1#(*self.BACK_RECS)
   free_lun,un
 end
 
@@ -1523,7 +1588,7 @@ function CubeProj::List
    for i=0,n-1 do begin 
       if which_list eq 0 then begin ;the standard list
          tchar=([" ","d","c","f"])[(*self.DR)[i].type]
-         s=string(FORMAT='(" ",A20,T23,F6.2,T30,A,T49,A,T68,A8,T78,' + $
+         s=string(FORMAT='(" ",A-20,T23,F6.2,T30,A,T49,A,T68,A8,T78,' + $
                   'I3,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
                   (*self.DR)[i].TIME, $
@@ -1540,9 +1605,8 @@ function CubeProj::List
          endif else acct="N"
          pos=self.reconstructed_pos?(*self.DR)[i].REC_POS: $
              (*self.DR)[i].RQST_POS
-         s=string(FORMAT= $
-                  '(" ",A20,T23,A11,T34,A12,T50,3(A1,7X),A,T83,A1)', $
-                  (*self.DR)[i].ID, $
+         s=string(FORMAT='(" ",A-19,T22,A11,T34,A12,T50,3(A1,7X),A,T83,A1)', $
+                  (*self.DR)[i].OBJECT, $
                   radecstring(pos[0],/RA),radecstring(pos[1]), $
                   ptr_valid((*self.DR)[i].BCD)?'Y':'N', $
                   ptr_valid((*self.DR)[i].UNC)?'Y':'N', $
@@ -1608,6 +1672,12 @@ pro CubeProj::UpdateButtons
      widget_control, ((*self.wInfo).MUST_BACK)[i], $
                      SENSITIVE=ptr_valid(self.BACKGROUND)
   
+  got_comb=ptr_valid(self.BACK_RECS) && size(*self.BACK_RECS,/TYPE) eq 8
+  got_back=got_comb?ptr_valid((*self.BACK_RECS).BACKGROUND):[0b,0b]
+  widget_control, (*self.wInfo).MUST_BACK_A, SENSITIVE=got_back[0]
+  widget_control, (*self.wInfo).MUST_BACK_B, SENSITIVE=got_back[1]
+  widget_control, (*self.wInfo).MUST_BACK_AB,SENSITIVE=array_equal(got_back,1b)
+  
   widget_control, (*self.wInfo).MUST_BG_SP,SENSITIVE=ptr_valid(self.BG_SP)
   
   widget_control, (*self.wInfo).MUST_ANY_BACK, $
@@ -1631,10 +1701,10 @@ end
 ;=============================================================================
 pro CubeProj::UpdateColumnHeads
   if NOT self->IsWidget() then return
-  flags=bytarr(13)
+  flags=bytarr(14)
   flags[self.sort]=1b
   if (*self.wInfo).which_list eq 0 then flags=flags[0:5] else $
-     flags=[flags[0],flags[6:*]]
+     flags=[flags[6:*]]
   widget_control, (*self.wInfo).wHead[(*self.wInfo).which_list],SET_VALUE=flags
 end
 
@@ -1732,12 +1802,31 @@ end
 ;=============================================================================
 ;  ViewBackground - View the background in an existing or new viewer
 ;=============================================================================
-pro CubeProj::ViewBackground,NEW_VIEWER=new
-  if NOT ptr_valid(self.BACKGROUND) then self->Error,'No background to view'
-  if ptr_valid(self.BACK_EXP_LIST) then $
-     self->SetListSelect,self->DCEIDtoRec(*self.BACK_EXP_LIST)
+pro CubeProj::ViewBackground,NEW_VIEWER=new,BLEND=comb
+  if n_elements(comb) ne 0 then begin 
+     pos=keyword_set(comb)
+     if ~ptr_valid(self.BACK_RECS) || $
+        ~ptr_valid((*self.BACK_RECS)[pos].BACKGROUND) then $
+           self->Error,'No background to view'
+     if ptr_valid((*self.BACK_RECS)[pos].DCEIDs) then $
+        self->SetListSelect,self->DCEIDtoRec(*(*self.BACK_RECS)[pos].DCEIDs)
+  endif else begin 
+     if ~ptr_valid(self.BACKGROUND) then self->Error,'No background to view'
+     if ptr_valid(self.BACK_RECS) then begin 
+        if size(*self.BACK_RECS,/TYPE) eq 8 then begin 
+           if ptr_valid((*self.BACK_RECS)[0].DCEIDs) then $
+              bglist=*(*self.BACK_RECS)[0].DCEIDs
+           if ptr_valid((*self.BACK_RECS)[0].DCEIDs) then begin 
+              bglist2=*(*self.BACK_RECS)[1].DCEIDs
+              if n_elements(bglist) eq 0 then $
+                 bglist=bglist2 else bglist=[bglist,bglist2]
+           endif 
+        endif else bglist=*self.BACK_RECS
+        self->SetListSelect,self->DCEIDtoRec(bglist)
+     endif 
+  endelse 
   self->FindViewer,NEW_VIEWER=new
-  self->Send,/BACKGROUND
+  self->Send,/BACKGROUND,BLEND=comb
 end
 
 ;=============================================================================
@@ -1882,7 +1971,8 @@ end
 ;=============================================================================
 ;  SetBackgroundFromRecs - Set the BCD background from selected recs.
 ;=============================================================================
-pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm,_EXTRA=e
+pro CubeProj::SetBackgroundFromRecs,recs, BLEND=comb, SET_ONLY=so, $
+                                    REJECT_MIN_MAX=rmm,_EXTRA=e
   self->RecOrSelect,recs,_EXTRA=e
   if recs[0] eq -1 then return
   self->RestoreData,recs
@@ -1904,18 +1994,117 @@ pro CubeProj::SetBackgroundFromRecs,recs,REJECT_MIN_MAX=rmm,_EXTRA=e
   endif else begin 
      choice=keyword_set(rmm) 
   endelse
+  
+  ;; Cube of BCD data
   bcds=self->BCD(recs)
   if n le 2 && choice eq 1 then $
      self->Warning,'Fewer than 3 BG records -- reverting to average.'
   back=imcombine(bcds,/AVERAGE,REJECT_MINMAX=n gt 2 && choice eq 1)
+
+  if n_elements(comb) gt 0  then begin 
+     ;; Blend backgrounds
+     pos=keyword_set(comb)
+     if ptr_valid(self.BACK_RECS) && $
+        size(*self.BACK_RECS,/TYPE) ne 8 then begin 
+        if self.BACK_RECS eq self.AS_BUILT.BACK_RECS then $
+           self.BACK_RECS=ptr_new() else ptr_free,self.BACK_RECS
+     endif 
+     
+     ;; When scale-combining, use an array of two structures
+     if ~ptr_valid(self.BACK_RECS) then begin 
+        self.BACK_RECS=ptr_new(replicate({BACKGROUND:ptr_new(), $
+                                          FIDUCIAL: 0.0, $
+                                          SCALE: 0.0, $
+                                          DCEIDS:ptr_new()},2)) 
+     endif else heap_free,(*self.BACK_RECS)[pos]
+     
+     (*self.BACK_RECS)[pos].BACKGROUND=ptr_new(back,/NO_COPY)
+     (*self.BACK_RECS)[pos].DCEIDs=ptr_new((*self.DR)[recs].DCEID)
+     
+     if keyword_set(so) then return ;just set the relevant background
+     self->ViewBackground,BLEND=pos
+     
+     widget_control, (*self.wInfo).background_menu,SENSITIVE=0
+     val=getinp('Fiducial Background Value (check viewer):',0.0, $
+                TITLE="Background Combine "+(['A','B'])[pos])
+     if ~val then begin         ;cancelled
+        heap_free,(*self.BACK_RECS)[pos]
+     endif else (*self.BACK_RECS)[pos].FIDUCIAL=float(val)
+     widget_control, (*self.wInfo).background_menu,/SENSITIVE
+  endif else begin 
+     ;; Straight averages
+     ptr_free,self.BACKGROUND
+     self.BACKGROUND=ptr_new(back,/NO_COPY)
+     self.BACK_DATE=systime(/JULIAN)
+     self.Changed=1b
+     self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
+     if self.BACK_RECS ne self.AS_BUILT.BACK_RECS then $
+        heap_free,self.BACK_RECS
+     self.BACK_RECS=ptr_new((*self.DR)[recs].DCEID)
+  endelse 
+  self->UpdateButtons
+end
+
+;=============================================================================
+;  BlendBackgrounds - Set the background from the scaling
+;=============================================================================
+pro CubeProj::BlendBackgrounds,USE_EXISTING_SCALES=ue, ASCALE=ascale, $
+                               BSCALE=bscale, TARGET_VALUE=tval
+  if ~ptr_valid(self.BACK_RECS) then return
+  if size(*self.BACK_RECS,/TYPE) ne 8 then return
+  
+  if ~array_equal(ptr_valid((*self.BACK_RECS).BACKGROUND),1b) then return
+  
+  if ~keyword_set(ue) then begin 
+     catch,err
+     if err ne 0 then begin 
+        self->Warning,['Invalid Target Fiducial Value:',!ERROR_STATE.MSG]
+     endif else begin 
+        aval=(*self.BACK_RECS)[0].FIDUCIAL
+        bval=(*self.BACK_RECS)[1].FIDUCIAL
+        if n_elements(tval) eq 0 then $
+           tval=getinp( $
+                string(FORMAT='(%"Fiducial Target Value (%0.2f-%0.2f):")', $
+                       aval<bval,aval>bval), 0.0, $
+                TITLE="Background Combination")
+        if ~tval then message,'No Target Value Selected',/NONAME
+        tval=float(tval)
+        
+        if ~( (tval le aval && tval ge bval) || $
+              (tval ge aval && tval le bval) ) then $
+                 message,'Value must be between two background fiducials', $
+                         /NONAME
+        bscale=(tval-aval)/(bval-aval)
+        ascale=(bval-tval)/(bval-aval)
+        (*self.BACK_RECS).SCALE=[ascale,bscale]
+        
+        na=n_elements(*(*self.BACK_RECS)[0].DCEIDs)
+        nb=n_elements(*(*self.BACK_RECS)[1].DCEIDs)
+        self->Info,TITLE='Background Combination', $
+                   ['Created scaled background with: ', $
+                    string(FORMAT='("A: ",I3," records scaled at ",F0.2)', $
+                           na,ascale), $
+                    string(FORMAT='("B: ",I3," records scaled at ",F0.2)', $
+                           nb,bscale)]
+        self.Changed=1b
+        self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
+     endelse 
+     catch,/cancel
+  endif else begin 
+     if n_elements(ascale) eq 0 then ascale=(*self.BACK_RECS)[0].SCALE $
+     else (*self.BACK_RECS)[0].SCALE=ascale
+     if n_elements(bscale) eq 0 then bscale=(*self.BACK_RECS)[1].SCALE $
+     else (*self.BACK_RECS)[1].SCALE=bscale
+  endelse 
+  
+  if n_elements(ascale) eq 0 then return
+  
+  ;; Create scaled background
+  back=ascale*(*(*self.BACK_RECS)[0].BACKGROUND)+ $
+       bscale*(*(*self.BACK_RECS)[1].BACKGROUND)
   ptr_free,self.BACKGROUND
   self.BACKGROUND=ptr_new(back,/NO_COPY)
   self.BACK_DATE=systime(/JULIAN)
-  self.Changed=1b
-  self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
-  if self.BACK_EXP_LIST ne self.AS_BUILT.BACK_EXP_LIST then $
-     ptr_free,self.BACK_EXP_LIST
-  self.BACK_EXP_LIST=ptr_new((*self.DR)[recs].DCEID)
   self->UpdateButtons
 end
 
@@ -1923,10 +2112,21 @@ end
 ;  RebuildBackground - Rebuild Background from records
 ;=============================================================================
 pro CubeProj::RebuildBackground,NO_UPDATE=noupdate
-  if ~ptr_valid(self.BACK_EXP_LIST) then return
-  list=self->DCEIDtoRec(*self.BACK_EXP_LIST)
-  self->SetListSelect,list
-  self->SetBackgroundFromRecs,list
+  if ~ptr_valid(self.BACK_RECS) then return
+  if size(*self.BACK_RECS,/TYPE) eq 8 then begin 
+     if ~array_equal(ptr_valid((*self.BACK_RECS).DCEIDs),1b) then $
+        self->Error,'Blended Background only partially set'
+     for pos=0,1 do begin ;; Set the two backgrounds, leaving scaling alone
+        list=self->DCEIDtoRec(*(*self.BACK_RECS)[pos].DCEIDs)
+        self->SetListSelect,list
+        self->SetBackgroundFromRecs,list,BLEND=pos,/SET_ONLY
+     endfor 
+     self->BlendBackgrounds,/USE_EXISTING_SCALES
+  endif else begin 
+     list=self->DCEIDtoRec(*self.BACK_RECS)
+     self->SetListSelect,list
+     self->SetBackgroundFromRecs,list
+  endelse 
   self.changed=1b
   if ~keyword_set(noupdate) then self->UpdateTitle
 end
@@ -2018,15 +2218,16 @@ pro CubeProj::Sort,sort
      3:  s=sort((*self.DR).DATE)
      4:  s=sort(long((*self.DR).FOVID)+ishft(long((*self.DR).TYPE),16))
      5:  s=sort((*self.DR).EXP)
-     6:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[0]: $
+     6:  s=sort((*self.DR).OBJECT)
+     7:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[0]: $
                 (*self.DR).RQST_POS[0])
-     7:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[1]: $
+     8:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[1]: $
                 (*self.DR).RQST_POS[1])
-     8:  s=sort(ptr_valid((*self.DR).BCD))
-     9:  s=sort(ptr_valid((*self.DR).UNC))
-     10: s=sort(ptr_valid((*self.DR).BMASK))
-     11: s=sort(ptr_valid((*self.DR).ACCOUNT))
-     12: s=sort(ptr_valid((*self.DR).BAD_PIXEL_LIST))
+     9:  s=sort(ptr_valid((*self.DR).BCD))
+     10:  s=sort(ptr_valid((*self.DR).UNC))
+     11: s=sort(ptr_valid((*self.DR).BMASK))
+     12: s=sort(ptr_valid((*self.DR).ACCOUNT))
+     13: s=sort(ptr_valid((*self.DR).BAD_PIXEL_LIST))
   endcase
   *self.DR=(*self.DR)[s]        ;rearrange
   if self->IsWidget() then begin 
@@ -2068,10 +2269,19 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
        " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
   
   if this.BACK_DATE ne 0.0d then begin 
-     str=[str,'Background: '+ $
-          (strtrim(ptr_valid(this.BACK_EXP_LIST)? $
-                   n_elements(*this.BACK_EXP_LIST):0,2)+' records, '+ $
-           jul2date(this.BACK_DATE))+(this.use_bg?"":" (disabled)")]
+     if ptr_valid(this.BACK_RECS) then begin 
+        if size(*this.BACK_RECS,/TYPE) eq 8 then begin 
+           desc=string(FORMAT='(%"Blended: %d recs @%0.2f, %d recs @%0.2f")', $
+                       n_elements(*(*this.BACK_RECS)[0].DCEIDS), $
+                       (*this.BACK_RECS)[0].SCALE, $
+                       n_elements(*(*this.BACK_RECS)[1].DCEIDS), $
+                       (*this.BACK_RECS)[1].SCALE)
+        endif else desc=strtrim(n_elements(*this.BACK_RECS),2)+' records'
+     endif else desc='0 records'
+     
+     str=[str,('Background: '+ $
+               desc + ', '+jul2date(this.BACK_DATE))+ $
+          (this.use_bg?"":" (disabled)")]
   endif else if this.BG_SP_FILE then begin 
      str=[str,'Background: 1D from file'+(this.use_bg?"":" (disabled)")+' --',$
           '   '+this.BG_SP_FILE]
@@ -3298,13 +3508,15 @@ function CubeProj::BCDBounds,recs,_EXTRA=e
            [final_off[1], pr_half], $
            [final_off[1],-pr_half]]-.5 ;nasalib standard: 0,0: center of pix
   
-  nr=n_elements(*self.DR)
+  nr=n_elements(recs)
   bounds=fltarr(8,nr)
   
-  pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR).RQST_POS
+  pos=self.reconstructed_pos?(*self.DR)[recs].REC_POS: $
+      (*self.DR)[recs].RQST_POS
   RADEG = 180.0d/!DPI           ; preserve double
   for i=0,nr-1 do begin 
-     pa=self.reconstructed_pos ? (*self.DR)[i].PA : (*self.DR)[i].PA_RQST
+     pa=self.reconstructed_pos ? (*self.DR)[recs[i]].PA : $
+        (*self.DR)[recs[i]].PA_RQST
      c_pa=cos((270.0D - pa)/RADEG) ;WCS uses CROTA = N CCW from +y 
      s_pa=sin((270.0D - pa)/RADEG)
      cd_pa=self.PLATE_SCALE*[[-c_pa,-s_pa],[-s_pa,c_pa]]
@@ -3318,10 +3530,10 @@ function CubeProj::BCDBounds,recs,_EXTRA=e
      
      ;; Offset to the correct order: account for building a cube using
      ;; data targeted at another order.
-     if (*self.DR)[i].TARGET_ORDER ne self.ORDER && $
+     if (*self.DR)[recs[i]].TARGET_ORDER ne self.ORDER && $
         self.ORDER ne 0 then begin
         self.cal->TransformCoords,self.MODULE,[1.#a_rect,1.#d_rect],pa, $
-                                  ORDER1=(*self.DR)[i].TARGET_ORDER, $
+                                  ORDER1=(*self.DR)[recs[i]].TARGET_ORDER, $
                                   self.MODULE,ORDER2=self.ORDER,newcoords,newpa
         a_rect=reform(newcoords[0,*]) & d_rect=reform(newcoords[1,*])
      endif 
@@ -3333,13 +3545,18 @@ end
 
 ;=============================================================================
 ;  LayoutBCDs - Define the cube astrometry and determine the BCD
-;               layout on the sky grid based on positions and PA's.
+;               layout on the sky grid based on positions and PA's,
+;               ignoring any disabled records.
 ;=============================================================================
 pro CubeProj::LayoutBCDs
   self->LoadCalib
   
   ;; Find the PA of the dominant AOR
-  aorids=(*self.DR).AORKEY
+  good=where(~(*self.DR).DISABLED,goodcnt)
+  if goodcnt eq 0 then self->Error,'Must enable some records.'
+  
+  recs=(*self.DR)[good]
+  aorids=recs.AORKEY
   uniqids=aorids[uniq(aorids,sort(aorids))]
   cnt=0
   
@@ -3350,18 +3567,17 @@ pro CubeProj::LayoutBCDs
         use=wh
      endif
   endfor
-  pa=self.reconstructed_pos?(*self.DR)[use].PA:(*self.DR)[use].PA_RQST
+  pa=self.reconstructed_pos?recs[use].PA:recs[use].PA_RQST
   self.PA=mean(pa)              ;match our PA to the most numerous
   ;; Approximate cube center (pos average), for now (not critical)
-  pos=self.reconstructed_pos?(*self.DR).REC_POS:(*self.DR).RQST_POS
-  self.POSITION=total(pos,2)/self->N_Records()
+  pos=self.reconstructed_pos?recs.REC_POS:recs.RQST_POS
+  self.POSITION=total(pos,2)/goodcnt
   cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
   
   ;; Compute the region bounds
-  bounds=self->BCDBounds(/ALL)
-  for i=0,n_elements(*self.DR)-1 do begin 
-     if (*self.DR)[i].DISABLED then continue
-     
+  bounds=self->BCDBounds(good)
+  
+  for i=0,goodcnt-1 do begin 
      ;; Compute corner celestial positions in the cube frame
      ad2xy,bounds[0:3,i],bounds[4:7,i],cubeastr,x,y 
                                 ;x,y in 0,0 pixel-centered coords
@@ -3384,7 +3600,7 @@ pro CubeProj::LayoutBCDs
   exact_size=[x_max-x_min,y_max-y_min]
 
   new_size=ceil(exact_size-.001) ;no hangers-on
-  if NOT array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
+  if ~array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
      self.CUBE_SIZE[0:1]=new_size
      self.ACCOUNTS_VALID AND= NOT 2b
   endif
@@ -4396,6 +4612,7 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
      rec.id=id
   endif 
   
+  rec.OBJECT=sxpar(header,'OBJECT')
   rec.FOVID=sxpar(header,'FOVID',COUNT=cnt)
   self->CheckModules,rec.FOVID,ERROR=err
   if err then begin 
@@ -4465,11 +4682,21 @@ pro CubeProj::RemoveBCD,recs,_EXTRA=e
   self->RecOrSelect,recs,_EXTRA=e
   
   keep=where(histogram([recs],MIN=0,MAX=self->N_Records()-1) eq 0,keepcnt)
-  if ptr_valid(self.BACK_EXP_LIST) then begin 
+  if ptr_valid(self.BACK_RECS) then begin 
+     if size(*self.BACK_RECS,/TYPE) eq 8 then begin 
+        if ptr_valid((*self.BACK_RECS)[0].DCEIDs) then $
+           bglist=*(*self.BACK_RECS)[0].DCEIDs
+        if ptr_valid((*self.BACK_RECS)[0].DCEIDs) then begin 
+           bglist2=*(*self.BACK_RECS)[1].DCEIDs
+           if n_elements(bglist) eq 0 then $
+              bglist=bglist2 else bglist=[bglist,bglist2]
+        endif 
+     endif else bglist=*self.BACK_RECS
+     
      if keepcnt ne 0 then begin 
-        brecs=self->DCEIDtoRec(*self.BACK_EXP_LIST,RECORDS=keep,newcnt)
-     endif else newcnt=0
-     if newcnt ne n_elements(*self.BACK_EXP_LIST) then begin 
+        brecs=self->DCEIDtoRec(bglist,RECORDS=keep,newbgcnt)
+     endif else newbgcnt=0
+     if newbgcnt ne n_elements(bglist) then begin 
         if self->IsWidget() then begin 
            ans=dialog_message( $
                ['Removing these BCDs invalidates the background', $
@@ -4478,8 +4705,8 @@ pro CubeProj::RemoveBCD,recs,_EXTRA=e
                DIALOG_PARENT=self->TopBase(),/DEFAULT_NO)
            if ans eq 'No' then return
         endif 
-        if self.BACK_EXP_LIST ne self.AS_BUILT.BACK_EXP_LIST then $
-           ptr_free,self.BACK_EXP_LIST else self.BACK_EXP_LIST=ptr_new()
+        if self.BACK_RECS ne self.AS_BUILT.BACK_RECS then $
+           heap_free,self.BACK_RECS else self.BACK_RECS=ptr_new()
         ptr_free,self.BACKGROUND
         self.BACK_DATE=0.0D
      endif 
@@ -4495,8 +4722,8 @@ end
 ;=============================================================================
 ;  Send - Send one of our messages
 ;=============================================================================
-pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
-                   NEW_CUBE=nc,SELECT=sel,SINGLE_SELECT=ss, $
+pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
+                   UPDATE=update, NEW_CUBE=nc,SELECT=sel,SINGLE_SELECT=ss, $
                    REC_UPDATE=rec_update,CALIB_UPDATE=cal_update, VISUALIZE=vis
   case 1b of
      keyword_set(sel): begin 
@@ -4522,11 +4749,35 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
                               self.NSTEP,jul2date(self.CUBE_DATE)), $
                        self.MODULE,self.WAVELENGTH}
      
-     keyword_set(back): $
+     keyword_set(back): begin 
+        name=self->ProjectName()+' <Background'
+        if ptr_valid(self.BACK_RECS) then begin 
+           if size(*self.BACK_RECS,/TYPE) eq 8 then begin 
+              if n_elements(comb) ne 0 then begin 
+                 ;; Show A or B background
+                 pos=keyword_set(comb) 
+                 n=n_elements(*(*self.BACK_RECS)[pos].DCEIDs)
+                 name+=(['A','B'])[pos]
+                 bg=(*self.BACK_RECS)[pos].BACKGROUND
+              endif else begin 
+                 ;; Show combine AB background
+                 n=n_elements(*(*self.BACK_RECS)[0].DCEIDs)+ $
+                   n_elements(*(*self.BACK_RECS)[1].DCEIDs)
+                 name+='Comb'
+                 bg=self.BACKGROUND
+              endelse 
+           endif else begin 
+              bg=self.BACKGROUND
+              n=n_elements(*self.BACK_RECS)
+           endelse 
+        endif 
+        
+        if n_elements(n) ne 0 then name+=' from '+strtrim(n,2)+' recs'
+        name+='>'
         self->MsgSend,{CUBEPROJ_RECORD, $
-                       self,self->ProjectName()+' Background',self.MODULE, $
-                       self.ORDER,self.CAL,ptr_new(),self.BACKGROUND, $
-                       self.BACKGROUND_UNC, ptr_new(),ptr_new()}
+                       self,name,self.MODULE,self.ORDER,self.CAL,ptr_new(), $
+                       bg,self.BACKGROUND_UNC,ptr_new(),ptr_new()}
+     end 
      
      keyword_set(update): $
         self->MsgSend,{CUBEPROJ_UPDATE,self,self.GLOBAL_BAD_PIXEL_LIST, $
@@ -4535,14 +4786,14 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
      keyword_set(cal_update): $
         self->MsgSend,{CUBEPROJ_CALIB_UPDATE,self}
      
-     else: begin 
-        ;; Otherwise send the record or stacked record set
+     else: begin         ;; Send the record or stacked record set for viewing
         nrec=n_elements(record) 
         if nrec eq 0 then return
   
         stackQ=nrec gt 1
         rec=(*self.DR)[record]
         if stackQ then begin 
+           ;; Stack of BCDs
            bcd=*rec[0].BCD
            if ptr_valid(rec[0].UNC) then unc=*rec[0].UNC^2 ;add in quadrature
            if ptr_valid(rec[0].BMASK) then mask=*rec[0].BMASK
@@ -4555,16 +4806,17 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
                  if n_elements(mask) gt 0 then mask OR=*rec[i].BMASK else $
                     mask=*rec[i].BMASK ;accumulate mask flags
            endfor 
+           bcd/=nrec 
            bcd_p=ptr_new(bcd,/NO_COPY)
-           unc_p=n_elements(unc) gt 0?ptr_new(sqrt(unc)):ptr_new()
+           if n_elements(unc) gt 0 then begin 
+              unc/=nrec
+              unc_p=n_elements(unc) 
+           endif else unc_p=ptr_new()
            mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
-           str=string(FORMAT='(%"%s <Stack of %d recs>")', $
+           str=string(FORMAT='(%"%s <Average of %d recs>")', $
                       self->ProjectName(),nrec)
-           if ptr_valid(self.BACKGROUND) then begin 
-              ptr_free,self.SCALED_BACK
-              self.SCALED_BACK=ptr_new(nrec * *self.BACKGROUND)
-           endif
         endif else begin 
+           ;; Single BCD
            bcd_p=rec.BCD
            unc_p=rec.UNC
            mask_p=rec.BMASK
@@ -4576,7 +4828,7 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,UPDATE=update, $
         self->MsgSend,{CUBEPROJ_RECORD, $
                        self,str,self.MODULE,self.ORDER,self.CAL, $
                        rec_set,bcd_p,unc_p,mask_p, $
-                       stackQ?self.SCALED_BACK:self.BACKGROUND}
+                       self.BACKGROUND}
         ptr_free,rec_set
      end 
   endcase 
@@ -4606,9 +4858,10 @@ pro CubeProj::Cleanup
   heap_free,self.MERGE
   heap_free,self.AS_BUILT
   ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC, $
-           self.BACKGROUND,self.BACKGROUND_UNC,self.SCALED_BACK, $
-           self.BACK_EXP_LIST,self.wInfo,self.WAVELENGTH, $
+           self.BACKGROUND,self.BACKGROUND_UNC, $
+           self.wInfo,self.WAVELENGTH, $
            self.VISUALIZE_ASTROMETRY,self.VISUALIZE_IMAGE
+  heap_free,self.BACK_RECS
   ;if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->OMArray::Cleanup
   self->ObjMsg::Cleanup
@@ -4652,7 +4905,8 @@ pro CubeProj__define
       APERTURE:ptr_new(), $     ;The aperture of the clip, or one
                                 ; for each order
       BACK_DATE: 0.0D, $        ;date background created
-      BACK_EXP_LIST: ptr_new(),$ ;list of expids used for the background
+      BACK_RECS: ptr_new(),$    ;list of expids used for the background,
+                                ;or pair of structures containing A/B info
       BG_SP_FILE:'', $          ;file used for 1D BG subtraction
       GLOBAL_BAD_PIXEL_LIST: ptr_new(),$ ;a user list of bad pixels to exclude
       GLOBAL_BP_FILES: ptr_new(), $ ;files which contribed to the BPs
@@ -4693,7 +4947,6 @@ pro CubeProj__define
      AS_BUILT: {CUBE_PARAMETERS}, $ ;the as-built cube parameters
      BACKGROUND: ptr_new(),$    ;the background image (if any) to subtract
      BACKGROUND_UNC:ptr_new(),$ ;the uncertainty in the background
-     SCALED_BACK: ptr_new(), $  ;the scaled background for stacks
      BG_SP: ptr_new(), $        ;2xn background spectrum for 1D subtractions
      POSITION:[0.0D,0.0D], $    ;optimized position of the cube center
      PA:0.0D, $                 ;optimized position angle of the cube
@@ -4723,6 +4976,7 @@ pro CubeProj__define
   ;; The data structure for each input BCD
   rec={CUBE_DR, $
        ID:'',$                  ;A unique (hopefully) ID
+       OBJECT:'', $             ;The name of the object, from the header
        file:'', $               ;the original file read for this BCD dataset
        DCEID: 0L, $             ;unique exposure id
        TIME:0.0, $              ;The integration time
@@ -4771,14 +5025,18 @@ pro CubeProj__define
          view_ids:lonarr(3), $  ;record view button ids
          nsel_sav: 0, $          ;save number of selected records
          feedback_window: 0, $  ;window id of feedback
+         background_menu: 0L, $ ;widget ID of background menu bar
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
-         MUST_SELECT:lonarr(17),$ ;the SW buttons which require any selected
+         MUST_SELECT:lonarr(19),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
          MUST_PROJ:lonarr(5), $ ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(5), $ ;background record must be set
+         MUST_BACK_A: 0L, $     ;back A of combined backs must be set
+         MUST_BACK_B: 0L, $     ;back B of combined backs must be set
+         MUST_BACK_AB: 0L, $    ;back A&B of combined backs must be set
          MUST_VIS: 0L, $        ;must have a visualization object loaded
          MUST_ANY_BACK: 0L, $   ;either BCD or 1D BG required
          MUST_BG_SP:0L, $       ;required background spectrum
