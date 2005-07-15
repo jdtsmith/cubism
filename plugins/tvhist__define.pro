@@ -118,7 +118,7 @@ pro tvHist::Histo,im
   boxon=self.Box->IsDrawn()
   if boxon then begin 
      self.Box->GetLRTB,l,r,t,b  ;get box sides
-     if NOT ((l lt r) and (b lt t)) then return
+     if ~((l le r) and (b le t)) then return
      self.oDraw->GetProperty,SIZE=sz
      if r ge sz[0] OR t ge sz[1] then begin 
         self->Reset             ;panic
