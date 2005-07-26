@@ -367,13 +367,15 @@ pro tvDraw::SetProperty, IMORIG=io,DISPSIZE=ds,OFFSET=off, $
   if n_elements(io) ne 0 then begin ; a new image
      pre=(draw=1)               ; Our plugins will want to have at it.
      if size(io,/N_DIMENSIONS) eq 1 then io=reform(io,n_elements(io),1)
-     s=size(io,/DIMENSIONS)
-     ptr_free,self.imorig
+     if self.free_orig then ptr_free,self.imorig
      if size(io,/TYPE) eq 10 then begin ;a pointer, don't duplicate the space
         self.imorig=io
+        self.free_orig=0b       ;it's not our copy
      endif else begin 
         self.imorig=ptr_new(io) ;actual data
+        self.free_orig=1b
      endelse 
+     s=size(*self.imorig,/DIMENSIONS)
      *self.immod=*self.imorig
      ;; Reset zoom, etc. if they didn't prohibit it, or if we're forced to
      if NOT keyword_set(nrs) OR self.dispsize[0] eq 0 OR $
@@ -755,9 +757,11 @@ end
 ;  Cleanup - Destroy all our plug-ins
 ;=============================================================================
 pro tvDraw::Cleanup
-  ptr_free,self.immod,self.imscl,self.imdisp,self.imorig
+  ptr_free,self.immod,self.imscl,self.imdisp
+  if self.free_orig then ptr_free,self.imorig
   wdelete,self.pixwin,self.dbwin
   if ptr_valid(self.plug_list) then obj_destroy,*self.plug_list
+  if widget_info(self.wTLB,/VALID_ID) then widget_control, self.wTLB,/DESTROY
   ptr_free,self.plug_list
   self->OMArray::Cleanup
   self->ObjMsg::Cleanup         ;chain up: cleans up the recip list
@@ -828,6 +832,7 @@ pro tvDraw__define
       wTLB: 0L, $               ;the TLB widget ID
       oldwin:0, $               ;the old window which was set.
       psconf:obj_new(), $       ;the FSC_PSConfig object
+      free_orig:0b, $           ;whether to free the original data
       imorig:ptr_new(), $       ;saved original image, unmodified
       immod:ptr_new(), $        ;the modifiable (by, e.g., filters) image
       imscl:ptr_new(), $        ;the byte-scaled image
