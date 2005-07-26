@@ -17,14 +17,17 @@ pro CubeViewSpec::Message, msg
      *self.lam=*msg.wavelength
      self.upgoing=((*self.lam)[n_elements(*self.lam)-1]-(*self.lam)[0]) gt 0.0
      *self.sp=*msg.spec
+     if ptr_valid(msg.spec_unc) then *self.sp_unc=*msg.spec_unc else $
+        if n_elements(*self.sp_unc) gt 0 then void=temporary(*self.sp_unc)
      widget_control, self.wToggles,GET_VALUE=ren
-     if n_elements(ren) eq 2 then begin ; if auto-renorm'ing
-        if ren[0] then begin 
-           med=median(*self.sp)
-           self.renorm=med gt 0.?round(alog10(med)):0
-        endif 
-     endif
-     if self.renorm ne 0. then *self.sp=*self.sp/10.0D^self.renorm
+     if ren[0] then begin 
+        med=median(*self.sp)
+        self.renorm=med gt 0.?round(alog10(med)):0
+     endif 
+     if self.renorm ne 0. then begin 
+        *self.sp=*self.sp/10.0D^self.renorm
+        if n_elements(*self.sp_unc) ne 0 then *self.sp_unc/=10.D^self.renorm
+     endif 
      widget_control, self.wDraw,/DRAW_BUTTON_EVENTS, /DRAW_MOTION_EVENTS
      self.movestart=-1
      self->Plot
@@ -53,6 +56,11 @@ end
 pro CubeViewSpec_map_event, ev
   widget_control,ev.top,get_uvalue=self
   self->MapEvent,ev
+end
+
+
+pro CubeViewSpec::Quit
+  widget_control, self.wBase,/DESTROY
 end
 
 ;=============================================================================
@@ -114,7 +122,7 @@ pro CubeViewSpec::Event,ev
                     widget_control, self.wDo, SET_VALUE=1
                     widget_control, self.wRType, SENSITIVE=0
                  end
-                 'Q': widget_control, ev.top, /DESTROY
+                 'Q': self->Quit
                  
                  ' ':  begin    ;Space, switch outlines...
                     if self.selected eq -1 then return
@@ -254,15 +262,23 @@ pro CubeViewSpec::Event,ev
            1b: self.press=0b    ;release
            
            2b: begin            ;motion
-              ind=value_locate(*self.lam,c[0])
-              nl=n_elements(*self.lam) 
+              m=min(abs(*self.lam-c[0]),ind)
+              ;ind=value_locate(*self.lam,c[0])
+              nl=n_elements(*self.lam)
               if ind lt 0 or ind ge nl then return
               moved=ind-self.movestart
               if moved eq 0 then return
               self.movestart=ind ;relative to here
-              widget_control, self.wLine,SET_VALUE= $
-                              string(FORMAT='("[",F7.3,":",G9.4,"]")', $
-                                     (*self.lam)[ind],(*self.sp)[ind])
+              if n_elements(*self.sp_unc) ne 0 then begin 
+                 widget_control, self.wLine,SET_VALUE= $
+                                 string(FORMAT='("[",F7.3,":",G9.4,' + $
+                                        'A0,G-0.4,"]")', $
+                                        (*self.lam)[ind],(*self.sp)[ind], $
+                                        string(177b),(*self.sp_unc)[ind])
+              endif else $
+                 widget_control, self.wLine,SET_VALUE= $
+                                 string(FORMAT='("[",F7.3,":",G9.4,"]")', $
+                                        (*self.lam)[ind],(*self.sp)[ind])
               ;; Maybe Moving a region
               if self.press then begin 
                  range=(*self.reg[self.seltype])[*,self.selected]
@@ -290,8 +306,12 @@ pro CubeViewSpec::Event,ev
      self.wSaveBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,0}
      self.wExportBut: self->MsgSend,{CUBEVIEWSPEC_SAVE,1}
      
-     self.wToggles: self->Plot
-
+     self.wToggles: begin 
+        widget_control, ev.id,GET_VALUE=tog
+        self.show_error=tog[2]
+        self->Plot
+     end 
+     
      self.wFit: $
         case ev.value of 
         0: self->Reset
@@ -835,6 +855,8 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   erase
   plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=5,YSTYLE=4, $
        CHARSIZE=1.3,POSITION=[.06,.06,.99,.95]
+  if self.show_error && n_elements(*self.sp_unc) gt 0 then $
+     errplot,*self.lam,*self.sp-*self.sp_unc,*self.sp+*self.sp_unc
   self->ShowRegions
   plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,/NOERASE, $
        CHARSIZE=1.3,POSITION=[.06,.06,.99,.95]
@@ -868,7 +890,7 @@ end
 ;=============================================================================
 pro CubeViewSpec::ShowValueLine
   if self.press or self.movestart eq -1 then return
-  if self->ShowingValueLine() eq 0 then return
+  if ~self->ShowingValueLine() then return
   x=(*self.lam)[self.movestart]
   plots,x,!Y.CRANGE
 end
@@ -878,8 +900,7 @@ end
 ;=============================================================================
 function CubeViewSpec::ShowingValueLine
   widget_control, self.wToggles, GET_VALUE=tog
-  if n_elements(tog) eq 2 then vl=tog[1] else vl=0
-  return,vl ne 0 
+  return,tog[1] ne 0 
 end
 
 ;=============================================================================
@@ -890,8 +911,13 @@ pro CubeViewSpec::HighlightPeak
   for i=0,n_elements(*self.reg[1])/2-1 do begin 
      reg=(*self.reg[1])[*,i]
      if NOT array_equal(reg ge 0,1b) then return
-     oplot,(*self.lam)[reg[0]:reg[1]],(*self.sp)[reg[0]:reg[1]], $
-           COLOR=self.colors_base+3
+     sp=(*self.sp)[reg[0]:reg[1]]
+     oplot,(*self.lam)[reg[0]:reg[1]],sp,COLOR=self.colors_base+3
+     if self.show_error && n_elements(*self.sp_unc) gt 0 then begin 
+        err=(*self.sp_unc)[reg[0]:reg[1]]
+        errplot,(*self.lam)[reg[0]:reg[1]],sp-err,sp+err, $
+                COLOR=self.colors_base+3
+     endif 
   endfor 
 end
 
@@ -1077,7 +1103,8 @@ end
 pro CubeViewSpec::Cleanup
   self.mode=0 & self->Send,/JUST_SEND ;make sure everybody is in Full mode
   wdelete,self.pixwin
-  ptr_free,self.lam,self.sp,self.fit,self.reg,self.weights,self.wMapSets
+  ptr_free,self.lam,self.sp,self.sp_unc, $
+           self.fit,self.reg,self.weights,self.wMapSets
   self->OMArray::Cleanup
   self->ObjMsg::Cleanup
 end
@@ -1153,12 +1180,11 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   col1row2base=widget_base(col1base,/ROW,/ALIGN_LEFT, $
                            /BASE_ALIGN_CENTER,SPACE=1,/FRAME) 
   
-  if NOT keyword_set(rn) then buttons=['Auto Renorm','Value line'] $
-  else buttons=['Value line']
+  buttons=['Renorm','ValLine','Errors']
   
   self.wToggles=cw_bgroup(col1row2base,buttons,/NONEXCLUSIVE,/ROW,$
                           SET_VALUE=replicate(1,n_elements(buttons)))
-  
+  self.show_error=1b
   self.wOrder=widget_droplist(col1row2base,TITLE='Fit Order:', $
                               VALUE=string(FORMAT='(I0)',indgen(5)+1))
   self.wGray[2]=self.wOrder
@@ -1173,17 +1199,18 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
   colbase=widget_base(controlbase,/COLUMN)
   self.wParams=widget_label(colbase,/FRAME,/ALIGN_LEFT,VALUE= $
                             string(FORMAT='(6A)', $
-                                   replicate(string(replicate(32b,24)),6)+ $
+                                   replicate(string(replicate(32b,30)),6)+ $
                                    string(10b)))
-  self.wLine=widget_label(colbase,/FRAME,/DYNAMIC_RESIZE,VALUE='***')
-  if keyword_set(rn) then self.renorm=round(rn)
+  self.wLine=widget_label(colbase,/FRAME, /ALIGN_LEFT, $
+                          VALUE=string(bytarr(30)+(byte('*'))[0]))
 
-  self.wDraw=widget_draw(self.wBase,XSIZE=600,YSIZE=400)
-  window,/FREE,/PIXMAP,XSIZE=600,YSIZE=400 ;to cache the image in
+  self.wDraw=widget_draw(self.wBase,XSIZE=650,YSIZE=400)
+  window,/FREE,/PIXMAP,XSIZE=650,YSIZE=400 ;to cache the image in
   self.pixwin=!D.WINDOW
   
   self.lam=ptr_new(/ALLOCATE_HEAP)
   self.sp=ptr_new(/ALLOCATE_HEAP)
+  self.sp_unc=ptr_new(/ALLOCATE_HEAP)
   self.fit=ptr_new(/ALLOCATE_HEAP)
   
   self.selected=-1
@@ -1215,6 +1242,7 @@ pro CubeViewSpec__define
       ;; The spectrum/fit and regions
       lam:ptr_new(), $          ;The spectral data
       sp:ptr_new(), $
+      sp_unc: ptr_new(), $      ;uncertainty in the spectrum
       fit:ptr_new(), $          ;the continuum fit
       reg:ptrarr(2),$           ;2 ptrs each to a 2xn array of
                                 ; continuum([0])/peak([1]) index ranges
@@ -1252,6 +1280,7 @@ pro CubeViewSpec__define
       upgoing:0b, $             ;whether the wavelength is increasing or not
       weight_cont:0b, $         ;fit continuum lambda-weighted
       map_name:'', $            ;the map name, if any
+      show_error:0b, $          ;whether to show the errors
       ;; Widget/Window/ColorMap ID's
       wBase:0L, $               ;the window base
       wMapSets:ptr_new(), $     ;point to map set buttons
