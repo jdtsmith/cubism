@@ -11,8 +11,8 @@ pro irs_bmask,mask,PMASK=pm,SATURATED=sat,NO_FLAT=nf,NO_PLANES=np, $
   rh=flags[3] ne 0b             ;Radiation Hit
   
   if arg_present(cs) then begin 
-     cs=(pm?'*':'.')+(sat?'S':'.')+(nf?'F':'.')+(rh?'R':'.')+ $
-        (op?'1':(np?'0':'.'))
+     cs=(pm?'*':'')+(sat?'S':'')+(nf?'F':'')+(rh?'R':'')+ $
+        (op?'1':(np?'0':''))
      if (mask AND 35575U) gt 0 then begin 
         flags[[14,10,8,13,12,3]]=0b
         cs+="["+strjoin(strtrim(where(flags),2),",")+"]"
