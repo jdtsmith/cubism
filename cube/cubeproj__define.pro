@@ -206,6 +206,18 @@ pro CubeProj::ShowEvent, ev
         self->SetProperty,USE_BACKGROUND=1b-self.use_bg
         widget_control, ev.id, SET_BUTTON=self.use_bg
      end 
+     'use_unc': begin 
+        self->SetProperty,USE_UNCERTAINTY=1b-self.use_unc
+        widget_control, ev.id, SET_BUTTON=self.use_unc
+     end
+     'load_masks': begin 
+        self->SetProperty,LOAD_MASKS=1b-self.load_masks
+        widget_control, ev.id, SET_BUTTON=self.load_masks
+     end
+     'load_unc': begin 
+        self->SetProperty,LOAD_UNCERTAINTY=1b-self.load_unc
+        widget_control, ev.id, SET_BUTTON=self.load_unc
+     end
      'wavecut': begin 
         self->SetProperty,WAVECUT=1b-self.wavecut
         widget_control, ev.id, SET_BUTTON=self.wavecut
@@ -263,7 +275,6 @@ pro CubeProj::ShowEvent, ev
            self->UpdateButtons
         endif 
      end 
-
      
      'select-by-keyword': begin 
         keys=strtrim(strmid(*(*self.DR)[0].HEADER,0,8),2)
@@ -523,6 +534,15 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   tmp=widget_button(b3,VALUE='DroopRes...',UVALUE='add-droop-module')
   tmp=widget_button(b3,VALUE='FlatAp...',UVALUE='add-flatap-module')
   
+  b1=widget_button(rec,VALUE='Load Record Masks',UVALUE='load_masks', $
+                   /CHECKED_MENU)
+  widget_control, b1,SET_BUTTON=self.load_masks
+  b1=widget_button(rec,VALUE='Load Record Uncertainties',UVALUE='load_unc', $
+                   /CHECKED_MENU)
+  widget_control, b1,SET_BUTTON=self.load_unc
+  
+  
+  
   wMustSel=[wMustSel, $
             widget_button(rec,VALUE='Switch Record Data Type...', $
                           UVALUE='switchrecorddatatype')]
@@ -598,7 +618,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   b1=widget_button(cube,VALUE='Use Reconstructed Positions', $
                    UVALUE='reconstructed', /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.reconstructed_pos
-  
+  (*self.wInfo).MUST_UNCERTAINTIES= $
+     widget_button(cube,VALUE='Build Cube Uncertainties',UVALUE='use_unc', $
+                   /CHECKED_MENU)
+  widget_control, (*self.wInfo).MUST_UNCERTAINTIES,SET_BUTTON=self.use_unc
   
   ;;-------------
   (*self.wInfo).MUST_MODULE= $
@@ -623,7 +646,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
             widget_button(bcomb,VALUE='Set and Scale Background B...', $
                           UVALUE='setbackgroundfromrecsb')]
   (*self.wInfo).MUST_BACK_AB= $
-     widget_button(bcomb,VALUE='Blend A & B Backgrounds...', $
+     widget_button(bcomb,VALUE='Blend A and B Backgrounds...', $
                    UVALUE='blendbackgrounds')
   ;;-------------
   (*self.wInfo).MUST_BACK_A=widget_button(bcomb,VALUE='View Background A...', $
@@ -689,7 +712,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      cw_bgroup(/NONEXCLUSIVE,headmap, $
                ['Target            ', $
                 'RA     ', $
-                'Dec  ', $
+                'Dec   ', $
                 'DATA',$
                 'UNC', $
                 'BMSK',$
@@ -701,7 +724,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   (*self.wInfo).SList= $
      widget_list(b,/MULTIPLE,/ALIGN_LEFT, $
-                 YSIZE=6>self->N_Records()<15,XSIZE=86,/FRAME)
+                 YSIZE=8>self->N_Records()<16,XSIZE=86,/FRAME)
   
   bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup', $
                 ['Enable','Disable','Delete','Header', $
@@ -733,6 +756,9 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
            CLEANUP='CubeProj_show_kill'
 end
 
+;=============================================================================
+;  KillShow - Kill the widget GUI if it's alive
+;=============================================================================
 pro CubeProj::KillShow
   if self->isWidget() && widget_info((*self.wInfo).SList,/VALID_ID) $
   then begin 
@@ -880,11 +906,13 @@ pro CubeProj::Initialize
         self->Warning,'Missing OBJECT tags: restored'
   endif 
   
-  ;; Default cube build parameters for older versions of cubes
+  ;; Default recent cube build parameters for older versions of cubes
+  ;; (e.g. if loaded from file)
   parts=stregex(self.version,'v([0-9.]+)',/SUBEXPR,/EXTRACT)
   version=float(parts[1])
-  if version lt 0.87 then self.use_bg=1b
-  if version lt 0.82 then self.reconstructed_pos=1b
+  if version lt 0.90 then self->SetProperty,/LOAD_MASKS
+  if version lt 0.87 then self->SetProperty,/USE_BACKGROUND
+  if version lt 0.82 then self->SetProperty,/RECONSTRUCTED_POSITIONS
 end
 
 ;=============================================================================
@@ -965,8 +993,10 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   self->UpdateTitle
 end
 
+
 ;=============================================================================
-;  RestoreData - Restore selected data from file
+;  RestoreData - Restore selected data from file, without invalidating
+;                records
 ;=============================================================================
 pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,_EXTRA=e
   self->RecOrSelect,sel,_EXTRA=e
@@ -989,17 +1019,18 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,_EXTRA=e
      
      ;; Optional BMASK, UNCERTAINTY
      ptr_free,(*self.DR)[which].BMASK,(*self.DR)[which].UNC
-     ;unc_file=irs_associated_file(file,/UNCERTAINTY)
      bmask_file=irs_associated_file(file,/BMASK)
      
      if bmask_file && file_test(bmask_file,/READ) then $
         (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
      
-     ;if size(unc_file,/TYPE) eq 7 && file_test(unc_file) then $
-     ;   (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
+     unc_file=irs_associated_file(file,/UNCERTAINTY)
+     if size(unc_file,/TYPE) eq 7 && file_test(unc_file) then $
+        (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
   endfor
   self->UpdateList
 end
+
 
 ;=============================================================================
 ;  RestoreAll - Restore All data
@@ -1274,7 +1305,6 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err,_EXTRA=e
   free_lun,un
 end
 
-
 ;=============================================================================
 ;  SaveBackGroundList - Save list of background records to file
 ;=============================================================================
@@ -1298,6 +1328,20 @@ pro CubeProj::SaveBackGroundList,file
   free_lun,un
 end
 
+
+;=============================================================================
+;  CheckRecordUncertainties - See if records have uncertainties set
+;=============================================================================
+function CubeProj::CheckRecordUncertainties,ENABLED=enabled
+  if ~ptr_valid(self.DR) then return,1b
+  if keyword_set(enabled) then begin
+     wh=where(~(*self.DR).DISABLED,cnt)
+     if cnt eq 0 then return,1b
+     return,array_equal(ptr_valid((*self.DR)[wh].UNC),1b)
+  endif else $
+     return,array_equal(ptr_valid((*self.DR).UNC),1b)     
+end
+
 ;=============================================================================
 ;  WriteFits - Write the Cube, Uncertainty, etc. to FITS file
 ;=============================================================================
@@ -1314,29 +1358,6 @@ pro CubeProj::WriteFits,file
   
   ;; Celestial coordinates
   putast,hdr,self->CubeAstrometryRecord()
-  ; RADEG = 180.0d/!DPI           ; preserve double
-;   fxaddpar,hdr,'EQUINOX', 2000.0,   ' Equinox of reference coordinate'
-;   fxaddpar,hdr,'CTYPE1','RA---TAN', ' RA in tangent plane projection'
-;   fxaddpar,hdr,'CTYPE2','DEC--TAN', ' DEC in tangent plane projection'
-;   fxaddpar,hdr,'CRPIX1',(self.CUBE_SIZE[0]+1.)/2, $
-;            ' Pixel x coordinate at reference point'
-;   fxaddpar,hdr,'CRPIX2',(self.CUBE_SIZE[1]+1.)/2, $
-;            ' Pixel y coordinate at reference point'
-;   fxaddpar,hdr,'CRVAL1',self.POSITION[0],' [deg] RA at reference point'
-;   fxaddpar,hdr,'CRVAL2',self.POSITION[1],' [deg] DEC at reference point'
-  
-;   ;; Old style angle, for older FITS readers
-;   fxaddpar,hdr,'CROTA2',self.PA,' [deg] Rotation angle'
-  
-;   ;; New style coordinate transform
-;   fxaddpar,hdr,'CDELT1',self.PLATE_SCALE, $
-;            ' [deg/pix] Plate scale, coordinate 1'
-;   fxaddpar,hdr,'CDELT2',self.PLATE_SCALE, $
-;            ' [deg/pix] Plate scale, coordinate 2'
-;   fxaddpar,hdr,'PC1_1' ,-cos(self.PA/RADEG),' Transformation matrix element'
-;   fxaddpar,hdr,'PC1_2' ,-sin(self.PA/RADEG),' Transformation matrix element'
-;   fxaddpar,hdr,'PC2_1' ,-sin(self.PA/RADEG),' Transformation matrix element'
-;  fxaddpar,hdr,'PC2_2' , cos(self.PA/RADEG),' Transformation matrix element'
   
   ;; Wavelength coordinates and wavelength LUT binary table extension.
   fxaddpar,hdr,'CTYPE3','WAVE-TAB','Wavelength'
@@ -1358,15 +1379,14 @@ pro CubeProj::WriteFits,file
   self->LoadCalib
   fxaddpar,hdr,'CAL_SET',self.cal->Name(),' IRS Calibration set used'
   
-
-  
   ;; Write the primary header and data
+  ;; XXX put in the binary table to allow uncertainty cube in another column!
   fxwrite,file,hdr,*self.CUBE
-;  fxwrite,file,hdr,*self.CUBE_UNC
+  if ptr_valid(self.CUBE_UNC) then fxwrite,file,hdr,*self.CUBE_UNC
   
   ;; Make the wavelength LUT extension header
   fxbhmake,hdr,1,'WCS-TAB','Wavelength look-up table for cube dimension 3'
-  fxbaddcol,wcol,hdr,*self.WAVELENGTH,'WAVELENGTH','Column label'
+  fxbaddcol,wcol,hdr,*self.WAVELENGTH,'WAVELENGTH','Column label',TUNIT='um'
   fxbcreate,unit,file,hdr
   fxbwrite,unit,*self.WAVELENGTH,wcol,1
   fxbfinish,unit
@@ -1694,6 +1714,9 @@ pro CubeProj::UpdateButtons
                   ptr_valid(self.DR) && $
                   ~array_equal(ptr_valid((*self.DR).BCD),1b)
   widget_control, (*self.wInfo).MUST_FLUXCON,SENSITIVE=self.fluxcon
+  
+  widget_control, (*self.wInfo).MUST_UNCERTAINTIES, $
+                  SENSITIVE=self->CheckRecordUncertainties(/ENABLED)
 end
 
 ;=============================================================================
@@ -1760,8 +1783,7 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode, $
         endif 
      endfor 
      if n_elements(free_rec) ne 0 then begin 
-        self->MsgSignup,free_rec,/ALL,CUBEPROJ_SELECT=0, $
-                        CUBEPROJ_RECORD_UPDATE=0
+        self->MsgSignup,free_rec,/ALL,CUBEPROJ_SELECT=0
         return
      endif 
   endif 
@@ -1780,13 +1802,12 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode, $
         if (keyword_set(vmode) && rvmode) || $
            bcd_mode eq ~keyword_set(cube_mode) then begin ;the right mode
            ;; sign up the correct one
-           self->MsgSignup,rec,/ALL,CUBEPROJ_SELECT=0, $
-                           CUBEPROJ_RECORD_UPDATE=0 
+           self->MsgSignup,rec,/ALL,CUBEPROJ_SELECT=0
            return
         endif 
      endfor 
      ;; Didn't find one with the right mode... just take the first one
-     self->MsgSignup,recs[0],/ALL,CUBEPROJ_SELECT=0,CUBEPROJ_RECORD_UPDATE=0
+     self->MsgSignup,recs[0],/ALL,CUBEPROJ_SELECT=0
   end else cubeview,CUBE=self
 end
 
@@ -1900,7 +1921,7 @@ pro CubeProj::DisableRecord,recs,DISABLE=dis,_EXTRA=e
   self->RecOrSelect,recs,_EXTRA=e
   (*self.DR)[recs].DISABLED=dis
   self.Changed=1b
-  self->Send,/REC_UPDATE
+  self->Send,/REC_UPDATE,/DISABLED
   self->UpdateAll
 end
 
@@ -1946,7 +1967,7 @@ pro CubeProj::SwitchRecordDataType,r,FLATAP=f2ap,BCD=bcd,DROOPRES=dr,_EXTRA=e
   
   if n_elements(new_type) eq 0 then begin 
      which=popup('Switch Records to Type:',types,TITLE='Switch Record Type', $
-                 PARENT_GROUP=self->TopBase(),/MODAL,SELECT=all_type)
+                 PARENT_GROUP=self->TopBase(),/MODAL,SELECT=0)
      if which eq "Coad2d" then self->Error,'Cannot convert Coad2d'
      new_type=where(all_types eq which)
   endif 
@@ -1996,10 +2017,12 @@ pro CubeProj::SetBackgroundFromRecs,recs, BLEND=comb, SET_ONLY=so, $
   endelse
   
   ;; Cube of BCD data
-  bcds=self->BCD(recs)
+  bcds=self->BCD(recs,UNCERTAINTY=unc)
+  
   if n le 2 && choice eq 1 then $
      self->Warning,'Fewer than 3 BG records -- reverting to average.'
-  back=imcombine(bcds,/AVERAGE,REJECT_MINMAX=n gt 2 && choice eq 1)
+  back=imcombine(bcds,UNCERTAINTY=unc,COMBINED_UNCERTAINTY=back_unc,/AVERAGE, $
+                 REJECT_MINMAX=n gt 2 && choice eq 1)
 
   if n_elements(comb) gt 0  then begin 
      ;; Blend backgrounds
@@ -2013,12 +2036,15 @@ pro CubeProj::SetBackgroundFromRecs,recs, BLEND=comb, SET_ONLY=so, $
      ;; When scale-combining, use an array of two structures
      if ~ptr_valid(self.BACK_RECS) then begin 
         self.BACK_RECS=ptr_new(replicate({BACKGROUND:ptr_new(), $
+                                          BACK_UNC:ptr_new(), $
                                           FIDUCIAL: 0.0, $
                                           SCALE: 0.0, $
                                           DCEIDS:ptr_new()},2)) 
      endif else heap_free,(*self.BACK_RECS)[pos]
      
      (*self.BACK_RECS)[pos].BACKGROUND=ptr_new(back,/NO_COPY)
+     if n_elements(back_unc) ne 0 then $
+        (*self.BACK_RECS)[pos].BACK_UNC=ptr_new(back_unc,/NO_COPY)     
      (*self.BACK_RECS)[pos].DCEIDs=ptr_new((*self.DR)[recs].DCEID)
      
      if keyword_set(so) then return ;just set the relevant background
@@ -2035,6 +2061,8 @@ pro CubeProj::SetBackgroundFromRecs,recs, BLEND=comb, SET_ONLY=so, $
      ;; Straight averages
      ptr_free,self.BACKGROUND
      self.BACKGROUND=ptr_new(back,/NO_COPY)
+     if n_elements(back_unc) ne 0 then $
+        self.BACKGROUND_UNC=ptr_new(back_unc,/NO_COPY)
      self.BACK_DATE=systime(/JULIAN)
      self.Changed=1b
      self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
@@ -2074,6 +2102,8 @@ pro CubeProj::BlendBackgrounds,USE_EXISTING_SCALES=ue, ASCALE=ascale, $
               (tval ge aval && tval le bval) ) then $
                  message,'Value must be between two background fiducials', $
                          /NONAME
+        
+        ;; Use fiducials and target value to compute blend fractions
         bscale=(tval-aval)/(bval-aval)
         ascale=(bval-tval)/(bval-aval)
         (*self.BACK_RECS).SCALE=[ascale,bscale]
@@ -2102,8 +2132,14 @@ pro CubeProj::BlendBackgrounds,USE_EXISTING_SCALES=ue, ASCALE=ascale, $
   ;; Create scaled background
   back=ascale*(*(*self.BACK_RECS)[0].BACKGROUND)+ $
        bscale*(*(*self.BACK_RECS)[1].BACKGROUND)
-  ptr_free,self.BACKGROUND
+  if array_equal(ptr_valid((*self.BACK_RECS).BACK_UNC),1b) then $
+     back_unc=sqrt(ascale^2 * (*(*self.BACK_RECS)[0].BACK_UNC)^2 + $
+                   bscale^2 * (*(*self.BACK_RECS)[1].BACK_UNC)^2)
+  
+  ptr_free,self.BACKGROUND,self.BACKGROUND_UNC
   self.BACKGROUND=ptr_new(back,/NO_COPY)
+  if n_elements(back_unc) ne 0 then $
+     self.BACKGROUND_UNC=ptr_new(back_unc,/NO_COPY)
   self.BACK_DATE=systime(/JULIAN)
   self->UpdateButtons
 end
@@ -2201,7 +2237,7 @@ end
 function CubeProj::DCEIDtoRec,dceid,cnt,RECORDS=recs
   if ~ptr_valid(self.DR) then return,-1
   if n_elements(recs) ne 0 then $
-     return,where_array([dceid],(*self.DR)[recs].DCEID,cnt) $
+     return,where_array([dceid],[(*self.DR)[recs].DCEID],cnt) $
   else return,where_array([dceid],(*self.DR).DCEID,cnt)
 end
 
@@ -2224,7 +2260,7 @@ pro CubeProj::Sort,sort
      8:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[1]: $
                 (*self.DR).RQST_POS[1])
      9:  s=sort(ptr_valid((*self.DR).BCD))
-     10:  s=sort(ptr_valid((*self.DR).UNC))
+     10: s=sort(ptr_valid((*self.DR).UNC))
      11: s=sort(ptr_valid((*self.DR).BMASK))
      12: s=sort(ptr_valid((*self.DR).ACCOUNT))
      13: s=sort(ptr_valid((*self.DR).BAD_PIXEL_LIST))
@@ -2292,6 +2328,7 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
   str=[str,'FLUXCON: '+(this.FLUXCON?"Yes":"No")]
   str=[str,'   SLCF: '+(this.SLCF?"Yes":"No")]
   str=[str,'WAVECUT: '+(this.wavecut?"Yes":"No")]
+  str=[str,'UNCERTAINTY: '+(this.use_unc?"Yes":"No")]
   str=[str,'Positions: '+(this.RECONSTRUCTED_POS?"Reconstructed":"Requested")]
   
   nbadpix=ptr_valid(this.GLOBAL_BAD_PIXEL_LIST)? $
@@ -2371,8 +2408,9 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
                           GLOBAL_BAD_PIXEL_LIST=gbpl, WAVECUT=wavecut, $
                           RECONSTRUCTED_POSITIONS=rcp, USE_BACKGROUND=ubg,$
-                          FLUXCON=fc,SLCF=slcf,PIXEL_OMEGA=po, $
-                          SAVE_ACCOUNTS=sa,SAVE_DATA=sd
+                          USE_UNCERTAINTY=uunc, LOAD_MASKS=lm, $
+                          LOAD_UNCERTAINTY=lu,FLUXCON=fc,SLCF=slcf, $
+                          PIXEL_OMEGA=po, SAVE_ACCOUNTS=sa,SAVE_DATA=sd
   update_cal=0b
   if n_elements(ps) ne 0 then begin 
      if self.PLATE_SCALE ne ps then begin 
@@ -2469,7 +2507,18 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      self.use_bg=keyword_set(ubg) 
      self.Changed=1b
   endif 
-  
+  if n_elements(uunc) ne 0 then begin 
+     self.use_unc=keyword_set(uunc) 
+     self.Changed=1b
+  endif
+  if n_elements(lm) ne 0 then begin 
+     self.load_masks=keyword_set(lm) 
+     self.Changed=1b
+  endif 
+  if n_elements(lu) ne 0 then begin 
+     self.load_unc=keyword_set(lu) 
+     self.Changed=1b
+  endif 
   if n_elements(fc) ne 0 then begin 
      self.fluxcon=keyword_set(fc) 
      self.Changed=1b
@@ -2502,8 +2551,8 @@ pro CubeProj::GetProperty, $
    ;; Global or AS_BUILT options
    AS_BUILT=as_built, GLOBAL_BAD_PIXEL_LIST=gbpl,APERTURE=ap, MODULE=module, $
    ORDER=order, BACK_DATE=bdate, FLUXCON=fc, SLCF=slcf, PIXEL_OMEGA=po, $
-   RECONSTRUCTED_POSITIONS=rp,WAVECUT=wavecut, USE_BG=use_bg, CAL_FILE=cf, $
-   PR_SIZE=prz, PR_WIDTH=prw, $
+   RECONSTRUCTED_POSITIONS=rp,WAVECUT=wavecut, USE_BG=use_bg, $
+   USE_UNCERTAINTY=use_unc, CAL_FILE=cf, PR_SIZE=prz, PR_WIDTH=prw, $
    ;; Global non-record based options
    SLIT_LENGTH=sl, CALIB=calib, PROJECT_NAME=pn, CUBE_SIZE=cs,$
    TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
@@ -2556,6 +2605,7 @@ pro CubeProj::GetProperty, $
   if arg_present(rp) then rp=this.reconstructed_pos
   if arg_present(wavecut) then wavecut=this.wavecut
   if arg_present(use_bg) then use_bg=this.use_bg
+  if arg_present(use_unc) then use_unc=this.use_unc
   if arg_present(cf) then cf=this.cal_file
   if arg_present(prz) then prz=this.PR_SIZE
   if arg_present(prw) then prw=this.PR_SIZE[1]
@@ -2682,12 +2732,18 @@ end
 ;=============================================================================
 ;  Cube
 ;=============================================================================
-function CubeProj::Cube,pln
-  if NOT ptr_valid(self.CUBE) then return,-1
+function CubeProj::Cube,pln,UNCERTAINTY=unc
+  if ~ptr_valid(self.CUBE) then return,-1
   if n_elements(pln) ne 0 then begin 
      pln=0>pln<((size(*self.CUBE,/DIMENSIONS))[2]-1)
+     if arg_present(unc) && ptr_valid(self.CUBE_UNC) then $
+        unc=(*self.CUBE_UNC)[*,*,pln]
      return,(*self.CUBE)[*,*,pln]
-  endif else return,*self.CUBE 
+  endif else begin
+     if arg_present(unc) && ptr_valid(self.CUBE_UNC) then $
+        unc=*self.CUBE_UNC
+     return,*self.CUBE 
+  endelse
 end
 
 ;=============================================================================
@@ -2713,7 +2769,7 @@ function CubeProj::BCD, which,UNCERTAINTY=unc,BMASK=bmask,ALL=all
      for i=0,nw-1 do ret[0,0,i]=*bcds[i]
      if arg_present(unc) && array_equal(ptr_valid((*self.DR)[which].UNC),1b) $
      then begin 
-        unc=make_array(/FLOAT,s)
+        unc=make_array(/FLOAT,s,/NOZERO)
         for i=0,nw-1 do unc[0,0,i]=*(*self.DR)[which[i]].UNC
      endif 
      if arg_present(bmask) && $
@@ -2761,7 +2817,7 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,SILENT=silent
   if ~self.cal_file || keyword_set(force) then begin 
      self.cal_file=filestrip(irs_recent_calib()) ;use the most recent
      if ~keyword_set(nr) then self->ResetAccounts,/NO_UPDATE
-     self.changed=1b            
+     self.changed=1b
      if n_elements(specified) eq 0 && ~keyword_set(silent) then $
         self->Info,['Calibration set unspecified, loading most recent: ', $
                     '  '+self.cal_file],TITLE='IRS Calibration'
@@ -3571,7 +3627,7 @@ pro CubeProj::LayoutBCDs
   self.PA=mean(pa)              ;match our PA to the most numerous
   ;; Approximate cube center (pos average), for now (not critical)
   pos=self.reconstructed_pos?recs.REC_POS:recs.RQST_POS
-  self.POSITION=total(pos,2)/goodcnt
+  self.POSITION=size(pos,/N_DIMENSIONS) eq 2?total(pos,2)/goodcnt:pos
   cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
   
   ;; Compute the region bounds
@@ -3656,14 +3712,26 @@ end
 ;              fluxing information if appropriate)
 ;=============================================================================
 pro CubeProj::BuildCube
-  if NOT ptr_valid(self.DR) then return
+  if ~ptr_valid(self.DR) then return
   self->RestoreAll              ;get all of the data, if necessary
+  
+  enabled=where(~(*self.DR).DISABLED,enabled_cnt)
+  if enabled_cnt eq 0 then $
+     self->Error,'Must enable some records to build cube.'
+  
   if (self.ACCOUNTS_VALID AND 3b) ne 3b OR $
-     ~array_equal(ptr_valid((*self.DR).ACCOUNT),1b) OR $
+     ~array_equal(ptr_valid((*self.DR)[enabled].ACCOUNT),1b) OR $
      self.feedback then self->BuildAccount else self->BuildRevAcct
+  
+  if self.fluxcon || self.slcf then fluxim=self->FluxImage()
+  use_unc=self.use_unc && array_equal(ptr_valid((*self.DR)[enabled].UNC),1b)
+  use_bg=self.use_bg && ptr_valid(self.BACKGROUND)
+  use_flux=n_elements(fluxim) gt 0
   
   cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
+  if use_unc then $
+     cube_unc=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
   
   ;; Bad pixels
   if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then begin 
@@ -3672,19 +3740,11 @@ pro CubeProj::BuildCube
      bpmask[*self.GLOBAL_BAD_PIXEL_LIST]=0b
   endif else use_bpmask=0
   
-  if self.feedback then begin 
-     csz=self.cube_size[0]*self.cube_size[1]
-     ctarg=self.cube_size[2]/2
-  endif 
-  
-  if self.fluxcon || self.slcf then fluxim=self->FluxImage()
-  
   cube_width=self.CUBE_SIZE[0]
-  cube_wh=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
+  cube_plane_pix=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
   
-  for dr=0,n_elements(*self.DR)-1 do begin 
-     this_dr=(*self.DR)[dr]
-     if this_dr.DISABLED then continue
+  for k=0L,enabled_cnt-1 do begin
+     this_dr=(*self.DR)[enabled[k]]
      acct=*this_dr.ACCOUNT
      rev_acc=*this_dr.REV_ACCOUNT
      rev_min=this_dr.REV_MIN
@@ -3694,50 +3754,35 @@ pro CubeProj::BuildCube
      rev_off=this_dr.REV_OFFSET
      
      bcd=*this_dr.BCD
-     if self.use_bg && ptr_valid(self.BACKGROUND) then bcd-=*self.BACKGROUND
-     if n_elements(fluxim) gt 0 then bcd*=fluxim
-     use_unc=ptr_valid(this_dr.UNC)
+     if use_bg then bcd-=*self.BACKGROUND
+     if use_flux then bcd*=fluxim
      if use_unc then begin 
-        ;; XXX should include error in background
-        unc=*this_dr.UNC
-        if n_elements(fluxim) gt 0 then unc*=fluxim
+        bcd_unc=*this_dr.UNC
+        if use_bg then bcd_unc=sqrt(bcd_unc^2+(*self.BACKGROUND_UNC)^2)
+        if use_flux then bcd_unc*=fluxim
      endif
      
+     ;; Masks
+     ;; Start with all BCD NaN's
+     mask=finite(bcd)
      ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
      ;; entering the cube, and add any global bad pixels
-     if ptr_valid(this_dr.BMASK) then begin 
-        use_bmask=1
-        bmask=(*this_dr.BMASK AND 28928U) eq 0L 
-        if use_bpmask then bmask AND= bpmask
-     endif else if use_bpmask then begin 
-        use_bmask=1
-        bmask=bpmask
-     endif else use_bmask=0
+     if ptr_valid(this_dr.BMASK) then $
+        mask AND= (*this_dr.BMASK AND 28928U) eq 0L 
+     if use_bpmask then mask AND= bpmask
      
      ;; Add any per-BCD bad pixels
-     if ptr_valid(this_dr.BAD_PIXEL_LIST) then begin 
-        if ~use_bmask then begin 
-           use_bmask=1
-           bmask=make_array(size(bcd,/DIMENSIONS),VALUE=1b)
-        endif 
-        bmask[*this_dr.BAD_PIXEL_LIST]=0b
-     endif 
+     if ptr_valid(this_dr.BAD_PIXEL_LIST) then $
+        mask[*this_dr.BAD_PIXEL_LIST]=0b
      
-     ;; Use the reverse account to populate the cube -- slow
+     ;; Use the reverse account for this BCD to populate the cube -- slow
      for i=0L,this_dr.REV_CNT-1 do begin 
         if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
         
-        ;; Accounts affecting this pixel
+        ;; Account records affecting this pixel
         these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
         
-        ;; XXX Error weighting, BMASK, other alternatives
-        ;;  need data from all records in one place? ... e.g trimmed mean?
-        ;if array_equal(finite(bcd[these_accts.BCD_PIX]),0b) then $
-        ;   print,rev_acc[rev_acc[i]:rev_acc[i+1]-1],these_accts.BCD_PIX, $
-                                ;         bcd[these_accts.BCD_PIX]
-        
-        ;; Default pixel value is non-finite (NaN)
-        ;; Translate pix in the smaller bounding-box holding this DRs data
+        ;; Translate pix in the smaller cube bounding-box holding this DRs data
         pix=rev_min+i           ;pixel inside the bounding box
         z=pix/rev_wh
         pix-=z*rev_wh
@@ -3745,31 +3790,26 @@ pro CubeProj::BuildCube
         pix-=y*rev_width
         y+=rev_off[1]
         x=rev_off[0]+pix
-        pix=z*cube_wh+y*cube_width+x
+        pix=z*cube_plane_pix+y*cube_width+x
         
-        if use_bmask then begin 
-           cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
-                     total(bcd[these_accts.BCD_PIX] * $
-                           these_accts.AREA * $
-                           bmask[these_accts.BCD_PIX],/NAN)
-           areas[pix]+=total(these_accts.AREA * $
-                             bmask[these_accts.BCD_PIX] * $
-                             finite(bcd[these_accts.BCD_PIX]))
-        endif else begin
-           cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
-                     total(bcd[these_accts.BCD_PIX] * $
-                           these_accts.AREA,/NAN)
-           areas[pix]+=total(these_accts.AREA * $
-                             finite(bcd[these_accts.BCD_PIX]))
-        endelse 
-        if self.feedback then begin ;highlight completed pixels
-           if pix/csz eq ctarg then begin 
-              pix=pix mod csz
-              x=pix mod self.cube_size[0]
-              y=pix/self.cube_size[0]
-              if ptr_valid(self.wInfo) then wset,(*self.wInfo).feedback_window
-              plots,[x,x,x+1,x+1,x],[y,y+1,y+1,y,y],THICK=2
-           endif 
+        bcd_pix=these_accts.BCD_PIX
+        
+        cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
+                  total(bcd[bcd_pix] * these_accts.AREA * mask[bcd_pix],/NAN)
+        areas[pix]+=total(these_accts.AREA * mask[bcd_pix])
+        if use_unc then $
+           cube_unc[pix]=(finite(cube_unc[pix])?cube_unc[pix]:0.0) + $
+                         total(bcd_unc[bcd_pix]^2 * these_accts.AREA^2 * $
+                               mask[bcd_pix],/NAN)
+           
+        ;; Feedback: outline completed pixels
+        if self.feedback && pix/cube_plane_pix eq self.cube_size[2]/2 then $
+           begin 
+           pix=pix mod cube_plane_pix
+           x=pix mod self.cube_size[0]
+           y=pix/self.cube_size[0]
+           if ptr_valid(self.wInfo) then wset,(*self.wInfo).feedback_window
+           plots,[x,x,x+1,x+1,x],[y,y+1,y+1,y,y],THICK=2
         endif 
      endfor
   endfor
@@ -3777,6 +3817,7 @@ pro CubeProj::BuildCube
   areas=areas>1.e-10            ;avoid divide by zero errors
   ptr_free,self.CUBE,self.CUBE_UNC
   self.CUBE=ptr_new(cube/areas)
+  if use_unc then self.CUBE_UNC=ptr_new(sqrt(cube_unc)/areas)
   
   ;; Subtract off 1D BG spectrum (converting to correct units if necessary)
   if self.use_bg && ptr_valid(self.BG_SP) && $
@@ -3794,7 +3835,8 @@ pro CubeProj::BuildCube
      bg=rebin(reform(bg,1,1,n_elements(*self.wavelength)), $
               size(*self.CUBE,/DIMENSIONS),/SAMPLE)
      *self.CUBE-=bg
-  endif 
+     ;; XXX Treat 1D BG errors
+  endif
   
   self.CUBE_DATE=systime(/JULIAN)
   self->SnapshotParameters
@@ -3814,7 +3856,8 @@ end
 ;                 format:
 ;
 ;                     {DR:0,ID:O,BCD_PIX:0,BCD_VAL:0.0, $
-;                      BACK_VAL:0.0,AREA:0.0,BAD:0b,FLAGS:' '}
+;                      BCD_UNC:0.0,BACK_VAL:0.0,BACK_UNC:0.0, $
+;                      AREA:0.0,BAD:0b,FLAGS:' '}
 ;
 ;                 where DR is the record number, ID is the record
 ;                 DCDID.  BCD_PIX is the 1D bcd pixel referenced,
@@ -3879,12 +3922,18 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow
      if show then show_vec[i]=1b
      accs=(*rec.ACCOUNT)[ri[ri[ind]:ri[ind+1]-1]]
      naccs=n_elements(accs) 
-     ret=replicate({DR:i,ID:rec.ID,BCD_PIX:0,BCD_VAL:0.0, $
-                    BACK_VAL:0.0,AREA:0.0,BAD:0b,FLAGS:' '},naccs)
+     ret=replicate({DR:i,ID:rec.ID,BCD_PIX:0,BCD_VAL:0.0,BCD_UNC:0.0, $
+                    BACK_VAL:0.0,BACK_UNC:0.0, AREA:0.0,BAD:0b, $
+                    FLAGS:' '},naccs)
      ret.BCD_PIX=accs.BCD_PIX 
      ret.BCD_VAL=(*rec.BCD)[accs.BCD_PIX]
+     if ptr_valid(rec.UNC) then ret.BCD_UNC=(*rec.UNC)[accs.BCD_PIX]
+     
      if ptr_valid(self.BACKGROUND) then $
         ret.BACK_VAL=(*self.BACKGROUND)[accs.BCD_PIX]
+     
+     if ptr_valid(self.BACKGROUND_UNC) then $
+        ret.BACK_UNC=(*self.BACKGROUND_UNC)[accs.BCD_PIX]
      
      ;; Add badpix
      if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then begin 
@@ -3943,8 +3992,10 @@ end
 ;=============================================================================
 function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
                            OUTPUT_POLY=op,REGION=oReg,PACKAGE_STRUCT=pkg, $
-                           OVERLAP_ERROR=err,_EXTRA=e
+                           OVERLAP_ERROR=err,UNCERTAINTY=sp_unc,_EXTRA=e
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to extract'
+  
+  use_unc=ptr_valid(self.CUBE_UNC)
   
   if keyword_set(rff) then begin
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
@@ -3972,13 +4023,17 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
         self->Warning,'Aperture lies partially outside of cube.'
      endif 
      nover=n_elements(overlap_pix)
+     
      pix=rebin(self.CUBE_SIZE[0]*self.CUBE_SIZE[1]* $
                transpose(findgen(self.CUBE_SIZE[2])), $
                nover, self.CUBE_SIZE[2],/SAMPLE) + $
          rebin(overlap_pix,nover,self.CUBE_SIZE[2],/SAMPLE)
-     sp=total((*self.CUBE)[pix]* $
-              rebin(areas,nover,self.CUBE_SIZE[2],/SAMPLE),$
-              1,/NAN)/total(areas)
+     area=rebin(areas,nover,self.CUBE_SIZE[2],/SAMPLE)
+     core=(*self.CUBE)[pix]
+     area_tot=total(areas*finite(core),1)
+     sp=total(core*area,1,/NAN)/area_tot
+     if use_unc then $
+        sp_unc=sqrt(total((*self.CUBE_UNC)[pix]^2*area^2,1,/NAN))/area_tot
   endif else begin 
      ;; Regular "four corners" integral pixel extraction
      max=(size(*self.CUBE,/DIMENSIONS))[0:1]-1
@@ -3986,6 +4041,12 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      high=0>high<max
      sp=total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
               1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+     if use_unc then begin 
+        sp_unc=sqrt(total(total((*self.CUBE_UNC)[low[0]:high[0], $
+                                                 low[1]:high[1],*]^2,1,/NAN), $
+                          1,/NAN))/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+     endif 
+     
      h=high+1
      op=[[low[0],low[1]], $
          [low[0],h[1]], $
@@ -3999,15 +4060,20 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      endif 
   endelse 
   
-  if keyword_set(sf) then self->SaveSpectrum,sf,sp,oSP,POLYGON=op,_EXTRA=e
+  if keyword_set(sf) then $
+     self->SaveSpectrum,sf,sp,oSP,POLYGON=op,UNCERTAINTY=sp_unc,_EXTRA=e
 
   if keyword_set(exp) then $
      self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
   if n_elements(oSP) ne 0 then obj_destroy,oSP
   if keyword_set(pkg) then begin 
-     ret=replicate({WAVELENGTH:0.0,FLUX:0.0},n_elements(sp))
+     if n_elements(sp_unc) ne 0 then $
+        rec={WAVELENGTH:0.0,FLUX:0.0,UNCERTAINTY:0.0} else $
+           rec={WAVELENGTH:0.0,FLUX:0.0}
+     ret=replicate(rec,n_elements(sp))
      ret.WAVELENGTH=*self.WAVELENGTH
      ret.FLUX=sp
+     if n_elements(sp_unc) ne 0 then ret.UNCERTAINTY=sp_unc
      return,ret
   endif else return,sp
 end
@@ -4016,7 +4082,7 @@ end
 ;=============================================================================
 ;  SaveSpectrum - Save a Spectrum using a spectrum object
 ;=============================================================================
-pro CubeProj::SaveSpectrum,file,sp,oSP,POLYGON=op,COMMENTS=comm
+pro CubeProj::SaveSpectrum,file,sp,oSP,UNCERTAINTY=unc,POLYGON=op,COMMENTS=comm
   if ~obj_valid(oSP) then begin 
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
                  self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
@@ -4029,7 +4095,7 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,POLYGON=op,COMMENTS=comm
      endif 
      destroy=1
   endif else begin 
-     ;; Re-use the region, since it must have been extracted from that.
+     ;; Re-use a given region: it must have been extracted from that.
      oSP->GetProperty,REGION=oReg
      oReg->UpdateAstrometry,self->CubeAstrometryRecord()
   endelse 
@@ -4040,12 +4106,12 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,POLYGON=op,COMMENTS=comm
      return
   endif 
   
-  oSP->SetProperty,SPECTRUM=sp,WAVELENGTH=*self.wavelength, WAVE_UNITS='um', $
+  oSP->SetProperty,FLUX_SPECTRUM=sp,WAVELENGTH=*self.wavelength, $
+                   WAVE_UNITS='um',FLUX_ERROR=unc, $
                    FLUX_UNITS=self->FluxUnits(/AS_BUILT)
   
   oSP->InitHeader
   oSP->AddPar,'CBSMVERS',self.version,'CUBISM Build Version'
-  
   
   ;; Add the first header as inheritance
   m=min((*self.DR).DCEID,pos)
@@ -4102,11 +4168,17 @@ end
 function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                          BG_VALS=bg_vals,MAP_NAME=mname, SAVE=save, $
                          CONTINUUM_SAVE=save_c,CONTINUUM_IMAGE=background, $
+                         CONTINUUM_UNCERTAINTY=background_unc, $
                          WAVELENGTH_WEIGHTED=ww, ALL=all, TEMP_STACK=ts, $
-                         COMMENTS=comm, INTEGRATE=int,_EXTRA=e
+                         COMMENTS=comm, INTEGRATE=int, $
+                         STACK_UNCERTAINTY=stack_unc,_EXTRA=e
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   ;; Get a map set by name
   wl=*self.WAVELENGTH
+  
+  use_unc=(arg_present(stack_unc) || keyword_set(stack_unc)) $
+          && ptr_valid(self.CUBE_UNC)
+  
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
      oMap->GetMap,mname,WEIGHTS=weights,FORERANGES=foreranges, $
@@ -4134,7 +4206,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   
   
   if keyword_set(ww) then begin 
-     ;; Wavelength weighted Backrounds
+     ;; Wavelength weighted Backgrounds
      if nbr eq 0 then $
         self->Error,'Must select continuum regions for wavelength weighting.'
      
@@ -4148,6 +4220,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      endfor
      
      back_cube=(*self.CUBE)[*,*,back_planes]
+     if use_unc then back_cube_unc=(*self.CUBE_UNC)[*,*,back_planes]
      back_finite=finite(back_cube)
      
      if keyword_set(int) then begin 
@@ -4160,29 +4233,44 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                        (delta_nu[1:*]+delta_nu)/2., $
                        delta_nu[n_elements(wl)-2]]
         stack=fltarr(self.CUBE_SIZE[0:1])
+        if use_unc then stack_unc=stack
         background=fltarr(self.CUBE_SIZE[0:1])
+        if use_unc then background_unc=background
         fore_cnt=0
         for i=0,nfr-1 do begin 
            this_cnt=foreranges[1,i]-foreranges[0,i]+1
            fore_cnt+=this_cnt
            fore_cube=(*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]]
+           if use_unc then fore_cube_unc= $
+              (*self.CUBE_UNC)[*,*,foreranges[0,i]:foreranges[1,i]]
            fore_wav=wl[foreranges[0,i]:foreranges[1,i]]
            for j=0,this_cnt-1 do begin ;background value for each plane
               back_weights=rebin(reform(1./(1.+abs(fore_wav[j]-back_wav)), $
                                         [1,1,back_cnt]), $
                                  [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
-              back=total(back_cube*back_weights,3,/NAN)/ $
-                   total(back_weights*back_finite>1.e-25,3)
+              wvec=total(back_weights*back_finite>1.e-25,3)
+              back=total(back_cube*back_weights,3,/NAN)/wvec
               background+=back  ;background not integrated.
               fore_cube[*,*,j]-=back
+              if use_unc then begin 
+                 back_unc=sqrt(total(back_cube_unc^2* $
+                                     back_weights^2,3,/NAN))/wvec
+                 background_unc=sqrt(background_unc^2+back_unc^2)
+                 fore_cube_unc[*,*,j]=sqrt(fore_cube_unc[*,*,j]^2+back_unc^2)
+              endif 
            endfor 
            fore_dnu=rebin(reform(delta_nu[foreranges[0,i]:foreranges[1,i]], $
                                  1,1,this_cnt),size(fore_cube,/DIMENSIONS))
            ;; Integral f_nu dnu.
-           stack+=total(fore_cube*fore_dnu,/NAN,3)/ $
-                  (total(finite(fore_cube),3)>1)*this_cnt
+           fcube_count=(total(finite(fore_cube),3)>1)/this_cnt
+           stack+=total(fore_cube*fore_dnu,/NAN,3)/fcube_count
+           if use_unc then stack_unc=sqrt(stack_unc^2+ $
+                                          total(fore_cube_unc^2*fore_dnu^2,3 $
+                                                /NAN)/fcube_count^2)
+           
         endfor
         background/=fore_cnt
+        if use_unc then background_unc/=fore_cnt
      endif else begin 
         ;; Collect the cube planes and associated wavelengths
         fore_wav=fltarr(fore_cnt) & fore_planes=lonarr(fore_cnt)
@@ -4195,21 +4283,36 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
         endfor
         
         fore_cube=(*self.CUBE)[*,*,fore_planes]
-        stack=total(fore_cube,/NAN,3)/ $
-              (total(finite(fore_cube),3)>1)*fore_cnt
+        if use_unc then fore_cube_unc=(*self.CUBE_UNC)[*,*,fore_planes]
+        fcube_count=(total(finite(fore_cube),3)>1)/fore_cnt
+
+        stack=total(fore_cube,/NAN,3)/fcube_count
+        if use_unc then $
+           stack_unc=sqrt(total(fore_cube_unc^2,/NAN,3))/fcube_count
+        
         background=fltarr(self.CUBE_SIZE[0:1])
+        if use_unc then background_unc=background
         for i=0,fore_cnt-1 do begin 
            ;;print,1./(1.+abs(fore_wav[i]-back_wav))
            back_weights=rebin(reform(1./(1.+abs(fore_wav[i]-back_wav)), $
                                      [1,1,back_cnt]), $
                               [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
            ;; Remove the weighted average background for this foreground plane
-           background+=total(back_cube*back_weights,3,/NAN)/ $
-                       total(back_weights*back_finite>1.e-25,3)
+           wvec=total(back_weights*back_finite>1.e-25,3)
+
+           background+=total(back_cube*back_weights,3,/NAN)/wvec
+           if use_unc then $
+              background_unc=sqrt(background_unc^2+ $
+                                  total(back_cube_unc^2* $
+                                        back_weights^2,3,/NAN))/wvec
         endfor 
         stack-=background
         stack/=fore_cnt
         background/=fore_cnt
+        if use_unc then begin 
+           stack_unc=sqrt(stack_unc^2+background_unc^2)/fore_cnt
+           background_unc/=fore_cnt
+        endif 
      endelse 
   endif else begin 
      ;; Non wavelength-weighted
@@ -4224,20 +4327,32 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                           /SAMPLE),3,/NAN)/total(weights)
      endif else begin           ;Foreground regions
         stack=fltarr(self.CUBE_SIZE[0:1])
+        if use_unc then stack_unc=stack
         fcnt=lonarr(self.CUBE_SIZE[0:1])
         for i=0,nfr-1 do begin 
            if foreranges[0,i] eq foreranges[1,i] then begin 
               stack+=(*self.CUBE)[*,*,foreranges[0,i]]
+              if use_unc then $
+                 stack_unc=sqrt(stack_unc^2+ $
+                                (*self.CUBE_UNC)[*,*,foreranges[0,i]]^2)
               fcnt+=long(finite((*self.CUBE)[*,*,foreranges[0,i]]))
            endif else begin 
               stack+= $
                  total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]], $
                        /NAN,3)
+              if use_unc then $
+                 stack_unc=sqrt(stack_unc^2+ $
+                                total((*self.CUBE_UNC)[*,*,foreranges[0,i]: $
+                                                       foreranges[1,i]]^2, $
+                                      /NAN,3))
               fcnt+=total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
                                               foreranges[1,i]]),3)
            endelse 
         endfor
-        if nfr gt 0 then stack=stack/(fcnt>1L)
+        if nfr gt 0 then begin 
+           stack/=(fcnt>1L)
+           if use_unc then stack_unc/=(fcnt>1L)
+        endif 
      endelse 
      
      ;; Background 
@@ -4249,23 +4364,36 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      endif else if nbr gt 0 then begin 
         bcnt=lonarr(self.CUBE_SIZE[0:1])
         background=fltarr(self.CUBE_SIZE[0:1])
+        if use_unc then background_unc=background
         for i=0,nbr-1 do begin 
            if backranges[0,i] eq backranges[1,i] then begin 
               background+=(*self.CUBE)[*,*,backranges[0,i]]
+              if use_unc then $
+                 background_unc=sqrt(background_unc^2+ $
+                                     (*self.CUBE_UNC)[*,*,backranges[0,i]]^2)
               bcnt+=long(finite((*self.CUBE)[*,*,backranges[0,i]]))
            endif else begin 
               background+=total((*self.CUBE)[*,*,backranges[0,i]: $
                                              backranges[1,i]], /NAN,3)
+              if use_unc then $
+                 background_unc=sqrt(background_unc^2+ $
+                                     total((*self.CUBE_UNC) $
+                                           [*,*,backranges[0,i]:$
+                                            backranges[1,i]]^2,/NAN,3))
               bcnt+=long(total(finite((*self.CUBE)[*,*,backranges[0,i]: $
                                                    backranges[1,i]]),3))
            endelse 
         endfor 
-        background=background/(bcnt>1L)
+        background/=bcnt>1L
         stack-=background
+        if use_unc then begin 
+           background_unc/=bcnt>1L
+           stack_unc=sqrt(stack_unc^2+background_unc^2)
+        endif
      endif 
   endelse
   
-  
+  ;; Form comments regarding the stack
   if nfr gt 0 then begin 
      if n_elements(mname) ne 0 then extra=" (map "+mname+")" else extra=""
      reg_comm=["Foreground regions"+extra+":",$
@@ -4296,17 +4424,19 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      else comm=[comm,reg_comm]
   endif 
   
+  ;; Possibly save the stack
   if keyword_set(save) then self->SaveMap,stack,save,COMMENTS=comm, $
-                                          INTEGRATE=int
+                                          INTEGRATE=int,UNCERTAINTY=stack_unc
   if keyword_set(save_c) && n_elements(background) gt 0 $
-  then self->SaveMap,background,save_c,COMMENTS=back_comm
+  then self->SaveMap,background,save_c,COMMENTS=back_comm, $
+                     UNCERTAINTY=background_unc
   return,stack
 end 
 
 ;=============================================================================
-;  SaveMap - Save a Stacked Map to FITS 
+;  SaveMap - Save a Stacked Map to FITS (possibly with uncertainty plane)
 ;=============================================================================
-pro CubeProj::SaveMap,map,sf,COMMENTS=comm,_EXTRA=e
+pro CubeProj::SaveMap,map,sf,COMMENTS=comm,UNCERTAINTY=unc,_EXTRA=e
   ;; XXX break out to IRS_Map...
   if size(sf,/TYPE) ne 7 then begin 
      xf,sf,/SAVEFILE, /RECENT, $
@@ -4317,6 +4447,7 @@ pro CubeProj::SaveMap,map,sf,COMMENTS=comm,_EXTRA=e
                                           /EXTRACT),'_')) + "_map.fits",/MODAL
      if size(sf,/TYPE) ne 7 then return
   endif
+  use_unc=array_equal(size(unc,/DIMENSIONS),size(map,/DIMENSIONS))
   
   catch, err
   if err ne 0 then begin 
@@ -4344,10 +4475,13 @@ pro CubeProj::SaveMap,map,sf,COMMENTS=comm,_EXTRA=e
   sxaddhist, ['This file contains a 2D map created from an IRS', $
               'spectral cube, assembled from a spectral mapping dataset.'], $
              hdr,/COMMENT
-  
+  if use_unc then $
+     sxaddhist,'This file contains a second plane of ' + $
+               'uncertainties in the 2D map',hdr,/COMMENT
   if n_elements(comm) ne 0 then sxaddhist,comm,hdr,/COMMENT
   sxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
-  writefits,sf,map,hdr
+  if use_unc then write_fits,sf,[ [[map]], [[unc]] ],hdr else $
+     writefits,sf,map,hdr
 end
 
 ;=============================================================================
@@ -4549,19 +4683,32 @@ pro CubeProj::AddData, files,DIR=dir,PATTERN=pat,_EXTRA=e
   endif
   for i=0,n_elements(files)-1 do begin 
      data=readfits(files[i],header,/SILENT)
-     if ~stregex(files[i],'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
+     
+     type=irs_file_type(files[i])
+     if ~type eq 0 then begin ;; not a bcd, load the relevant header
         bcdfile=irs_associated_file(files[i])
         if bcdfile && file_test(bcdfile,/READ) then header=headfits(bcdfile)
+     endif
+     
+     if self.load_masks then begin 
+        bfile=irs_associated_file(files[i],/BMASK)
+        if bfile && file_test(bfile,/READ) then $
+           bmask=readfits(bfile,/SILENT) else bmask=0
      endif 
      
-     bfile=irs_associated_file(files[i],/BMASK)
-     if bfile && file_test(bfile,/READ) then $
-        bmask=readfits(bfile,/SILENT) else bmask=0
+     ;; Uncertainty: use BCD uncertainty for all types
+     if self.load_unc then begin 
+        uncfile=irs_associated_file(files[i],/UNCERTAINTY)
+        if uncfile && file_test(uncfile,/READ) then $
+           unc=readfits(uncfile,/SILENT)
+     endif 
      
-     self->AddBCD,data,header,FILE=files[i],BMASK=bmask,ERR=err,_EXTRA=e
+     self->AddBCD,data,header,FILE=files[i],BMASK=bmask,ERR=err, $
+                  UNCERTAINTY=unc,TYPE=type,_EXTRA=e
      if keyword_set(err) then break
   endfor
   self->CheckModules            ;Set default build order, and double check.
+  self->Send,/REC_UPDATE
   self->UpdateList & self->UpdateButtons
 end
 
@@ -4571,7 +4718,7 @@ end
 ;           header derived values.
 ;=============================================================================
 pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
-                     DCEID=dceid,EXP=exp,COLUMN=col, ROW=row, $
+                     DCEID=dceid,TYPE=type,EXP=exp,COLUMN=col, ROW=row, $
                      RQST_POS=rqpos, REC_POS=rpos, PA=pa,ERR=err,DISABLED=dis
   self->LoadCalib
   ;; Don't add same file twice
@@ -4580,6 +4727,7 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   s=size(bcd,/DIMENSIONS)
   rec={CUBE_DR}
   if n_elements(s) eq 3 then begin 
+     ;; uncertainty plane
      if s[2] eq 2 then begin 
         rec.BCD=ptr_new(bcd[*,*,0]) & rec.UNC=ptr_new(bcd[*,*,1])
      endif else self->Error,'Incorrect BCD dimensions: '+ $
@@ -4595,10 +4743,8 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   rec.header=ptr_new(header)
   
   if n_elements(file) ne 0 then rec.file=file
-  if stregex(file,'droop(res)?\.fits$',/BOOLEAN) then rec.type=1 else $
-     if stregex(file,'coad[^.]*\.fits$',/BOOLEAN) then rec.type=2 else $
-        if stregex(file,'f2ap\.fits$',/BOOLEAN) then rec.type=3 else $   
-           rec.type=0
+  if n_elements(type) eq 0 then type=irs_file_type(file)
+  rec.type=type
   
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
      id=filestrip(rec.file)
@@ -4716,6 +4862,7 @@ pro CubeProj::RemoveBCD,recs,_EXTRA=e
   if keepcnt ne 0 then (*self.DR)=(*self.DR)[keep] else ptr_free,self.DR
   
   self.Changed=1b               ;but accounts remain valid!
+  self->Send,/REC_UPDATE,/DELETED
   self->UpdateList,/CLEAR_SELECTION & self->UpdateButtons & self->UpdateTitle
 end
 
@@ -4724,14 +4871,16 @@ end
 ;=============================================================================
 pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
                    UPDATE=update, NEW_CUBE=nc,SELECT=sel,SINGLE_SELECT=ss, $
-                   REC_UPDATE=rec_update,CALIB_UPDATE=cal_update, VISUALIZE=vis
+                   REC_UPDATE=rec_update,DELETED=del, DISABLED=dis, $
+                   CALIB_UPDATE=cal_update, VISUALIZE=vis
   case 1b of
      keyword_set(sel): begin 
         if n_elements(ss) ne 0 && ptr_valid(self.DR) then $
            ss=(*self.DR)[ss[0]].DCEID else ss=-1
         self->MsgSend,{CUBEPROJ_SELECT,self,ss}
      end 
-     keyword_set(rec_update): self->MsgSend,{CUBEPROJ_RECORD_UPDATE,self}
+     keyword_set(rec_update): self->MsgSend,{CUBEPROJ_RECORD_UPDATE,self, $
+                                             keyword_set(del),keyword_set(dis)}
      keyword_set(vis): $
         self->MsgSend, {CUBEPROJ_VISUALIZE, self, $
                         self->ProjectName() + ' '+ $
@@ -4759,24 +4908,28 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
                  n=n_elements(*(*self.BACK_RECS)[pos].DCEIDs)
                  name+=(['A','B'])[pos]
                  bg=(*self.BACK_RECS)[pos].BACKGROUND
+                 unc=(*self.BACK_RECS)[pos].BACK_UNC
               endif else begin 
                  ;; Show combine AB background
                  n=n_elements(*(*self.BACK_RECS)[0].DCEIDs)+ $
                    n_elements(*(*self.BACK_RECS)[1].DCEIDs)
-                 name+='Comb'
+                 name+=' Blended'
                  bg=self.BACKGROUND
+                 unc=self.BACKGROUND_UNC
               endelse 
            endif else begin 
               bg=self.BACKGROUND
+              unc=self.BACKGROUND_UNC
               n=n_elements(*self.BACK_RECS)
            endelse 
         endif 
         
         if n_elements(n) ne 0 then name+=' from '+strtrim(n,2)+' recs'
         name+='>'
+        ;; Pretend it is a real BCD:
         self->MsgSend,{CUBEPROJ_RECORD, $
                        self,name,self.MODULE,self.ORDER,self.CAL,ptr_new(), $
-                       bg,self.BACKGROUND_UNC,ptr_new(),ptr_new()}
+                       bg,unc,ptr_new(),ptr_new(),ptr_new(),0b}
      end 
      
      keyword_set(update): $
@@ -4795,24 +4948,23 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
         if stackQ then begin 
            ;; Stack of BCDs
            bcd=*rec[0].BCD
-           if ptr_valid(rec[0].UNC) then unc=*rec[0].UNC^2 ;add in quadrature
-           if ptr_valid(rec[0].BMASK) then mask=*rec[0].BMASK
+           use_bmask=array_equal(ptr_valid(rec.BMASK),1b)
+           use_unc=array_equal(ptr_valid(rec.UNC),1b)
+           if use_unc then unc=*rec[0].UNC^2 ;add in quadrature
+           if use_bmask then mask=*rec[0].BMASK
            for i=1,nrec-1 do begin 
               bcd+=*rec[i].BCD
-              if ptr_valid(rec[i].UNC) then $
-                 if n_elements(unc) gt 0 then unc+=*rec[i].UNC^2 else $
-                    unc=*rec[i].UNC^2
-              if ptr_valid(rec[i].BMASK) then $
-                 if n_elements(mask) gt 0 then mask OR=*rec[i].BMASK else $
-                    mask=*rec[i].BMASK ;accumulate mask flags
+              if use_unc then unc+=*rec[i].UNC^2
+              if use_bmask then mask OR=*rec[i].BMASK
            endfor 
            bcd/=nrec 
            bcd_p=ptr_new(bcd,/NO_COPY)
            if n_elements(unc) gt 0 then begin 
-              unc/=nrec
-              unc_p=n_elements(unc) 
+              unc=sqrt(unc)/nrec
+              unc_p=ptr_new(unc,/NO_COPY)
            endif else unc_p=ptr_new()
            mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
+           free=1
            str=string(FORMAT='(%"%s <Average of %d recs>")', $
                       self->ProjectName(),nrec)
         endif else begin 
@@ -4820,15 +4972,16 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
            bcd_p=rec.BCD
            unc_p=rec.UNC
            mask_p=rec.BMASK
+           free=0
            str=string(FORMAT='(%"%s <%s> %s")', $
                       self->ProjectName(),rec.ID, $
                       irs_fov(rec.FOVID,/SHORT_NAME))
-        endelse 
+        endelse
         rec_set=ptr_new(rec.DCEID)
         self->MsgSend,{CUBEPROJ_RECORD, $
                        self,str,self.MODULE,self.ORDER,self.CAL, $
                        rec_set,bcd_p,unc_p,mask_p, $
-                       self.BACKGROUND}
+                       self.BACKGROUND,self.BACKGROUND_UNC,free}
         ptr_free,rec_set
      end 
   endcase 
@@ -4875,16 +5028,10 @@ function CubeProj::Init, name, _EXTRA=e
 ;  if self->IDLitComponent::Init() ne 1 then return,0
   if n_elements(name) ne 0 then self->SetProjectName,name
   self.Changed=0b               ;coming into existence doesn't count
+  ;; A few default toggles
+  self->SetProperty,/LOAD_MASKS,/USE_BACKGROUND,/RECONSTRUCTED_POSITIONS
   if n_elements(e) ne 0 then self->SetProperty,_EXTRA=e
   self->Initialize
-  ;; Properties:
-;   self->SetPropertyAttribute,['Name','Description'],/HIDE
-;   self->RegisterProperty,'BUILD_ORDER',NAME='Cube Build Order(s)',ENUMLIST=''
-;   self->RegisterProperty,'REQUESTED_POSITIONS',NAME='Build Positions', $
-;                          ENUMLIST=['Requested','Reconstructed']
-;   self->RegisterProperty,'FEEDBACK',NAME='Show Build Feedback',/BOOLEAN
-;   self->RegisterProperty,'PR_WIDTH',NAME='Slit PR Width (pix)',/FLOAT, $
-;                          VALID_RANGE=[1.,3.]
   return,1
 end
 
@@ -4892,10 +5039,9 @@ end
 ;  CubeProj - IRS Spectral (+MIPS SED) Cubes
 ;=============================================================================
 pro CubeProj__define
-  
   ;; Basic parameters which go into building a cube: they can be
   ;; changed without rebuilding a cube.  Useful for saving snapshots.
-  ;; Careful when freeing pointers
+  ;; Careful when freeing pointers!
   cp={CUBE_PARAMETERS, $
       MODULE:'', $              ;The name of the module, one of
                                 ;   SL,LL,SH,LH (IRS),MSED (MIPS)
@@ -4921,6 +5067,7 @@ pro CubeProj__define
       reconstructed_pos:0b, $   ;whether to build with reconstructed positions
       wavecut: 0b, $            ;whether to trim wavelengths with WAVECUT
       use_bg: 0b, $             ;whether to use the background
+      use_unc: 0b, $            ;build an uncertainty cube
       cal_file:'', $            ;the calibration file used (if not a full
                                 ; directory, in the "calib/" subdir)
       NSTEP:[0L,0L], $          ;perpendicular (row), parallel (col) steps
@@ -4962,6 +5109,8 @@ pro CubeProj__define
      SaveFile:'', $             ;the file we are saved to
      SaveMethod:0b, $           ;bit 1: data, bit 2: accounts
      sort:0b, $                 ;our sorting order
+     load_masks:0b, $           ;whether to load masks by default
+     load_unc:0b, $             ;whether to load uncertainties by default
      version:'', $              ;the Cubism version of this cube
      wInfo:ptr_new()}           ;the widget info struct.... a diconnectable ptr
       
@@ -4999,7 +5148,7 @@ pro CubeProj__define
        PA: 0.0D, $              ;Position angle of slit (+w?) E of N
        PA_RQST: 0.0D, $         ;Requested PA of slit (+w?)
        AORKEY: 0L, $            ;the AOR ID KEY
-       BCD: ptr_new(), $        ;the BCD
+       BCD: ptr_new(), $        ;the BCD data (or varietal: FLATAP,DROOPRES...)
        UNC:ptr_new(), $         ;the BCD's uncertainty image
        BMASK:ptr_new(), $       ;the BCD's BMASK image
        BAD_PIXEL_LIST: ptr_new(),$ ;this BCD's specific bad pixel list (if any)
@@ -5042,18 +5191,20 @@ pro CubeProj__define
          MUST_BG_SP:0L, $       ;required background spectrum
          MUST_BPL:lonarr(2), $  ;must have a list of bad pixels
          MUST_UNRESTORED:0L, $  ;must have unrestored data
-         MUST_FLUXCON: 0L}      ;must have Fluxcon building set
+         MUST_FLUXCON: 0L, $    ;must have Fluxcon building set
+         MUST_UNCERTAINTIES: 0L} ;must have enabled records with uncertainties
   
   ;; Messages: send a cube, record, etc.
   msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),RECORD_SET:ptr_new(), BCD:ptr_new(),UNC:ptr_new(), $
-       BMASK:ptr_new(), BACKGROUND:ptr_new()}    ;XXX UNC
+       BMASK:ptr_new(), BACKGROUND:ptr_new(),BACKGROUND_UNC:ptr_new(), $
+       FREE:0b}
   msg={CUBEPROJ_VISUALIZE,CUBE:obj_new(),INFO:'',MODULE:'', $
        IMAGE:ptr_new(),ASTROMETRY:ptr_new()}
   msg={CUBEPROJ_UPDATE, CUBE:obj_new(), BAD_PIXEL_LIST:ptr_new(), NEW_CUBE:0b}
   msg={CUBEPROJ_SELECT, CUBE:obj_new(),SINGLE_SELECT: 0L}
-  msg={CUBEPROJ_RECORD_UPDATE, CUBE:obj_new()}
+  msg={CUBEPROJ_RECORD_UPDATE, CUBE:obj_new(),deleted:0b,disabled:0b}
   msg={CUBEPROJ_CALIB_UPDATE, CUBE:obj_new()}
 end
 
