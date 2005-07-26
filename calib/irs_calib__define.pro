@@ -258,10 +258,7 @@
 ;    evolve over time, due to updates in the calibration thread, or
 ;    changing instrumental performance.  
 ;
-;    See the document "SSC--ISC: Interface Products and Conventions"
-;    for further description of these calibration products.
-;
-;    IRS_Calib object sets can be found in the subdirectory
+;    Pre-made IRS_Calib object sets can be found in the subdirectory
 ;    calib/sets in this distribution.
 ;
 ; INHERITANCE TREE:
@@ -277,7 +274,7 @@
 ;
 ;     Update the WAVSAMP to the latest version for long-low only:
 ;     
-;    cal=sm_restore_calib('sm_2001_12_14.cal') 
+;    cal=irs_restore_calib('irs_2006_01_01.cal')
 ;    a->ReadCalib,'LL',WAVSAMP_VERSION=0,/ONLY
 ;
 ; MODIFICATION HISTORY:
@@ -294,7 +291,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001-2004 J.D. Smith
+;  Copyright (C) 2001-2005 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -355,9 +352,9 @@ end
 ;=============================================================================
 ;  Save - Save this cal set
 ;=============================================================================
-pro IRS_Calib::Save,file
+pro IRS_Calib::Save,file,_EXTRA=e
   if self.Name eq '' then self.Name=filestrip(file)
-  save,self,FILENAME=file
+  save,self,FILENAME=file,_EXTRA=e
 end
 
 ;=============================================================================
