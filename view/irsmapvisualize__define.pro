@@ -116,7 +116,8 @@ pro IRSMapVisualize::Message, msg
      end 
      
      'CUBEPROJ_RECORD_UPDATE': begin 
-        self->UpdateMapStatus,/CHECK_DISABLED
+        if msg.disabled then self->UpdateMapStatus,/CHECK_DISABLED $
+        else self->UpdateMapRecords 
         self->DrawAllRecords
      end 
   endcase 
@@ -155,12 +156,14 @@ pro IRSMapVisualize::Select,which,APPEND=app,RANGE=range,NO_DRAW=nd, $
   endif else begin 
      if keyword_set(dceid) then $
         which=where_array([which],(*self.recs).DCEID,cnt)
+     if cnt eq 0 then return
      (*self.recs)[which].SELECTED=1b
      if ~keyword_set(nd) then self->DrawOneRecord,which
   endelse 
   ;; Sync up cube to our list selection
   self.last=which
   self.cube->SetListSelect,where((*self.recs).SELECTED),_EXTRA=e
+  self->UpdateSelectStatus
 end
 
 ;=============================================================================
@@ -206,7 +209,6 @@ pro IRSMapVisualize::UpdateMapStatus, CHECK_DISABLED=cd
      self.cube->GetProperty,RECORD_SET=(*self.recs).DCEID,DISABLED=dis
      (*self.recs).DISABLED=dis
   endif 
-  
   self->UpdateSelectStatus
 end
 
@@ -284,7 +286,10 @@ pro IRSMapVisualize::DrawAllRecords
        XSTYLE=5,YSTYLE=5,POSITION=[pan,pan+ds*zm],/DEVICE,/NODATA,/NOERASE
   self.csave=[!X.S,!Y.S]
   nrec=n_elements(*self.recs)
-  for i=0,nrec-1 do self->DrawOneRecord,i
+  selected=where((*self.recs).SELECTED,COMPLEMENT=not_selected, $
+                 NCOMPLEMENT=ncnt,scnt)
+  for i=0,ncnt-1 do self->DrawOneRecord,not_selected[i]
+  for i=0,scnt-1 do self->DrawOneRecord,selected[i]
   self.oDraw->DBRefresh,/FULL
 end
 
