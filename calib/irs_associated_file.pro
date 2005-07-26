@@ -9,7 +9,11 @@ function irs_associated_file,file,BMASK=bm,UNCERTAINTY=unc,FLATAP=f2ap, $
         reg='bmask\.fits$' & filt='bmask'
      end 
      keyword_set(unc): begin 
-        filt='func' & reg='func\.fits$'
+        if keyword_set(f2ap) then begin
+           filt='f2unc' & reg='f2unc\.fits$'           
+        endif else begin 
+           filt='func' & reg='func\.fits$'
+        endelse 
      end 
      keyword_set(f2ap): begin 
         filt='f2ap' & reg='f2ap\.fits$'
