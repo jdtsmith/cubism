@@ -12,7 +12,7 @@ end
 ;=============================================================================
 ;  SetProperty
 ;=============================================================================
-pro IRS_Spectrum::SetProperty,REGION=region,WAVELENGTH=wl,SPECTRUM=flux, $
+pro IRS_Spectrum::SetProperty,REGION=region,WAVELENGTH=wl,FLUX_SPECTRUM=flux, $
                               FLUX_ERROR=error,WAVE_UNITS=wu,FLUX_UNITS=fu
   if n_elements(region) ne 0 then self.region=region
   if n_elements(wl) ne 0 then begin 
