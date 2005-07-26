@@ -90,7 +90,7 @@ pro tvStats::Stats
   take=(*io)[l:r,b:t]
   wh=where(finite(take),n)
   if n le 1 then return
-  max=max(take,MIN=min)
+  max=max(take,MIN=min,/NAN)
   med=median(take)
   avg=total(take,/NAN)/n
   std=sqrt(total((take-avg)^2,/NAN)/(n-1))
