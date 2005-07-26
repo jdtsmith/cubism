@@ -9,6 +9,7 @@ pro CubeRec::Message, msg
   if widget_info(self.wBase[0],/VALID_ID) eq 0 then return
   self->tvPlug::Message,msg,TYPE=type
   cal_update=0b
+  free=0b
   case type of
      'BOX': begin 
         self->Extract
@@ -31,18 +32,20 @@ pro CubeRec::Message, msg
      'CUBEVIEWSPEC_STACK': begin
         self->EnsureCube
         *self.stack_msg=msg
-        self->BuildStack
         widget_control, self.wStackInfo,SET_VALUE=msg.info
         self->SwitchMode,/STACK
      end
      'CUBEPROJ_RECORD': begin 
         widget_control, self.wInfoLine,set_value='Record: '+msg.INFO
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
+        if self.free_bcd then ptr_free,self.BCD,self.BCD_UNC,self.BCD_BMASK
+        self.free_bcd=msg.free
         self.cube=msg.CUBE
         self.bcd=msg.BCD
-        self.bcd_UNC=msg.UNC
-        self.bcd_BMASK=msg.BMASK
-        self.bcd_BACKGROUND=msg.BACKGROUND
+        self.BCD_UNC=msg.UNC
+        self.BCD_BMASK=msg.BMASK
+        self.BCD_BACKGROUND=msg.BACKGROUND
+        self.BCD_BACKGROUND_UNC=msg.BACKGROUND_UNC
         self.module=msg.MODULE
         ptr_free,self.rec_set
         if ptr_valid(msg.RECORD_SET) then self.rec_set=ptr_new(*msg.RECORD_SET)
@@ -64,7 +67,6 @@ pro CubeRec::Message, msg
         widget_control, self.wLambda,SET_VALUE= $
                         string(*msg.wavelength,FORMAT='(F7.4)'),/CLEAR_EVENTS
         ;; we don't want BCD mode, but either cube mode (full or stack) will do
-        
         self->SwitchMode,BCD=0
      end
      'CUBEPROJ_VISUALIZE': begin 
@@ -84,13 +86,22 @@ pro CubeRec::Message, msg
         if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
      end 
      'CUBEPROJ_CALIB_UPDATE': cal_update=1b
+     'CUBEPROJ_RECORD_UPDATE': begin 
+        ;; Bring down the whole house of cards
+        if msg.deleted && ~ptr_valid(self.IMAGE) then begin 
+           obj_destroy,self.oDraw
+           return
+        endif 
+     end 
+     else:
   endcase
+  self->UpdateData
   if n_elements(astr) ne 0 then astr=ptr_new(astr,/NO_COPY) else $
      astr=ptr_new()
   self->MsgSend,{CUBEREC_UPDATE, $
                  self.mode eq 2b,self.mode eq 0b,self.mode eq 3b,$
-                 self.cur_wav, self.cube,self.MODULE,self.bcd,self.bcd_BMASK, $
-                 astr,self.rec_set,cal_update}
+                 self.cur_wav, self.cube,self.MODULE,self.BCD,self.BCD_BMASK, $
+                 self.UNCERTAINTY, astr,self.rec_set,cal_update}
   ptr_free,astr
   self->UpdateView
 end
@@ -170,15 +181,16 @@ end
 ;=============================================================================
 ;  BuildStack
 ;=============================================================================
-pro CubeRec::BuildStack,_EXTRA=e
+pro CubeRec::BuildStack,UNCERTAINTY=stack_unc,_EXTRA=e
   if ~ptr_valid(self.stack_msg) then $
      self->Error,'No stack yet received.'
   msg=*self.stack_msg
   ptr_free,self.stack
   if msg.name then begin        ; A named map
      self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name, $
-                                         WAVELENGTH_WEIGHTED= $
-                                         msg.weight_cont,_EXTRA=e)) 
+                                         WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                         STACK_UNCERTAINTY=stack_unc, $
+                                         _EXTRA=e))
   endif else begin 
      if ptr_valid(msg.background) then begin
         type=size(*msg.background,/TYPE)
@@ -186,14 +198,17 @@ pro CubeRec::BuildStack,_EXTRA=e
            self.stack=ptr_new(self.cube-> $
                               Stack(*msg.foreground, $
                                     WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                    STACK_UNCERTAINTY=stack_unc, $
                                     BG_VALS=*msg.background,_EXTRA=e))
         endif else $            ;background index ranges
            self.STACK=ptr_new(self.cube-> $
                               Stack(*msg.foreground, $
                                     WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                    STACK_UNCERTAINTY=stack_unc, $
                                     BACKRANGES=*msg.background,_EXTRA=e))
-     endif else self.STACK=ptr_new(self.cube->Stack(*msg.foreground, $
-                                                    _EXTRA=e))
+     endif else self.STACK= $
+        ptr_new(self.cube->Stack(*msg.foreground, $
+                                 STACK_UNCERTAINTY=stack_unc,_EXTRA=e))
   endelse 
 end
 
@@ -210,7 +225,7 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
   if keyword_set(viz) then mode=3
   ;; BCD=0 was passed
   if n_elements(mode) eq 0 AND n_elements(bcd) ne 0 then begin 
-     if self.mode eq 2 then self.mode=0 ;go to full by default
+     if self.mode ge 2 then self.mode=0 ;go to full by default
   endif                         ; otherwise, just leave it the same
   
   if n_elements(mode) ne 0 then begin
@@ -223,8 +238,10 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
   
   if self.mode ge 2 then begin  ;bcd or vis
      self->Reset,/DISABLE       ;no need for our extraction tool.
-     if obj_valid(self.oView) then $
+     if obj_valid(self.oView) then begin
         self.oView->MsgSignup,self,/NONE ;not listening to the view tool
+        self.oView->Quit
+     endif 
      if self.mode eq 2 then begin ;bcd mode
         self.oAper->On 
         self.oVis->Off,/RESET,/NO_REDRAW,/DISABLE
@@ -255,35 +272,70 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
   widget_control, self.wBase[self.mode],/MAP,/SENSITIVE
 end
 
+
+;=============================================================================
+;  UpdateData - Update the image and its uncertainty
+;=============================================================================
+pro CubeRec::UpdateData
+  if self.free_im then ptr_free,self.IMAGE,self.UNCERTAINTY
+  case self.mode of
+     0: begin                   ;full cube, show the correct plane
+        self.IMAGE=ptr_new(self.cube->Cube(self.cur_wav,UNCERTAINTY=im_unc))
+        if n_elements(im_unc) ne 0 then $
+           self.UNCERTAINTY=ptr_new(im_unc,/NO_COPY) $
+        else self.UNCERTAINTY=ptr_new()
+        self.free_im=1b
+     end
+     1: begin                   ;show the stack
+        self->BuildStack,UNCERTAINTY=im_unc
+        if n_elements(im_unc) ne 0 then $
+           self.UNCERTAINTY=ptr_new(im_unc,/NO_COPY) $
+        else self.UNCERTAINTY=ptr_new()
+        self.IMAGE=self.STACK
+        self.free_im=1b
+     end
+     2: begin                   ;show the record
+        if widget_info(self.wBGSub,/BUTTON_SET) && $
+           ptr_valid(self.BCD_BACKGROUND) then begin 
+           self.IMAGE=ptr_new(*self.BCD - *self.BCD_BACKGROUND)
+           if ptr_valid(self.BCD_UNC) && ptr_valid(self.BCD_BACKGROUND_UNC) $
+           then $
+              self.UNCERTAINTY=ptr_new(sqrt(*self.BCD_UNC^2+ $
+                                            *self.BCD_BACKGROUND_UNC^2)) $
+           else self.UNCERTAINTY=ptr_new()
+           self.free_im=1b
+        endif else begin 
+           self.image=self.BCD
+           self.UNCERTAINTY=self.BCD_UNC
+           self.free_im=0b
+        endelse 
+     end
+     3: begin                   ;visualize an image
+        self.image=self.VISUALIZE_IMAGE
+        self.UNCERTAINTY=ptr_new()
+        self.free_im=0b
+     end 
+  endcase
+end
+
 ;=============================================================================
 ;  UpdateView - Show the appropriate cube plane/bcd/stack.
 ;=============================================================================
 pro CubeRec::UpdateView
   case self.mode of
-     0: begin                   ;full cube, show the correct plane
+     0: begin                   ;full cube
         widget_control, self.wLambda,SET_COMBOBOX_SELECT=self.cur_wav
-        self.oDraw->SetProperty,/NO_RESIZE, $
-                                IMORIG=self.cube->Cube(self.cur_wav)
      end
-     1: begin                   ;show the stack
-        if ptr_valid(self.stack) then $
-           self.oDraw->SetProperty,/NO_RESIZE,IMORIG=*self.STACK
-     end
-     2: begin                   ;show the record
+     2: begin                   ;record, update BG button
         widget_control, self.wBGSub,SENSITIVE=ptr_valid(self.BCD_BACKGROUND)
-        if ptr_valid(self.BCD) then $
-           self.oDraw->SetProperty,/NO_RESIZE,IMORIG= $
-                                   (widget_info(self.wBGSub,/BUTTON_SET) && $
-                                    ptr_valid(self.BCD_BACKGROUND)) ? $
-                                   (*self.BCD - *self.BCD_BACKGROUND) : $
-                                   *self.BCD
      end
-     3: begin 
-        if ptr_valid(self.VISUALIZE_IMAGE) then $
-           self.oDraw->SetProperty,IMORIG=*self.VISUALIZE_IMAGE,/NO_RESIZE
-     end 
+     else:
   endcase 
+  if ptr_valid(self.IMAGE) then $
+     self.oDraw->SetProperty,/NO_RESIZE,IMORIG=self.IMAGE $ ;; save memory w/ ptr
+  else self.oDraw->Erase,/FULL
 end
+
 
 ;=============================================================================
 ;  Export - Export the image to the command line
@@ -382,7 +434,7 @@ pro CubeRec::SaveMapEvent,ev
   self->CheckCube
   if ~ptr_valid(self.STACK) || ~ptr_valid(self.stack_msg) then $
      self->Error,'No valid map to save.'
-  self->BuildStack,/SAVE
+  self->BuildStack,/UNCERTAINTY,/SAVE
 end
 
 
@@ -411,18 +463,21 @@ pro CubeRec::ExtractFileRegion,FILE=rff,_EXTRA=e
   self->CheckCube
 
   if n_elements(rff) eq 0 then rff=1 ;select and return the file
-  spec=self.cube->Extract(FROM_FILE=rff,OUTPUT_POLY=op,_EXTRA=e)
+  spec=self.cube->Extract(FROM_FILE=rff,OUTPUT_POLY=op,UNCERTAINTY=spec_unc, $
+                          _EXTRA=e)
   if spec[0] eq -1 then return
   self.region_file=rff     
   self->SetupViewSpec
   
   spec=ptr_new(spec,/NO_COPY)
+  if n_elements(spec_unc) ne 0 then spec_unc=ptr_new(spec_unc,/NO_COPY) else $
+     spec_unc=ptr_new()
   info=string(FORMAT='(%"Region from %s")',file_basename(self.region_file))
   self.Box->Reset & self.Box->Off
   self.region->SetProperty,REGION=op
   if ~self.region->On() then self.region->On
-  self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,spec}
-  ptr_free,spec
+  self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,spec,spec_unc}
+  ptr_free,spec,spec_unc
 end
 
 
@@ -433,13 +488,15 @@ pro CubeRec::Extract,_EXTRA=e
   self->CheckCube
   self.Box->Getlrtb,l,r,t,b
   self.region_file=''           ;no longer extracting by region
-  spec=self.cube->Extract([l,b],[r,t],_EXTRA=e)
+  spec=self.cube->Extract([l,b],[r,t],UNCERTAINTY=spec_unc,_EXTRA=e)
   info=string(FORMAT='(%"Extracted from %s, [%d,%d]->[%d,%d]")', $
               self.cube->ProjectName(),l,b,r,t)
   self->SetupViewSpec
-  sp=ptr_new(spec,/NO_COPY)
-  self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,sp}
-  ptr_free,sp
+  spec=ptr_new(spec,/NO_COPY)
+  if n_elements(spec_unc) ne 0 then spec_unc=ptr_new(spec_unc,/NO_COPY) else $
+     spec_unc=ptr_new()
+  self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,spec,spec_unc}
+  ptr_free,spec,spec_unc
 end
 
 ;=============================================================================
@@ -456,6 +513,8 @@ end
 pro CubeRec::Cleanup
   ;; bcd,wavelength, and error are not ours to destroy
   ptr_free,self.STACK,self.stack_msg,self.rec_set
+  if self.free_im then ptr_free,self.IMAGE,self.UNCERTAINTY
+  if self.free_bcd then ptr_free,self.BCD,self.BCD_BMASK,self.BCD_UNC
   self->tvPlug::Cleanup
 end
 
@@ -478,7 +537,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper, $
   ;; listen for this cube's messages
   if obj_valid(cube) then $
      cube->MsgSignup,self,/CUBEPROJ_RECORD,/CUBEPROJ_CUBE,/CUBEPROJ_VISUALIZE,$
-                     /CUBEPROJ_UPDATE,/CUBEPROJ_CALIB_UPDATE
+                     /CUBEPROJ_UPDATE,/CUBEPROJ_CALIB_UPDATE,/CUBEPROJ_RECORD_UPDATE
 
   ;; set up the different bases
   b=widget_base(parent,/COLUMN,/FRAME,/BASE_ALIGN_LEFT,SPACE=1, $
@@ -522,9 +581,9 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper, $
   self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
   self->MsgSignup,self.oAper,/CUBEREC_UPDATE ;give them our message
   b3=widget_base(self.wBase[2],/COLUMN,/NONEXCLUSIVE,/FRAME,SPACE=1)
-  self.wBGsub=widget_button(b3,VALUE='BGSub', $
-                            /FRAME,EVENT_PRO='cuberec_event', $
-                            UVALUE=[{self:self,method:'UpdateView',event:0}])
+  self.wBGsub=widget_button(b3,VALUE='BGSub',/FRAME,EVENT_PRO='cuberec_event',$
+                            UVALUE=[{self:self, $
+                                     method:'Message',event:1}])
   
   
   ;; Populate the fourth base: visualization
@@ -575,12 +634,17 @@ pro CubeRec__define
       oVis: obj_new(), $        ;the visualization tool
       STACK:ptr_new(), $        ;the stacked image
       stack_msg: ptr_new(), $   ;cache the stack message
-      BCD:ptr_new(), $          ;the BCD data
-      BCD_UNC:ptr_new(), $      ;the BCD error
+      BCD:ptr_new(), $          ;the BCD (or flatap,droopres, etc.) data
+      BCD_UNC:ptr_new(), $      ;uncertainty in the BCD
       BCD_BMASK:ptr_new(), $    ;the BCD mask data
       BCD_BACKGROUND:ptr_new(),$ ;the BCD background to subtract (togglable)
+      BCD_BACKGROUND_UNC:ptr_new(),$ ;the uncertainty in the background
       VISUALIZE_IMAGE: ptr_new(), $ ;the vis image
       MODULE:'',$               ;the modules for cube or rec
+      IMAGE: ptr_new(), $       ;the displayed image
+      UNCERTAINTY:ptr_new(), $  ;the uncertainty in BCD,Cube,etc.
+      free_im:0b, $             ;whether to free the image and uncertainty data
+      free_bcd:0b, $            ;whether to free the BCD data
       cal:obj_new(), $          ;the calibration object
       rec_set:ptr_new(), $      ;the record(s) being examined
       ;; Widget ID's
@@ -598,9 +662,10 @@ pro CubeRec__define
   
   ;; The messages we send
   
-  ;; Extracted Spectra: spec is 2xn or 3xn, info is a text message
-  ;; describing the extraction.
-  msg={CUBEREC_SPEC,Info:'',wavelength:ptr_new(),spec:ptr_new()}
+  ;; Extracted Spectra: spec and spec_unc are 1D vectors, info is a
+  ;; text message describing the extraction.
+  msg={CUBEREC_SPEC,Info:'',wavelength:ptr_new(),spec:ptr_new(), $
+       spec_unc:ptr_new()}
   
   ;; Special purpose: full Cube being viewed.
   msg={CUBEREC_FULL,plane:0L,wavelength:0.0}
@@ -608,5 +673,6 @@ pro CubeRec__define
   ;; General update
   msg={CUBEREC_UPDATE,BCD_MODE:0b,FULL_MODE:0b,VISUALIZE_MODE:0b,PLANE:0L, $
        CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new(), $
-       ASTROMETRY: ptr_new(), RECORD_SET: ptr_new(), CALIB_UPDATE:0b}
+       UNC: ptr_new(), ASTROMETRY: ptr_new(), RECORD_SET: ptr_new(), $
+       CALIB_UPDATE:0b}
 end
