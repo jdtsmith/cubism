@@ -122,6 +122,9 @@ pro tvslice_plot_event,ev
   self->PlotEvent,ev
 end
 
+;=============================================================================
+;       PlotEvent -  Update indicator and overlay point
+;=============================================================================
 pro tvSlice::PlotEvent,ev
   type=tag_names(ev,/STRUCTURE_NAME)
   if type eq 'WIDGET_TRACKING' then begin 
@@ -146,6 +149,9 @@ pro tvSlice::PlotEvent,ev
   self->ShowIndicator           ;Draw the symbols
 end
 
+;=============================================================================
+;       ShowIndicator -  Show the overlay indicator
+;=============================================================================
 pro tvSlice::ShowIndicator, IMONLY=il
   self.oDraw->GetProperty,DRAWWIN=win,SIZE=sz
   wset,win
