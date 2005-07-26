@@ -10,6 +10,7 @@ pro cvLine::Message,msg
         self.bcd_mode=msg.bcd_mode
         self.module=msg.module
         self.cube=msg.cube
+        self.unc=msg.unc
         if self.bcd_mode then begin 
            self.mask=msg.bmask
            self->UpdateWAVSAMP 
@@ -168,15 +169,19 @@ end
 ;=============================================================================
 function cvLine::ValString, im,point,EXTRA_STRING=ext
   pt=floor(point)
-  ext='       '
   if self.bcd_mode && ptr_valid(self.mask) then begin 
      m=(*self.mask)[pt[0],pt[1]]
      if m ne 0 then begin 
         irs_bmask,m,CODE_STRING=cs
-        ext=string(FORMAT='(" <",A,">")',cs)
-     endif 
-  endif 
-  return,string(FORMAT='("(",I3,",",I3,") ",G14.8)',pt, (*im)[pt[0],pt[1]])
+        ext=string(FORMAT='(" ",A10)',cs)
+     endif else ext='           '
+  endif else ext=''
+  if ptr_valid(self.UNC) then $
+     val=string(FORMAT='(G13.7," ",A0," ",G0.6)', $
+                (*im)[pt[0],pt[1]],string(177b), $
+                (*self.UNC)[pt[0],pt[1]]) $
+  else val=string(FORMAT='(G14.8)',(*im)[pt[0],pt[1]])
+  return,string(FORMAT='("(",I3,",",I3,")", A23)',pt, val)
 end
 
 ;=============================================================================
@@ -201,7 +206,7 @@ end
 pro cvLine::Cleanup
   if ptr_valid(self.PRs) then $
      ptr_free,(*self.PRs).PRs,(*self.PRs).RANGE,self.PRs
-  ptr_free,self.astrometry,self.mask
+  ptr_free,self.astrometry
   self->tvPlug_lite::Cleanup
 end
 
@@ -211,7 +216,7 @@ end
 function cvLine::Init,parent,oDraw,CALIB=calib,MODULE=module,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   r=widget_base(parent,/ROW,/SPACE)
-  self.wLine=widget_label(r,value=' ',/dynamic_resize)
+  self.wLine=widget_label(r,VALUE=string(FORMAT='(T64,A)',''))
   
   ;; Called outside the cube context
   if n_elements(module) ne 0 then begin 
@@ -242,6 +247,7 @@ pro cvLine__define
           cube:obj_new(), $     ;
           calib:obj_new(), $    ;
           mask:ptr_new(), $     ;mask data to display
+          unc:ptr_new(), $      ;uncertainty data to display (if any)
           astrometry:ptr_new(),$ ;cube astrometry record
           module:'', $          ;the module that came with the latest bcd/cube
           wLine:0L}             ;widget id of text line
