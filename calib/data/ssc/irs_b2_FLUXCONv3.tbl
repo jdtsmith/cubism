@@ -1,0 +1,27 @@
+\order flux
+\comment Identifier = b2_fluxcon.tbl
+\comment Flux conversion factors and order tuning coefficients.
+\comment Version 0.0 09/18/02 PM    Defined this file.
+\comment         0.1 01/03/03 PM    Long Low key wavelengths and passbands, adjusted to avoid A0V H lines.
+\comment         0.2 03/15/03 PM    Set flux conversions, assuming saturation at 20 Jy (LL2,LL3), 40 Jy (LL1) corresponding to 2.99 e- in 6 sec, factor 2 uncertain.
+\comment         0.9 11/28/03 PM    Derived fluxcon from HR7341 7463680 IRS-O map, 5 positions delta(W) 2.52 arsec, 
+\comment                             Tested against HR6606 7462144 and HR6688 7680768 
+\comment         1.0 12/20/03 PM    Updated all coefficents based on SV data, in 5th order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR7891 map (7868928), optimized for the two nods, and tested against point sources flux calibrator HR8585 (7869440), HR6688 (7836416) and representative science cases.
+\comment                             ***** WARNING:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with aperture extraction widths
+\comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S8.9/031213/b2_psf_fov.tbl file. Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_wavsamp.tbl.
+\comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_flatfield.fits.
+\comment         2.0 08/02/04 PM    Updated all coefficients, all orders, derived from HR7891 (7868928), HR6606 (7562144), tested with HR8585 (7869440), HR6688 (7836416), HD105 (7458304) and various staring AORs of 
+\comment                             expected to be point sources.  
+\comment                             ***** WARNING: The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with aperture extraction widths
+\comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S10.5/040723/b2_psf_fov.tbl file. Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_wavsamp.tbl.
+\comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b2_flatfield.fits.
+\comment         x.x Nov/15/2004    Fluxcon for LL for S11 pipeline using HR 6606 as the calibrator.
+\comment History
+\character channelID = 2
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |               |            |               |           |               |           |               |           |              |
+ 1           23.0000           2.00000           0.00000         0.00000        0.00000          0.00000         4667.00     1.2826e+02       1.033333       0.00000      -0.005000      0.00000       0.000331       0.000000      0.0000000     0.00000       0.0000000      0.00000      0.0000000      0.00000
+ 2           17.0000           0.80000           0.00000         0.00000        0.00000          0.00000         6182.00     1.5717e+02       0.992058       0.00000       0.004291      0.00000      -0.000431       0.00000       0.0000000     0.00000       0.0000000      0.00000      0.0000000      0.00000
+ 3           20.6000           0.50000           0.00000         0.00000        0.00000          0.00000         6316.00     1.0380e+02       0.990495       0.00000      -0.016157      0.00000       0.000000       0.00000       0.0000000     0.00000       0.0000000      0.00000      0.0000000      0.00000
