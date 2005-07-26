@@ -843,7 +843,7 @@ pro CubeProj::Open,pname,PROJECT=proj,_EXTRA=e
   if size(pname,/TYPE) ne 7 then return ;cancelled
   proj=self->Load(pname)
   if NOT obj_valid(proj) then return
-  proj->SetProperty,/SPAWNED
+  proj->SetProperty,/SPAWNED,CHANGED=0b
   proj->Show
 end
 
@@ -910,7 +910,7 @@ pro CubeProj::Initialize
   ;; (e.g. if loaded from file)
   parts=stregex(self.version,'v([0-9.]+)',/SUBEXPR,/EXTRACT)
   version=float(parts[1])
-  if version lt 0.90 then self->SetProperty,/LOAD_MASKS
+  if version lt 0.89 then self->SetProperty,/LOAD_MASKS
   if version lt 0.87 then self->SetProperty,/USE_BACKGROUND
   if version lt 0.82 then self->SetProperty,/RECONSTRUCTED_POSITIONS
 end
@@ -2481,7 +2481,6 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
      self.ProjectName=pn
      self.Changed=1b
   endif
-  if n_elements(chngd) ne 0 then self.Changed=chngd
   if n_elements(spn) ne 0 then self.Spawned=spn
   if n_elements(fb) ne 0 then self.feedback=fb
   if n_elements(gbpl) ne 0 then begin
@@ -2536,6 +2535,9 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
   if n_elements(sd) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 1b) OR keyword_set(sd)
   
+  if n_elements(chngd) ne 0 then begin 
+     self.Changed=chngd
+  endif 
   if update_cal then self->Send,/CALIB_UPDATE
   self->UpdateAll,/NO_LIST
 end
@@ -5027,9 +5029,9 @@ function CubeProj::Init, name, _EXTRA=e
   if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up
 ;  if self->IDLitComponent::Init() ne 1 then return,0
   if n_elements(name) ne 0 then self->SetProjectName,name
-  self.Changed=0b               ;coming into existence doesn't count
   ;; A few default toggles
   self->SetProperty,/LOAD_MASKS,/USE_BACKGROUND,/RECONSTRUCTED_POSITIONS
+  self.Changed=0b               ;coming into existence doesn't count
   if n_elements(e) ne 0 then self->SetProperty,_EXTRA=e
   self->Initialize
   return,1
