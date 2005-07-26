@@ -128,7 +128,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   top=floor(maxy)<(sy-1L)
   nx=right-left+1L & ny=top-bottom+1L
   npol=long(n_elements(px)) & npix=long(nx*ny)
-  if npix eq 0L then return,-1L
+  if npix le 0L then return,-1L
   ret=lonarr(npix,/NOZERO)
   apa=arg_present(areas)
   areas=fltarr(npix,/NOZERO)
@@ -166,7 +166,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
                        [0b,0b,1b,   0b,0b,1b,    0b,    0b,    0b,   0b], $
                        vi,vj,npix,  px,py,npol,  px_out,py_out,areas,ri_out)
 
-     for i=0,npix-1 do begin 
+     for i=0L,npix-1 do begin 
         if ri_out[i] ge ri_out[i+1] then continue ;no overlap for this one
         px_new=px_out[ri_out[i]:ri_out[i+1]-1] 
         py_new=py_out[ri_out[i]:ri_out[i+1]-1]
