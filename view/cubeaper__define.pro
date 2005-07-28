@@ -427,7 +427,7 @@ pro CubeAper::UpdateApDrop
   widget_control,self.wapDrop,SET_DROPLIST_SELECT=ind,SET_VALUE= $
                  prefix+ $
                  (normscl? $
-                  string(FORMAT='(%"%5.2f->%5.2f:%4.2f->%4.2f")',aps):$
+                  string(FORMAT='(%"%4.2f->%4.2f:%4.2f->%4.2f")',aps):$
                   string(FORMAT='(%"%5.2f@%5.2fum cen:%4.2f")',aps))
 end
 
