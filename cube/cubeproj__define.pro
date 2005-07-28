@@ -2291,10 +2291,10 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
   str=['IRS Spectral Cube: '+self->ProjectName()+ $
        ((~keyword_set(cur) && ((self.ACCOUNTS_VALID AND 6b) ne 6b))? $
      " (needs rebuilding)":"")]
-  if keyword_set(cur) then begin 
+  if keyword_set(as_built) then begin 
      str=[str,'Cube Created: '+ $
-          (this.CUBE_DATE eq 0.0d?"(not yet)":jul2date(this.CUBE_DATE))]
-     if this.CUBE_DATE eq 0.0d then return,str
+          (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))]
+     if self.CUBE_DATE eq 0.0d then return,str
   endif 
   str=[str,(this.MODULE?this.MODULE:"(no module)")+ $
        (this.ORDER ne 0?' Order '+strtrim(this.ORDER,2): $
