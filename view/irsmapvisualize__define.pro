@@ -64,7 +64,7 @@ pro IRSMapVisualize::Message, msg
         got=self->NearestRecord(msg.X,msg.Y)
         if got eq -1 then return ; no penalty for going off
         ;; If any were skipped, include them as well (up to a few)
-        self->Select,got,/APPEND,RANGE=abs(self.last-got) le 7,/NO_UPDATE
+        self->Select,got,/APPEND,RANGE=abs(self.last-got) le 5,/NO_UPDATE
      end
         
      'DRAW_BUTTON': begin 
@@ -72,6 +72,7 @@ pro IRSMapVisualize::Message, msg
            0: begin             ;button press
               self.drawing=1b
               got=self->NearestRecord(msg.X,msg.Y)
+              if got eq -1 then self.last=-1
               self.oDraw->MsgSignup,self,/DRAW_MOTION
               ;;Append with control key, range with Shift key
               self->Select,got,APPEND=logical_true(msg.modifiers AND 2b), $
@@ -154,9 +155,10 @@ pro IRSMapVisualize::Select,which,APPEND=app,RANGE=range,NO_DRAW=nd, $
      (*self.recs)[low:high].SELECTED=1b
      if ~keyword_set(nd) then for i=low,high do self->DrawOneRecord,i
   endif else begin 
-     if keyword_set(dceid) then $
+     if keyword_set(dceid) then begin 
         which=where_array([which],(*self.recs).DCEID,cnt)
-     if cnt eq 0 then return
+        if cnt eq 0 then return
+     endif 
      (*self.recs)[which].SELECTED=1b
      if ~keyword_set(nd) then self->DrawOneRecord,which
   endelse 
@@ -239,7 +241,6 @@ function IRSMapVisualize::NearestRecord,x,y
   
   bounds=(*self.recs)[wh].bounds
   xps=bounds[0:3,*] & yps=bounds[4:7,*]
-  
   
   if ocnt eq 1 then begin 
      y=rebin([y],4,/SAMPLE) & x=rebin([x],4,/SAMPLE)
