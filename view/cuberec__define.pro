@@ -82,7 +82,7 @@ pro CubeRec::Message, msg
      'CUBEPROJ_UPDATE': begin 
         if msg.new_cube && self.mode ge 2 then return
         self.cube=msg.cube
-        self.cube->GetProperty,WAVELENGTH=wl,/POINTER
+        self.cube->GetProperty,WAVELENGTH=wl,ASTROMETRY=astr,/POINTER
         if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
      end 
      'CUBEPROJ_CALIB_UPDATE': cal_update=1b
@@ -537,7 +537,8 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper, $
   ;; listen for this cube's messages
   if obj_valid(cube) then $
      cube->MsgSignup,self,/CUBEPROJ_RECORD,/CUBEPROJ_CUBE,/CUBEPROJ_VISUALIZE,$
-                     /CUBEPROJ_UPDATE,/CUBEPROJ_CALIB_UPDATE,/CUBEPROJ_RECORD_UPDATE
+                     /CUBEPROJ_UPDATE,/CUBEPROJ_CALIB_UPDATE, $
+                     /CUBEPROJ_RECORD_UPDATE
 
   ;; set up the different bases
   b=widget_base(parent,/COLUMN,/FRAME,/BASE_ALIGN_LEFT,SPACE=1, $
