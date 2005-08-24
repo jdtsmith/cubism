@@ -331,8 +331,9 @@ pro CubeRec::UpdateView
      end
      else:
   endcase 
+  ;; save memory w/ ptr
   if ptr_valid(self.IMAGE) then $
-     self.oDraw->SetProperty,/NO_RESIZE,IMORIG=self.IMAGE $ ;; save memory w/ ptr
+     self.oDraw->SetProperty,/NO_RESIZE,IMORIG=self.IMAGE $ 
   else self.oDraw->Erase,/FULL
 end
 
@@ -412,7 +413,7 @@ pro CubeRec::FullEvent,ev
         endcase
      end
   endcase 
-  self->UpdateView
+  self->UpdateData &  self->UpdateView
   self->MsgSend,{CUBEREC_FULL,self.cur_wav,(*self.wavelength)[self.cur_wav]}
 end
 
