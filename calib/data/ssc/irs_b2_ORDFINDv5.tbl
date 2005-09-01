@@ -1,0 +1,6 @@
+\JDS (Thu Aug  4 11:16:55 MST 2005) slid LL2 0.95 pixels left as interim measure to correct LL1/LL2 offset.
+| order | wavelength_center |  a5       | a4        | a3        |  a2       |    a1     | a0        |  b5       | b4        | b3        |  b2       |    b1     | b0        | wavelength_min | wavelength_max | width_search |  width_found |
+| int   | real              |  real     | real      | real      |  real     |    real   | real      |  real     | real      | real      |  real     |    real   | real      | real           | real           | real         |  real        |
+1                 30.8419     0.0000e+00  0.0000e+00  0.0000e+00  12.7693     -0.495062   40.5116    0.0000e+00  0.0000e+00  0.0000e+00  8.8000e+00  -168.870    64.0000       19.4939          42.2962        3.6000e+01     3.60e+01
+2                 17.6121     0.0000e+00  -368.354     32.4497     31.9882     2.53420    78.0148    0.0000e+00  0.0000e+00  0.0000e+00  0.0000e+00  -192.077    40.0000       14.0451          21.3375        3.6000e+01     3.60e+01
+3                 20.398000   0.0000e+00  0.0000e+00  0.0000e+00  -39.9721    -6.69507    81.0668000 0.0000e+00  0.0000e+00  0.0000e+00  0.0000e+00  -111.230    121.500       19.355000        21.721000      3.6000e+01     3.600e+01

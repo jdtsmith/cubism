@@ -1,0 +1,17 @@
+\ SLCF: SLIT LOSS CORRECTION FUNCTION, SH
+\ 2005-08-17, Kartik Sheth
+\ Using STinyTim PSF + assumed slit beam profiles
+\ Region of integration is X:  173.08:236.92 Y: 191.72:218.28
+| wavelength        |   slcf         |
+| real              |   real         |
+| micron            |                |
+      10    		0.7021      
+      11    		0.6923
+      12    		0.6785
+      13    		0.6591
+      14    		0.6364
+      15    		0.6132
+      16    		0.5912
+      17    		0.5713
+      18    		0.5542
+      19    		0.5389
