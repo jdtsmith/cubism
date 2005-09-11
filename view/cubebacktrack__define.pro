@@ -47,7 +47,7 @@ pro CubeBackTrack::Message, msg
                  widget_control,BASE_SET_TITLE= $
                                 string(FORMAT='(%"Backtracking: %s")',pn), $
                                 self.wBase
-              self.wavelength=wave[msg.plane]
+              self.wavelength=wave[msg.plane<(n_elements(wave)-1) ]
               self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
               if bcdsz[0] ne -1 then self.bcd_size=bcdsz
            endif 
@@ -184,10 +184,14 @@ pro CubeBackTrack::Event,ev
      'WIDGET_BASE': begin       ;size
         self.list_size=ev.Y+self.list_size_diff
         widget_control, self.wList, SCR_YSIZE=self.list_size
+        ;; Workaround v6.1 resize offset bug:
+        widget_control, ev.top, TLB_GET_OFFSET = offset
+        widget_control, ev.top, TLB_SET_XOFFSET = offset[0], $
+                        TLB_SET_YOFFSET = offset[1]
      end 
      
      'WIDGET_CONTEXT': begin 
-        if ~ptr_valid(self.list) then return
+        if n_elements(*self.list) eq 0 then return
         item=widget_info(self.wList,/LIST_SELECT)
         if item lt 0 then return
         item=(*self.list)[item]
@@ -253,9 +257,11 @@ pro CubeBackTrack::UpdateList
         endelse 
      endfor
   endelse 
+  top=widget_info(self.wList,/LIST_TOP)
+  select=widget_info(self.wList,/LIST_SELECT)
   widget_control, self.wList,SET_VALUE=str
-  ptr_free,self.list
-  self.list=ptr_new(list,/NO_COPY)
+  widget_control, self.wList,SET_LIST_TOP=top,SET_LIST_SELECT=select
+  *self.list=temporary(list)
 end
 
 ;=============================================================================
@@ -288,6 +294,7 @@ function CubeBackTrack::Init,parent,oDraw,COLOR=color,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   self.parent=parent
   self.point=[-1,-1]
+  self.list=ptr_new(/ALLOCATE_HEAP)
   if n_elements(color) ne 0 then self.color=color
   return,1
 end
