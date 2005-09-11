@@ -124,7 +124,7 @@ pro CubeProj_show_event, ev
    if err ne 0 then begin 
       catch,/CANCEL
       self->Error,!ERROR_STATE.MSG
-   endif 
+  endif 
    self->ShowEvent,ev
 end
 
@@ -491,7 +491,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      widget_button(file,VALUE='Revert To Saved...',uvalue='revert')
   ;;-------------  
   wMustCube=widget_button(file,VALUE='Write FITS Cube...',$
-                          UVALUE='writefits',/SEPARATOR)
+                          UVALUE='savecube',/SEPARATOR)
   ;;-------------
   b1=widget_button(file,VALUE='Rename Project...',uvalue='setprojectname', $
                    /SEPARATOR)
@@ -910,6 +910,7 @@ pro CubeProj::Initialize
   ;; (e.g. if loaded from file)
   parts=stregex(self.version,'v([0-9.]+)',/SUBEXPR,/EXTRACT)
   version=float(parts[1])
+  if version lt 0.91 then self->SetProperty,OVERSAMPLE_FACTOR=1.0
   if version lt 0.89 then self->SetProperty,/LOAD_MASKS
   if version lt 0.87 then self->SetProperty,/USE_BACKGROUND
   if version lt 0.82 then self->SetProperty,/RECONSTRUCTED_POSITIONS
@@ -1127,8 +1128,9 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
   endelse 
   if ~self.Changed then begin 
      self.Changed=1b
-     self->UpdateButtons & self->UpdateTitle
+     self->UpdateTitle
   endif 
+  if ~self.GLOBAL_SAVEFILE_UPTODATE then self->UpdateButtons 
   if keyword_set(ud) then self->Send,/UPDATE
 end
 
@@ -1340,56 +1342,6 @@ function CubeProj::CheckRecordUncertainties,ENABLED=enabled
      return,array_equal(ptr_valid((*self.DR)[wh].UNC),1b)
   endif else $
      return,array_equal(ptr_valid((*self.DR).UNC),1b)     
-end
-
-;=============================================================================
-;  WriteFits - Write the Cube, Uncertainty, etc. to FITS file
-;=============================================================================
-pro CubeProj::WriteFits,file
-  if NOT ptr_valid(self.CUBE) then return 
-  if NOT ptr_valid(self.WAVELENGTH) then return
-  if size(file,/TYPE) ne 7 then begin 
-     xf,file,/RECENT,FILTERLIST=['*.fits','*.*','*'],/SAVEFILE, $
-        TITLE='Save Cube As FITS File...',/NO_SHOW_ALL,SELECT=0, $
-        START=self->FileBaseName()+".fits", PARENT_GROUP=self->TopBase(),/MODAL
-     if size(file,/TYPE) ne 7 then return
-  endif
-  fxhmake,hdr,*self.CUBE,/extend,/date
-  
-  ;; Celestial coordinates
-  putast,hdr,self->CubeAstrometryRecord()
-  
-  ;; Wavelength coordinates and wavelength LUT binary table extension.
-  fxaddpar,hdr,'CTYPE3','WAVE-TAB','Wavelength'
-  fxaddpar,hdr,'CUNIT3','um','Wavelength units'
-  fxaddpar,hdr,'PS3_0','WCS-TAB','Coordinate table extension name'
-  fxaddpar,hdr,'PS3_1','WAVELENGTH','Coordinate table column name'
-  
-  ;; Description
-  fxaddpar,hdr,'CUBE-DT',jul2date(self.CUBE_DATE),' Cube build date'
-  
-  fxaddpar,hdr,'FILENAME',filestrip(file),' Name of this file'
-
-  ;;Module/Order
-  fxaddpar,hdr,'APERNAME',self.MODULE,' The IRS module'
-  fxaddpar,hdr,'ORDER',self.ORDER,' The order: 0 for all orders'
-  
-  ;; Code version & calibration set used to create cube
-  fxaddpar,hdr,'CUBE_VER',self.version,' CUBISM version used'
-  self->LoadCalib
-  fxaddpar,hdr,'CAL_SET',self.cal->Name(),' IRS Calibration set used'
-  
-  ;; Write the primary header and data
-  ;; XXX put in the binary table to allow uncertainty cube in another column!
-  fxwrite,file,hdr,*self.CUBE
-  if ptr_valid(self.CUBE_UNC) then fxwrite,file,hdr,*self.CUBE_UNC
-  
-  ;; Make the wavelength LUT extension header
-  fxbhmake,hdr,1,'WCS-TAB','Wavelength look-up table for cube dimension 3'
-  fxbaddcol,wcol,hdr,*self.WAVELENGTH,'WAVELENGTH','Column label',TUNIT='um'
-  fxbcreate,unit,file,hdr
-  fxbwrite,unit,*self.WAVELENGTH,wcol,1
-  fxbfinish,unit
 end
 
 ;=============================================================================
@@ -1898,6 +1850,10 @@ pro CubeProj::LoadVisualize,SELECT=sel
   extast,hdr,astr
   catch,/cancel
   
+  ;; Convert astrometry to celestial if required.
+  if strpos(astr.ctype[0],'RA') ne 0 || strpos(astr.ctype[1],'DEC') ne 0 then $
+     heuler,astr,/CELESTIAL
+  
   ptr_free,self.visualize_image,self.visualize_astrometry
   self.visualize_image=ptr_new(im,/NO_COPY)
   self.visualize_astrometry=ptr_new(astr,/NO_COPY)
@@ -2367,7 +2323,7 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
        ' '+string(FORMAT='(I0,"x",I0," steps = ",F7.3," x ",F7.3,' + $
                   '" arcsec"," (",F6.3," arcsec/pixel)")',this.NSTEP, $
                   this.STEP_SIZE*3600.0D*(this.NSTEP-1), $
-                  this.PLATE_SCALE*3600.0D)]
+                  this.PLATE_SCALE*3600.0D/this.OVERSAMPLE_FACTOR)]
   str=[str,string(FORMAT='("PR Sample Size: ",F6.3," x ",F6.3," pixels")',$
                       this.PR_SIZE)]
   
@@ -2401,7 +2357,8 @@ end
 ;                actually changed, indicate that the account is no
 ;                longer valid.
 ;=============================================================================
-pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
+pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
+                          STEP_SIZE=stepsz, $
                           MODULE=md,ORDER=ord, PR_WIDTH=prw, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
                           APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
@@ -2412,9 +2369,9 @@ pro CubeProj::SetProperty,PLATE_SCALE=ps,NSTEP=nstep,STEP_SIZE=stepsz, $
                           LOAD_UNCERTAINTY=lu,FLUXCON=fc,SLCF=slcf, $
                           PIXEL_OMEGA=po, SAVE_ACCOUNTS=sa,SAVE_DATA=sd
   update_cal=0b
-  if n_elements(ps) ne 0 then begin 
-     if self.PLATE_SCALE ne ps then begin 
-        self.PLATE_SCALE=ps
+  if n_elements(osf) ne 0 then begin 
+     if self.OVERSAMPLE_FACTOR ne osf then begin 
+        self.OVERSAMPLE_FACTOR=osf
         self->ResetAccounts,/NO_UPDATE & self.Changed=1b
      endif 
   endif 
@@ -2651,13 +2608,11 @@ pro CubeProj::GetProperty, $
   if arg_present(sa) then sd=(self.SaveMethod AND 2b) ne 0b
   if arg_present(bcdsz) then begin 
      ;; Assume all the same BCD sizes
-     if ~ptr_valid(self.DR) || $
-        array_equal(ptr_valid((*self.DR).BCD),0b) then begin 
-        bcdsz=-1
-     endif else begin 
-        wh=where(ptr_valid((*self.DR).BCD),cnt)
+     if ~ptr_valid(self.DR) then bcdsz=-1 $
+     else begin 
+        wh=where(ptr_valid((*self.DR).HEADER),cnt)
         if cnt eq 0 then bcdsz=-1 else $
-           bcdsz=size(*(*self.DR)[wh[0]].BCD,/DIMENSIONS)
+           bcdsz=[sxpar(*(*self.DR)[wh[0]].HEADER,'NAXIS*')]
      endelse 
   endif 
   if arg_present(cdate) then cdate=self.CUBE_DATE
@@ -2843,7 +2798,7 @@ pro CubeProj::Flux,lam,sp,ORDER=ord,SLCF=do_slcf,PIXEL_OMEGA=solid
   if keyword_set(do_slcf) then begin 
      if ptr_valid(slcf) then begin 
         slcf=*slcf
-        slcf=interpol(slcf[1,*],slcf[0,*],lam)
+        slcf=interpol(slcf[1,*],slcf[0,*],lam,/LSQUADRATIC)
         sp*=slcf/flux_conv      ;Jy/pix
      endif else sp/=flux_conv
   endif else sp/=flux_conv
@@ -2874,7 +2829,7 @@ function CubeProj::FluxImage
      flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
      if ptr_valid(slcf) then begin 
         slcf=*slcf
-        slcf=interpol(slcf[1,*],slcf[0,*],lam)
+        slcf=interpol(slcf[1,*],slcf[0,*],lam,/LSQUADRATIC)
      endif else tmp=temporary(slcf)
      
      for j=0,n_elements(lam)-1 do begin 
@@ -3229,9 +3184,10 @@ pro CubeProj::BuildAccount,_EXTRA=e
                                   self.MODULE,ORDER2=self.ORDER,newpos
         pos=newpos
      endif
-
+     
+     ;; Calculate precise sky pixel center of the slit center coordinate
      ad2xy,pos[0],pos[1],astr,x,y
-     offset=[x,y]+.5            ;NASALib WCSism
+     offset=[x,y]+.5            ;NASALib WCS: pixel centered at [0.0,0.0]
      
      ;; (Probably small) difference between PA of this BCD and the
      ;; mean map PA
@@ -3285,8 +3241,9 @@ pro CubeProj::BuildAccount,_EXTRA=e
               ;; associated polygon (2xn list) this pixel got clipped to
               ;; by the PR on the detector grid
               poly=*(*prs[j].POLYGONS)[k]
-              ;; Offset to canonical slit center 
-              poly=poly-rebin(prs[j].cen,size(poly,/DIMENSIONS))
+              ;; Offset to canonical slit center and scale with plate scale
+              poly=(poly-rebin(prs[j].cen,size(poly,/DIMENSIONS)))* $
+                   self.OVERSAMPLE_FACTOR
               ;; Rotate this polygon to the cube sky grid, if necessary
               if angle ne 0.0 then poly=rot#poly ;XXX check!!!
               ;; Offset the polygon correctly into the sky grid
@@ -3411,8 +3368,8 @@ pro CubeProj::Normalize
   if good_cnt eq 0 then return
   
   if ptr_valid((*self.DR)[enabled[0]].HEADER) then begin 
-     stepsper=sxpar(*(*self.DR)[enabled[0]].HEADER,'STEPSPER')
-     stepspar=sxpar(*(*self.DR)[enabled[0]].HEADER,'STEPSPAR')
+     stepsper=sxpar(*(*self.DR)[enabled[0]].HEADER,'STEPSPER')>1
+     stepspar=sxpar(*(*self.DR)[enabled[0]].HEADER,'STEPSPAR')>1
      stepszpar=sxpar(*(*self.DR)[enabled[0]].HEADER,'SIZEPAR')
      stepszper=sxpar(*(*self.DR)[enabled[0]].HEADER,'SIZEPER')
      self.NSTEP=[stepsper[0],stepspar[0]]
@@ -3515,11 +3472,11 @@ function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
   angle=(270.0D - self.PA)/RADEG
   if self.module eq 'LH' then angle+=180./RADEG
   c=cos(angle) & s=sin(angle)
-  cd=self.PLATE_SCALE*[[-c,-s],[-s,c]]
+  cd=[[-c,-s],[-s,c]]
   if keyword_set(zo) then crpix=[0.5,0.5] else $
      crpix=self.CUBE_SIZE[0:1]/2.+.5 ;[1,1] => pixel center FITS silliness
-  
-  make_astr,astr,CD=cd,DELTA=[1.D,1.D],CRPIX=crpix,CRVAL=self.POSITION, $
+  cdelt=self.PLATE_SCALE/self.OVERSAMPLE_FACTOR
+  make_astr,astr,CD=cd,DELTA=[cdelt,cdelt],CRPIX=crpix,CRVAL=self.POSITION, $
             CTYPE=['RA---TAN','DEC--TAN']
   return,astr
 end
@@ -4065,8 +4022,12 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
   if keyword_set(sf) then $
      self->SaveSpectrum,sf,sp,oSP,POLYGON=op,UNCERTAINTY=sp_unc,_EXTRA=e
 
-  if keyword_set(exp) then $
-     self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
+  if keyword_set(exp) then begin 
+     if use_unc then      $
+        self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH], $
+                                                [sp],[sp_unc]]) $
+     else self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
+  endif 
   if n_elements(oSP) ne 0 then obj_destroy,oSP
   if keyword_set(pkg) then begin 
      if n_elements(sp_unc) ne 0 then $
@@ -4078,6 +4039,99 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      if n_elements(sp_unc) ne 0 then ret.UNCERTAINTY=sp_unc
      return,ret
   endif else return,sp
+end
+
+
+;=============================================================================
+;  AddOutputInfo - Add the output info only we know.
+;=============================================================================
+pro CubeProj::AddOutputInfo,out_obj
+  self->LoadCalib
+  calname=self.cal->Name()
+  if calname eq '' then calname=self.cal_file
+  fullname=irs_fov(MODULE=self.MODULE,ORDER=self.ORDER,POSITION=0,/SLIT_NAME, $
+                   /LOOKUP_MODULE)
+  out_obj->SetProperty,SOFTWARE='CUBISM',VERSION=self.version, $
+                       FLUX_UNITS=self->FluxUnits(/AS_BUILT,_EXTRA=e), $
+                       CAL_SET=calname,APERNAME=fullname
+  widget_control,/HOURGLASS  
+end
+
+
+;=============================================================================
+;  SaveCube - Save the cube using a cube object
+;=============================================================================
+pro CubeProj::SaveCube,file,COMMENTS=comm
+  if ~ptr_valid(self.cube) || ~ptr_valid(self.WAVELENGTH) then return
+
+  oC=obj_new('IRS_Cube',FILE_BASE=self->FileBaseName()+'_'+ $
+             self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
+             PARENT_GROUP=self->TopBase(),/FITS)
+  
+  oC->SaveInit,file
+  if size(file,/TYPE) ne 7 then begin 
+     obj_destroy,oC
+     return
+  endif 
+  
+  self->AddOutputInfo,oC
+  oC->SetProperty,CUBE_FLUX=*self.cube,WAVELENGTH=*self.wavelength, $
+                  WAVE_UNITS='um',CUBE_DATE=self.CUBE_DATE, $
+                  ASTROMETRY=self->CubeAstrometryRecord()
+  
+  if ptr_valid(self.cube_unc) then $
+     oC->SetProperty, CUBE_UNCERTAINTY=*self.cube_unc
+  
+  oC->InitHeader
+  
+  ;; Add the first header as inheritance
+  m=min((*self.DR).DCEID,pos)
+  self->RestoreData,pos
+  h1=*(*self.DR)[pos].HEADER
+  oC->InheritHeader,h1,'KEYWORDS FROM FIRST BCD',/STRIP
+  
+  oC->AddHist,['This file contains a 3D spectral cube created from',$
+                'an IRS spectral mapping dataset.'],/COMMENT
+  if n_elements(comm) ne 0 then oC->AddHist,comm,/COMMENT
+
+  oC->Save,file
+  obj_destroy,oC
+end
+
+
+;=============================================================================
+;  SaveMap - Save a Stacked Map to FITS (possibly with uncertainty plane)
+;=============================================================================
+pro CubeProj::SaveMap,map,sf,COMMENTS=comm,UNCERTAINTY=unc,_EXTRA=e
+
+  oM=obj_new('IRS_Map',FILE_BASE=self->FileBaseName()+'_'+ $
+             self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
+             PARENT_GROUP=self->TopBase(),/FITS)
+  
+  oM->SaveInit,file
+  if size(file,/TYPE) ne 7 then begin 
+     obj_destroy,oM
+     return
+  endif 
+  
+  self->AddOutputInfo,oM
+  oM->SetProperty,MAP_FLUX=map, MAP_UNCERTAINTY=unc, $
+                  ASTROMETRY=self->CubeAstrometryRecord()
+  
+  oM->InitHeader
+  
+  ;; Add the first header as inheritance
+  m=min((*self.DR).DCEID,pos)
+  self->RestoreData,pos
+  h1=*(*self.DR)[pos].HEADER
+  oM->InheritHeader,h1,'KEYWORDS FROM FIRST BCD',/STRIP
+  
+  oM->AddHist,['This file contains a 2D spectral map created from',$
+               'an IRS spectral mapping dataset.'],/COMMENT
+  if n_elements(comm) ne 0 then oM->AddHist,comm,/COMMENT
+
+  oM->Save,file
+  obj_destroy,oM
 end
 
 
@@ -4108,12 +4162,12 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,UNCERTAINTY=unc,POLYGON=op,COMMENTS=comm
      return
   endif 
   
-  oSP->SetProperty,FLUX_SPECTRUM=sp,WAVELENGTH=*self.wavelength, $
-                   WAVE_UNITS='um',FLUX_ERROR=unc, $
-                   FLUX_UNITS=self->FluxUnits(/AS_BUILT)
+  oSP->SetProperty,SPECTRUM_FLUX=sp,SPECTRUM_UNCERTAINTY=unc, $
+                   WAVELENGTH=*self.wavelength, WAVE_UNITS='um'
+  
+  self->AddOutputInfo,oSP
   
   oSP->InitHeader
-  oSP->AddPar,'CBSMVERS',self.version,'CUBISM Build Version'
   
   ;; Add the first header as inheritance
   m=min((*self.DR).DCEID,pos)
@@ -4435,73 +4489,6 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   return,stack
 end 
 
-;=============================================================================
-;  SaveMap - Save a Stacked Map to FITS (possibly with uncertainty plane)
-;=============================================================================
-pro CubeProj::SaveMap,map,sf,COMMENTS=comm,UNCERTAINTY=unc,_EXTRA=e
-  ;; XXX break out to IRS_Map...
-  if size(sf,/TYPE) ne 7 then begin 
-     xf,sf,/SAVEFILE, /RECENT, $
-        FILTERLIST=['*.fits', '*.*', '*'], $
-        TITLE='Save Map As FITS File...', $
-        /NO_SHOW_ALL, SELECT=0, PARENT_GROUP=self->TopBase(), $
-        START=strlowcase(strjoin(strsplit(self->ProjectName(), $
-                                          /EXTRACT),'_')) + "_map.fits",/MODAL
-     if size(sf,/TYPE) ne 7 then return
-  endif
-  use_unc=array_equal(size(unc,/DIMENSIONS),size(map,/DIMENSIONS))
-  
-  catch, err
-  if err ne 0 then begin 
-     catch,/CANCEL
-     self->Error,['Error saving map to file '+sf,!ERROR_STATE.MSG]
-  endif 
-  widget_control,/HOURGLASS  
-
-  fxhmake,hdr,/date
-  putast,hdr,self->CubeAstrometryRecord()
-  self->AddHeaderInfo,hdr,_EXTRA=e
-  
-  m=min((*self.DR).DCEID,pos)
-  self->RestoreData,pos
-  h1=*(*self.DR)[pos].HEADER
-  sxdelpar,h1,['SIMPLE','BITPIX','CD1_1','CD1_2','CD2_1','CD2_2','NAXIS', $
-               'NAXIS1','NAXIS2','CRVAL1','CRVAL2','CTYPE1','CTYPE2',$
-               'CRPIX1','CRPIX2','EQUINOX','BUNIT']
-  sxaddhist,' ',hdr,/BLANK
-  sxaddhist,'         / KEYWORDS FROM FIRST BCD',hdr,/BLANK
-  sxaddhist,' ',hdr,/BLANK
-  hdr=[hdr[0:n_elements(hdr)-2],h1,hdr[n_elements(hdr)-1]]
-  
-  ;; Description
-  sxaddhist, ['This file contains a 2D map created from an IRS', $
-              'spectral cube, assembled from a spectral mapping dataset.'], $
-             hdr,/COMMENT
-  if use_unc then $
-     sxaddhist,'This file contains a second plane of ' + $
-               'uncertainties in the 2D map',hdr,/COMMENT
-  if n_elements(comm) ne 0 then sxaddhist,comm,hdr,/COMMENT
-  sxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
-  if use_unc then write_fits,sf,[ [[map]], [[unc]] ],hdr else $
-     writefits,sf,map,hdr
-end
-
-;=============================================================================
-;  AddHeaderInfo - Add the header information only we know
-;=============================================================================
-pro CubeProj::AddHeaderInfo,hdr,_EXTRA=e
-  fullname=irs_fov(MODULE=self.MODULE,ORDER=self.ORDER,POSITION=0,/SLIT_NAME, $
-                   /LOOKUP_MODULE)
-  fxaddpar,hdr,'APERNAME',fullname,' IRS module and order'
-  fxaddpar,hdr,'SOFTWARE','CUBISM',' Spectral Cube Assembly Software'
-  fxaddpar,hdr,'CUBS_VER',self.version,' CUBISM version used'
-  fxaddpar,hdr,'BUNIT',self->FluxUnits(/AS_BUILT,_EXTRA=e), $
-           ' Units of map data'
-  self->LoadCalib
-  name=self.cal->Name()
-  if name eq '' then name=self.cal_file
-  fxaddpar,hdr,'CAL_SET',name,' IRS Calibration set used'
-end
 
 ;=============================================================================
 ;  CheckSteps - Ensure that all of the BCD's for this map are present.
@@ -4723,9 +4710,12 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
                      DCEID=dceid,TYPE=type,EXP=exp,COLUMN=col, ROW=row, $
                      RQST_POS=rqpos, REC_POS=rpos, PA=pa,ERR=err,DISABLED=dis
   self->LoadCalib
-  ;; Don't add same file twice
-  if n_elements(file) ne 0 AND ptr_valid(self.DR) then $
-     if NOT array_equal((*self.DR).file ne file,1b) then return
+  ;; Don't add same file twice, even symlinks (1 level deep)
+  if n_elements(file) ne 0 AND ptr_valid(self.DR) then begin 
+     if (file_info(file)).SYMLINK then file=file_readlink(file)
+     if ~array_equal((*self.DR).file ne file,1b) then return
+  endif 
+  
   s=size(bcd,/DIMENSIONS)
   rec={CUBE_DR}
   if n_elements(s) eq 3 then begin 
@@ -5029,8 +5019,9 @@ function CubeProj::Init, name, _EXTRA=e
   if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up
 ;  if self->IDLitComponent::Init() ne 1 then return,0
   if n_elements(name) ne 0 then self->SetProjectName,name
-  ;; A few default toggles
-  self->SetProperty,/LOAD_MASKS,/USE_BACKGROUND,/RECONSTRUCTED_POSITIONS
+  ;; A few defaults
+  self->SetProperty,/LOAD_MASKS,/USE_BACKGROUND,/RECONSTRUCTED_POSITIONS, $
+                    OVERSAMPLE_FACTOR=1.0D
   self.Changed=0b               ;coming into existence doesn't count
   if n_elements(e) ne 0 then self->SetProperty,_EXTRA=e
   self->Initialize
@@ -5074,7 +5065,8 @@ pro CubeProj__define
                                 ; directory, in the "calib/" subdir)
       NSTEP:[0L,0L], $          ;perpendicular (row), parallel (col) steps
       STEP_SIZE: [0.0D,0.0D], $ ;perpendicular, parallel slit step sizes (deg)
-      PLATE_SCALE:0.0D, $       ;the plate scale (degrees/pixel)
+      PLATE_SCALE:0.0D, $       ;the instrument plate scale (degrees/pixel)
+      OVERSAMPLE_FACTOR: 0.0D,$ ;the factor by which the sky is oversampled
       PR_SIZE:[0.0,0.0]}        ;the, parallel (long axis), perpendicular
                                 ; (short axis) size of the PRs to use (pixels)
   c={CubeProj, $
@@ -5197,7 +5189,8 @@ pro CubeProj__define
          MUST_UNCERTAINTIES: 0L} ;must have enabled records with uncertainties
   
   ;; Messages: send a cube, record, etc.
-  msg={CUBEPROJ_CUBE,  CUBE:obj_new(),INFO:'',MODULE:'',WAVELENGTH:ptr_new()}
+  msg={CUBEPROJ_CUBE, CUBE:obj_new(),INFO:'',MODULE:'', $
+       WAVELENGTH:ptr_new()}
   msg={CUBEPROJ_RECORD,CUBE:obj_new(),INFO:'',MODULE:'',ORDER:0, $
        CAL:obj_new(),RECORD_SET:ptr_new(), BCD:ptr_new(),UNC:ptr_new(), $
        BMASK:ptr_new(), BACKGROUND:ptr_new(),BACKGROUND_UNC:ptr_new(), $
