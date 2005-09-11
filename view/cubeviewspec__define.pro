@@ -205,9 +205,9 @@ pro CubeViewSpec::Event,ev
                     case doing of 
                        2: begin ;region
                           sel=widget_info(self.wRtype,/DROPLIST_SELECT) 
-                          r=[value_locate(*self.lam,self.pressloc[0]), $
-                             value_locate(*self.lam,c[0])]
-                          r=[r[0]<r[1],r[1]>r[0]]
+                          m=min(abs(*self.lam-c[0]),ind1)
+                          m=min(abs(*self.lam-self.pressloc[0]),ind2)
+                          r=[ind1<ind2,ind1>ind2]
                           if NOT array_equal(r ne -1,1b) then return
                           ;; append the new region
                           if ptr_valid(self.reg[sel]) then $
