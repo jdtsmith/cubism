@@ -261,6 +261,9 @@
 ;    Pre-made IRS_Calib object sets can be found in the subdirectory
 ;    calib/sets in this distribution.
 ;
+;    Nota Bene: All pixel coordinates in the WAVSAMP and related
+;    follow the convention of the first pixel centered at [0.5,0.5].
+;
 ; INHERITANCE TREE:
 ;
 ;     IRS_Calib
@@ -317,7 +320,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
                             PLATE_SCALE=ps,PIXEL_OMEGA=po,PMASK=pmask, $
                             FLUXCON=fluxcon,KEY_WAV=fluxcon_kw,TUNE=tune, $
-                            SLCF=slcf
+                            SLCF=slcf,WAVECUT=wavecut
   if arg_present(pmask) then begin 
      m=irs_module(module)
      pmask=self.PMASK[m]
@@ -339,6 +342,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   if arg_present(fluxcon) then fluxcon=rec.FLUXCON
   if arg_present(fluxcon_kw) then fluxcon_kw=rec.FLUXCON_KEY_WAV
   if arg_present(tune) then tune=rec.TUNE
+  if arg_present(wavecut) then wavecut=rec.WAVECUT  
   ;;if arg_present(sz) then sz=self.detsize[*,0>irs_module(module)<5]
 end
 
