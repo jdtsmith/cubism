@@ -195,7 +195,7 @@ pro CubeRec::BuildStack,UNCERTAINTY=stack_unc,_EXTRA=e
      if ptr_valid(msg.background) then begin
         type=size(*msg.background,/TYPE)
         if type eq 4 OR type eq 5 then begin ;floating pt. continuum vals
-           self.stack=ptr_new(self.cube-> $
+           self.STACK=ptr_new(self.cube-> $
                               Stack(*msg.foreground, $
                                     WAVELENGTH_WEIGHTED=msg.weight_cont,$
                                     STACK_UNCERTAINTY=stack_unc, $
@@ -331,9 +331,8 @@ pro CubeRec::UpdateView
      end
      else:
   endcase 
-  ;; save memory w/ ptr
   if ptr_valid(self.IMAGE) then $
-     self.oDraw->SetProperty,/NO_RESIZE,IMORIG=self.IMAGE $ 
+     self.oDraw->SetProperty,/NO_RESIZE,IMORIG=*self.IMAGE $ 
   else self.oDraw->Erase,/FULL
 end
 
