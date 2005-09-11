@@ -12,8 +12,8 @@ end
 ;=============================================================================
 ;  SetProperty
 ;=============================================================================
-pro IRS_Spectrum::SetProperty,REGION=region,WAVELENGTH=wl,FLUX_SPECTRUM=flux, $
-                              FLUX_ERROR=error,WAVE_UNITS=wu,FLUX_UNITS=fu
+pro IRS_Spectrum::SetProperty,REGION=region,WAVELENGTH=wl,SPECTRUM_FLUX=flux, $
+                              SPECTRUM_UNCERTAINTY=unc,WAVE_UNITS=wu,_EXTRA=e
   if n_elements(region) ne 0 then self.region=region
   if n_elements(wl) ne 0 then begin 
      ptr_free,self.wavelength
@@ -24,26 +24,28 @@ pro IRS_Spectrum::SetProperty,REGION=region,WAVELENGTH=wl,FLUX_SPECTRUM=flux, $
      self.flux=ptr_new(flux)
   endif 
   
-  if n_elements(error) ne 0 then begin 
-     ptr_free,self.error
-     self.error=ptr_new(error)
+  if n_elements(unc) ne 0 then begin 
+     ptr_free,self.unc
+     self.unc=ptr_new(unc)
   endif 
   
   if n_elements(wu) ne 0 then self.wave_units=wu
-  if n_elements(fu) ne 0 then self.flux_units=fu
+  self->IRS_File_IO::SetProperty,_EXTRA=e  
 end
 
 
 ;=============================================================================
 ;  GetProperty
 ;=============================================================================
-pro IRS_Spectrum::GetProperty,REGION=region,FLUX_UNITS=fu,WAVE_UNITS=wu, $
-                              WAVELENGTH=wl, SPECTRUM=flux
+pro IRS_Spectrum::GetProperty,REGION=region,WAVE_UNITS=wu, $
+                              WAVELENGTH=wl, SPECTRUM_FLUX=flux, $
+                              SPECTRUM_UNCERTAINTY=unc,_REF_EXTRA=e
   if arg_present(wu) then wu=self.wave_units
-  if arg_present(fu) then fu=self.flux_units
   if arg_present(region) then region=self.region
   if arg_present(wl) && ptr_valid(self.wavelength) then wl=*self.wavelength
   if arg_present(flux) && ptr_valid(self.flux) then flux=*self.flux
+  if arg_present(unc) && ptr_valid(self.unc) then unc=*self.unc
+  self->IRS_File_IO::GetProperty,_EXTRA=e
 end
 
 
@@ -66,7 +68,7 @@ pro IRS_Spectrum::Save,sf
      catch,/cancel
      self->Error,['Error saving spectrum to file '+sf,!ERROR_STATE.MSG]
   endif 
-  widget_control,/HOURGLASS  
+  
   
   self->AddPar,'FILENAME',filestrip(sf),' Name of this file'
   
@@ -115,8 +117,8 @@ pro IRS_Spectrum::Save,sf
   endif else begin 
      base=create_struct('Wavelength',0.0,'Flux',0.0)
      units=[self.wave_units,self.flux_units]
-     if ptr_valid(self.error) then begin 
-        base=create_struct(base,'Error',0.0)
+     if ptr_valid(self.unc) then begin 
+        base=create_struct(base,'Flux_Uncertainty',0.0)
         units=[units,self.flux_units]
      endif 
      
@@ -132,8 +134,8 @@ pro IRS_Spectrum::Save,sf
      data.wavelength=*self.wavelength
      data.flux=*self.flux
      off=2
-     if ptr_valid(self.error) then begin 
-        data.error=*self.error
+     if ptr_valid(self.unc) then begin 
+        data.flux_uncertainty=*self.unc
         off++
      endif 
      
@@ -180,7 +182,7 @@ pro IRS_Spectrum::Read,file
      names=tag_names(st)
      off=2
      if n_elements(names) gt 2 && strupcase(names[2]) eq 'ERROR' then begin 
-        self.error=ptr_new(st.error)
+        self.unc=ptr_new(st.flux_uncertainty)
         off++
      endif 
      
@@ -195,9 +197,10 @@ end
 ;  Cleanup
 ;=============================================================================
 pro IRS_Spectrum::Cleanup
-  ptr_free,self.wavelength,self.flux,self.error
+  ptr_free,self.wavelength,self.flux,self.unc
   heap_free,self.extra_data
   if obj_valid(self.region) then obj_destroy,self.region
+  self->IRS_File_IO::Cleanup
 end
 
 
@@ -205,14 +208,12 @@ end
 ;  Init
 ;=============================================================================
 function IRS_Spectrum::Init,wavelength,flux,error, WAVELENGTH_UNITS=wu,$
-                            FLUX_UNITS=fu,_EXTRA=e
+                            _EXTRA=e
   if (self->IRS_File_IO::Init(_EXTRA=e) ne 1) then return,0 ;chain up
   ;; Append to default file_base
   if self.file_base then self.file_base+='_sp'
   self.file_title='Spectrum'
   if n_elements(wu) eq 0 then self.wave_units='um' else self.wave_units=wu
-  if n_elements(fu) eq 0 then self.flux_units='MJy/sr' $
-  else self.flux_units=fu  
   
   if n_elements(wavelength) ne 0 then self.wavelength=ptr_new(wavelength)
   if n_elements(flux) ne 0 then self.flux=ptr_new(flux)
@@ -228,8 +229,7 @@ pro IRS_Spectrum__define
       wavelength: ptr_new(), $  ;wavelength
       wave_units: '', $         ;units for wavelength
       flux: ptr_new(), $        ;the spectrum
-      error: ptr_new(), $       ;the error
-      flux_units: '', $         ;units for flux
+      unc: ptr_new(), $         ;the spectrum uncertainty
       extra_data: ptr_new(), $  ;list of IRS_Spectrum_EXTRA_Data structures
       region: obj_new() }       ;region object, if any regions attached
   
