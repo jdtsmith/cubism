@@ -94,7 +94,7 @@ function read_ipac_table,file, hdr,UNITS=units
   at_data=(chead=0)
   while NOT eof(un) do begin 
      readf,un,line
-     if stregex(line,'^ *$',/BOOLEAN) then continue ; Skip blank lines
+     if ~strtrim(line,2) then continue ; Skip blank lines
      if at_data eq 0 then begin 
         line_cnt++
         firstchar = strmid(line,0,1)
@@ -162,7 +162,8 @@ function read_ipac_table,file, hdr,UNITS=units
            end 
            else: begin 
               at_data=1
-              ret=replicate(data_elem,nlines-line_cnt+1)
+              nlines=nlines-line_cnt+1
+              ret=replicate(data_elem,nlines)
               line_cnt=0
            end 
         endcase
@@ -172,6 +173,10 @@ function read_ipac_table,file, hdr,UNITS=units
      reads,line,data_elem,FORMAT='('+strjoin(format,",")+')'
      ret[line_cnt++]=data_elem
   endwhile
+  
+  if line_cnt lt nlines then begin 
+     ret=ret[0:line_cnt-1]
+  endif 
   
   if n_elements(got_string) ne 0 then begin 
      wh=where(got_string eq 1b,cnt)
