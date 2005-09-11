@@ -7,25 +7,43 @@ end
 ;=============================================================================
 ;  SetProperty
 ;=============================================================================
-pro IRS_File_IO::SetProperty,FITS=fits,IPAC_TABLE=it
+pro IRS_File_IO::SetProperty,FITS=fits,IPAC_TABLE=it,VERSION=cv, $
+                             CAL_SET=cs, SOFTWARE=soft, FLUX_UNITS=fu, $
+                             APERNAME=an
+                             
   if n_elements(fits) ne 0 then new_fits=keyword_set(fits) else $
      if n_elements(it) ne 0 then new_fits=~keyword_set(it)
-  if n_elements(new_fits) ne 0 && new_fits ne self.fits then begin 
+  if n_elements(new_fits) ne 0 && new_fits ne self.fits then $
      self.fits=new_fits
-     self->InitHeader
-  endif 
+
+  if n_elements(cv) ne 0 then self.version=cv
+  if n_elements(cs) ne 0 then self.cal=cs
+  if n_elements(soft) ne 0 then self.software=soft
+  if n_elements(fu) ne 0 then self.flux_units=fu
+  if n_elements(an) ne 0 then self.apername=an
 end
 
 ;=============================================================================
-;  InitHeader - Initialize the header, with date
+;  InitHeader - Initialize the header, with date, etc.
 ;=============================================================================
-pro IRS_File_IO::InitHeader,data
+pro IRS_File_IO::InitHeader,data,_EXTRA=e
   if ~ptr_valid(self.hdr) then self.hdr=ptr_new(/ALLOCATE_HEAP)
   if self.fits then begin 
-     fxhmake,*self.hdr,data,/DATE,/INITIALIZE
+     fxhmake,*self.hdr,data,/DATE,/INITIALIZE,_EXTRA=e
   endif else begin 
      ipac_table_hmake,*self.hdr,/DATE,/INITIALIZE
   endelse
+
+  if self.apername then $
+     self->AddPar,'APERNAME',self.apername,' IRS module and order'
+  if self.flux_units then $
+     self->AddPar,'BUNIT',self.flux_units,' Units of flux data'
+
+  if self.cal then self->AddPar,'CAL_SET',self.cal,' Calibration set'
+  if self.software then self->AddPar,'SOFTWARE',self.software, $
+                                     ' Product assembly software'
+  if self.version then $
+     self->AddPar,'SOFT_VER',self.version,' Software version used'
 end
 
 ;=============================================================================
@@ -50,7 +68,20 @@ end
 ;=============================================================================
 ;  InheritHeader - Inherit a fixed header, with optional leading comment
 ;=============================================================================
-pro IRS_File_IO::InheritHeader,hdr,comment
+pro IRS_File_IO::InheritHeader,hdr,comment,STRIP=strip
+  if ptr_valid(self.hdr) then begin 
+     keys=strmid(*self.hdr,0,8)
+     if self.fits then endpos=where(keys eq 'END     ',endcnt) $
+     else endcnt=0
+     wh=where(strtrim(keys,2),cnt)
+     if cnt gt 0 then keys=keys[wh] 
+     if endcnt gt 0 then begin 
+        preh=(*self.hdr)[0:endpos-1]
+        posth=(*self.hdr)[endpos:*]
+     endif 
+  endif 
+  
+  
   ;; add a comment ahead of the header material, if necessary
   if n_elements(comment) ne 0 then begin 
      blank=self.fits?' ':'\'
@@ -58,14 +89,27 @@ pro IRS_File_IO::InheritHeader,hdr,comment
                (self.fits?'':'\')+'          '+ (self.fits?'/':' ') + $
                strmid(comment,0,80-13),$
                blank]
-     if ptr_valid(self.hdr) then *self.hdr=[*self.hdr,add_comm] else $
-        self.hdr=ptr_new([add_comm])
   endif 
   
+  
+  ;; strip the new header of any pre-existing keywords in our header
+  if keyword_set(strip) && ptr_valid(self.hdr) then begin 
+     new_keys=strmid(hdr,0,8)
+     wh=where_not_array(keys,new_keys,cnt)
+     if cnt eq 0 then return
+     hdr=hdr[wh]
+  endif 
+     
+  if ~self.fits then h='\'+hdr else h=hdr
+  if n_elements(add_comm) gt 0 then h=[add_comm,h]
+  
   if ~ptr_valid(self.hdr) then $
-     self.hdr=ptr_new(self.fits?hdr:'\'+hdr) $
-  else $
-     *self.hdr=[*self.hdr,self.fits?hdr:'\'+hdr]
+     self.hdr=ptr_new(h) $
+  else begin 
+     if n_elements(preh) gt 0 then $
+        *self.hdr=[preh,h,posth] $
+     else *self.hdr=[*self.hdr,h]
+  endelse 
 end
 
 
@@ -81,10 +125,16 @@ function IRS_File_IO::SaveFile,sf
         START=self.file_base?(self.file_base+(self.fits?".fits":".tbl")):'', $
         /MODAL
   endif
-  if size(sf,/TYPE) eq 7 then self.fits=stregex(sf,'\.fits\$',/BOOLEAN)
+  if size(sf,/TYPE) eq 7 then self.fits=stregex(sf,'\.fits?$',/BOOLEAN)
   return,sf
 end 
 
+;=============================================================================
+;  SaveInit - Normalize save file, and pull FITS status from extension.
+;=============================================================================
+pro IRS_File_IO::SaveInit,sf
+  sf=self->SaveFile(sf)
+end
 
 ;=============================================================================
 ;  ReadFile - Return a save file, and set FITS status based on extension
@@ -104,15 +154,16 @@ end
 
 pro IRS_File_IO::Cleanup
   ptr_free,self.hdr
-  heap_free,self.hdr_extra
 end
 
-function IRS_File_IO::Init,PARENT_GROUP=pg,FILE_TITLE=st,FILE_BASE=fb
+function IRS_File_IO::Init,PARENT_GROUP=pg,FILE_TITLE=st,FILE_BASE=fb, $
+                           _EXTRA=e
   if (self->ObjMsg::Init(_EXTRA=e) ne 1) then return,0 ;chain up
   if n_elements(pg) ne 0 then self.parent_group=pg
   if n_elements(st) ne 0 then self.file_title=st else $
      self.file_title='File'
   if n_elements(fb) ne 0 then self.file_base=fb
+  if n_elements(e) ne 0 then self->SetProperty,_EXTRA=e
   return,1
 end
 
@@ -125,5 +176,10 @@ pro IRS_File_IO__define
       parent_group: 0L, $       ;parent group
       file_title:'', $          ;title for saving
       file_base:'', $           ;default basename of files to save
+      version:'', $             ;software version used
+      cal:'', $                 ;calibration set used
+      software:'', $            ;the software version
+      flux_units:'', $          ;units of the flux
+      apername:'', $            ;aperture name (module/order)
       hdr:ptr_new() }           ;the header itself
 end
