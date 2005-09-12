@@ -1106,13 +1106,17 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
      only_set=0 & only_clear=0
   endelse
   
+  status_changed=0b
   set=1
   if ptr_valid(list) then begin 
      got=where(*list eq pix,ngot,COMPLEMENT=others,NCOMPLEMENT=nothers)
      if ngot gt 0 then begin    ;already on list, clear it
         set=0
         if only_set then return
-        if nothers gt 0 then *list=(*list)[others] else ptr_free,list
+        if nothers gt 0 then *list=(*list)[others] else begin 
+           ptr_free,list
+           status_changed=1b
+        endelse 
         self.GLOBAL_BP_BYHAND=1b & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
      endif else begin 
         if only_clear then return
@@ -1124,13 +1128,14 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
      if n_elements(rec) ne 0 then $
         (*self.DR)[rec[0]].BAD_PIXEL_LIST=ptr_new([pix]) $
      else self.GLOBAL_BAD_PIXEL_LIST=ptr_new([pix])
+     status_changed=1b
      self.GLOBAL_BP_BYHAND=1b & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
   endelse 
   if ~self.Changed then begin 
      self.Changed=1b
      self->UpdateTitle
   endif 
-  if ~self.GLOBAL_BP_SAVEFILE_UPTODATE then self->UpdateButtons 
+  if status_changed then self->UpdateButtons
   if keyword_set(ud) then self->Send,/UPDATE
 end
 
