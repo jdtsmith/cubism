@@ -1130,7 +1130,7 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
      self.Changed=1b
      self->UpdateTitle
   endif 
-  if ~self.GLOBAL_SAVEFILE_UPTODATE then self->UpdateButtons 
+  if ~self.GLOBAL_BP_SAVEFILE_UPTODATE then self->UpdateButtons 
   if keyword_set(ud) then self->Send,/UPDATE
 end
 
