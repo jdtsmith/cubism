@@ -181,7 +181,8 @@ pro IRS_Spectrum::Read,file
      
      names=tag_names(st)
      off=2
-     if n_elements(names) gt 2 && strupcase(names[2]) eq 'ERROR' then begin 
+     if n_elements(names) gt 2 && strupcase(names[2]) eq 'FLUX_UNCERTAINTY' $
+     then begin 
         self.unc=ptr_new(st.flux_uncertainty)
         off++
      endif 
