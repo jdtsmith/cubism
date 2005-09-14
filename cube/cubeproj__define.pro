@@ -860,7 +860,9 @@ function CubeProj::Load,file,ERROR=err
      return,-1
   endif
   if self->IsWidget() then widget_control,/HOURGLASS
-  obj=restore_object(file,obj_class(self),OTHER_CLASSES='irs_aperture')
+  obj=restore_object(file,obj_class(self), $
+                     OTHER_CLASSES=['irs_aperture','irs_file_io', $
+                                    'irs_spectrum','irs_map','irs_cube'])
   if obj_valid(obj) then begin 
      if ~obj_isa(obj,obj_class(self)) then $
         self->Error,'Invalid Cube Project'
