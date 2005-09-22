@@ -104,8 +104,10 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   if n_elements(polyclip_compiled) eq 0 OR keyword_set(rc) then begin 
      catch, err
      if err ne 0 then begin   ; any failure in compiling, just use the IDL vers
-        message, /CONTINUE, $
-           'Failed compiling DLM clipper -- reverting to internal version.'
+        message, $
+           /CONTINUE, $
+           'Failed compiling DLM clipper -- reverting to internal version. '+ $
+           'Error: '+!ERROR_STATE.MSG
         polyclip_compiled=0
      endif else begin 
         @cubism_dir
