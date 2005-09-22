@@ -98,6 +98,11 @@ pro IRS_File_IO::InheritHeader,hdr,comment,STRIP=strip
      wh=where_not_array(keys,new_keys,cnt)
      if cnt eq 0 then return
      hdr=hdr[wh]
+     ;; Clear out any astrometry keywords, for safety
+     wh=where(~stregex(hdr,'^((CD|PC)[0-9]_[0-9]|CDELT[0-9]|CRVAL[0-9]|' + $
+                       'CRPIX[0-9])',/BOOLEAN),cnt2)
+     if cnt2 eq 0 then return
+     if cnt2 lt cnt then hdr=hdr[wh]
   endif 
      
   if ~self.fits then h='\'+hdr else h=hdr
