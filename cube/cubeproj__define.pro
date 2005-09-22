@@ -302,7 +302,12 @@ pro CubeProj::ShowEvent, ev
         self->SetListSelect,/INVERT
         self->UpdateButtons
      end 
-             
+     
+     'deselect-disabled': begin 
+        self->SetListSelect,/NO_DISABLED
+        self->UpdateButtons
+     end 
+     
      'filenames': begin 
         if sel[0] eq -1 then return
         if n_elements(sel) gt 1 then $
@@ -457,10 +462,10 @@ end
 ;  Show - Run the project interface
 ;=============================================================================
 pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
-  if NOT keyword_set(force) then if self->Showing() then return
+  if ~keyword_set(force) then if self->Showing() then return
 
   ;; make the info structure if we need it.
-  if NOT ptr_valid(self.wInfo) then begin
+  if ~ptr_valid(self.wInfo) then begin
      self.wInfo=ptr_new({CubeProj_wInfo})
   endif 
   
@@ -516,7 +521,8 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                                            UVALUE='select-by-keyword')
   (*self.wInfo).MUST_PROJ[3]=widget_button(edit,VALUE='Invert Selection',$
                                            UVALUE='invert-select',/SEPARATOR)
-  
+  (*self.wInfo).MUST_PROJ[4]=widget_button(edit,VALUE='Deselect Disabled', $
+                                           UVALUE='deselect-disabled')
   
   
   wMustSel=widget_button(edit,VALUE='Replace File Substring...', $
@@ -580,7 +586,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Cube menu  
   cube=widget_button(mbar,VALUE='Cube',/MENU)
-  (*self.wInfo).MUST_PROJ[4]= $
+  (*self.wInfo).MUST_PROJ[5]= $
      widget_button(cube,VALUE='Build Cube',UVALUE='buildcube') 
   (*self.wInfo).MUST_ACCT= $
      widget_button(cube,VALUE='Reset Accounts',UVALUE='resetaccounts')
@@ -746,7 +752,8 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).list_size_diff=geom.SCR_YSIZE- $
      (widget_info(base,/GEOMETRY)).SCR_YSIZE
   
-  name='CubeProj_Show:'+self.ProjectName+self.savefile
+  name='CubeProj_Show:'+self.ProjectName+file_basename(self.savefile)
+  name=strmid(name,0,127)
   XManager,name,(*self.wInfo).Base,/JUST_REG
   if keyword_set(spn) then $
      self->SetProjectName,TITLE='New Project Name'
@@ -1526,7 +1533,7 @@ end
 ;  SetListSelect - Set the list selection
 ;=============================================================================
 pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv, $
-                            NONE=none,NO_UPDATE=nu
+                            NONE=none,NO_DISABLED=nd,NO_UPDATE=nu
   
   if ~ptr_valid(self.wInfo) then return
   
@@ -1541,6 +1548,15 @@ pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv, $
      recs=where(~inds,cnt)
   endif 
   
+  if keyword_set(nd) then begin 
+     if n_elements(recs) eq 0 then $
+        recs=widget_info((*self.wInfo).SList, /LIST_SELECT)
+     if recs[0] ne -1 then begin 
+        wh=where(~(*self.DR)[recs].DISABLED,cnt)
+        if cnt eq 0 then recs=-1 else recs=recs[wh]
+     endif 
+  endif 
+
   if ~keyword_set(npt) then $
      top=widget_info((*self.wInfo).SList,/LIST_TOP)
   
@@ -4052,7 +4068,7 @@ end
 ;=============================================================================
 ;  AddOutputInfo - Add the output info only we know.
 ;=============================================================================
-pro CubeProj::AddOutputInfo,out_obj
+pro CubeProj::AddOutputInfo,out_obj,_EXTRA=e
   self->LoadCalib
   calname=self.cal->Name()
   if calname eq '' then calname=self.cal_file
@@ -4113,10 +4129,10 @@ pro CubeProj::SaveMap,map,sf,COMMENTS=comm,UNCERTAINTY=unc,_EXTRA=e
 
   oM=obj_new('IRS_Map',FILE_BASE=self->FileBaseName()+'_'+ $
              self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
-             PARENT_GROUP=self->TopBase(),/FITS)
+             PARENT_GROUP=self->TopBase(),/FITS,_EXTRA=e)
   
-  oM->SaveInit,file
-  if size(file,/TYPE) ne 7 then begin 
+  oM->SaveInit,sf
+  if size(sf,/TYPE) ne 7 then begin 
      obj_destroy,oM
      return
   endif 
@@ -4137,7 +4153,7 @@ pro CubeProj::SaveMap,map,sf,COMMENTS=comm,UNCERTAINTY=unc,_EXTRA=e
                'an IRS spectral mapping dataset.'],/COMMENT
   if n_elements(comm) ne 0 then oM->AddHist,comm,/COMMENT
 
-  oM->Save,file
+  oM->Save,sf
   obj_destroy,oM
 end
 
@@ -4288,7 +4304,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      
      if keyword_set(int) then begin 
         if ~self.as_built.fluxcon then $
-           self->Error,'Integrated maps for fluxed cubes only'
+           self->Error,'Integrated maps available for fluxed cubes only'
         delta_nu=(wl[1:*]-wl)
         conv=(self.as_built.pix_omega?2.9979246e-6: $ ;Jy->W/m^2
               2.9979246e-12)/wl^2 ;MJy->W/m^2
@@ -4313,7 +4329,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                                  [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
               wvec=total(back_weights*back_finite>1.e-25,3)
               back=total(back_cube*back_weights,3,/NAN)/wvec
-              background+=back  ;background not integrated.
+              background+=back  ;background is not integrated
               fore_cube[*,*,j]-=back
               if use_unc then begin 
                  back_unc=sqrt(total(back_cube_unc^2* $
@@ -4328,9 +4344,8 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
            fcube_count=(total(finite(fore_cube),3)>1)/this_cnt
            stack+=total(fore_cube*fore_dnu,/NAN,3)/fcube_count
            if use_unc then stack_unc=sqrt(stack_unc^2+ $
-                                          total(fore_cube_unc^2*fore_dnu^2,3 $
+                                          total(fore_cube_unc^2*fore_dnu^2,3, $
                                                 /NAN)/fcube_count^2)
-           
         endfor
         background/=fore_cnt
         if use_unc then background_unc/=fore_cnt
@@ -4355,26 +4370,36 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
         
         background=fltarr(self.CUBE_SIZE[0:1])
         if use_unc then background_unc=background
-        for i=0,fore_cnt-1 do begin 
-           ;;print,1./(1.+abs(fore_wav[i]-back_wav))
-           back_weights=rebin(reform(1./(1.+abs(fore_wav[i]-back_wav)), $
-                                     [1,1,back_cnt]), $
-                              [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
-           ;; Remove the weighted average background for this foreground plane
-           wvec=total(back_weights*back_finite>1.e-25,3)
-
-           background+=total(back_cube*back_weights,3,/NAN)/wvec
-           if use_unc then $
-              background_unc=sqrt(background_unc^2+ $
-                                  total(back_cube_unc^2* $
-                                        back_weights^2,3,/NAN))/wvec
-        endfor 
+        if back_cnt eq 1 then begin 
+           background=back_cube*fore_cnt
+           if use_unc then background_unc=back_cube_unc
+        endif else begin 
+           for i=0,fore_cnt-1 do begin 
+              ;;print,1./(1.+abs(fore_wav[i]-back_wav))
+              fweights=1./(1.+abs(fore_wav[i]-back_wav))
+              back_weights=rebin(reform(fweights,[1,1,back_cnt]), $
+                                 [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
+              if i eq 0 then fweight_avg=fweights else fweight_avg+=fweights
+              ;; Remove the weighted average background for foreground plane
+              wvec=total(back_weights*back_finite>1.e-25,3)
+              
+              background+=total(back_cube*back_weights,3,/NAN)/wvec
+           endfor 
+           fweight_avg/=fore_cnt
+           if use_unc then begin 
+              fweight_avg=rebin(reform(fweight_avg,[1,1,back_cnt]), $
+                                [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
+              background_unc=sqrt(total(back_cube_unc^2*fweight_avg^2, $
+                                        3,/NAN))/ $
+                             total(fweight_avg*back_finite>1.e-25,3,/NAN)
+           endif 
+        endelse 
         stack-=background
         stack/=fore_cnt
         background/=fore_cnt
         if use_unc then begin 
-           stack_unc=sqrt(stack_unc^2+background_unc^2)/fore_cnt
-           background_unc/=fore_cnt
+           stack_unc/=fore_cnt
+           stack_unc=sqrt(stack_unc^2+background_unc^2)
         endif 
      endelse 
   endif else begin 
@@ -4385,9 +4410,10 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      use_weights=0
      if nw gt 0 then if weights[0] ne -1 then use_weights=1
      if use_weights then begin  ;A weight vector overrides foreground regions
-        stack=total(*self.CUBE * $
-                    rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],$
-                          /SAMPLE),3,/NAN)/total(weights)
+        w=rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],/SAMPLE)
+        tw=total(weights)
+        stack=total(*self.CUBE*w,3,/NAN)/tw
+        if use_unc then stack_unc=sqrt(total(*self.CUBE_UNC^2*w^2))/tw
      endif else begin           ;Foreground regions
         stack=fltarr(self.CUBE_SIZE[0:1])
         if use_unc then stack_unc=stack
@@ -4483,12 +4509,12 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   endif 
      
   if n_elements(reg_comm) ne 0 then begin 
-     if n_elements(comm) eq 0 then comm=reg_comm $
-     else comm=[comm,reg_comm]
+     if n_elements(comm) eq 0 then comment=reg_comm $
+     else comment=[comm,reg_comm]
   endif 
   
   ;; Possibly save the stack
-  if keyword_set(save) then self->SaveMap,stack,save,COMMENTS=comm, $
+  if keyword_set(save) then self->SaveMap,stack,save,COMMENTS=comment, $
                                           INTEGRATE=int,UNCERTAINTY=stack_unc
   if keyword_set(save_c) && n_elements(background) gt 0 $
   then self->SaveMap,background,save_c,COMMENTS=back_comm, $
@@ -4719,8 +4745,9 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   self->LoadCalib
   ;; Don't add same file twice, even symlinks (1 level deep)
   if n_elements(file) ne 0 AND ptr_valid(self.DR) then begin 
-     if (file_info(file)).SYMLINK then file=file_readlink(file)
-     if ~array_equal((*self.DR).file ne file,1b) then return
+     if (file_info(file)).SYMLINK then chfile=file_readlink(file) else $
+        chfile=file
+     if ~array_equal((*self.DR).file ne chfile,1b) then return
   endif 
   
   s=size(bcd,/DIMENSIONS)
@@ -5180,7 +5207,7 @@ pro CubeProj__define
          MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
          MUST_SELECT:lonarr(19),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
-         MUST_PROJ:lonarr(5), $ ;SW button which requires a valid project
+         MUST_PROJ:lonarr(6), $ ;SW button which requires a valid project
          MUST_ACCT:0L, $        ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(5), $ ;background record must be set
