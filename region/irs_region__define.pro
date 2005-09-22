@@ -2,6 +2,30 @@
 
 ;; Coordinates assumed J2000 decimal degrees (FK5).
 
+
+;=============================================================================
+;  ClipRegion -- Clip this region against an image with the given
+;                astrometry record
+;=============================================================================
+function IRS_Region::ClipRegion,image,clip_astr,_REF_EXTRA=ref
+  if ~ptr_valid(self.region) then return,-1
+  self->GetProperty,RA=ra,DEC=dec
+  ad2xy,ra,dec,clip_astr,x,y
+  s=size(image,/DIMENSIONS)
+  return,polyfillaa(x-0.5,y-0.5,s[0],s[1],_EXTRA=ref)
+end
+
+
+;=============================================================================
+;  RegionPhotometry -- Compute area averaged photometry of an image
+;                      over our region
+;=============================================================================
+function IRS_Region::RegionPhotometry,image,clip_astr
+  pix=self->ClipRegion(image,clip_astr,AREAS=areas)
+  if pix[0] eq -1 then return,!VALUES.F_NAN
+  return,total(image[pix]*areas)/total(areas)
+end
+
 ;=============================================================================
 ;  UpdateAstrometry -- Convert region to a new astrometry
 ;=============================================================================
@@ -22,13 +46,24 @@ pro IRS_Region::UpdateAstrometry,astr
   *self.astr=astr
 end
 
+
 ;=============================================================================
 ;  GetProperty
 ;=============================================================================
-pro IRS_Region::GetProperty,REGION=reg,ASTROMETRY=astr
+pro IRS_Region::GetProperty,REGION=reg,ASTROMETRY=astr,RA=ra,DEC=dec
   if arg_present(reg) && ptr_valid(self.region) then reg=*self.region
   if arg_present(astr) && ptr_valid(self.astr) then astr=*self.astr
-  return
+  if arg_present(ra) || arg_present(dec) then begin 
+     if ptr_valid(self.region) then begin 
+        ra=(*self.region)[0,*]
+        dec=(*self.region)[1,*]
+        if ptr_valid(self.astr) then begin 
+           ;; assume they are in Cubism native pixel units, aka 0.5,0.5 centers
+           xy2ad,ra-0.5,dec-0.5,*self.astr,newra,newdec
+           ra=newra & dec=newdec
+        endif 
+     endif 
+  endif 
 end
 
 ;=============================================================================
@@ -71,13 +106,7 @@ pro IRS_Region::WriteRegion,bhdr,file,IPAC_TBL=ipac_tbl
   if ~keyword_set(ipac_tbl) then begin 
      ;; XXX write Chandra region file extension(s) to FITS file
   endif else begin 
-     ra=(*self.region)[0,*]
-     dec=(*self.region)[1,*]
-     if ptr_valid(self.astr) then begin 
-        ;; assume they are in Cubism native pixel units, aka 0.5,0.5 centering
-        xy2ad,ra-0.5,dec-0.5,*self.astr,newra,newdec
-        ra=newra & dec=newdec
-     endif 
+     self->GetProperty,RA=ra,DEC=dec
      
      ;; XXX more general ASCII region format here
      s='Extraction Rectangle:'
