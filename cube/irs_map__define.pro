@@ -57,11 +57,11 @@ pro IRS_Map::Save,sf
   self->SaveInit,sf
   if size(sf,/TYPE) ne 7 then return
   
-;   catch, err
-;   if err ne 0 then begin
-;      catch,/cancel
-;      self->Error,['Error saving map to file '+sf,!ERROR_STATE.MSG]
-;  endif 
+  catch, err
+  if err ne 0 then begin
+     catch,/cancel
+     self->Error,['Error saving map to file '+sf,!ERROR_STATE.MSG]
+  endif 
   
   self->AddPar,'FILENAME',filestrip(sf),' Name of this file'
   
