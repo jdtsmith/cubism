@@ -2450,10 +2450,12 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
      endif else self->Error,'Calibration object not of correct type.'
   endif
   if n_elements(aper) ne 0 then begin 
-     if self.APERTURE ne self.AS_BUILT.APERTURE then ptr_free,self.APERTURE
-     self.APERTURE=ptr_new(aper)
-     self->ResetAccounts,/NO_UPDATE & self.Changed=1b
-     update_cal=1b
+     if ~self->ApertureEqual(aper) then begin 
+        if self.APERTURE ne self.AS_BUILT.APERTURE then ptr_free,self.APERTURE
+        self.APERTURE=ptr_new(aper)
+        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        update_cal=1b
+     endif 
   endif 
   if n_elements(sf) ne 0 then self.SaveFile=sf
   if n_elements(pn) ne 0 then begin 
@@ -2478,8 +2480,10 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
   endif
   
   if n_elements(rcp) ne 0 then begin 
-     self.reconstructed_pos=keyword_set(rcp) 
-     self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+     if self.reconstructed_pos ne keyword_set(rcp) then begin 
+        self.reconstructed_pos=keyword_set(rcp) 
+        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+     endif 
   endif
   
   if n_elements(ubg) ne 0 then begin 
@@ -3460,6 +3464,23 @@ pro CubeProj::NormalizeApertures
   endif else self.APERTURE=ptr_new(irs_aperture(0.,1.))
 end
 
+
+;=============================================================================
+;  ApertureEqual - Test if a given aperture is equal to the internal
+;                  one.
+;=============================================================================
+function CubeProj::ApertureEqual,aper
+  ;; See if aperture is the same or different from internal aperture
+  if ~ptr_valid(self.APERTURE) then return,0
+  if n_elements(*self.APERTURE) ne n_elements(aper) then return,0
+  for i=0,n_elements(aper)-1 do $
+     if ~array_equal((*self.APERTURE)[i].low,aper[i].low) || $
+        ~array_equal((*self.APERTURE)[i].high,aper[i].high) || $
+        (*self.APERTURE)[i].Wavscl ne aper[i].Wavscl || $
+        ~array_equal((*self.APERTURE)[i].scale,aper[i].scale) then return,0
+  return,1
+end
+
 ;=============================================================================
 ;  RotFlipMatrix - Matrix for transforming between celestial and sky
 ;                  coordinate systems.
@@ -4109,10 +4130,10 @@ pro CubeProj::SaveCube,file,COMMENTS=comm
   
   ;; Add the first header as inheritance
   m=min((*self.DR).DCEID,pos)
-  self->RestoreData,pos
-  h1=*(*self.DR)[pos].HEADER
-  oC->InheritHeader,h1,'KEYWORDS FROM FIRST BCD',/STRIP
-  
+  h1=(*self.DR)[pos].HEADER
+  if ~ptr_valid(h1) then self->RestoreData,pos
+  h1=*h1
+
   oC->AddHist,['This file contains a 3D spectral cube created from',$
                 'an IRS spectral mapping dataset.'],/COMMENT
   if n_elements(comm) ne 0 then oC->AddHist,comm,/COMMENT
@@ -4145,8 +4166,10 @@ pro CubeProj::SaveMap,map,sf,COMMENTS=comm,UNCERTAINTY=unc,_EXTRA=e
   
   ;; Add the first header as inheritance
   m=min((*self.DR).DCEID,pos)
-  self->RestoreData,pos
-  h1=*(*self.DR)[pos].HEADER
+  h1=(*self.DR)[pos].HEADER
+  if ~ptr_valid(h1) then self->RestoreData,pos
+  h1=*h1
+  
   oM->InheritHeader,h1,'KEYWORDS FROM FIRST BCD',/STRIP
   
   oM->AddHist,['This file contains a 2D spectral map created from',$
@@ -4194,8 +4217,9 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,UNCERTAINTY=unc,POLYGON=op,COMMENTS=comm
   
   ;; Add the first header as inheritance
   m=min((*self.DR).DCEID,pos)
-  self->RestoreData,pos
-  h1=*(*self.DR)[pos].HEADER
+  h1=(*self.DR)[pos].HEADER
+  if ~ptr_valid(h1) then self->RestoreData,pos
+  h1=*h1
   oSP->InheritHeader,h1,'KEYWORDS FROM FIRST BCD'
   
   oSP->AddHist,['This file contains a spectral extraction created from',$
@@ -4413,7 +4437,7 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
         w=rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],/SAMPLE)
         tw=total(weights)
         stack=total(*self.CUBE*w,3,/NAN)/tw
-        if use_unc then stack_unc=sqrt(total(*self.CUBE_UNC^2*w^2))/tw
+        if use_unc then stack_unc=sqrt(total(*self.CUBE_UNC^2*w^2,3,/NAN))/tw
      endif else begin           ;Foreground regions
         stack=fltarr(self.CUBE_SIZE[0:1])
         if use_unc then stack_unc=stack
