@@ -69,10 +69,10 @@ pro IRS_Map::Save,sf
     
   ;; Recursively save uncertainty map
   if ptr_valid(self.map_unc) then begin 
-     sf=file_basename(sf,'.fits')+'_unc.fits'
+     sf2=file_basename(sf,'.fits')+'_unc.fits'
      map=self.map
      self.map=self.map_unc & self.map_unc=ptr_new()
-     self->Save,sf
+     self->Save,sf2
      self.map_unc=self.map & self.map=map
   endif 
 end
