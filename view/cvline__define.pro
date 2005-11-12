@@ -181,7 +181,8 @@ function cvLine::ValString, im,point,EXTRA_STRING=ext
                 (*im)[pt[0],pt[1]],string(177b), $
                 (*self.UNC)[pt[0],pt[1]]) $
   else val=string(FORMAT='(G14.8)',(*im)[pt[0],pt[1]])
-  return,string(FORMAT='("(",I3,",",I3,")", A23)',pt, val)
+  if self.bcd_mode then i='I3' else i='I4'
+  return,string(FORMAT='("(",'+i+',",",'+i+',")", A23)',pt, val)
 end
 
 ;=============================================================================
