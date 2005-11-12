@@ -69,8 +69,10 @@ pro tvSwitcher::Toggle, hit
   list=*self.MsgList
   obj=self->GetMsgListObj(list[hit])
   if ~obj->Enabled() then return
+  self.oDraw->QueueRedraws
   if list[hit].Exclusive then obj->On else $
      if obj->On() then obj->Off else obj->On
+  self.oDraw->FlushRedraws
 end
 
 ;=============================================================================
@@ -93,30 +95,14 @@ end
 ;              present.
 ;=============================================================================
 pro tvSwitcher::SetButton,object,which
-  if NOT ptr_valid(self.wList) then return
-  ic=object->Icon()
-  if NOT keyword_set(ic) then return
-  
-  bitmap=size(ic,/N_DIMENSIONS) eq 2
-  
-  if object->Enabled() eq 0b then begin 
-     if widget_info((*self.wList)[which],/VALID_ID) then $
-        widget_control, (*self.wList)[which],SENSITIVE=0
-     if widget_info((*self.wTList)[which],/VALID_ID) then $
-        widget_control, (*self.wTList)[which],SENSITIVE=0
-     return
-  endif 
-  
-  if object->On() then begin    ;on
-     if size(ic,/N_DIMEN) eq 2 then val=ic else val='*'+ic+'*'
-  endif else begin              ;off
-     if size(ic,/N_DIMEN) eq 2 then val=ic XOR 255b else val=ic
-  endelse 
+  if ~ptr_valid(self.wList) then return
+  onQ=object->On() & enabledQ=object->Enabled()
   if widget_info((*self.wList)[which],/VALID_ID) then $
-     widget_control, (*self.wList)[which],set_value=val,/SENSITIVE
-  if NOT ptr_valid(self.wTList) then return
+     widget_control, (*self.wList)[which], SET_BUTTON=onQ,SENSITIVE=enabledQ
+    
+  if ~ptr_valid(self.wTList) then return
   if widget_info((*self.wTList)[which],/VALID_ID) then $
-     widget_control, (*self.wTList)[which],/SENSITIVE,SET_BUTTON=object->On()
+     widget_control, (*self.wTList)[which],SET_BUTTON=onQ,SENSITIVE=enabledQ
 end
 
 ;=============================================================================
@@ -126,6 +112,7 @@ pro tvSwitcher::Start
   objs=self->GetMsgObjs()
   if obj_valid(objs[0]) eq 0 then return
   
+  widget_control, self.topmenu,UPDATE=0
   ;; Set up the base(s)' event handler
   for type=0,1 do begin 
      if widget_info(self.sBase[type],/VALID_ID) eq 0 then continue
@@ -150,7 +137,7 @@ pro tvSwitcher::Start
         desc+=' - [ '+mh[0]+' | '+mh[1]+' | '+mh[2]+' ]'
      (*self.wList)[i]= $
         widget_button(self.sBase[1b-(*self.MsgList)[i].Exclusive], $
-                      /NO_RELEASE,value=val,UVALUE=i,/ALIGN_CENTER, $
+                      value=val,UVALUE=i,/ALIGN_CENTER, $
                       SENSITIVE=objs[i]->Enabled(),TOOLTIP=desc)
   endfor 
   
@@ -185,6 +172,8 @@ pro tvSwitcher::Start
         widget_button(self.toolMenu,value=desc,UVALUE=tog[i],/CHECKED_MENU, $
                       SEPARATOR=i eq 0, SENSITIVE=objs[tog[i]]->Enabled()) 
   endfor 
+  
+  widget_control, self.topmenu,/UPDATE
 end
 
 ;=============================================================================
@@ -227,13 +216,15 @@ function tvSwitcher::Init,parent,oDraw,TOOL_MENU=tm,USECASE=uc,_EXTRA=e
         (*self.MsgList).keys=strlowcase((*self.MsgList).keys)
      exc=where((*self.MsgList).Exclusive,exc_cnt,COMPLEMENT=tog, $
                NCOMPLEMENT=tog_cnt)
-     row_base=widget_base(parent,/FRAME,/ROW,YPAD=0,XPAD=0,SPACE=1, $
-                          /BASE_ALIGN_TOP) 
+     self.topmenu=widget_base(parent,/ROW,/FRAME,SPACE=0,XPAD=0,YPAD=0)
      if exc_cnt gt 0 then $
-        self.sBase[0]=widget_base(row_base,/ROW,SPACE=0,XPAD=0,YPAD=0,/FRAME)
+        self.sBase[0]=widget_base(self.topmenu,/ROW,SPACE=0, $
+                                  /TOOLBAR,/NONEXCLUSIVE,/ALIGN_LEFT)
 
+     
      if tog_cnt gt 0 then $
-        self.sBase[1]=widget_base(row_base,/ROW,SPACE=0,XPAD=0,YPAD=0,/FRAME) 
+        self.sBase[1]=widget_base(self.topmenu,/ROW,SPACE=0, $
+                                  /TOOLBAR,/NONEXCLUSIVE,/ALIGN_RIGHT)
   endif 
   
   return,1
@@ -249,6 +240,7 @@ pro tvSwitcher__define
       sBase: [0L,0L], $         ;widget ids of the button bases
       oColor:obj_new(), $       ;the color object (if any)
       toolMenu: 0L, $           ;the menu for the tools
+      topmenu:0L, $
       wList: ptr_new(), $       ;list of buttons, for each on MsgList
       wTList:ptr_new(), $       ;list of tool menu buttons
       cur:0}                    ;which is currently the active one
