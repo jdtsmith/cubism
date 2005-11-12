@@ -6,11 +6,11 @@
 pro tvPhot::Message, msg
   self->tvPlug::Message,msg,TYPE=type
   ;; Whenever we get a POST, or a BOX, a redraw will let us change up
-  switch type of
-     'BOX':
+  case type of
+     'BOX': self->Phot
      'TVDRAW_POSTDRAW': self->Phot              
      'TVDRAW_SNAPSHOT': self->Draw ;Make sure our circles are visible
-  endswitch
+  endcase 
 end 
 
 ;=============================================================================
@@ -150,6 +150,11 @@ function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
   endif else begin
      y2=y2+.5-dy & y=tr*y+(1.-tr)*y2
   endelse 
+  
+  if ~finite(x) || ~finite(y) then begin 
+     err=1b
+     return,[-1.,-1.]
+  endif 
   
   if x lt 0. or x ge (r-1.) or y lt 0. or y ge (t-1.) then begin 
      if not keyword_set(silent) then $
@@ -346,7 +351,7 @@ function tvPhot::Init,parent,oDraw,HIDE=hide,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
   self.cntrd=[-1.,-1.]          ;no centroid yet!
   self.do_cntrd=1               ;default to doing it
   ;; Get a tvrbox object, signing *ourself* up for box messages.
-  self.Box=obj_new('tvrbox', oDraw,/CORNERS,_EXTRA=e)
+  self.Box=obj_new('tvrbox', oDraw,/CORNERS,/NO_REDRAW,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
   self->Off
   return,1
