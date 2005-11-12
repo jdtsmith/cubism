@@ -156,6 +156,7 @@ pro find_nearby_bgs,targ_coords,targ_date,files,RECORDS=recs,DELTA_DAYS=dd, $
   if n_elements(recs) eq 0 then message,'No records found'
   get_coords,INSTRING=targ_coords,tc
   euler,tc[0]*15.D,tc[1],tl,tb,3
+  print,FORMAT='("Target Eclipt: (",F0.3,", ",F0.3,")")',tl,tb
   s=strsplit(targ_date,/EXTRACT)
   d=strsplit(s[0],'-',/EXTRACT)
   t=strsplit(s[1],':',/EXTRACT)
