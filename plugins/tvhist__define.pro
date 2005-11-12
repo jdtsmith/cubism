@@ -6,7 +6,8 @@
 pro tvHist::Message, msg
   self->tvPlug::Message,msg,TYPE=type
   case type of
-     'BOX': if self.freeze eq 0 then self.oDraw->Draw    ; box moved!
+     'BOX': if self.freeze eq 0 then self.oDraw->Draw        ; box moved!
+
      'TVDRAW_PREDRAW':  begin
         ptr_free,self.finite
         self.finite=ptr_new(finite(*msg.im))
@@ -75,9 +76,26 @@ end
 ;=============================================================================
 pro tvHist::ScaleEvent, ev
   widget_control, ev.id,get_uvalue=scale_mode,/SET_BUTTON
-  if scale_mode eq self.scale_mode then return
-  widget_control, self.wScalButs[self.scale_mode],SET_BUTTON=0
-  self.scale_mode=scale_mode
+  ;; The scaling modes
+  if scale_mode le 3 then begin 
+     if scale_mode eq self.scale_mode then return
+     widget_control, self.wScalButs[self.scale_mode],SET_BUTTON=0
+     self.scale_mode=scale_mode
+  endif else begin 
+     trim=scale_mode-3b         ;1 or 2
+     if self.trim_mode eq trim then begin 
+        ;; It was already set, clear it
+        widget_control, ev.id,SET_BUTTON=0
+        self.trim_mode=0b
+     endif else begin 
+        ;; Not already set, clear the other, if it was set
+        if self.trim_mode gt 0b then begin 
+           ;; turn the other off
+           widget_control, self.wTrimButs[self.trim_mode-1],SET_BUTTON=0
+        endif 
+        self.trim_mode=trim
+     endelse 
+  endelse 
   self.oDraw->Draw              ;redraw it 
 end
 
@@ -116,6 +134,7 @@ end
 ;=============================================================================
 pro tvHist::Histo,im
   boxon=self.Box->IsDrawn()
+  widget_control, /HOURGLASS
   if boxon then begin 
      self.Box->GetLRTB,l,r,t,b  ;get box sides
      if ~((l le r) and (b le t)) then return
@@ -126,21 +145,20 @@ pro tvHist::Histo,im
      endif   
   endif
   
-  if self.freeze then begin ;self.min and self.max are frozen
+  ;; Frozen scaling range
+  if self.freeze then begin
      switch self.scale_mode of
         0:                      ; linear
-        1:                      ;99%,95% linear
-        2:
-        5: begin                ;histeq
+        3: begin                ;histeq
            self.oDraw->SetDrawMinMax,MIN=self.min,MAX=self.max
            break
         end 
-        3: begin                ;sqrt
+        1: begin                ;sqrt
            *im=sqrt(*im-self.min>0)
            self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(self.max-self.min)
            break
         end
-        4: begin                ;logarithm
+        2: begin                ;logarithm
            *im=alog10((*im - self.min)>0. + (self.max-self.min)*.05)
            self.oDraw->SetDrawMinMax,MIN=alog10((self.max-self.min)*.05), $
                                      MAX=alog10((self.max-self.min)*(1.+.05))
@@ -150,7 +168,7 @@ pro tvHist::Histo,im
      return
   endif   
   
-  ;; Non-frozen modes
+  ;; Non-frozen scaling range
   if boxon then begin 
      take=(*im)[l:r,b:t] 
      if self.non_finite then finite=(*self.finite)[l:r,b:t]
@@ -160,47 +178,70 @@ pro tvHist::Histo,im
      if self.non_finite then finite=*self.finite
   endelse
   
+
+  ;; Find maximum and minimum/Trimmed max/min
+  if self.trim_mode eq 0b then begin 
+     mx=max(take,min=mn,NAN=self.non_finite)
+  endif else begin 
+     ;; Dilutely sample the image portion if it is larger than 500x500
+     s=size(take,/DIMENSIONS)
+     n=500
+     if ~array_equal(s le n,1b) then begin 
+        keep_x=lindgen(n)*(s[0]-1)/(n-1)
+        keep_y=lindgen(n)*(s[1]-1)/(n-1)
+        case 1 of 
+           s[0] gt n && s[1] le n: begin 
+              take=take[keep_x,*]
+              if self.non_finite then finite=finite[keep_x,*]
+           end 
+
+           s[0] le n && s[1] gt n: begin 
+              take=take[*,keep_y]
+              if self.non_finite then finite=finite[*,keep_y]
+           end 
+           
+           else: begin 
+              take=take[keep_x,keep_y]
+              if self.non_finite then finite=finite[keep_x,keep_y]
+           end 
+        endcase 
+     endif 
+     
+     if self.non_finite then begin 
+        wh=where(finite,nt)
+        if nt eq 0 then return
+        ;; sort the values
+        s=take[wh[sort(take[wh])]]
+     endif else begin 
+        s=take[sort(take)]
+        nt=n_elements(take) 
+     endelse 
+     mx=s[((nt-1)*([99,95])[self.trim_mode-1]/100)<(nt-2)]
+     mn=s[((nt-1)*([1,5])[self.trim_mode-1]/100)>1]
+  endelse
+  
   switch self.scale_mode of 
      0: begin                   ; linear
-        mx=max(take,min=mn,NAN=self.non_finite)
         if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
         break
      end
      
-     1: 
-     2: begin                   ;99%,95% linear
-        if self.non_finite then begin 
-           wh=where(finite,nt)
-           if nt eq 0 then return
-           s=take[wh[sort(take[wh])]]
-        endif else begin 
-           s=take[sort(take)]
-           nt=n_elements(take) 
-        endelse 
-        mx=s[((nt-1)*([99,95])[self.scale_mode-1]/100)<(nt-2)]
-        mn=s[((nt-1)*([1,5])[self.scale_mode-1]/100)>1]
-        if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
-        break
-     end
-     
-     3: begin                   ;sqrt
-        mx=max(take,min=mn,NAN=self.non_finite)
+     1: begin                   ;sqrt
         *im=sqrt((mn>*im)-mn)
-        self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(mx-mn)
+        if mx gt mn then self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(mx-mn)
         break
      end
      
-     4: begin                   ;logarithm
-        mx=max(take,min=mn,NAN=self.non_finite)
+     2: begin                   ;logarithm
         *im=alog10((mn>*im)-mn+(mx-mn)*.05)
-        self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*.05), $
-                                  MAX=alog10((mx-mn)*(1.+.05))
+        if mx gt mn then $
+           self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*.05), $
+                                     MAX=alog10((mx-mn)*(1.+.05))
         break
      end
      
-     5: begin                   ;histeq
-        mx=max(take,min=mn,NAN=self.non_finite)
-        if mx eq mn then return
+     3: begin                   ;histeq
+        if mx le mn then return
         bs=(mx-mn)/500
         h=histogram(*im,BINSIZE=bs,MIN=mn,MAX=mx,NAN=self.non_finite)
         h[0]=0.                 ;don't elevate the background
@@ -296,7 +337,7 @@ function tvHist::Init,oDraw,NBINS=nb,SCALING_MENU=smenu,_EXTRA=e
   if (self->tvPlug::Init(oDraw) ne 1) then return,0 ;chain up
   if n_elements(nb) eq 0 then self.nbins=200 else self.nbins=nb
   ;; Get a tvrbox object, signing ourselves up for box messages from it.
-  self.box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,_EXTRA=e)
+  self.box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,/NO_REDRAW,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
   self.Box->GetProperty,COLOR=col
   self.color=col                ;for drawing the histogram over the color-bar
@@ -306,13 +347,16 @@ function tvHist::Init,oDraw,NBINS=nb,SCALING_MENU=smenu,_EXTRA=e
                              UVALUE={Obj:self,Method:"ScaleEvent"}, $
                              EVENT_PRO='tvHist_event')
      self.wScalButs= $
-        [widget_button(scal_menu,value='Linear',uvalue=0,/CHECKED_MENU), $
-         widget_button(scal_menu,value='Linear 99%',uvalue=1,/CHECKED_MENU), $
-         widget_button(scal_menu,value='Linear 95%',uvalue=2,/CHECKED_MENU), $
-         widget_button(scal_menu,value='Square Root',uvalue=3,/CHECKED_MENU), $
-         widget_button(scal_menu,value='Logarithmic',uvalue=4,/CHECKED_MENU), $
-         widget_button(scal_menu,value='Histogram Equalization',uvalue=5, $
+        [widget_button(scal_menu,value='Linear',uvalue=0b,/CHECKED_MENU), $
+         widget_button(scal_menu,value='Square Root',uvalue=1b,/CHECKED_MENU),$
+         widget_button(scal_menu,value='Logarithmic',uvalue=2b,/CHECKED_MENU),$
+         widget_button(scal_menu,value='Histogram Equalization',uvalue=3b, $
                        /CHECKED_MENU)]
+     
+     self.wTrimButs= $
+        [widget_button(scal_menu,value='Trim 1%',uvalue=4b,/CHECKED_MENU, $
+                       /SEPARATOR), $
+         widget_button(scal_menu,value='Trim 5%',uvalue=5b,/CHECKED_MENU)]
      widget_control,self.wScalButs[0],/SET_BUTTON
      but=widget_button(smenu,VALUE='Set Scale Range...', $
                        UVALUE={Obj:self,Method:"SetScaleRange"}, $
@@ -341,8 +385,10 @@ pro tvHist__define
           finite:ptr_new(), $   ;finite map
           non_finite:0, $       ;efficiency flag if any non-finite
           nbins:0, $            ;number of bins, defaults to 100
-          scale_mode: 0, $      ;0:linear 1:99% 2:95% 3:sqrt 4:log 5:histeq
-          wScalButs:lonarr(6), $ ;the scaling widget buttons
+          scale_mode: 0b, $     ;0:linear  1:sqrt 2:log 3:histeq
+          trim_mode: 0b, $       ;0: no trim, 1:99% trim, 2:95% trim
+          wScalButs:lonarr(4), $ ;the scaling widget buttons
+          wTrimButs:lonarr(2), $ ;the trimming buttons
           freeze:0, $           ;whether to freeze the scaling
           wFreeze:0L, $         ;the freeze menu item
           oCol:obj_new(), $     ;a tvColor object to use
