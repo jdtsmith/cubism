@@ -45,16 +45,18 @@ pro CubeBadPix::Message, msg
         pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING,/SINGLE_INDEX)
         pt=pt[0]
         if pt eq -1 then return
-  
         
-        if msg.press eq 2b then begin ;middle click: this bcd only
+        if msg.press eq 1b && (msg.modifiers AND 2b) ne 0b then $
+           press=2b else press=msg.press
+        
+        if press eq 2b then begin ;control or middle click: this bcd only
            if ptr_valid(self.rec_set) then begin 
               if n_elements(*self.rec_set) gt 1 then return
               this_rec=(*self.rec_set)[0]
            endif else return
         endif 
         
-        self.press=msg.press
+        self.press=press
         self.last_pt=pt
         self.oDraw->MsgSignup,self,/DRAW_MOTION
         self.cube->ToggleBadPixel,pt,SET=set,RECORD_SET=this_rec
@@ -94,7 +96,6 @@ pro CubeBadPix::Reset,NO_REDRAW=nrd,_EXTRA=e
   if ~keyword_set(nrd) then self.oDraw->ReDraw,/ERASE,/SNAPSHOT
   self->tvPlug::Off,_EXTRA=e
 end
-
 
 ;=============================================================================
 ;  Off - No more events needed
@@ -142,7 +143,7 @@ end
 
 
 function CubeBadPix::MouseHelp
-  return,['Mark/Remove','','ShowAll/Fatal/User']
+  return,['Mark/Remove','SingleBCD','ShowAll/Fatal/User']
 end
 
 
@@ -237,11 +238,9 @@ pro CubeBadPix::MarkAll
   if ptr_valid(bpl) then $
      for i=0,n_elements(*bpl)-1 do self->DrawMark,(*bpl)[i]
   if ptr_valid(self.rec_set) then begin 
-     if n_elements(*self.rec_set) gt 1 then return
-     self.cube->GetProperty,BAD_PIXEL_LIST=rbpl,RECORD_SET=(*self.rec_set)[0],$
-                            /POINTER
-     if n_elements(rbpl) gt 0 && ptr_valid(rbpl) then $
-        for i=0,n_elements(*rbpl)-1 do self->DrawMark,(*rbpl)[i],/SINGLE_REC
+     self.cube->GetProperty,BAD_PIXEL_LIST=rbpl,RECORD_SET=*self.rec_set
+     for i=0,n_elements(rbpl)-1 do $
+        self->DrawMark,rbpl[i],/SINGLE_REC
   endif 
 end
 
