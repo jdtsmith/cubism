@@ -57,7 +57,8 @@ pro CubeRec::Message, msg
         self.cube=msg.CUBE
         ptr_free,self.rec_set
         if ptr_valid(self.wavelength) then $
-           cur_wav=(*self.wavelength)[self.cur_wav]
+           cur_wav=(*self.wavelength)[self.cur_wav< $
+                                      (n_elements(*self.wavelength)-1)]
         self.wavelength=msg.WAVELENGTH
         if n_elements(cur_wav) gt 0 then begin 
            mn=min(abs(*self.wavelength-cur_wav),pos)
@@ -82,8 +83,15 @@ pro CubeRec::Message, msg
      'CUBEPROJ_UPDATE': begin 
         if msg.new_cube && self.mode ge 2 then return
         self.cube=msg.cube
-        self.cube->GetProperty,WAVELENGTH=wl,ASTROMETRY=astr,/POINTER
+        self.cube->GetProperty,WAVELENGTH=wl,ASTROMETRY=astr,CUBE_SIZE=cs, $
+                               /POINTER
+        
         if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
+        if self.mode eq 1 && n_elements(*self.stack_msg) gt 0 then begin 
+           fg=*(*self.stack_msg).foreground
+           if ~array_equal(fg le (cs[2]-1),1b) then $
+              self->SwitchMode,/FULL
+        endif 
      end 
      'CUBEPROJ_CALIB_UPDATE': cal_update=1b
      'CUBEPROJ_RECORD_UPDATE': begin 
@@ -449,6 +457,7 @@ pro CubeRec::SetupViewSpec
      self->MsgSignup,self.oView,/CUBEREC_SPEC,/CUBEREC_FULL
      self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL, $
                            /CUBEVIEWSPEC_SAVE
+     self.cur_wav <= n_elements(*self.wavelength)-1
      if self.mode eq 0 then $
         self->MsgSend, $
            {CUBEREC_FULL,self.cur_wav,(*self.wavelength)[self.cur_wav]}
