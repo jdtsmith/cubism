@@ -276,11 +276,13 @@ pro tvDraw::Message,msg
      self->TLBComputeSize  
      diff=self.TLBsize-old
      if array_equal(diff,0) then return
-        
      self->Resize,self.winsize+diff
      self->Draw
      widget_control, msg.id,/CLEAR_EVENTS ;get rid of accumulated events
-  endif else if msg.enter then self->Focus
+  endif else begin 
+     if msg.enter && ~self.entered then self->Focus
+     self.entered=msg.enter
+  endelse 
 end
 
 ;=============================================================================
@@ -593,15 +595,29 @@ pro tvDraw::Snapshot
   wset,self.drawwin
 end
 
+pro tvDraw::QueueRedraws
+  self.redraw_queue=1b
+end
+
+pro tvDraw::FlushRedraws
+  rq=self.redraw_queue
+  self.redraw_queue=0b
+  set=(rq AND 2b) ne 0b
+  if set then begin 
+     snap=(rq AND 4b) ne 0b
+     self->ReDraw,SNAPSHOT=snap
+  endif 
+end
+
 ;=============================================================================
 ;  ReDraw - Quickly redraw the already computed draw image.
 ;=============================================================================
 pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era
-;   if keyword_set(snap) then begin 
-;      print,'redrawing with snap'
-;      help,/traceback
-;   endif else print,'redrawing without snap'
   snap=keyword_set(snap) 
+  if self.redraw_queue then begin ;; queue any redraws
+     self.redraw_queue OR= 2b OR (4b*snap)
+     return
+  endif 
   if snap then begin 
      self->SetWin
      if keyword_set(era) then self->EraseBackground
@@ -810,7 +826,7 @@ function tvDraw::Init,parent,IMORIG=imdata,TVD_XSIZE=xs,TVD_YSIZE=ys, $
                   'TVDRAW_REDRAW','TVDRAW_SNAPSHOT','TVDRAW_RESIZE']
   
   ;; Sign us up for resize and tracking events
-  self->MsgSignup,self,/TLB_WIDGET_BASE,/TLB_WIDGET_TRACKING
+  self->MsgSignup,self,/TLB_WIDGET_BASE,/WIDGET_TRACKING
   
   ;; we don't draw it here since our widget is as of yet unrealized.
   return,1
@@ -830,8 +846,10 @@ pro tvDraw__define
       TLBTitle:'', $            ;the title we've given the TLB, if any
       TLBsize: [0,0],$          ;size of our TLB
       wTLB: 0L, $               ;the TLB widget ID
+      entered:0b, $             ;whether we've received an entry
       oldwin:0, $               ;the old window which was set.
       psconf:obj_new(), $       ;the FSC_PSConfig object
+      redraw_queue:0b, $        ;anyone waiting for a redraw?
       free_orig:0b, $           ;whether to free the original data
       imorig:ptr_new(), $       ;saved original image, unmodified
       immod:ptr_new(), $        ;the modifiable (by, e.g., filters) image
