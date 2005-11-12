@@ -5,7 +5,7 @@
 
 ;=============================================================================
 ;  ClipRegion -- Clip this region against an image with the given
-;                astrometry record
+;                astrometry record, and return the clipped pixels.
 ;=============================================================================
 function IRS_Region::ClipRegion,image,clip_astr,_REF_EXTRA=ref
   if ~ptr_valid(self.region) then return,-1
@@ -50,10 +50,11 @@ end
 ;=============================================================================
 ;  GetProperty
 ;=============================================================================
-pro IRS_Region::GetProperty,REGION=reg,ASTROMETRY=astr,RA=ra,DEC=dec
+pro IRS_Region::GetProperty,REGION=reg,ASTROMETRY=astr,RA=ra,DEC=dec, $
+                            SOLID_ANGLE=sa,CENTROID=cen,OFFSET_ANGLES=oa
   if arg_present(reg) && ptr_valid(self.region) then reg=*self.region
   if arg_present(astr) && ptr_valid(self.astr) then astr=*self.astr
-  if arg_present(ra) || arg_present(dec) then begin 
+  if arg_present(ra) || arg_present(dec) || arg_present(cen) then begin 
      if ptr_valid(self.region) then begin 
         ra=(*self.region)[0,*]
         dec=(*self.region)[1,*]
@@ -62,9 +63,54 @@ pro IRS_Region::GetProperty,REGION=reg,ASTROMETRY=astr,RA=ra,DEC=dec
            xy2ad,ra-0.5,dec-0.5,*self.astr,newra,newdec
            ra=newra & dec=newdec
         endif 
+        cen=[mean(ra),mean(dec)] ;XXX not true generally!!!
      endif 
   endif 
+  if arg_present(sa) then sa=self->RegionSolidAngle()
+  if arg_present(oa) then oa=self->OffSetAngles()
 end
+
+;=============================================================================
+;  RegionSolidAngle -- Return the solid angle of the polygonal region
+;                      in steradians.
+;=============================================================================
+function IRS_Region::RegionSolidAngle
+  reg=self->Region()            ;in ra/dec degrees
+  if reg[0] eq -1 then return,-1
+  return,spherical_poly_area(reg[0,*],reg[1,*])
+end
+
+
+
+;=============================================================================
+;  OffsetAngles -- Calculate the angles of offset between consecutive
+;                  points in the region
+;=============================================================================
+function IRS_Region::OffsetAngles
+  reg=self->Region()
+  if reg[0] eq -1 then return,-1
+  RADEG=180.D/!DPI
+  reg/=RADEG
+  reg2=shift(reg,0,1)
+  return,spherical_angle_offset(reg[0,*],reg[1,*],reg2[0,*],reg2[1,*])
+end
+
+;=============================================================================
+;  Centroid -- Compute the approximate centroid of the spherical
+;              polygonal region.  Project to tangent plane, form 2D
+;              centroid, and de-project.
+;=============================================================================
+;;function IRS_Region::Centroid
+;;  reg=self->Region()            ;in ra/dec degrees
+;;  if reg[0] eq -1 then return,-1
+;;  RADEG=180.D/!DPI
+;;  ra=reg[0,*]/RADEG & dec=reg[1,*]/RADEG
+;;  ra_mean=mean(ra) & dec_mean=mean(dec)
+;;  cosc=sin(dec_mean)*sin(dec) + cos(dec_mean)*cos(dec)*cos(ra-ra_mean)
+;;  x=cos(dec)*sin(ra-ra_mean)/cosc
+;;  y=(cos(dec_mean)*sin(dec)-sin(dec_mean)*cos(dec)*cos(ra-ra_mean))/cosc
+;;  return
+;;end
 
 ;=============================================================================
 ;  Region -- Return specified region as 2xn list of celestial coords
@@ -183,7 +229,7 @@ pro IRS_Region__define
   st={IRS_Region, $
       source:'', $              ;source file, if any for region
       region: ptr_new(), $      ; region as 2xn lists of points, 
-                                ; in pixel or celestial coordinates
+                                ; in pixel or ra/dec degree coordinates
       astr:ptr_new()}           ;astrometry structure, if celestial
                                 ; coordinates
   
