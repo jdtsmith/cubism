@@ -77,7 +77,7 @@ pro tvRBox::Message, msg
                  self.boxsize=abs(self.save-self.boxoff)
               self->SendBox     ;maybe send a box message
               ;; A redraw message (since box might have erased other things)
-              self.oDraw->SendRedraw    
+              if ~self.no_redraw then self.oDraw->SendRedraw    
            end 
         endcase
      end
@@ -142,8 +142,8 @@ pro tvRBox::On
                         /TVDRAW_REDRAW,TVDRAW_SNAPSHOT=0,/TVDRAW_RESIZE
   usersym,*self.ux,*self.uy,/FILL
   if self->IsDrawn() then begin 
-     if self.corners then self.oDraw->ReDraw,/SNAPSHOT ;remove bg corners
-     self->DrawBox              ;just turned on
+     if self.corners then self.oDraw->ReDraw,/SNAPSHOT $ ;remove bg corners
+     else self->DrawBox         ;just turned on, no snapshot coming
   endif
   self->SetUpDisplay
 end
@@ -180,9 +180,10 @@ pro tvRBox::GetLRTB, l, r, t, b
   endelse 
 end
 
-pro tvRBox::SetProperty, CORNERS=cor, COLOR=col
+pro tvRBox::SetProperty, CORNERS=cor, COLOR=col, NO_REDRAW=nrd
   if n_elements(cor) ne 0 then self.corners=cor
   if n_elements(col) ne 0 then self.color=col
+  if n_elements(nrd) ne 0 then self.no_redraw=keyword_set(nrd) 
 end
 
 pro tvRBox::GetProperty, OFFSET=off,SIZE=sz, THICK=th, COLOR=cl, _REF_EXTRA=re
@@ -199,7 +200,7 @@ pro tvRBox::Reset
      self->tvPlug::Off
      self->EraseBox
      self.boxflag=-1
-     self.oDraw->SendRedraw
+     if ~self.no_redraw then self.oDraw->SendRedraw
   endif 
 end
 
@@ -390,7 +391,7 @@ end
 ;=============================================================================
 function tvRBox::Init,oDraw,COLOR=color,THICK=thick,HANDLE=handle,KNOBRAD=kr,$
                       HSIZE=hs,CORLEN=cl,BUTTON=but,CORNERS=co,HANDCURS=hc, $
-                      ON_MOTION=om,SNAP=snap,_EXTRA=e
+                      ON_MOTION=om,SNAP=snap,NO_REDRAW=nrd,_EXTRA=e
   if (self->tvPlug::Init(oDraw,/NO_ON_OFF,_EXTRA=e) ne 1) then return,0
   if n_elements(but) eq 0 then but=0b
   self.button=2b^fix(but)       ;assign which button
@@ -403,6 +404,7 @@ function tvRBox::Init,oDraw,COLOR=color,THICK=thick,HANDLE=handle,KNOBRAD=kr,$
   self.corners=keyword_set(co)  ;whether to draw outline corners when off
   self.handcurs=keyword_set(hc) ;whether to show a hand cursor on movement
   self.on_motion=keyword_set(om) ;whether to send messages for box moves.
+  self.no_redraw=keyword_set(nrd) 
   
   ;; What type of corner knob to draw
   case self.handle of
@@ -438,6 +440,7 @@ pro tvRBox__define
   struct={tvRBox, $
           INHERITS tvPlug, $    ;make it a tvDraw plug-in
           snap_mode:0, $        ;using snap mode?
+          no_redraw:0b, $       ;whether to skip sending any redraws
           on_motion: 0, $       ;whether to send Box messages on box motion
           color:0, $            ;color to draw it.
           thick:0., $           ;thickness of box line
