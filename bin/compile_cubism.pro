@@ -13,6 +13,7 @@ pro compile_cubism
   ;; Normalize path
   path=strsplit(!PATH,':',/EXTRACT)
   wh=where((sp=strpos(path,ps+'nasa',/REVERSE_SEARCH)) ne -1)
+  if wh[0] eq -1 then message,'No NASALib found, aborting.'
   nasa=strmid(path[wh[0]],0,sp[wh[0]]+5)
   !PATH=expand_path('<IDL_DEFAULT>'+":+"+sourcepath+':+'+nasa)
   
