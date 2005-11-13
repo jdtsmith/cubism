@@ -182,7 +182,6 @@ end
 ;=============================================================================
 pro CubeBackTrack::Event,ev
   tn=tag_names(ev,/STRUCTURE_NAME)
-  help,ev,/st
   case tn of
      'WIDGET_BASE': begin       ;size
         self.list_size=ev.Y+self.list_size_diff
