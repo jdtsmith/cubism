@@ -163,6 +163,8 @@ pro CubeProj::ShowEvent, ev
   case action of
      'save-as': self->Save,/AS
      
+     'viewuncertainty': self->ViewRecord,/UNCERTAINTY
+     'viewuncertainty-new': self->ViewRecord,/UNCERTAINTY,/NEW_VIEWER
      'viewrecord-new': self->ViewRecord,/NEW_VIEWER
      'visaors-new': self->VisualizeAORs,/NEW_VIEWER
      'loadvisimage': self->LoadVisualize,/SELECT
@@ -558,13 +560,23 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   (*self.wInfo).MUST_UNRESTORED=widget_button(rec, UVALUE='restoreall',$
                                               VALUE='Restore All Record Data')
+  
   wMustSel=[wMustSel, $
             ;;-------------
             ((*self.wInfo).view_ids[0:1]= $
              [widget_button(rec,VALUE='View Record...',UVALUE='viewrecord', $
                             /SEPARATOR),$
               widget_button(rec,VALUE='View Record (new viewer)...', $
-                            UVALUE='viewrecord-new')]), $
+                            UVALUE='viewrecord-new')])]
+  
+  ;;-------------
+  (*self.wInfo).MUST_REC_UNC= $
+     [widget_button(rec,VALUE='View Uncertainty...', $
+                    UVALUE='viewuncertainty',/SEPARATOR),$
+      widget_button(rec,VALUE='View Uncertainty (new viewer)...', $
+                    UVALUE='viewuncertainty-new')]
+  
+  wMustSel=[wMustSel, $
             ;;-------------
             widget_button(rec,VALUE='Delete',UVALUE='removebcd',/SEPARATOR),$
             widget_button(rec,VALUE='Rename',UVALUE='renamerecord'),$
@@ -1767,7 +1779,7 @@ pro CubeProj::UpdateButtons
                      SENSITIVE=ptr_valid(self.CUBE)
   
   for i=0,n_elements((*self.wInfo).MUST_BACK)-1 do $ 
-     widget_control, ((*self.wInfo).MUST_BACK)[i], $
+     widget_control, (*self.wInfo).MUST_BACK[i], $
                      SENSITIVE=ptr_valid(self.BACKGROUND)
   
   got_comb=ptr_valid(self.BACK_RECS) && size(*self.BACK_RECS,/TYPE) eq 8
@@ -1788,6 +1800,11 @@ pro CubeProj::UpdateButtons
   
   rbpl=got_sel?~array_equal(ptr_valid((*self.DR)[sel].BAD_PIXEL_LIST),0b):0
   widget_control, (*self.wInfo).MUST_REC_BPL,SENSITIVE=rbpl
+  
+  for i=0,n_elements((*self.wInfo).MUST_REC_UNC)-1 do $
+     widget_control, (*self.wInfo).MUST_REC_UNC[i], $
+                     SENSITIVE=got_sel && $
+                     ~array_equal(ptr_valid((*self.DR)[sel].UNC),0b)
   
   widget_control, (*self.wInfo).MUST_ANY_BPL,SENSITIVE=gbpl || rbpl
   
@@ -1941,8 +1958,9 @@ pro CubeProj::ViewRecord,rec,NEW_VIEWER=new,_EXTRA=e
   self->RecOrSelect,rec,_EXTRA=e
   self->RestoreData,rec
   self->FindViewer,NEW_VIEWER=new
-  self->Send,RECORD=rec
+  self->Send,RECORD=rec,_EXTRA=e
 end
+
 
 ;=============================================================================
 ;  VisualizeAORs - View the AORs on top of a vis image, with select
@@ -5224,7 +5242,8 @@ end
 pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
                    UPDATE=update, NEW_CUBE=nc,SELECT=sel,SINGLE_SELECT=ss, $
                    REC_UPDATE=rec_update,DELETED=del, DISABLED=dis, $
-                   CALIB_UPDATE=cal_update, VISUALIZE=vis
+                   CALIB_UPDATE=cal_update, VISUALIZE=vis, $
+                   UNCERTAINTY=show_unc
   case 1b of
      keyword_set(sel): begin 
         if n_elements(ss) ne 0 && ptr_valid(self.DR) then $
@@ -5294,7 +5313,7 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
      else: begin         ;; Send the record or stacked record set for viewing
         nrec=n_elements(record) 
         if nrec eq 0 then return
-  
+        showing_unc=keyword_set(show_unc) 
         stackQ=nrec gt 1
         rec=(*self.DR)[record]
         if stackQ then begin 
@@ -5305,35 +5324,49 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
            if use_unc then unc=*rec[0].UNC^2 ;add in quadrature
            if use_bmask then mask=*rec[0].BMASK
            for i=1,nrec-1 do begin 
-              bcd+=*rec[i].BCD
+              if ~showing_unc then bcd+=*rec[i].BCD
               if use_unc then unc+=*rec[i].UNC^2
               if use_bmask then mask OR=*rec[i].BMASK
            endfor 
-           bcd/=nrec 
-           bcd_p=ptr_new(bcd,/NO_COPY)
+           if ~showing_unc then begin 
+              bcd/=nrec 
+              bcd_p=ptr_new(bcd,/NO_COPY)
+           endif 
            if n_elements(unc) gt 0 then begin 
               unc=sqrt(unc)/nrec
               unc_p=ptr_new(unc,/NO_COPY)
            endif else unc_p=ptr_new()
            mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
            free=1
-           str=string(FORMAT='(%"%s <Average of %d recs>")', $
-                      self->ProjectName(),nrec)
+           if showing_unc then begin 
+              str=string(FORMAT='(%"%s <Quadrature sum of %d uncs>")', $
+                         self->ProjectName(),nrec)
+           endif else begin 
+              str=string(FORMAT='(%"%s <Average of %d recs>")', $
+                         self->ProjectName(),nrec)
+           endelse 
         endif else begin 
            ;; Single BCD
            bcd_p=rec.BCD
            unc_p=rec.UNC
            mask_p=rec.BMASK
            free=0
-           str=string(FORMAT='(%"%s <%s> %s")', $
-                      self->ProjectName(),rec.ID, $
+           str=string(FORMAT='(%"%s <%s%s> %s")', $
+                      self->ProjectName(),rec.ID,showing_unc?" unc":"", $
                       irs_fov(rec.FOVID,/SHORT_NAME))
         endelse
         rec_set=ptr_new(rec.DCEID)
+        if showing_unc then begin 
+           bcd_p=unc_p 
+           unc_p=(bg=(bg_unc=ptr_new()))
+        endif else begin 
+           bg=self.BACKGROUND
+           bg_unc=self.BACKGROUND_UNC
+        endelse 
         self->MsgSend,{CUBEPROJ_RECORD, $
                        self,str,self.MODULE,self.ORDER,self.CAL, $
                        rec_set,bcd_p,unc_p,mask_p, $
-                       self.BACKGROUND,self.BACKGROUND_UNC,free}
+                       bg,bg_unc,free}
         ptr_free,rec_set
      end 
   endcase 
@@ -5526,7 +5559,7 @@ pro CubeProj__define
          which_list:0, $        ;which list we're using
          list_size_diff:0, $    ;the difference in ysize between list and base
          lines:0, $             ;number of list lines last set
-         view_ids:lonarr(3), $  ;record view button ids
+         view_ids:lonarr(5), $  ;record view button ids
          nsel_sav: 0, $          ;save number of selected records
          feedback_window: 0, $  ;window id of feedback
          background_menu: 0L, $ ;widget ID of background menu bar
@@ -5549,6 +5582,7 @@ pro CubeProj__define
          MUST_REC_BPL: 0L, $    ;must have record bad pixels
          MUST_UNRESTORED:0L, $  ;must have unrestored data
          MUST_FLUXCON: 0L, $    ;must have Fluxcon building set
+         MUST_REC_UNC: [0L,0L],$ ;selected record must have uncertainty
          MUST_UNCERTAINTIES: 0L} ;must have enabled records with uncertainties
   
   ;; Messages: send a cube, record, etc.
