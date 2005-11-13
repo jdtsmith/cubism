@@ -1,3 +1,12 @@
+;; tvZOOM controls:
+;; left-click and release: zoom in on spot by factor of 2.
+;; left-click drag: draw rubber-band region: zoom up region to maximum
+;; middle-click or control left-click and drag: pan inside zoomed image.
+;; middle-double-click or control left-double-click: recenter at point
+;;   (no zoom).
+;; right-click: zoom out one level on saved zoom stack.
+;; right-double-click: zoom all the way out.
+
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
@@ -41,8 +50,16 @@ pro tvZoom::Message, msg
                  self.orig=[msg.X,msg.Y]
                  ;;sign up for motion events.
                  self.oDraw->MsgSignup,self,/DRAW_MOTION
-                 self.buttondwn=msg.press
-                 if msg.press eq 2b then begin 
+                 ;; Control-click == middle-click
+                 if msg.press eq 1b && (msg.modifiers AND 2b) ne 0b then $
+                    press=2b else press=msg.press
+                 if press eq 2b && msg.clicks eq 2 then begin 
+                    self->ZoomIt,msg.X,msg.Y,/TRANSLATE
+                    self.buttondwn=0b
+                    return
+                 endif 
+                 self.buttondwn=press
+                 if press eq 2b then begin ;middle click drag
                     self.oDraw->GetProperty,offset=offset
                     self.save=offset
                  endif 
@@ -63,8 +80,9 @@ pro tvZoom::Message, msg
 end 
 
 pro tvZoom::On
-  if self->On() then self->Off ;already on
-  self->tvPlug::On
+  on=self->On()                 ;already on
+  self->tvPlug::On              ;Ensures the button stays on, etc.
+  if on then return
   self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_PREDRAW
 end
 
@@ -114,7 +132,7 @@ pro tvZoom::ZoomBox,X,Y
   self.save=[X,Y]
 end 
 
-pro tvZoom::ZoomIt, X, Y
+pro tvZoom::ZoomIt, X, Y,TRANSLATE=translate
   self.oDraw->GetProperty,zoom=zoom,pan=pan,offset=offset,size=size, $
                           dispsize=ds
   left=FIX(((self.orig[0] < X)- $
@@ -134,8 +152,10 @@ pro tvZoom::ZoomIt, X, Y
         return
      endif 
      ;; show as much as possible at 2x zoom, centered on pix
-     max=self.winsize/(2*zoom)
-     halfsize=floor(max/2-1)>1
+     max=self.winsize/zoom
+     scale=keyword_set(translate)?2:4
+     halfsize=floor(max/scale-1)>1
+     
      left=pix[0]-halfsize[0]>0
      right=pix[0]+halfsize[0]<(size[0]-1)
      bottom=pix[1]-halfsize[1]>0
@@ -147,13 +167,15 @@ pro tvZoom::ZoomIt, X, Y
   dispsize=[right-left+1, top-bottom+1]
   
   ;; update the zoomlist
-  if ptr_valid(self.zoomlist) then begin 
-     n=n_elements(*self.zoomlist) 
-     if array_equal((*self.zoomlist)[n-1].off, offset) AND $
-        array_equal((*self.zoomlist)[n-1].size,dispsize) then return
-     *self.zoomlist=[*self.zoomlist, {ZoomBox,offset, dispsize}]
-  endif else  $
-     self.zoomlist=ptr_new({ZoomBox,offset,dispsize})
+  if ~keyword_set(translate) then begin 
+     if ptr_valid(self.zoomlist) then begin 
+        n=n_elements(*self.zoomlist) 
+        if array_equal((*self.zoomlist)[n-1].off, offset) AND $
+           array_equal((*self.zoomlist)[n-1].size,dispsize) then return
+        *self.zoomlist=[*self.zoomlist, {ZoomBox,offset, dispsize}]
+     endif else  $
+        self.zoomlist=ptr_new({ZoomBox,offset,dispsize})
+  endif 
   ;; set and draw it
   self.oDraw->SetProperty,offset=offset,dispsize=dispsize
 end
