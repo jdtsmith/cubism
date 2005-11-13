@@ -140,7 +140,7 @@ end
 ;=============================================================================
 pro IRSMapVisualize::Select,which,APPEND=app,RANGE=range,NO_DRAW=nd, $
                             DCEID=dceid,_EXTRA=e
-  if ~ptr_valid(self.recs) then return
+  if ~ptr_valid(self.recs) || ~obj_valid(self.cube) then return
   if ~keyword_set(app) then begin 
      selected=where((*self.recs).SELECTED,scnt)
      if scnt gt 0 then begin 
