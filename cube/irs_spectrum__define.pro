@@ -67,7 +67,7 @@ pro IRS_Spectrum::Save,sf
   if err ne 0 then begin
      catch,/cancel
      self->Error,['Error saving spectrum to file '+sf,!ERROR_STATE.MSG]
-  endif 
+ endif 
   
   
   self->AddPar,'FILENAME',filestrip(sf),' Name of this file'
@@ -151,7 +151,7 @@ end
 ;=============================================================================
 ;  Read - Read a spectrum file, including region data, etc.
 ;=============================================================================
-pro IRS_Spectrum::Read,file
+pro IRS_Spectrum::Read,file,DISCARD_EXTRA=de
   file=self->ReadFile(file)
   if size(file,/TYPE) ne 7 then return
 
@@ -188,8 +188,9 @@ pro IRS_Spectrum::Read,file
      endif 
      
      heap_free,self.extra_data
-     for i=off,n_elements(names)-1 do $
-        self->AddDataColumn,names[i],units[i],st.(i)
+     if ~keyword_set(de) then $
+        for i=off,n_elements(names)-1 do $
+           self->AddDataColumn,names[i],units[i],st.(i)
   endelse 
 end
 
