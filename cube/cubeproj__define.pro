@@ -1075,6 +1075,7 @@ pro CubeProj::RestoreAll
   self->RestoreData,lindgen(self->N_Records()),RESTORE_CNT=cnt
   if cnt gt 0 then self->Info, $
      string(FORMAT='("Restored ",I0," record",A)',cnt,cnt gt 1?"s":"")
+  self->UpdateAll
 end
 
 
@@ -1817,7 +1818,8 @@ pro CubeProj::UpdateButtons
   widget_control, (*self.wInfo).MUST_FLUXCON,SENSITIVE=self.fluxcon
   
   widget_control, (*self.wInfo).MUST_UNCERTAINTIES, $
-                  SENSITIVE=self->CheckRecordUncertainties(/ENABLED)
+                  SENSITIVE=self->CheckRecordUncertainties(/ENABLED) && $
+                  (~self.use_bg || ptr_valid(self.BACKGROUND_UNC))
 end
 
 ;=============================================================================
@@ -3890,6 +3892,9 @@ pro CubeProj::BuildCube
   use_unc=self.use_unc && array_equal(ptr_valid((*self.DR)[enabled].UNC),1b)
   use_bg=self.use_bg && ptr_valid(self.BACKGROUND)
   use_flux=n_elements(fluxim) gt 0
+  
+  if use_bg && use_unc && ~ptr_valid(self.BACKGROUND_UNC) then $
+     self->Error,'Must rebuild background for cube uncertainty.'
   
   cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
