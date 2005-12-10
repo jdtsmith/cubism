@@ -75,8 +75,14 @@ pro CubeViewSpec::Event,ev
         widget_control, self.wDraw,/INPUT_FOCUS
      endif 
      return
-  end
-           
+  endif
+  
+  catch,err
+  if err ne 0b then begin
+     catch,/cancel
+     self->Error,!ERROR_STATE.MSG
+  endif 
+  
   case ev.id of 
      self.wDraw: begin          ;press and motion events
         if ev.type lt 5 then $
@@ -578,7 +584,7 @@ pro CubeViewSpec::Fit
      
      ;; Calculate cumulatives
      pcnt=n_elements(whpeak)
-     if pcnt le 3 then message,'Not enough points in peak.'
+     if pcnt le 3 then self->Error,'Not enough points in peak.'
      
      ;; The line strength
      strength=int_tabulated(/SORT,(*self.lam)[whpeak], $
