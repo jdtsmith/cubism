@@ -368,13 +368,14 @@ pro IRS_Calib::Print,modules,orders,_EXTRA=e
   print,transpose(self->Info(modules,orders,_EXTRA=e))
 end
 
-function IRS_Calib::Info, modules, orders, SHORT=short
-  if n_elements(modules) eq 0 then modules=indgen(4)
+function IRS_Calib::Info, modules, orders,SHORT=short
+  if n_elements(modules) eq 0 then modules=indgen(4) else $
+     modules=irs_module(modules)
   str=' == IRS Calibration Object: '+self.Name+' =='
   str=[str,'', $
-       '  PLATESCALE: '+self.PLATESCALE_FILE, $
-       ' FRAME_TABLE: '+self.FRAMETABLE_FILE, $
-       ' PIXEL_OMEGA: '+self.PIXEL_OMEGA_FILE]
+       '  PLATESCALE: '+file_basename(self.PLATESCALE_FILE), $
+       ' FRAME_TABLE: '+file_basename(self.FRAMETABLE_FILE), $
+       ' PIXEL_OMEGA: '+file_basename(self.PIXEL_OMEGA_FILE)]
   for i=0,n_elements(modules)-1 do begin 
      md=irs_module(modules[i])
      module=irs_module(md,/TO_NAME)
@@ -388,19 +389,19 @@ function IRS_Calib::Info, modules, orders, SHORT=short
         ords=where_array((*self.cal[md]).ORDER,[orders],no,/SWITCHAB)
      if no eq 0 then continue
      str=[str,'']
-     wsf=self.WAVSAMP_FILE[md]
+     wsf=file_basename(self.WAVSAMP_FILE[md])
      if wsf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'WAVSAMP',wsf)]
-     orf=self.ORDER_FILE[md]
+     orf=file_basename(self.ORDER_FILE[md])
      if orf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'ORDER',orf)]
-     tif=self.TILT_FILE[md]
+     tif=file_basename(self.TILT_FILE[md])
      if tif ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'TILT',tif)]
-     pmf=self.PMASK_FILE[md]
+     pmf=file_basename(self.PMASK_FILE[md])
      if pmf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'PMASK',pmf)]
-     fcf=self.FLUXCON_FILE[md]
+     fcf=file_basename(self.FLUXCON_FILE[md])
      if fcf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'FLUXCON',fcf)]
-     slcff=self.SLCF_FILE[md]
+     slcff=file_basename(self.SLCF_FILE[md])
      if slcff ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'SLCF',slcff)]
-     wcf=self.WAVECUT_FILE[md]
+     wcf=file_basename(self.WAVECUT_FILE[md])
      if wcf then str=[str,string(FORMAT='(A12,": ",A)','WAVECUT',wcf)]
      str=[str,string(FORMAT='(A39,": ",G12.5)',"Plate Scale (deg)", $
                      (*self.cal[md])[0].PLATE_SCALE)]
@@ -409,6 +410,7 @@ function IRS_Calib::Info, modules, orders, SHORT=short
                      (*self.cal[md])[0].PIXEL_OMEGA)]
      
      str=[str,'']
+     if keyword_set(short) then continue
      for j=0,no-1 do begin 
         rec=(*self.cal[md])[ords[j]]
         if rec.order eq 0 then str=[str,"    ==> Target "+module+" center"] $
