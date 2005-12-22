@@ -11,7 +11,7 @@
 use File::Find;
 
 @keywords=qw{AORKEY OBJECT FOVID AIRSCMDN AOT_TYPE OBJTYPE EXPID NCYCLES
-             EXPTOT_T RAMPTIME STEPSPAR STEPSPER COLUMN ROW};
+             EXPTOT_T RAMPTIME STEPSPAR STEPSPER COLUMN ROW CREATOR};
 
 foreach (@keywords) {$keywords{pack("A8",$_)}++;};
 
@@ -49,7 +49,8 @@ sub parsefile {
   foreach (@keywords[2..$#keywords-2]) {
     $bcds{$obj}{$aor}{$dir}{$fov}{$_}=$keys{$_};
   }
-
+  push @{$bcds{$obj}{$aor}{$dir}{$fov}{creator}},$keys{CREATOR};
+  
   if ($keys{AOT_TYPE}=~/IrsMap/) {
     push @{$bcds{$obj}{$aor}{$dir}{$fov}{steps}}, [$keys{COLUMN},$keys{ROW}];
     push @{$bcds{$obj}{$aor}{$dir}{$fov}{files}},$file;
@@ -68,14 +69,23 @@ foreach $obj (sort keys %bcds) {
 
     foreach $dir (keys %{$bcds{$obj}{$aor}}) {
       foreach $fov (keys %{$bcds{$obj}{$aor}{$dir}}) {
-	$types{join(", ",@{$bcds{$obj}{$aor}{$dir}{$fov}}{AOT_TYPE,OBJTYPE})}++;
+	$types{join(", ",
+		    @{$bcds{$obj}{$aor}{$dir}{$fov}}{AOT_TYPE,OBJTYPE})}++;
       }
     }
 
     print " AOR: $aor (",join(";",sort keys(%types)),"):\n";
 
     foreach $dir (sort keys %{$bcds{$obj}{$aor}}) {
-      print "   ==> $dir <==\n";
+      %creators=();
+      foreach $fov (keys %{$bcds{$obj}{$aor}{$dir}}) {
+	foreach (@{$bcds{$obj}{$aor}{$dir}{$fov}{creator}}) {
+	  $creators{$_}++;
+	}
+      }
+
+      print "   ==> $dir <==","  [",join("; ",sort keys(%creators)),"]\n";
+
       foreach $fov (sort keys %{$bcds{$obj}{$aor}{$dir}}) {
 	%rec=%{$bcds{$obj}{$aor}{$dir}{$fov}};
 	if($fov=~/PU/) {
