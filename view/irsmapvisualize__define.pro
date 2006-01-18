@@ -175,6 +175,8 @@ pro IRSMapVisualize::UpdateMapRecords
   if ~obj_valid(self.cube) || ~ptr_valid(self.astrometry) then return
   bounds=self.cube->BCDBounds(/ALL) ;ra,dec
   self.cube->GetProperty,/ALL_RECORDS,DCEID=dceid,DISABLED=disabled
+  if tag_names(*self.astrometry,/STRUCTURE_NAME) eq 'GSSS_ASTROMETRY' then $
+     gsssadxy,*self.astrometry,bounds[0:3,*],bounds[4:7,*],x,y else $
   ad2xy,bounds[0:3,*],bounds[4:7,*],*self.astrometry,x,y
   if n_elements(dceid) eq 0 then return
   ptr_free,self.recs
