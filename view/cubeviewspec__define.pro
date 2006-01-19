@@ -1,3 +1,76 @@
+;+
+; NAME:  
+;
+;    CubeViewSpec
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Interface for displaying extracted spectra, and creating maps.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Analysis and Processing.
+;    Spectral manipulation.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('CubeViewSpec',[XRANGE=,YRANGE=,PARENT_GROUP=]
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          (X|Y)RANGE: The X,Y plot range to use, defaults to
+;             auto-ranging.
+;
+;          PARENT_GROUP: The widget ID of the group leader.
+;             
+;
+; INHERITANCE TREE:
+;
+;    OMArray--+
+;              \      
+;       ObjMsg-->CubeViewSpec
+;              /
+;  ObjReport--+
+;    
+;
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2002-2006 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;;**************************OverRiding methods********************************
 
@@ -504,19 +577,13 @@ pro CubeViewSpec::Send,MAP_NAME=mn,JUST_SEND=js
         msg.weights=self.weights
      endelse 
      
-     if ptr_valid(self.reg[0]) then msg.info=msg.info+' (Cont'
-     ;; Send either the fit, or the background regions themselves.
-     if ptr_valid(self.reg[0]) && n_elements(*self.fit) gt 0 && $
-        self.medlam ne 0. && n_elements(mn) eq 0 then begin 
-        msg.background=ptr_new(poly( $
-                       (*self.lam)[self->RegionIndices(*self.reg[1])], $
-                       *self.fit)*10.^self.renorm)
-        msg.info=msg.info+' -- Fit'
-     endif else begin 
-        if self.weight_cont && ptr_valid(self.reg[0]) then $
-           msg.info+=' -- Lam-Weight'
-        if n_elements(mn) eq 0 then msg.background=self.reg[0]
-     endelse 
+     if ptr_valid(self.reg[0]) then begin 
+        msg.info=msg.info+' (Cont'
+        ;; Send either the background regions themselves or map name
+        if self.weight_cont then msg.info+=' -- Lam-Weight'
+     endif 
+        
+     if n_elements(mn) eq 0 then msg.background=self.reg[0]
      
      ;;if ptr_valid(self.weights) then msg.info=msg.info+', Wts.'
      if ptr_valid(self.reg[0]) then msg.info+=')'
@@ -673,7 +740,6 @@ pro CubeViewSpec::Fit
   self->UpdateButtons
   if self.map_name then self->ResetMap
   self->Plot
-  self->Send
 end
 
 ;=============================================================================
@@ -796,7 +862,6 @@ pro CubeViewSpec::Reset,KEEP=k
   self->UpdateParams
   self->UpdateButtons
   self->Plot
-  self->Send
 end
 
 ;=============================================================================
@@ -1118,8 +1183,7 @@ end
 ;=============================================================================
 ;  Init
 ;=============================================================================
-function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,LAM=lam, $
-                            SPECTRUM=sp,PARENT_GROUP=grp
+function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,PARENT_GROUP=grp
   if n_elements(xr) ne 0 then self.xr_def=xr else self.xr_def=[0,0]
   if n_elements(yr) ne 0 then self.yr_def=yr else self.yr_def=[0,0]
   self.xr=self.xr_def & self.yr=self.yr_def
