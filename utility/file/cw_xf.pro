@@ -98,6 +98,28 @@
 ;
 ;-
 ;---------------------------------------------------------------------------
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;=========================================================================
 ;      xf_getrecent = Get recent files.
@@ -229,7 +251,7 @@ end
 function xf_getdir,file_path,FULL=full
    common cw_xfblock, sep, recfile
    ;; Parse out the directory from the supplied value
-   dir=xf_strip(file_path)
+   dir=file_dirname(file_path)
    if dir eq '' then begin      ;value entered is only filename
       cd, curr=dir
       if dir ne sep then dir=dir+sep
@@ -856,8 +878,8 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    cd, curr=curr               ;get current directory
    if size(start,/TYPE) eq 7 then begin
       if strmid(start,strlen(start)-1,1) ne sep then begin ;it's a file
-         start_file=filestrip(start)
-         start=strtrim(xf_strip(start),2) ;strip off file
+         start_file=file_basename(start)
+         start=file_dirname(start) ;strip off file
          if strlen(start) eq 0 then start=curr ;ensure a directory
       endif 
    endif else begin 
