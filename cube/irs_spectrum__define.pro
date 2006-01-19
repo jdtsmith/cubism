@@ -1,3 +1,54 @@
+;+
+; NAME:  
+;
+;    IRS_Spectrum
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    File I/O handler for 1D IRS spectra.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, File I/O
+;    	
+; INHERITANCE TREE:
+;
+;   IRS_File_IO-->IRS_Spectrum
+;
+; MODIFICATION HISTORY:
+;    
+;    2005-03-24 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2005 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;=============================================================================
 ;  AddDataColumn - Add an extra column of data
@@ -70,7 +121,7 @@ pro IRS_Spectrum::Save,sf
  endif 
   
   
-  self->AddPar,'FILENAME',filestrip(sf),' Name of this file'
+  self->AddPar,'FILENAME',file_basename(sf),' Name of this file'
   
   if obj_valid(self.region) then $
      self.region->WriteRegion,*self.hdr,sf,IPAC_TBL=~self.fits
@@ -89,7 +140,7 @@ pro IRS_Spectrum::Save,sf
   if self.fits then begin 
 ;      fxhmake,hdr,/date,/EXTEND
      
-;      fxaddpar,hdr,'FILENAME',filestrip(sf),' Name of this file'
+;      fxaddpar,hdr,'FILENAME',file_basename(sf),' Name of this file'
      
 ;      if n_elements(ra) ne 0 then begin 
 ;         fxaddpar,hdr,'RA_LL',ra[0],' RA of LL of extraction box'
