@@ -1,3 +1,82 @@
+;+
+; NAME:  
+;
+;    IRSMapVisualize
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Visualize IRS spectral mapping AORs on any WCS-enabled image.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Analysis and Processing.
+;    AOR Visualization
+;    	
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('IRSMapVisualize',oDraw,parent,COLOR=)
+;
+;       INPUT PARAMETERS:
+;
+;          oDraw: The tvDraw object.
+;
+;          parent: The widget ID of the parent to place the selection
+;             status label into.
+;
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: A 4-element array, with color IDs to use for
+;             normal,selected,disabled,select/disables records.
+; NOTES:
+;  
+;    Supports selection of records on the image.  Click and drag to
+;    select ranges, Control-click-drag to extend ranges.  Shift click
+;    to extend selection serially from last selected.
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->IRSMapVisualize
+;
+; MODIFICATION HISTORY:
+;    
+;    2005-06-26 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2005 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 ;;**************************OverRiding methods********************************
 ;=============================================================================
 ;  On - (Extraction Tool)
@@ -175,8 +254,6 @@ pro IRSMapVisualize::UpdateMapRecords
   if ~obj_valid(self.cube) || ~ptr_valid(self.astrometry) then return
   bounds=self.cube->BCDBounds(/ALL) ;ra,dec
   self.cube->GetProperty,/ALL_RECORDS,DCEID=dceid,DISABLED=disabled
-  if tag_names(*self.astrometry,/STRUCTURE_NAME) eq 'GSSS_ASTROMETRY' then $
-     gsssadxy,*self.astrometry,bounds[0:3,*],bounds[4:7,*],x,y else $
   ad2xy,bounds[0:3,*],bounds[4:7,*],*self.astrometry,x,y
   if n_elements(dceid) eq 0 then return
   ptr_free,self.recs
@@ -307,7 +384,7 @@ end
 ;=============================================================================
 ;  Init
 ;=============================================================================
-function IRSMapVisualize::Init,parent,oDraw,COLOR=color
+function IRSMapVisualize::Init,oDraw,parent,COLOR=color
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   if n_elements(color) ne 0 then self.color=color
   self.wSelectStatus=widget_label(parent,VALUE='---',/DYNAMIC_RESIZE)
