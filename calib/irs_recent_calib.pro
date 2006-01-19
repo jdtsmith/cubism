@@ -1,7 +1,7 @@
 ;+
 ; NAME:  
 ;
-;    irs_recent_calib
+;    IRS_RECENT_CALIB
 ;
 ; CONTACT:
 ;
@@ -55,8 +55,8 @@
 ;  
 ;  You should have received a copy of the GNU General Public License
 ;  along with this file; see the file COPYING.  If not, write to the
-;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-;  Boston, MA 02111-1307, USA.
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;; Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
 function irs_recent_calib,PRE_FTBOTH=pre_FTBOTH
@@ -75,7 +75,7 @@ function irs_recent_calib,PRE_FTBOTH=pre_FTBOTH
      openr,un,/get_lun,files[i]
      dates[0,i]=(fstat(un)).mtime
      free_lun,un
-     date=stregex(/EXTRACT,/SUBEXPR,filestrip(files[i]), $
+     date=stregex(/EXTRACT,/SUBEXPR,file_basename(files[i]), $
                   '([0-9]{4})[-_]([0-9]{2})[-_]([0-9]{2})')
      if n_elements(date) ne 4 OR strlen(date[1]) eq 0 then continue
      dates[1,i]=julday(date[2],date[3],date[1])
