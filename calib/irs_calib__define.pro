@@ -308,8 +308,8 @@
 ;  
 ;  You should have received a copy of the GNU General Public License
 ;  along with this file; see the file COPYING.  If not, write to the
-;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-;  Boston, MA 02111-1307, USA.
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
 
@@ -357,7 +357,7 @@ end
 ;  Save - Save this cal set
 ;=============================================================================
 pro IRS_Calib::Save,file,_EXTRA=e
-  if self.Name eq '' then self.Name=filestrip(file)
+  if self.Name eq '' then self.Name=file_basename(file)
   save,self,FILENAME=file,_EXTRA=e
 end
 
@@ -558,7 +558,6 @@ function IRS_Calib::FindWAVSAMP, module, order, APERTURE=aperture, $
 
   return,wh_pix
 end
-
 
 ;=============================================================================
 ;  GetWAVSAMP - Generate a list of IRS_WAVSAMP_PSEUDORECT structures
@@ -1014,7 +1013,6 @@ end
 ;   endfor  
 ;end
 
-
 ;=============================================================================
 ;  GetRecord - Get the calibration record for a given module and
 ;              order, or make one, if none yet exists.  If order is
@@ -1153,7 +1151,6 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   self->SortOrders
 end
 
-
 ;=============================================================================
 ;  SortOrders - Sort Orders according to minimum wavelength
 ;=============================================================================
@@ -1194,7 +1191,6 @@ function IRS_Calib::CalibrationFileVersion,base,version,name,type,md
   endif 
   return,cfile
 end
-
 
 ;=============================================================================
 ;  RecoverPolynomials - Work around the limited (and braindead) lack
@@ -1292,7 +1288,6 @@ pro IRS_Calib::RecoverPolynomials,module,orders
   endfor 
 end
 
-
 ;=============================================================================
 ;  ParseWAVSAMP - Read and parse the specified WAVSAMP file, clipping
 ;                 and caching the PSUEDO-RECT full-slit polygons for
@@ -1381,7 +1376,6 @@ pro IRS_Calib::ParseLineTilt,file,module
   self.TILT_FILE[m]=file
 end
 
-
 ;=============================================================================
 ;  ParsePMASK
 ;=============================================================================
@@ -1400,7 +1394,6 @@ pro IRS_Calib::ParseSLCF,file,module
   self.SLCF[m]=ptr_new(transpose([[data.wavelength],[data.slcf]]))
   self.SLCF_FILE[m]=file
 end
-
 
 ;=============================================================================
 ;  ParseWAVECUT
@@ -1433,7 +1426,6 @@ pro IRS_Calib::ParseFluxcon,file,module
   endfor
   self.FLUXCON_FILE[m]=file 
 end
-
 
 ;=============================================================================
 ;  ParseFrameTable - Parse frame table and update individual orders
@@ -1472,7 +1464,6 @@ pro IRS_Calib::ParseFrameTable,file
   self.FRAMETABLE_FILE=file
 end
 
-
 ;=============================================================================
 ;  ParsePlateScale
 ;=============================================================================
@@ -1487,7 +1478,6 @@ pro IRS_Calib::ParsePlateScale,file
   self.PLATESCALE_FILE=file
 end
 
-
 ;=============================================================================
 ;  ParsePixel_Omega
 ;=============================================================================
@@ -1501,7 +1491,6 @@ pro IRS_Calib::ParsePixel_Omega,file
   endfor 
   self.PIXEL_OMEGA_FILE=file
 end
-
 
 ;=============================================================================
 ;  CleanWAVSAMP - Delete the contents of one or more WAVSAMP records
