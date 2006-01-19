@@ -1,3 +1,65 @@
+;+
+; NAME:  
+;
+;    IRSMAPSET
+;
+; DESCRIPTION:
+;    
+;    Manage map sets for creating spectral maps from pre-defined sets.
+;    
+; CATEGORY:
+;
+;    IRS Spectral maps.
+;
+; CALLING SEQUENCE:
+;
+;    map_obj=irsmapset(reporter)
+;
+; OPTIONAL INPUT PARAMETERS:
+;
+;    reporter: An IRSReport object to use for reporting message.
+;    
+; OUTPUTS:
+;
+;    map_obj:  An IRSMapSet object, which can be used to query and
+;       store IRS map set.
+;
+; NOTES:
+;
+;    IRSMAPSET is a function front end to the singleton class
+;    IRSMapSet, also defined here. 
+;
+; INHERITANCE TREE:
+;
+;    ObjReport->CubeViewSpec
+;    
+; MODIFICATION HISTORY:
+;    
+;    2003-05-23 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;;**************************OverRiding methods********************************
 
@@ -271,7 +333,7 @@ end
 
 function IRSMapSet::Init
   self->LoadDefaultSets
-  self->SetProperty,TITLE_BASE='IRS Map Set'
+  self->SetProperty,REPORT_TITLE_BASE='IRS Map Set'
   return,1
 end
 
