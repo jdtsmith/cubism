@@ -19,6 +19,10 @@
 ;
 ;    CUBISM Spectral Cube Reduction, Analysis and Processing.
 ;    	
+; COMMON BLOCKS:
+;
+;    CUBISM_DIR and CUBISM_VERSION: See include files.
+;
 ; SIDE EFFECTS:
 ;
 ;    A GUI interface to CubeProj is available.
@@ -29,7 +33,7 @@
 ;
 ; METHODS:
 ;
-;    Init:  (always start with the INIT method function)
+;    Init: 
 ;
 ;       CALLING SEQUENCE:
 ;
@@ -58,14 +62,15 @@
 ; NOTES:
 ;  
 ;    A Cube Project is a single, self-contained data object which
-;    contains all the IRS BCD data, calibration parameters, and
-;    positional information required to create a single, 3D (two
-;    spatial, one wavelength) "spectral cube" from input IRS Spectral
-;    Mapping Mode data sets (see
-;    http://sirtf.caltech.edu/SSC/irs/aotintro.html).  In addition, it
-;    can perform various manipulations on the resulting cubes.  It
-;    exists both as a GUI interface, and a scriptable back-end to the
-;    cube construction and spectral extraction algorithms.
+;    holds all the IRS BCD/BMASK/UNC/etc. data, references to
+;    calibration parameters, and positional account information
+;    required to create a single, 3D (two spatial, one wavelength)
+;    "spectral cube" from input IRS Spectral Mapping Mode data sets
+;    (see http://ssc.spitzer.caltech.edu/irs/aotintro.html).  In
+;    addition, it can perform various manipulations and extractions on
+;    the resulting cubes.  It exists both as a GUI interface, and a
+;    scriptable back-end to the cube construction and spectral
+;    extraction algorithms.
 ;
 ; INHERITANCE TREE:
 ;
@@ -95,7 +100,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002-2005 J.D. Smith
+;  Copyright (C) 2002-2006 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -120,11 +125,6 @@
 
 pro CubeProj_show_event, ev
   widget_control, ev.top, get_uvalue=self
-  catch, err
-  if err ne 0 then begin 
-     catch,/CANCEL
-     self->Error,!ERROR_STATE.MSG
-  endif 
   self->ShowEvent,ev
 end
 
@@ -133,13 +133,27 @@ end
 ;              the appropriate method
 ;=============================================================================
 pro CubeProj::ShowEvent, ev
-  if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_BASE' then begin ;size
+  if ~self.debug then begin     ;; trap errors unless debugging
+     catch, err
+     if err ne 0 then begin 
+        catch,/CANCEL
+        self->Error,!ERROR_STATE.MSG
+     endif 
+  endif 
+  event_type=tag_names(ev,/STRUCTURE_NAME)
+  if event_type eq 'WIDGET_BASE' then begin ;size
      widget_control, (*self.wInfo).SList, $
                      SCR_YSIZE=ev.Y+(*self.wInfo).list_size_diff
      ;; Workaround v6.1 resize offset bug:
      widget_control, ev.top, TLB_GET_OFFSET = offset
      widget_control, ev.top, TLB_SET_XOFFSET = offset[0], $
                      TLB_SET_YOFFSET = offset[1]
+     return
+  endif else if event_type eq 'WIDGET_TIMER' then begin 
+     self->GetProperty,REPORT_STATUS=status
+     ;; See if the startup message is still there
+     if byte(strmid(status,0,1)) eq 164 then $
+        self->Status,/CLEAR
      return
   endif 
   sel=widget_info((*self.wInfo).SList,/LIST_SELECT)
@@ -152,8 +166,14 @@ pro CubeProj::ShowEvent, ev
         self->SetListSelect,sel[0],/NO_PRESERVE_TOP
         action='viewrecord' 
      endif else begin 
-        if n_sel eq 1 then self->Send,/SELECT,SINGLE_SELECT=sel[0] else $
+        if n_sel eq 1 then begin 
+           self->GetProperty,REPORT_STATUS=status
+           if status then self->Status,/CLEAR
+           self->Send,/SELECT,SINGLE_SELECT=sel[0] 
+        end else begin 
+           self->Status,string(FORMAT='(I0," records selected")',n_sel)
            self->Send,/SELECT
+        endelse 
         return 
      endelse 
   endif else widget_control, ev.id, get_uvalue=action
@@ -373,6 +393,7 @@ pro CubeProj::ShowEvent, ev
      
      'switchlist': begin 
         widget_control, ev.id,get_value=val
+        widget_control, ev.top, UPDATE=0
         val=val eq "<"?">":"<"
         which=val eq "<"?1:0
         widget_control, (*self.wInfo).wHead[1-which],MAP=0
@@ -381,6 +402,7 @@ pro CubeProj::ShowEvent, ev
         widget_control, ev.id,set_value=val
         self->UpdateColumnHeads
         self->UpdateList
+        widget_control, ev.top, /UPDATE
      end
      
      'sort': begin 
@@ -411,7 +433,7 @@ pro CubeProj::ShowEvent, ev
         xpopdiag,modules,info,PARENT_GROUP=self->TopBase(), $
                  BUTTON_TEXT='  Done  ',LABEL='Module:', $
                  TITLE=self->ProjectName()+': Calibration Set <'+ $
-                 filestrip(self.cal_file)+'>',TSIZE=[94,15], $
+                 file_basename(self.cal_file)+'>',TSIZE=[94,15], $
                  DEFAULT=irs_module(self.MODULE),/FREE_POINTERS
      end
      
@@ -427,10 +449,16 @@ pro CubeProj::ShowEvent, ev
                     title,                               $
                     thiscube,                            $
                     '                                 ', $
-                    '       JD Smith -- 2002-2005     ', $
+                    '   JD Smith and the SINGS Team   ', $
+                    '            2002-2006            ', $
                     '  http://sings.stsci.edu/cubism  ', $
                     '*********************************']
      end
+     
+     'debug': begin 
+        self->SetProperty,DEBUG=1b-self.debug
+        widget_control, ev.id, SET_BUTTON=self.debug
+     end    
      
      else: call_method,action,self ;all others, just call the named method
   endcase     
@@ -557,10 +585,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
             widget_button(rec,VALUE='Switch Record Data Type...', $
                           UVALUE='switchrecorddatatype')]
   
-  
+  ;;-------------  
   (*self.wInfo).MUST_UNRESTORED=widget_button(rec, UVALUE='restoreall',$
-                                              VALUE='Restore All Record Data')
-  
+                                              VALUE='Restore All Record Data',$
+                                              /SEPARATOR)  
   wMustSel=[wMustSel, $
             ;;-------------
             ((*self.wInfo).view_ids[0:1]= $
@@ -723,11 +751,13 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      [wMustCal, $
       widget_button(info,VALUE='Calibration Set Details...',UVALUE='calset')]
   ;;-------------
+  b1=widget_button(info,VALUE='Debug Cubism',UVALUE='debug',/SEPARATOR, $
+                   /CHECKED_MENU)
   b1=widget_button(info,VALUE='About Cubism',UVALUE='about',/SEPARATOR)
   
-  b=widget_base(base,/COLUMN,/BASE_ALIGN_LEFT,SPACE=1,YPAD=0,XPAD=0) 
-  headbase=widget_base(b,/ROW,XPAD=0,YPAD=0,/FRAME,SPACE=1) 
-  headmap=widget_base(headbase) 
+  b=widget_base(base,/COLUMN,/BASE_ALIGN_LEFT,SPACE=1,YPAD=0,XPAD=0)
+  headbase=widget_base(b,/ROW,XPAD=0,YPAD=0,/FRAME,SPACE=1)
+  headmap=widget_base(headbase)
   (*self.wInfo).wHead[0]= $
      cw_bgroup(/NONEXCLUSIVE,headmap, $
                ['ID               ', $
@@ -750,9 +780,13 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   b1=widget_button(headbase,VALUE='>',UVALUE='switchlist')
   
+  width=86
+  
   (*self.wInfo).SList= $
      widget_list(b,/MULTIPLE,/ALIGN_LEFT, $
-                 YSIZE=8>self->N_Records()<16,XSIZE=86,/FRAME)
+                 YSIZE=8>self->N_Records()<16,XSIZE=width,/FRAME)
+  
+  (*self.wInfo).Status=widget_label(b,/ALIGN_LEFT,/SUNKEN_FRAME)
   
   bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup', $
                 ['Enable','Disable','Delete','Header', $
@@ -769,10 +803,18 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   widget_control, base,set_uvalue=self,/REALIZE
   
+  geom=widget_info(base,/GEOMETRY) 
+  widget_control, (*self.wInfo).Status, $
+                  XSIZE=geom.XSIZE-2*geom.MARGIN-2*geom.XPAD-2
   geom=widget_info((*self.wInfo).SList,/GEOMETRY)
   (*self.wInfo).list_row=(geom.SCR_YSIZE-7)/geom.YSIZE
   (*self.wInfo).list_size_diff=geom.SCR_YSIZE- $
-     (widget_info(base,/GEOMETRY)).SCR_YSIZE
+                               (widget_info(base,/GEOMETRY)).SCR_YSIZE
+  
+  @cubism_version
+  status=string(164b)+' CUBISM version '+cubism_version+ $
+         ' by JDS and the SINGS team'
+  self->Status,status
   
   name='CubeProj_Show:'+self.ProjectName+file_basename(self.savefile)
   name=strmid(name,0,127)
@@ -783,6 +825,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).showing=1
   XManager,name, base,/NO_BLOCK,EVENT_HANDLER='CubeProj_show_event', $
            CLEANUP='CubeProj_show_kill'
+  widget_control, base,TIMER=45.
 end
 
 ;=============================================================================
@@ -902,12 +945,11 @@ function CubeProj::Load,file,ERROR=err
   return,obj
 end
 
-
 ;=============================================================================
 ;  Initialize - We want to do this on Init or Load
 ;=============================================================================
 pro CubeProj::Initialize
-  self->ObjReport::SetProperty,TITLE_BASE='CUBISM Project'
+  self->SetProperty,REPORT_TITLE_BASE='CUBISM Project'
   self->MsgSetup,['CUBEPROJ_CUBE','CUBEPROJ_RECORD','CUBEPROJ_VISUALIZE', $
                   'CUBEPROJ_UPDATE', 'CUBEPROJ_SELECT', $
                   'CUBEPROJ_RECORD_UPDATE','CUBEPROJ_CALIB_UPDATE']
@@ -966,18 +1008,27 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
         return                
      endif 
   endif else if size(file,/TYPE) ne 7 then file=self.SaveFile
-  if self->IsWidget() then  widget_control, /HOURGLASS
+  if self->IsWidget() then widget_control, /HOURGLASS
+  
+  ;; Check default save method
+  if n_elements(nodata) eq 0 then nodata=~(self.SaveMethod AND 1b)
+  if n_elements(noacc) eq 0 then noacc=~(self.SaveMethod AND 2b)
+  status='Saving project to '+file_basename(file)+ $
+         ' ('+(nodata?'no data,':'with data,') + $
+         (noacc?' no accts)':' with accts)') + '...'
+  self->Status,status
   ;; Detach the stuff we don't want to save!
   detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the widgets
   detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
   detCal=self.cal & self.cal=obj_new() ;or the calibration object
+  detabpl_pix=self.AUTO_BPL.BCD_PIX & self.AUTO_BPL.BCD_PIX=ptr_new()
+  detabpl_vals=self.AUTO_BPL.BCD_VALS & self.AUTO_BPL.BCD_VALS=ptr_new()
+  detabpl_cnt=self.AUTO_BPL.CNT_VEC & self.AUTO_BPL.CNT_VEC=ptr_new()
+  detabpl_unc=self.AUTO_BPL.BCD_UNC & self.AUTO_BPL.BCD_UNC=ptr_new()
   
   nr=self->N_Records()
   
   if ptr_valid(self.DR) then begin 
-     ;; Check default save method
-     if n_elements(nodata) eq 0 then nodata=~(self.SaveMethod AND 1b)
-     if n_elements(noacc) eq 0 then noacc=~(self.SaveMethod AND 2b)
      stub=ptrarr(nr)
      detRevAccts=(*self.DR).REV_ACCOUNT ;never save reverse accounts
      (*self.DR).REV_ACCOUNT=stub
@@ -1010,6 +1061,11 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   self.wInfo=detInfo           
   self.MsgList=detMsgList   
   self.cal=detCal
+  self.AUTO_BPL.BCD_PIX=detabpl_pix
+  self.AUTO_BPL.BCD_VALS=detabpl_vals
+  self.AUTO_BPL.BCD_UNC=detabpl_unc
+  self.AUTO_BPL.CNT_VEC=detabpl_cnt
+  
   if ptr_valid(self.DR) then begin 
      (*self.DR).REV_ACCOUNT=detRevAccts
      if keyword_set(nodata) then begin 
@@ -1026,58 +1082,104 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   if serr then self->Error,['Error Saving to File: ',file]
   
   if strlen(self.SaveFile) eq 0 or keyword_set(AS) then self.SaveFile=file
+  self->Status,status+'done'
   self->UpdateTitle
 end
 
 
 ;=============================================================================
 ;  RestoreData - Restore selected data from file, without invalidating
-;                records
+;                records.  If BCD, UNCERTAINTY, or BMASK is passed,
+;                only restore that component (default to all 3).
+;                UNCERTAINTY will only be read if
 ;=============================================================================
-pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,_EXTRA=e
+pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,BCD=bcd,UNCERTAINTY=unc, $
+                          BMASK=bm,_EXTRA=e
   self->RecOrSelect,sel,_EXTRA=e
-  wh=where(~ptr_valid((*self.DR)[sel].BCD),cnt)
-  if cnt eq 0 then return
+  
+  restore_bcd=0 & restore_unc=0 & restore_bmask=0
+  case 1 of
+     keyword_set(bcd): begin 
+        restore_bcd=1
+        wh=where(~ptr_valid((*self.DR)[sel].BCD),cnt)
+     end 
+     
+     keyword_set(unc): begin 
+        if self.load_unc then $
+           wh=where(~ptr_valid((*self.DR)[sel].UNC),cnt) $
+        else self->Error,"Must enable Uncertainty Loading to restore UNC."
+        restore_unc=1
+     end 
+     
+     keyword_set(bmask): begin
+        restore_bmask=1
+        wh=where(~ptr_valid((*self.DR)[sel].BMASK),cnt)
+     end 
+     
+     ;; Default cases:
+     ~self.load_unc: begin 
+        wh=where(~ptr_valid((*self.DR)[sel].BCD) OR $
+                 ~ptr_valid((*self.DR)[sel].BMASK),cnt)
+        restore_bcd=1 & restore_bmask=1
+     end 
+     
+     else: begin 
+        wh=where(~ptr_valid((*self.DR)[sel].BCD) OR $
+                 ~ptr_valid((*self.DR)[sel].UNC) OR $
+                 ~ptr_valid((*self.DR)[sel].BMASK),cnt)
+        restore_bcd=1 & restore_bmask=1 & restore_unc=1
+     end 
+  endcase
+  
+  if cnt gt 0 then begin 
+     status=string(FORMAT='("Restoring ",I0," records...")',cnt)
+     self->Status,status
+  endif else return
+  
   if self->IsWidget() then widget_control, /HOURGLASS
   
   for i=0,cnt-1 do begin 
      which=sel[wh[i]]
+     
      file=(*self.DR)[which].FILE
      if ~file_test(file,/READ) then $
         self->Error,["Couldn't restore data from file (check filename): ",file]
-     (*self.DR)[which].BCD=ptr_new(readfits(file,/SILENT,hdr))
      
-     if ~stregex(file,'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
-        bcdfile=irs_associated_file(file)
-        if bcdfile && file_test(bcdfile,/READ) then hdr=headfits(bcdfile)
+     if restore_bcd then begin  ;or whatever other data type (droop,etc.)
+        ptr_free,(*self.DR)[which].BCD,(*self.DR)[which].HEADER
+        (*self.DR)[which].BCD=ptr_new(readfits(file,/SILENT,hdr))
+        if ~stregex(file,'bcd(_fp)?\.fits$',/BOOLEAN) then begin 
+           bcdfile=irs_associated_file(file)
+           if bcdfile && file_test(bcdfile,/READ) then hdr=headfits(bcdfile)
+        endif 
+        (*self.DR)[which].HEADER=ptr_new(hdr)
      endif 
-     (*self.DR)[which].HEADER=ptr_new(hdr)
      
-     ;; Optional BMASK, UNCERTAINTY
-     ptr_free,(*self.DR)[which].BMASK,(*self.DR)[which].UNC
-     bmask_file=irs_associated_file(file,/BMASK)
+     if restore_bmask then begin 
+        ptr_free,(*self.DR)[which].BMASK
+        bmask_file=irs_associated_file(file,/BMASK)
+        if bmask_file && file_test(bmask_file,/READ) then $
+           (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
+     endif 
      
-     if bmask_file && file_test(bmask_file,/READ) then $
-        (*self.DR)[which].BMASK=ptr_new(readfits(bmask_file,/SILENT))
-     
-     unc_file=irs_associated_file(file,/UNCERTAINTY)
-     if size(unc_file,/TYPE) eq 7 && file_test(unc_file) then $
-        (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
+     if restore_unc then begin 
+        ptr_free,(*self.DR)[which].UNC
+        unc_file=irs_associated_file(file,/UNCERTAINTY)
+        if unc_file && file_test(unc_file,/READ) then $
+           (*self.DR)[which].UNC=ptr_new(readfits(unc_file,/SILENT))
+     endif
   endfor
+  if n_elements(status) gt 0 then self->Status,status+'done'
   self->UpdateList
 end
-
 
 ;=============================================================================
 ;  RestoreAll - Restore All data
 ;=============================================================================
 pro CubeProj::RestoreAll
-  self->RestoreData,lindgen(self->N_Records()),RESTORE_CNT=cnt
-  if cnt gt 0 then self->Info, $
-     string(FORMAT='("Restored ",I0," record",A)',cnt,cnt gt 1?"s":"")
-  self->UpdateAll
+  self->RestoreData,/ALL,RESTORE_CNT=cnt
+  if cnt gt 0 then self->UpdateAll
 end
-
 
 ;=============================================================================
 ;  ReplaceFilenameSubstring - Replace common substring in selected
@@ -1556,7 +1658,8 @@ pro CubeProj::Revert
                         DIALOG_PARENT=self->TopBase())
      if ans ne 'Yes' then return
   endif 
-  
+  status='Reverting project from '+time+'...'
+  self->Status,status
   oldself=self                  ;our old self, soon to be history!
   wsav=self.wInfo               ;detach wInfo and MsgList from Self, to retach
   msav=self.MsgList             ;to the transmogrified self.
@@ -1587,6 +1690,7 @@ pro CubeProj::Revert
      self.Changed=oldchange
   endelse 
   
+  self->Status,status+'done'
   self->Send,/UPDATE
   self->UpdateAll
 end
@@ -1618,7 +1722,7 @@ pro CubeProj::UpdateTitle
   if self.Changed then pn='*'+pn+'*'
   widget_control, (*self.wInfo).Base,  $
                   TLB_SET_TITLE='CUBISM Project: '+ pn + $
-                  "  <"+(self.SaveFile?filestrip(self.SaveFile): $
+                  "  <"+(self.SaveFile?file_basename(self.SaveFile): $
                          "(unsaved)")+">"
 end
 
@@ -1674,12 +1778,15 @@ pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv, $
      top=widget_info((*self.wInfo).SList,/LIST_TOP)
   
   widget_control, (*self.wInfo).SList, SET_LIST_SELECT=recs
-  
+  if ~keyword_set(nu) then begin 
+     nrec=n_elements(recs) 
+     if nrec gt 1 then self->Status,strtrim(nrec,2)+' records selected'
+  endif 
   if ~keyword_set(npt) then $
      widget_control, (*self.wInfo).SList,SET_LIST_TOP=top
   self->UpdateButtons
   if keyword_set(nu) then return
-  if n_elements(recs) eq 1 && recs[0] ne -1 then begin 
+  if nrec eq 1 && recs[0] ne -1 then begin 
      self->Send,/SELECT,SINGLE_SELECT=recs[0]
   endif else self->Send,/SELECT
 end
@@ -1693,6 +1800,21 @@ function CubeProj::List
    which_list=0
    if self->isWidget() then if (*self.wInfo).which_list then which_list=1 
    
+   if which_list eq 0 then begin 
+      date_obs=jul2date((*self.DR).DATE_OBS,/D_T)
+      date=jul2date((*self.DR).DATE,/D_T)
+      fovname=irs_fov((*self.DR).FOVID,/SHORT_NAME)
+   endif else begin 
+      bcd_valid=ptr_valid((*self.DR).BCD)
+      unc_valid=ptr_valid((*self.DR).UNC)
+      bmask_valid=ptr_valid((*self.DR).BMASK)
+      bpl_valid=ptr_valid((*self.DR).BAD_PIXEL_LIST)
+      gacc_valid=self.ACCOUNTS_VALID AND 1b
+      acct_valid=ptr_valid((*self.DR).ACCOUNT)
+      rev_acct_valid=ptr_valid((*self.DR).REV_ACCOUNT)
+   endelse 
+   
+   list=strarr(n)
    for i=0,n-1 do begin 
       if which_list eq 0 then begin ;the standard list
          type=(*self.DR)[i].type>0
@@ -1701,14 +1823,14 @@ function CubeProj::List
                   'I3,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
                   (*self.DR)[i].TIME, $
-                  jul2date((*self.DR)[i].DATE_OBS,FORM='D*T'), $
-                  jul2date((*self.DR)[i].DATE,FORM='D*T'), $
-                  tchar+irs_fov((*self.DR)[i].FOVID,/SHORT_NAME), $
+                  date_obs[i], $
+                  date[i], $
+                  tchar+fovname[i], $
                   (*self.DR)[i].EXP,(*self.DR)[i].ROW,(*self.DR)[i].COLUMN)
       endif else begin          ;the additional list
-         if ptr_valid((*self.DR)[i].ACCOUNT) then begin 
-            if self.ACCOUNTS_VALID AND 1b then begin 
-               if ptr_valid((*self.DR)[i].REV_ACCOUNT) then acct="Y(+R)" $
+         if acct_valid[i] then begin 
+            if gacc_valid && acct_valid[i] then begin 
+               if rev_acct_valid[i] then acct="Y(+R)" $
                else acct="Y"
             endif else acct="INV"
          endif else acct="N"
@@ -1717,18 +1839,18 @@ function CubeProj::List
          s=string(FORMAT='(" ",A-19,T22,A11,T34,A12,T50,3(A1,7X),A,T83,A1)', $
                   (*self.DR)[i].OBJECT, $
                   radecstring(pos[0],/RA),radecstring(pos[1]), $
-                  ptr_valid((*self.DR)[i].BCD)?'Y':'N', $
-                  ptr_valid((*self.DR)[i].UNC)?'Y':'N', $
-                  ptr_valid((*self.DR)[i].BMASK)?'Y':'N', $
+                  bcd_valid[i]?'Y':'N', $
+                  unc_valid[i]?'Y':'N', $
+                  bmask_valid[i]?'Y':'N', $
                   acct, $ 
-                  ptr_valid((*self.DR)[i].BAD_PIXEL_LIST)?'Y':'N')
+                  bpl_valid[i]?'Y':'N')
       endelse       
       if (*self.DR)[i].DISABLED then begin 
          b=byte(s)
          b[where(b eq 32b)]=45b ;replace space with dash
          s=string(b)
       endif
-      if i eq 0 then list=s else list=[list,s]
+      list[i]=s
    endfor 
    return,list
 end
@@ -1812,9 +1934,17 @@ pro CubeProj::UpdateButtons
   widget_control, (*self.wInfo).MUST_SAVE_CHANGED,SENSITIVE= $
                   strlen(self.SaveFile) ne 0 AND keyword_set(self.Changed)
   
-  widget_control, (*self.wInfo).MUST_UNRESTORED,SENSITIVE= $
-                  ptr_valid(self.DR) && $
-                  ~array_equal(ptr_valid((*self.DR).BCD),1b)
+  if ~ptr_valid(self.DR) then $
+     unrestored=1b $
+  else begin 
+     unrestored=~array_equal(ptr_valid((*self.DR).BCD),1b) || $
+                ~array_equal(ptr_valid((*self.DR).BMASK),1b)
+     if ~unrestored && self.load_unc then $
+        unrestored=~array_equal(ptr_valid((*self.DR).UNC),1b)
+  endelse 
+     
+  widget_control, (*self.wInfo).MUST_UNRESTORED,SENSITIVE=unrestored  
+  
   widget_control, (*self.wInfo).MUST_FLUXCON,SENSITIVE=self.fluxcon
   
   widget_control, (*self.wInfo).MUST_UNCERTAINTIES, $
@@ -1963,7 +2093,6 @@ pro CubeProj::ViewRecord,rec,NEW_VIEWER=new,_EXTRA=e
   self->Send,RECORD=rec,_EXTRA=e
 end
 
-
 ;=============================================================================
 ;  VisualizeAORs - View the AORs on top of a vis image, with select
 ;=============================================================================
@@ -1980,7 +2109,8 @@ end
 ;=============================================================================
 pro CubeProj::LoadVisualize,SELECT=sel
   if ~keyword_set(sel) then begin 
-     if ptr_valid(self.visualize_image) then return
+     if ptr_valid(self.visualize_image) && ptr_valid(self.visualize_header) $
+     then return
      if ~file_test(self.visualize_file) then sel=1
   endif
   
@@ -1999,19 +2129,34 @@ pro CubeProj::LoadVisualize,SELECT=sel
   if ~file_test(self.visualize_file) || err then $
      self->Error,["Couldn't load visualization image:",self.visualize_file]
   im=readfits(self.visualize_file,hdr)
-  extast,hdr,astr
   catch,/cancel
   
-  ;; Convert astrometry to celestial if required.
-  if strpos(astr.ctype[0],'RA') ne 0 || strpos(astr.ctype[1],'DEC') ne 0 then $
-     heuler,astr,/CELESTIAL
-  
-  ptr_free,self.visualize_image,self.visualize_astrometry
+  ptr_free,self.visualize_image,self.visualize_header
   self.visualize_image=ptr_new(im,/NO_COPY)
-  self.visualize_astrometry=ptr_new(astr,/NO_COPY)
+  self.visualize_header=ptr_new(hdr,/NO_COPY)
+  
   self->UpdateTitle & self->UpdateButtons
 end  
+
+;=============================================================================
+;  VisualizeAstrom - Return the visualization astrometry from the vis
+;                    header.
+;=============================================================================
+function CubeProj::VisualizeAstrom
+  if ~ptr_valid(self.visualize_header) then return,-1
   
+  extast,*self.visualize_header,astr,code
+  if code eq 4 then begin       ;convert from gss to normal header
+     gsss_stdast,*self.visualize_header
+     extast,*self.visualize_header,astr
+  endif 
+  
+  ;; Take care of non-celestial images
+  if strpos(astr.ctype[0],'RA') ne 0 || strpos(astr.ctype[1],'DEC') ne 0 then $
+     heuler,astr,/CELESTIAL
+  return,astr
+end
+
 ;=============================================================================
 ;  EnableRecord - Remove the records disable flag
 ;=============================================================================
@@ -2381,7 +2526,7 @@ pro CubeProj::Sort,sort
      b=bytarr(n)
      b[ls]=1b
      b=b[s]
-     self->SetListSelect,where(b)
+     self->SetListSelect,where(b),/NO_UPDATE
   endif 
 end
 
@@ -2537,7 +2682,12 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
                           RECONSTRUCTED_POSITIONS=rcp, USE_BACKGROUND=ubg,$
                           USE_UNCERTAINTY=uunc, LOAD_MASKS=lm, $
                           LOAD_UNCERTAINTY=lu,FLUXCON=fc,SLCF=slcf, $
-                          PIXEL_OMEGA=po, SAVE_ACCOUNTS=sa,SAVE_DATA=sd
+                          PIXEL_OMEGA=po, SAVE_ACCOUNTS=sa,SAVE_DATA=sd, $
+                          DEBUG=debug, _REF_EXTRA=e
+  if n_elements(e) ne 0 then begin 
+     self->ObjReport::SetProperty,_EXTRA=e
+  endif 
+     
   update_cal=0b
   if n_elements(osf) ne 0 then begin 
      if self.OVERSAMPLE_FACTOR ne osf then begin 
@@ -2633,6 +2783,8 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
      endif 
   endif
   
+  if n_elements(debug) ne 0 then self.debug=keyword_set(debug) 
+  
   if n_elements(ubg) ne 0 then begin 
      self.use_bg=keyword_set(ubg) 
      self.Changed=1b
@@ -2693,9 +2845,12 @@ pro CubeProj::GetProperty, $
    SAVE_ACCOUNT=sa, CUBE_DATE=cdate, $
    ;; Record based options
    ALL_RECORDS=all_recs,RECORDS=recs, RECORD_SET=rec_set, DATE_OBS=dobs, $
-   BAD_PIXEL_LIST=bpl, FILENAMES=fn, DCEID=dceid, DISABLED=dis
+   BAD_PIXEL_LIST=bpl, FILENAMES=fn, DCEID=dceid, DISABLED=dis,_REF_EXTRA=e
    
-                           
+  if n_elements(e) ne 0 then begin 
+     self->ObjReport::GetProperty,_EXTRA=e
+  endif 
+  
   ;;--- Global, potentially pointer-based data
   ptr=keyword_set(ptr)
   if arg_present(account) && ptr_valid(self.ACCOUNT) then $
@@ -2938,7 +3093,7 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,SILENT=silent
            TITLE='Load Calibration Object',/NO_SHOW_ALL,SELECT=0,/MODAL, $
            PARENT_GROUP=self->TopBase()
         if size(calname,/TYPE) eq 7 then begin 
-           calname=filestrip(calname)
+           calname=file_basename(calname)
            if calname ne self.cal_file then begin 
               self.cal_file=calname
               self.changed=1b
@@ -2959,7 +3114,7 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,SILENT=silent
      specified=1
   endif
   if ~self.cal_file || keyword_set(force) then begin 
-     self.cal_file=filestrip(irs_recent_calib()) ;use the most recent
+     self.cal_file=file_basename(irs_recent_calib()) ;use the most recent
      if ~keyword_set(nr) then self->ResetAccounts,/NO_UPDATE
      self.changed=1b
      if n_elements(specified) eq 0 && ~keyword_set(silent) then $
@@ -3335,11 +3490,17 @@ pro CubeProj::BuildAccount,_EXTRA=e
   ;; if self.ACCOUNTS_VALID eq 2b then begin 
   ;;    new=where(NOT ptr_valid((*self.DR).ACCOUNT)) ;newly added BCD's
   
+  wh=where(~(*self.DR).DISABLED,good_cnt)
+  if good_cnt eq 0 then return
+  t0=systime(1) 
+  status=string(FORMAT='("Projecting and Clipping ",I0," records...")', $
+                good_cnt)
+  self->Status,status
+  
   astr=self->CubeAstrometryRecord()
   exp_off=-1
-  for i=0L,n_elements(*self.DR)-1 do begin 
-     ;; skip disabled records unconditionally
-     if (*self.DR)[i].DISABLED then continue 
+  for iwh=0L,good_cnt-1 do begin 
+     i=wh[iwh]
      feedback_only=0            ;might just be showing the feedback
      if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
      color=!D.TABLE_SIZE-5+((*self.DR)[i].EXP-exp_off) mod 4
@@ -3446,7 +3607,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
                  wait,0
               endif
               
-              if feedback_only then continue
+              if feedback_only then continue ; already have accounts
               ;; Clip the offset polygon against the sky (cube) grid
               cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
                                           self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
@@ -3484,6 +3645,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
      endfor
   endfor
   self->BuildRevAcct            ;we need these too...
+  self->Status,status+string(FORMAT='("done in ",F0.2,"s")',systime(1)-t0)
   if self.feedback then wset,save_win
   self->ResetAccounts,/VALID
 end
@@ -3492,11 +3654,19 @@ end
 ;  BuildRevAcct - Build the reverse accounts from the regular accounts.
 ;=============================================================================
 pro CubeProj::BuildRevAcct
-  for i=0L,n_elements(*self.DR)-1 do begin
-     if self.ACCOUNTS_VALID AND 1b AND ptr_valid((*self.DR)[i].REV_ACCOUNT) $
-        then continue else ptr_free,(*self.DR)[i].REV_ACCOUNT
-     if (*self.DR)[i].DISABLED then continue
-     
+  accs_changed=0b
+  if ~(self.ACCOUNTS_VALID AND 1b) then ptr_free,(*self.DR).REV_ACCOUNT
+  need=where(~ptr_valid((*self.DR).REV_ACCOUNT) AND ~(*self.DR).DISABLED, $
+             need_cnt)
+  if need_cnt eq 0 then return
+  
+  sform='("Building Reverse Lookup Information for ",I0," records...")'
+  status=string(need_cnt,FORMAT=sform)
+  self->Status,status
+  
+  
+  for ineed=0L,need_cnt-1 do begin
+     i=need[ineed]
      ;; Find the x/y bounding box of this DRs footprint in the cube:
      pix=(*(*self.DR)[i].ACCOUNT).cube_pix
      y=pix/self.CUBE_SIZE[0]
@@ -3518,8 +3688,14 @@ pro CubeProj::BuildRevAcct
      (*self.DR)[i].REV_ACCOUNT=ptr_new(ri,/NO_COPY)
      (*self.DR)[i].REV_CNT=n_elements(h) 
      (*self.DR)[i].REV_MIN=om
+     accs_changed=1b
   endfor
-  self->UpdateButtons
+  if accs_changed then begin 
+     ptr_free,self.AUTO_BPL.BCD_PIX,self.AUTO_BPL.BCD_VALS, $
+              self.AUTO_BPL.CNT_VEC,self.AUTO_BPL.BCD_UNC
+     self->UpdateButtons
+  endif
+  self->Status,status+'done'
 end
 
 ;=============================================================================
@@ -3888,6 +4064,10 @@ pro CubeProj::BuildCube
      ~array_equal(ptr_valid((*self.DR)[enabled].ACCOUNT),1b) OR $
      self.feedback then self->BuildAccount else self->BuildRevAcct
   
+  status=string(FORMAT='("Building ",I0,"x",I0,"x",I0," cube...")', $
+                self.CUBE_SIZE)
+  self->status,status
+  
   if self.fluxcon || self.slcf then fluxim=self->FluxImage()
   use_unc=self.use_unc && array_equal(ptr_valid((*self.DR)[enabled].UNC),1b)
   use_bg=self.use_bg && ptr_valid(self.BACKGROUND)
@@ -3911,21 +4091,25 @@ pro CubeProj::BuildCube
   cube_width=self.CUBE_SIZE[0]
   cube_plane_pix=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
   
+  update=10<(enabled_cnt/50)>1
+  
   for k=0L,enabled_cnt-1 do begin
-     this_dr=(*self.DR)[enabled[k]]
-     acct=*this_dr.ACCOUNT
-     rev_acc=*this_dr.REV_ACCOUNT
-     rev_min=this_dr.REV_MIN
-     rev_width=this_dr.REV_WIDTH
-     rev_height=this_dr.REV_HEIGHT
+     if k mod update eq 0 then $
+        self->Status,status+string(FORMAT='(I2.2,"%")',k*100/enabled_cnt)
+     rec=(*self.DR)[enabled[k]]
+     acct=*rec.ACCOUNT
+     rev_acc=*rec.REV_ACCOUNT
+     rev_min=rec.REV_MIN
+     rev_width=rec.REV_WIDTH
+     rev_height=rec.REV_HEIGHT
      rev_wh=rev_width*rev_height
-     rev_off=this_dr.REV_OFFSET
+     rev_off=rec.REV_OFFSET
      
-     bcd=*this_dr.BCD
+     bcd=*rec.BCD
      if use_bg then bcd-=*self.BACKGROUND
      if use_flux then bcd*=fluxim
      if use_unc then begin 
-        bcd_unc=*this_dr.UNC
+        bcd_unc=*rec.UNC
         if use_bg then bcd_unc=sqrt(bcd_unc^2+(*self.BACKGROUND_UNC)^2)
         if use_flux then bcd_unc*=fluxim
      endif
@@ -3935,16 +4119,16 @@ pro CubeProj::BuildCube
      mask=finite(bcd)
      ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
      ;; entering the cube, and add any global bad pixels
-     if ptr_valid(this_dr.BMASK) then $
-        mask AND= (*this_dr.BMASK AND 28928U) eq 0L 
+     if ptr_valid(rec.BMASK) then $
+        mask AND= (*rec.BMASK AND 28928U) eq 0L 
      if use_bpmask then mask AND= bpmask
      
      ;; Add any per-BCD bad pixels
-     if ptr_valid(this_dr.BAD_PIXEL_LIST) then $
-        mask[*this_dr.BAD_PIXEL_LIST]=0b
+     if ptr_valid(rec.BAD_PIXEL_LIST) then $
+        mask[*rec.BAD_PIXEL_LIST]=0b
      
      ;; Use the reverse account for this BCD to populate the cube -- slow
-     for i=0L,this_dr.REV_CNT-1 do begin 
+     for i=0L,rec.REV_CNT-1 do begin 
         if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
         
         ;; Account records from this BCD affecting this cube pixel
@@ -4011,6 +4195,11 @@ pro CubeProj::BuildCube
   self.Changed=1
   @cubism_version 
   self.version=cubism_version
+  self->Status,status+'done'
+  
+  ;;Mark the records which went into this cube
+  (*self.DR).IN_CUBE=0b & (*self.DR)[enabled].IN_CUBE=1b
+
   self->UpdateButtons & self->UpdateList & self->UpdateTitle
   self->Send,/UPDATE,/NEW_CUBE
 end
@@ -4159,90 +4348,147 @@ end
 
 
 ;=============================================================================
-;  BackTrackArray - Run backtracking over a full array of cube pixel
-;                   values: much faster than one at a time.
+;  BackTrackFullCube - Run backtracking over the full array of cube
+;                      pixel values into a reverse-indices style
+;                      array: highly-optimized: much faster than one
+;                      at a time.
 ;=============================================================================
-pro CubeProj::BackTrackArray,cube_pix,bcd_pix,vals
+pro CubeProj::BackTrackFullCube,bcd_pix,vals,cnt_vec,BCD_UNC=unc
   nrec=self->N_Records()
   if nrec eq 0 then return
-  if ~(self.ACCOUNTS_VALID AND 1b) OR $
-     array_equal(ptr_valid((*self.DR).ACCOUNT),0) then $
+  if ~(self.ACCOUNTS_VALID AND 1b) || $
+     array_equal(ptr_valid((*self.DR).ACCOUNT),0b) then $
         self->Error,"Accounts not valid: must rebuild cube"
   
-  ;; At least one reverse account required
-  if array_equal(ptr_valid((*self.DR).REV_ACCOUNT),0b) then self->BuildRevAcct
+  ;; Must have all reverse accounts
+  self->BuildRevAcct
+  
+  status='Backtracking Full cube...'
+  self->Status,status
+  
+  wh=where((*self.DR).IN_CUBE,cnt)
+  if cnt eq 0 then self->Error,"Must rebuild cube."
+  
+  use_unc=ptr_valid(self.CUBE_UNC) && $
+     array_equal(ptr_valid((*self.DR)[wh].UNC),1b)
   
   sz=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
-  z=cube_pix/sz
-  cube_pix-=z*sz
-  y=cube_pix/self.CUBE_SIZE[0]
-  x=cube_pix-y*self.CUBE_SIZE[0]
   
-  bcd_pix=ptrarr(n_elements(x))
-  vals=ptrarr(n_elements(x))
-  for i=0,nrec-1 do begin 
-     rec=(*self.DR)[i]
-     if ~ptr_valid(rec.REV_ACCOUNT) then continue
+  cnt_vec=intarr(self.CUBE_SIZE)
+  
+  ;; Count the total number of all backtracked pixels in the cube
+  good=where(ptr_valid((*self.DR).REV_ACCOUNT) AND (*self.DR).in_cube, $
+             goodcnt)
+  if goodcnt eq 0 then return
+  
+  bt_cnt=lonarr(goodcnt,/NOZERO)
+  for i=0,goodcnt-1 do $ $
+     bt_cnt[i]=n_elements(*(*self.DR)[good[i]].ACCOUNT)
+  
+  all_bt_cnt=total(bt_cnt,/INTEGER)
+  track_pix=lonarr(all_bt_cnt,/NOZERO)
+  bcd_pix=lonarr(all_bt_cnt,/NOZERO)
+  vals=fltarr(all_bt_cnt,/NOZERO)
+  if use_unc then unc=fltarr(all_bt_cnt,/NOZERO)
+  
+  cur=0L
+  for i=0,goodcnt-1 do begin 
+     rec=(*self.DR)[good[i]]
+     if ~ptr_valid(rec.REV_ACCOUNT) || rec.DISABLED then continue
+     
      w=rec.REV_WIDTH
      w_h=w*rec.REV_HEIGHT
      
-     wh=where(x ge rec.REV_OFFSET[0] AND $
-              x lt rec.REV_OFFSET[0]+rec.REV_WIDTH AND $
-              y ge rec.REV_OFFSET[1] AND $
-              y lt rec.REV_OFFSET[1]+rec.REV_HEIGHT,cnt)
-     if cnt eq 0 then continue
+     ;; Only consider cube pixels within the bounding box of the
+     ;; record's slit layout; form the sub-indices
+     targ=[rec.REV_WIDTH,rec.REV_HEIGHT]
+     wh=lindgen(targ) + $
+        rec.REV_OFFSET[1]*self.CUBE_SIZE[0] + rec.REV_OFFSET[0] + $
+        rebin(transpose(lindgen(rec.REV_HEIGHT))* $
+              (self.CUBE_SIZE[0]-rec.REV_WIDTH),targ,/SAMPLE)
+     targ=[targ,self.CUBE_SIZE[2]]
+     wh=rebin(temporary(wh),targ,/SAMPLE) + $
+        rebin(reform(lindgen(self.CUBE_SIZE[2])*sz, $
+                     1L,1L,self.CUBE_SIZE[2]),targ,/SAMPLE)
      
-     ;; offset into the RI bounding-box coordinates
-     ind=(x[wh]-rec.REV_OFFSET[0]) + w*(y[wh]-rec.REV_OFFSET[1]) + w_h*z[wh]
-     
-     wh2=where(ind ge rec.REV_MIN,cnt)
-     if cnt eq 0 then continue
-     wh=wh[wh2]
-     ind=ind[wh2]
+     ;; Trim WH on both sides
+     if rec.REV_MIN gt 0L then wh=wh[rec.REV_MIN:*]
+     if rec.REV_CNT lt n_elements(wh) then wh=wh[0:rec.REV_CNT-1]
      
      ri=*rec.REV_ACCOUNT
-     ind-=rec.REV_MIN
-     wh3=where(ri[ind] lt ri[ind+1],cnt)
-     if cnt eq 0 then continue
-     wh=wh[wh3]
-     ind=ind[wh3]
-     
      bcd=(*rec.BCD)
+     if use_unc then bcd_unc=(*rec.UNC)
      acc=(*rec.ACCOUNT)
-     pv=ptr_valid(bcd_pix[wh])
-     for j=0L,cnt-1L do begin 
-        pix=acc[ri[ri[ind[j]]:ri[ind[j]+1]-1]].BCD_PIX
-        if ~pv[j] then begin 
-           bcd_pix[wh[j]]=ptr_new(pix)
-           vals[wh[j]]=ptr_new(bcd[pix])
-        end else begin 
-           *bcd_pix[wh[j]]=[*bcd_pix[wh[j]],pix]
-           *vals[wh[j]]=[*vals[wh[j]],bcd[pix]]
-        endelse      
-     endfor 
+     
+     ;; Populate the output arrays many entries at a time,
+     ;; based on how many backtrack entries they have (dual histogram thin)
+     backtrack_per_pix=ri[1:rec.REV_CNT]-ri
+     
+     h=histogram(backtrack_per_pix,REVERSE_INDICES=bpp_ri,MIN=1)
+     
+     for j=0L,n_elements(h)-1L do begin 
+        if bpp_ri[j+1] eq bpp_ri[j] then continue ; none with that many dupes
+        in_cnt_bin=bpp_ri[bpp_ri[j]:bpp_ri[j+1]-1] ;indices in this count bin
+        nbin=h[j]               ; how many cube pixels had these counts
+        
+        cnt_vec[wh[in_cnt_bin]]+=j+1 ;increment the global count record
+        
+        if j eq 0 then begin    ; cube inds with just 1 back-tracked pixel
+           pix=acc[ri[ri[in_cnt_bin]]].BCD_PIX 
+        endif else begin        ; cube inds with more than 1 back-tracked pix
+           rind=ri[in_cnt_bin]  ; First of the index range into ri
+           ;; In each case, take j+1 indices from the first index
+           rind=reform(rebin(temporary(rind),nbin,j+1,/SAMPLE)+ $
+                       rebin(transpose(lindgen(j+1)),nbin,j+1,/SAMPLE), $
+                       nbin*(j+1))
+           pix=acc[ri[rind]].BCD_PIX
+        endelse 
+        bcd_pix[cur]=pix
+        vals[cur]=bcd[pix]
+        if use_unc then unc[cur]=bcd_unc[pix]
+        if j eq 0 then begin 
+           track_pix[cur]=wh[in_cnt_bin] 
+        endif else begin 
+           track_pix[cur]=wh[reform(rebin(in_cnt_bin,nbin,j+1,/SAMPLE), $
+                                    nbin*(j+1))]
+        endelse 
+        cur+=nbin*(j+1L)
+     endfor  
   endfor 
+  
+  s=sort(temporary(track_pix))
+  bcd_pix=bcd_pix[s]
+  vals=vals[s]
+  if use_unc then unc=unc[s]
+  self->Status,status+'done (cached)'
 end
 
 
 ;=============================================================================
 ;  AutoBadPixels - Prompt for and set automatic bad pixels
 ;=============================================================================
-pro CubeProj::AutoBadPixels,NO_PROMPT=np
+pro CubeProj::AutoBadPixels,NO_PROMPT=np,WITH_BACKGROUND=wb,WITH_UNC=wu
   if ~ptr_valid(self.cube) then self->Error,'Cube must be present'
+  self->RestoreAll
   ;; Override defaults with prompt
   if self->Showing() && ~keyword_set(no_prompt) then begin 
      if ~obj_valid(self.oautobadpix) then $
         self.oautobadpix=obj_new('CubeAutoBadPix')
      self.oautobadpix->Prompt,/MODAL,GROUP_LEADER=self->TopBase(), $
-                              maxvar,minfrac,wb, $
+                              maxvar,minfrac,wb,wu, $
                               DISABLE_WITH_BACKGROUND= $
-                              ~ptr_valid(self.BACKGROUND)
+                              ~ptr_valid(self.BACKGROUND), $
+                              DISABLE_WITH_UNC= $
+                              ~ptr_valid(self.DR) || $
+                              array_equal(ptr_valid((*self.DR).UNC),0b)
      widget_control, /HOURGLASS
      if maxvar eq -1 then return
   endif 
-  bp=self->GuessBadPix(MAXVAR=maxvar,MINFRAC=minfrac,WITH_BACKGROUND=wb)
+  
+  bp=self->GuessBadPix(MAXVAR=maxvar,MINFRAC=minfrac,WITH_BACKGROUND=wb, $
+                       WITH_UNC=wu)
   if bp[0] eq -1 then return
-  self->Info,'Found '+strtrim(n_elements(bp),2)+' bad pixels.'
+  
   self->ToggleBadPixel,bp,/SET,/UPDATE
 end
 
@@ -4259,52 +4505,104 @@ end
 ;=============================================================================
 function CubeProj::GuessBadPix,MAXVAR=maxvar,MINFRAC=minfrac, $
                                COUNT=badcnt,WITH_BACKGROUND=wb, $
-                               BAD_MASK=bad_cnt, TOT_MASK=tot_cnt
+                               BAD_MASK=bad_cnt, TOT_MASK=tot_cnt, $
+                               WITH_UNC=wu
   if ~ptr_valid(self.cube) then return,-1
   
-  
+  t0=systime(1)
   wb=keyword_set(wb) 
   if n_elements(maxvar) eq 0 then maxvar=wb?5.0:10.0
   if n_elements(minfrac) eq 0 then minfrac=wb?.1:.5 
-  
   
   self->GetProperty,BCD_SIZE=bcd_sz,CUBE_SIZE=cs
   bad_cnt=lonarr(bcd_sz)
   tot_cnt=lonarr(bcd_sz)
   
   use_bg=self.as_built.use_bg && wb
-
-  cube_pix=lindgen(cs)
-  self->BackTrackArray,cube_pix,bcd_pix,bcd_vals
   
-  for i=0L,n_elements(bcd_pix)-1L do begin 
-     if ~ptr_valid(bcd_pix[i]) then continue
-     pix=*bcd_pix[i] & vals=*bcd_vals[i]
+  if ~ptr_valid(self.AUTO_BPL.BCD_PIX) then begin 
+     ;; Nothing cached, rebuild full cube backtrack
+     restore=0b
+     self->BackTrackFullCube,bcd_pix,bcd_vals,cnt_vec,BCD_UNC=bcd_unc
+  endif else begin 
+     ;; Use cached info
+     restore=1b
+     bcd_pix=temporary(*self.AUTO_BPL.BCD_PIX)
+     bcd_vals=temporary(*self.AUTO_BPL.BCD_VALS)
+     cnt_vec=temporary(*self.AUTO_BPL.CNT_VEC)
+     if ptr_valid(self.AUTO_BPL.BCD_UNC) then $
+        bcd_unc=temporary(*self.AUTO_BPL.BCD_UNC)
+  endelse 
+  
+  status='Generating Auto Bad Pixels...'
+  self->Status,status
+  
+  use_unc=keyword_set(wu) && n_elements(bcd_unc) gt 0 
+  
+  ;; Need at least 3 backtracks for useful statistics
+  h=histogram(cnt_vec,MIN=3,REVERSE_INDICES=ri)
+  
+  ;; map inds into long bcd_pix, etc.
+  ind_map=shift(total(cnt_vec,/CUMULATIVE,/INTEGER),1) 
+  ind_map[0]=0
+  
+  for i=0L,n_elements(h)-1L do begin 
+     if ri[i] eq ri[i+1] then continue
+     n=i+3L
+     targ=[h[i],n]
+     in=rebin(ind_map[ri[ri[i]:ri[i+1]-1]],targ,/SAMPLE) + $
+        rebin(transpose(lindgen(n)),targ,/SAMPLE)
+     
+     ;; XXX 
+     pix=bcd_pix[in]
+     vals=bcd_vals[in]
+     if use_unc then unc=bcd_unc[in]
+     
      if use_bg then vals-=(*self.BACKGROUND)[pix]
-     n=n_elements(pix)
-     if n lt 3 then continue    ;need at least 3 to get stddev
      
-     ;;don't count NaN's
-     good=where(finite(vals),cnt) 
-     if cnt lt 3 then continue
-     if cnt lt n then begin 
-        pix=pix[good]
-        vals=vals[good]
-     endif 
+     med=median(vals,DIMENSION=2,/EVEN)
+     dev=abs(vals-rebin(med,targ,/SAMPLE))
      
-     med=median(vals)
-     dev=abs(vals-med)
-     wh=where(dev ne 0.0,cnt)
-     if cnt eq 0 then continue
-     scale=median(dev[wh])
+     if n eq 3L then begin      ;for the case of 3, use a different method
+        ;; At most one bad pixel, maximum deviation
+        mx=max(dev,DIMENSION=2,MIN=mn,mxpos,/NAN)
+        if use_unc then typical_dev=median(unc,DIMENSION=2,/EVEN) else $
+           typical_dev=mn
+        bad=where(mx gt maxvar*typical_dev,cnt)
+        if cnt gt 0 then bad=mxpos[bad]
+     endif else begin 
+        if use_unc then typical_dev=median(unc,DIMENSION=2,/EVEN) else begin 
+           wh=where(dev eq 0.0,cnt) ;flag out the actual median.
+           if cnt gt 0 then dev[wh]=!VALUES.F_NAN ;don't let actual median in
+           typical_dev=median(dev,DIMENSION=2,/EVEN)
+        endelse 
         
-     bad=where(dev gt maxvar*scale,cnt)
+        bad=where(dev gt maxvar*rebin(typical_dev,targ,/SAMPLE),cnt)
+     endelse 
+     
      if cnt gt 0 then bad_cnt[pix[bad]]++
      tot_cnt[pix]++
   endfor 
   
-  ptr_free,bcd_pix,bcd_vals
+  if restore then begin 
+     *self.AUTO_BPL.BCD_PIX=temporary(bcd_pix)
+     *self.AUTO_BPL.BCD_VALS=temporary(bcd_vals)
+     if n_elements(bcd_unc) gt 0 then $
+        *self.AUTO_BPL.BCD_UNC=temporary(bcd_unc)
+     *self.AUTO_BPL.CNT_VEC=temporary(cnt_vec)
+  endif else begin 
+     self.AUTO_BPL.BCD_PIX=ptr_new(bcd_pix,/NO_COPY)
+     self.AUTO_BPL.BCD_VALS=ptr_new(bcd_vals,/NO_COPY)
+     if n_elements(bcd_unc) gt 0 then $
+        self.AUTO_BPL.BCD_UNC=ptr_new(bcd_unc,/NO_COPY)
+     self.AUTO_BPL.CNT_VEC=ptr_new(cnt_vec,/NO_COPY)
+  endelse 
+
+  
   bad=where(float(bad_cnt)/(tot_cnt>1L) gt minfrac,badcnt)
+  self->Status,status+ $
+               string(FORMAT='("done in ",F0.2,"s with ",I0," badpix")', $
+                      systime(1)-t0,badcnt)
   return,bad
 end
 
@@ -5122,7 +5420,7 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   rec.type=type
   
   if n_elements(id) ne 0 then rec.id=id else if rec.file then begin 
-     id=filestrip(rec.file)
+     id=file_basename(rec.file)
      if stregex(id,'IRSX.*\.fits',/BOOLEAN) then begin ;Sandbox style names
         parts=strsplit(id,'.',/EXTRACT)
         id=parts[3]+'.'+parts[5]+'.'+parts[6]
@@ -5257,14 +5555,20 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
      end 
      keyword_set(rec_update): self->MsgSend,{CUBEPROJ_RECORD_UPDATE,self, $
                                              keyword_set(del),keyword_set(dis)}
-     keyword_set(vis): $
+     keyword_set(vis): begin 
+        astr=self->VisualizeAstrom()
+        if size(astr,/TYPE) ne 8 then $
+           self->Error,'Cannot decode Visualization Image header'
+        astr=ptr_new(astr)
         self->MsgSend, {CUBEPROJ_VISUALIZE, self, $
                         self->ProjectName() + ' '+ $
                         irs_fov(MODULE=self.module,ORDER=self.order, $
                                 POSITION=0,/SLIT_NAME,/LOOKUP_MODULE) + ': ' +$
                         file_basename(self.visualize_file), $
                         self.MODULE,self.VISUALIZE_IMAGE, $
-                        self.VISUALIZE_ASTROMETRY}
+                        astr}
+        ptr_free,astr
+     end
      
      keyword_set(cube): $
         self->MsgSend,{CUBEPROJ_CUBE, $
@@ -5403,7 +5707,9 @@ pro CubeProj::Cleanup
   ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC, $
            self.BACKGROUND,self.BACKGROUND_UNC, $
            self.wInfo,self.WAVELENGTH, $
-           self.VISUALIZE_ASTROMETRY,self.VISUALIZE_IMAGE
+           self.VISUALIZE_HEADER,self.VISUALIZE_IMAGE, $
+           self.AUTO_BPL.BCD_PIX,self.AUTO_BPL.BCD_VALS, $
+           self.AUTO_BPL.BCD_UNC,self.AUTO_BPL.CNT_VEC
   heap_free,self.BACK_RECS
   ;if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->OMArray::Cleanup
@@ -5466,7 +5772,16 @@ pro CubeProj__define
       PLATE_SCALE:0.0D, $       ;the instrument plate scale (degrees/pixel)
       OVERSAMPLE_FACTOR: 0.0D,$ ;the factor by which the sky is oversampled
       PR_SIZE:[0.0,0.0]}        ;the, parallel (long axis), perpendicular
-                                ; (short axis) size of the PRs to use (pixels)
+                                ; (short axis) size of the PRs to use
+                                ; (pixels)
+  
+  ;; Grouped auto-bad pixel parameters
+  cbpl={CUBE_AUTO_BPL, $
+        BCD_PIX:ptr_new(), $    ;cached copy of full cube BPL pix return
+        BCD_VALS:ptr_new(),$    ;cached copy of full cube BPL vals return
+        BCD_UNC:ptr_new(),$     ;cached copy of full cube BPL unc return
+        CNT_VEC:ptr_new()}      ;cached copy of full count vec
+  
   c={CubeProj, $
 ;     INHERITS IDLitComponent, $ ;Use Property stuff
      INHERITS OMArray, $        ;array messenger
@@ -5491,9 +5806,11 @@ pro CubeProj__define
      PA:0.0D, $                 ;optimized position angle of the cube
      VISUALIZE_FILE:'',$        ;file for visualization image
      VISUALIZE_IMAGE:ptr_new(),$ ;image for AOR visulization
-     VISUALIZE_ASTROMETRY:ptr_new(), $ ;astrometry record for vis_image
+     VISUALIZE_HEADER:ptr_new(), $ ;header for vis_image
      MERGE:ptr_new(),$          ;a set of records to aid merging the orders
                                 ;  ptr to list of {offset,inds,wave,to,frac}
+     AUTO_BPL: {CUBE_AUTO_BPL},$ ;auto bad pixel cached copies
+     debug:0b, $                ;whether to debug
      cal:obj_new(), $           ;the irs_calib object.
      oautobadpix: obj_new(), $  ;automatic bad pixel parameters
      Changed:0b, $              ;if the project is changed since last saved.
@@ -5523,6 +5840,7 @@ pro CubeProj__define
        DCEID: 0L, $             ;unique exposure id
        TIME:0.0, $              ;The integration time
        DISABLED: 0b, $          ;whether this DR is disabled
+       IN_CUBE: 0b, $           ;is this record in the built cube?
        ACCOUNT: ptr_new(), $    ;list of {CUBE_PLANE,CUBE_PIX,BCD_PIX,AREAS}
        REV_ACCOUNT: ptr_new(),$ ;reverse indices of the CUBE_INDEX histogram
        REV_MIN:0L, $            ;minimum cube index affected
@@ -5558,6 +5876,7 @@ pro CubeProj__define
   winfo={cubeProj_wInfo,$
          showing:0, $           ;whether we're showing
          Base:0L, $             ;the Show Widget, DR list display base
+         Status: 0L, $          ;the status line widget
          SList:0L, $            ;the Widget List for Show 
          wHead:lonarr(2), $     ;the widget heads
          list_row:0.0, $        ;the height of list rows in pixels
