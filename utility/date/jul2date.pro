@@ -1,32 +1,68 @@
+;+
+; NAME:
+;
+;    JUL2DATE
+;       
+; DESCRIPTION:
+;
+;    Convert a julian day value to a formatted date string.
+;
+; CATEGORY:
+;
+;    Date Utility
+;
+; CALLING SEQUENCE:
+; 
+;    date=jul2date(jul,[D_T=]
+;   
+; INPUTS:
+; 
+;    jul: The julian day value, as a double (e.g. systime(/JULIAN).
+;	
+; INPUT KEYWORD PARAMETERS:
+;
+;    D_T: Format as "DATE*TIME" instead of the default.
+;	  
+; OUTPUTS:
+; 
+;    date: The formatted date
+;       
+; MODIFICATION HISTORY:
+;
+;    2006-01-02 (J.D. Smith): Use new date formatting codes.
+;    2002-12-14 (J.D. Smith): Initial import from SCORE-era sources.
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2002, 2003, 2006 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
-function jul2date,jul,FORMAT=f
-  if n_elements(f) eq 0 then f='standard'
-  caldat,jul,m,d,y,hr,min,sec
-  
-  sec=round(sec)
-  wh=where(sec eq 60,cnt)
-  if cnt gt 0 then begin 
-     caldat,jul[wh]+0.5D/24.D/3600.D,m2,d2,y2,hr2,min2,sec2
-     m[wh]=m2 & d[wh]=d2 & y[wh]=y2 & hr[wh]=hr2 & min[wh]=min2 
-     sec[wh]=round(sec2)
-  endif 
-  
-  case f of
-     'D*T': begin 
-        y=y mod 100
-        form='(2(I2.2,"/"),I2.2,"*",3(I2.2,:,":"))'
-        return,string(format=form,m,d,y,hr,min,sec)
+function jul2date,jul,D_T=d_t
+  case 1 of
+     keyword_set(d_t) : begin 
+        form='(C(CMOI2.2,"/",CDI2.2,"/",CYI2.2,"*",' + $
+             'CHI2.2,":",CMI2.2,":",CSI2.2))'
+        return,string(format=form,jul)
      end
-     
-     'standard': begin
-        wday=(['Sun','Mon','Tue', $
-               'Wed','Thu','Fri','Sat'])[floor((jul+1.5) mod 7)]
-        mon=(['Jan','Feb','Mar','Apr','May', $
-              'Jun','Jul','Aug','Sep','Oct','Nov','Dec'])[m-1]
-        return,string(FORMAT='(A3," ",A3," ",I2," ",2(I2.2,":"),I2.2," ",' + $
-                      'I4)',wday,mon,d,hr,min,sec,y)
-     end
-     
-     else: return,string(format=f,m,d,y,hr,min,sec)
+     else: return,string(FORMAT='(C())',jul)
   endcase
 end
