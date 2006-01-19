@@ -20,7 +20,8 @@
 ; INPUT PARAMETERS:
 ;
 ;    fovname|fovid: The string name or integer id of the IRS fov
-;       aperture.
+;       aperture.  Can be vectors, in which case the return has the
+;       same dimensions.
 ;			
 ; OUTPUT KEYWORD PARAMETERS:
 ;
@@ -85,8 +86,8 @@
 ;  
 ;  You should have received a copy of the GNU General Public License
 ;  along with CUBISM; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;; Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
 
@@ -131,29 +132,30 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
                (strmid(f.module,1) eq 'H' AND f.order eq 0)) AND $
               f.position eq long(pos),cnt)
   endif else begin 
-     if size(fov,/type) eq 7 then $
-        wh=where(strupcase(f.NAME) eq strupcase(fov) OR $
-                 strupcase(f.SHORT_NAME) eq strupcase(fov) ,cnt) $
-     else wh=where(f.ID eq long(fov),cnt)
+     if size(fov,/type) eq 7 then begin 
+        if keyword_set(sn) then $
+           wh=where_array(strupcase([fov]),strupcase(f.SHORT_NAME),cnt) $
+        else wh=where_array(strupcase([fov]),strupcase(f.NAME),cnt)
+     endif else wh=where_array(long([fov]),f.ID,cnt)
   endelse 
   if cnt eq 0 then return,-1
   
   ;; Return 
   if ~keyword_set(lm) then begin 
-     if arg_present(md_in) then md_in= f[wh[0]].MODULE
-     if arg_present(ord)   then ord=f[wh[0]].ORDER
-     if arg_present(pos)   then pos=f[wh[0]].POSITION
+     if arg_present(md_in) then md_in= f[wh].MODULE
+     if arg_present(ord)   then ord=f[wh].ORDER
+     if arg_present(pos)   then pos=f[wh].POSITION
   endif 
   
   case 1 of
      keyword_set(sno): begin 
-        short=f[wh[0]].SHORT_NAME
+        short=f[wh].SHORT_NAME
         pos=strpos(short,'_',/REVERSE_SEARCH)
         if pos ne -1 then short=strmid(short,0,pos)
         return,short
      end 
-     keyword_set(sn): return,f[wh[0]].SHORT_NAME
-     keyword_set(nm): return,f[wh[0]].NAME
-     else: return,f[wh[0]].ID
+     keyword_set(sn): return,f[wh].SHORT_NAME
+     keyword_set(nm): return,f[wh].NAME
+     else: return,f[wh].ID
   endcase
 end
