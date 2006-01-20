@@ -1,5 +1,96 @@
-;; A class which handles extractions on the cube, and also serves as a
-;; concentrator for all messages to the viewer-related objects.
+;+
+; NAME:  
+;
+;    CubeRec
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Maintains the interface between a CubeProj Cubism Project and
+;    various CubeView tools, and handles cube extraction and
+;    interaction with CubeSpec as well.  It also controls aperture
+;    (WAVSAMP) drawing/editing, and image visualization.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Component Interaction
+;
+; SIDE EFFECTS:
+;
+;    Four widget bases are drawn to handle cube display (full and
+;    stacked), BCD display, and visualization image display.
+;
+; METHODS:
+;
+;    Init: 
+;
+;       CALLING SEQUENCE:
+;
+;          rec=obj_new('CubeRec',oDraw,parent,[CUBE=,APER_OBJECT=,
+;                      VISUALIZE_OBJECT=,MENU=,VISUALIZE_COLOR=,_EXTRA=])
+;
+;       INPUT PARAMETERS:
+;
+;          oDraw: The tvDraw object.
+;
+;          parent: The widget id of the object widget's parent, into
+;             which the WAVSAMP selection/editing base is drawn.
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          CUBE: The cube project to listen to (can be modified by
+;             messages).
+;
+;          APER_OBJECT: The cube aper object created, for editing
+;             WAVSAMP tools.
+;
+;          VISUALIZE_OBJECT: The visualize object created, for
+;             visualizing slit overlays on images.
+;
+;          MENU=The menu id to place saving maps to FITS, exporting,
+;             and extracting from file menu items.
+;
+;          VISUALIZE_COLOR: The color to draw the visualizer with
+;
+; INHERITANCE TREE:
+;
+;    ObjReport
+;             \
+;     ObjMsg-->tvPlug->CubeProj
+;
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J. D. Smith): Initially written.
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2003-2005 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
@@ -530,7 +621,7 @@ end
 ;=============================================================================
 ;  Init -  Initialize the CubeRec object
 ;=============================================================================
-function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper, $
+function CubeRec::Init,oDraw,parent,CUBE=cube,APER_OBJECT=aper, $
                        VISUALIZE_OBJECT=vis,MENU=menu, $
                        VISUALIZE_COLOR=vis_color,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
@@ -588,7 +679,7 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper, $
   
   ;; Populate the third base: for the BCD's
   self.wBase[2]=widget_base(mapbase,/ROW,MAP=0,/BASE_ALIGN_CENTER)
-  self.oAper=(aper=obj_new('CubeAper',self.wBase[2],oDraw,_EXTRA=e))
+  self.oAper=(aper=obj_new('CubeAper',oDraw,self.wBase[2],_EXTRA=e))
   self->MsgSignup,self.oAper,/CUBEREC_UPDATE ;give them our message
   b3=widget_base(self.wBase[2],/COLUMN,/NONEXCLUSIVE,/FRAME,SPACE=1)
   self.wBGsub=widget_button(b3,VALUE='BGSub',/FRAME,EVENT_PRO='cuberec_event',$
@@ -598,8 +689,8 @@ function CubeRec::Init,parent,oDraw,CUBE=cube,APER_OBJECT=aper, $
   
   ;; Populate the fourth base: visualization
   self.wBase[3]=widget_base(mapbase,/COLUMN,MAP=0,/BASE_ALIGN_CENTER)
-  self.oVis=(vis=obj_new('IRSMapVisualize',self.wBase[3], $
-                         oDraw,COLOR=vis_color))
+  self.oVis=(vis=obj_new('IRSMapVisualize',oDraw,self.wBase[3], $
+                         COLOR=vis_color))
   self->MsgSignup,self.oVis,/CUBEREC_UPDATE
   
   ;; Add a menu items if allowed
