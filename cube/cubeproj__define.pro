@@ -753,6 +753,9 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   ;;-------------
   b1=widget_button(info,VALUE='Debug Cubism',UVALUE='debug',/SEPARATOR, $
                    /CHECKED_MENU)
+  widget_control, b1,SET_BUTTON=self.debug
+  if lmgr(/VM,/RUNTIME) then widget_control, b1,SENSITIVE=0
+  
   b1=widget_button(info,VALUE='About Cubism',UVALUE='about',/SEPARATOR)
   
   b=widget_base(base,/COLUMN,/BASE_ALIGN_LEFT,SPACE=1,YPAD=0,XPAD=0)
@@ -979,6 +982,8 @@ pro CubeProj::Initialize
      if noobjectcnt gt 0 then $
         self->Warning,'Missing OBJECT tags: restored'
   endif 
+  
+  if lmgr(/VM,/RUNTIME) then self.debug=0b
   
   ;; Default recent cube build parameters for older versions of cubes
   ;; (e.g. if loaded from file)
