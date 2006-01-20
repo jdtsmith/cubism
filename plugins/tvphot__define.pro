@@ -1,3 +1,73 @@
+;+
+; NAME:  
+;
+;    tvPhot
+;
+; DESCRIPTION:
+;    
+;    A circular aperture photometry tvTools plug-in.
+;    
+; CATEGORY:
+;
+;    tvTools, Statistics, Photometry
+;    	
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvPhot',oDraw,parent,[RADIUS=,SKY_WIDTH=,_EXTRA=e])
+;                
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;          parent:  The widget id of the object widget's parent.          
+;          
+;       INPUT KEYWORD PARAMETERS:
+;
+;          RADIUS: Initial radius of the inner photometry circle.
+;             
+;          SKY_WIDTH: Width of the sky annulus in pixels.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvPhot
+;
+; MODIFICATION HISTORY:
+; 
+;    2001-08-07 (J.D. Smith): Initial import from SCORE-era viewer
+;       component collection.
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
@@ -339,12 +409,10 @@ end
 
 ;=============================================================================
 ;   Init - Initialize the Phot object.  All tvRBox keywords are
-;          relevant (see tvrbox).  If HIDE is set, the widget is
-;          hidden when turned off.
+;          relevant (see tvrbox). 
 ;=============================================================================
-function tvPhot::Init,parent,oDraw,HIDE=hide,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
+function tvPhot::Init,oDraw,parent,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
-  self.hide=keyword_set(hide)
   self.parent=parent
   if n_elements(rad) eq 0 then self.rad=12.0 else self.rad=rad
   if n_elements(sw) ne 0 then self.SkyWidth=sw else self.SkyWidth=2.5
@@ -367,7 +435,6 @@ pro tvPhot__define
           cntrd:[0.,0.], $      ;the centroid
           parent:0L, $          ;the parent base         
           photgood:0b, $        ;whether a good phot has been obtained
-          hide:0b, $            ;whether to hide the phot line when off
           do_cntrd:0b, $        ;Do the centroid
           wBase:0L, $           ;a base to put the text widget in
           Rad:0.0, $            ;the radius of the phot aperture
