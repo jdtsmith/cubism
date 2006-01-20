@@ -1,3 +1,82 @@
+;+
+; NAME:  
+;
+;    CubeBadPix
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Bad Pixel selection and editing.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Analysis and Processing.
+;    Bad Pixels.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('CubeAper',oDraw,parent,COLOR=)
+;
+;       INPUT PARAMETERS:
+;
+;          oDraw: The tvDraw object.
+;
+;          parent: The widget ID of the parent to place the controls into.
+;
+; NOTES:
+;  
+;    All Left click to add global bad pixels (cyan), middle or control
+;    click to add per-record bad pixels (green).  Right click to cycle
+;    among four cumulative levels of showing masked pixels:
+;
+;      All BMASK marks, Non-fatal: red diamonds.
+;      PMASK flagged pixels: Blue pluses.
+;      Fatal BMASK Marks: Red X's
+;      User global and per-record bad pixels: Cyan/Green X's.
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->CubeBadPix
+;
+; MODIFICATION HISTORY:
+;    
+;    2004-03-02 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2004, 2005 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
+
 ;;**************************OverRiding methods********************************
 ;=============================================================================
 ;  Message - We'll hear from CubeRec
@@ -286,7 +365,7 @@ end
 ;=============================================================================
 ;  Init -  Initialize the CubeBadPix object
 ;=============================================================================
-function CubeBadPix::Init,parent,oDraw,_EXTRA=e
+function CubeBadPix::Init,oDraw,parent,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   self.parent=parent
   return,1

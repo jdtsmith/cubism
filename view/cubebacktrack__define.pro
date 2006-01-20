@@ -1,3 +1,80 @@
+;+
+; NAME:  
+;
+;    CubeBackTrack
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Show backtracking information from individual cube planes.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Analysis and Processing.
+;    BackTracking.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('CubeBackTrack',oDraw,parent,COLOR=)
+;
+;       INPUT PARAMETERS:
+;
+;          oDraw: The tvDraw object.
+;
+;          parent: The widget ID of the parent to place the controls into.
+;
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: The color ID to use for drawing the backtrack mark.
+;             
+; NOTES:
+;  
+;    Left click to freeze back-tracking on an individual pixel, right
+;    click to release the freeze.
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->CubeBackTrack
+;
+; MODIFICATION HISTORY:
+;    
+;    2003-03-31 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2003-2006 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 ;;**************************OverRiding methods********************************
 ;=============================================================================
 ;  Message - We'll hear from CubeRec
@@ -293,7 +370,7 @@ end
 ;=============================================================================
 ;  Init -  Initialize the CubeBackTrack object
 ;=============================================================================
-function CubeBackTrack::Init,parent,oDraw,COLOR=color,_EXTRA=e
+function CubeBackTrack::Init,oDraw,parent,COLOR=color,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   self.parent=parent
   self.point=[-1,-1]
