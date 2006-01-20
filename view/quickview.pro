@@ -45,20 +45,20 @@ pro quickview,im,SIZE=sz,BLOCK=bl,TITLE=ttl,XNAME=xn,ODRAW=odraw,MODULE=md, $
   tool_menu=widget_button(mbar,value="Tools",/MENU)
   
    ;; a display line.
-  if n_elements(md) eq 0 then line=obj_new('tvLine',base,oDraw,_EXTRA=e) $
-  else line=obj_new('cvLine',base,oDraw,MODULE=md,_EXTRA=e)
+  if n_elements(md) eq 0 then line=obj_new('tvLine',oDraw,base,_EXTRA=e) $
+  else line=obj_new('cvLine',oDraw,base,MODULE=md,_EXTRA=e)
   
   ;; A plane picker, if we need one
   if nd eq 3 then begin 
      pbase=widget_base(base,/COLUMN,/FRAME) 
-     pick=obj_new('tvpSelect',pbase,oDraw,im,START=0)
+     pick=obj_new('tvpSelect',oDraw,pbase,im,START=0)
   endif 
   
   ;;************ Setup the Exclusive Tools (with icons!) **************
   ;; a color stretcher, with colorbar drawn in cbar, color table
   ;; selector, reserve colors, protected internal colors, and
   ;; mouse-mode (which makes it an exclusive plug-in!)
-  stretcher=obj_new('tvColor',base,oDraw,CBAR=cbar,/PROTECT, $
+  stretcher=obj_new('tvColor',oDraw,base,CBAR=cbar,/PROTECT, $
                     /RESERVE,COL_TABLE_MENU=option_menu,/MOUSE_MODE,$
                     USE_COLORMAPS=[0,1,3,4,6,8,13,32],_EXTRA=e)
   
@@ -73,15 +73,15 @@ pro quickview,im,SIZE=sz,BLOCK=bl,TITLE=ttl,XNAME=xn,ODRAW=odraw,MODULE=md, $
   zoomer=obj_new('tvZoom',oDraw,COLOR=stretcher->GetColor('Green'),_EXTRA=e)
   
   ;; a box statistics tool, yellow
-  stats=obj_new('tvStats',base,oDraw,COLOR=stretcher->GetColor('Yellow'), $
+  stats=obj_new('tvStats',oDraw,base,COLOR=stretcher->GetColor('Yellow'), $
                 HANDLE=2,_EXTRA=e)
   
   ;; a photometry tool, blue
-  phot=obj_new('tvPhot',base,oDraw,COLOR=stretcher->GetColor('Blue'), $
+  phot=obj_new('tvPhot',oDraw,base,COLOR=stretcher->GetColor('Blue'), $
                /HIDE,_EXTRA=e)
 
   ;; a pixel table tool (non-exclusive)
-  pxtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
+  pxtbl=obj_new('tvPixTbl',oDraw,base,_EXTRA=e)
   
   ;;**********************************************************************
   exc_list=replicate({Obj:obj_new(), keys:'',Exclusive:1b},6)
@@ -93,7 +93,7 @@ pro quickview,im,SIZE=sz,BLOCK=bl,TITLE=ttl,XNAME=xn,ODRAW=odraw,MODULE=md, $
   tog_list.keys=['t']
 
   ;; a switcher for switching among the tools using icons or keypresses
-  switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
+  switcher=obj_new('tvSwitcher',oDraw,sbase,MsgList=[exc_list, tog_list], $
                    TOOL_MENU=tool_menu,_EXTRA=e)
   
   bquit=widget_button(file_menu,value="Quit") 
