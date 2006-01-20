@@ -1,3 +1,72 @@
+;+
+; NAME:  
+;
+;    CubeRose
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Display a compass rose on images and cubes.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Analysis and Processing.
+;    WCS.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('CubeRose',oDraw,COLOR=)
+;
+;       INPUT PARAMETERS:
+;
+;          oDraw: The tvDraw object.
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: The color ID to use for drawing the rose.
+;             
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->CubeBackTrack
+;
+; MODIFICATION HISTORY:
+;    
+;    2003-12-18 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2003-2006 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 ;;**************************OverRiding methods********************************
 
 ;=============================================================================
@@ -15,7 +84,8 @@ pro CubeRose::Message, msg
         self.cube=msg.cube
         if ptr_valid(msg.astrometry) then astr=*msg.astrometry else $
            self.cube->GetProperty,ASTROMETRY=astr
-        self.angle=atan(-astr.cd[1,0],-astr.cd[0,0])
+        getrot,astr,rot
+        self.angle=rot/!RADEG
         ;if self->On() then self.oDraw->ReDraw,/SNAPSHOT
      end
   endcase 
