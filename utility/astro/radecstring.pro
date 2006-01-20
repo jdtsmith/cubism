@@ -1,3 +1,65 @@
+;+
+; NAME:  
+;
+;    RADECSTRING
+;
+; DESCRIPTION:
+;    
+;    Create a string from RA or DEC coordinates.
+;    
+; CATEGORY:
+;
+;    Astro Utility
+;
+; CALLING SEQUENCE:
+;
+;    st=radecstring(ra_dec,[RA=,PRECISION=,HMS=])
+;
+; INPUT PARAMETERS:
+;
+;    ra_dec: An ra or dec coordinate to format.
+;    
+; INPUT KEYWORD PARAMETERS:
+;
+;    RA: If set, format the coordinate as an RA, otherwise as a DEC.
+;
+;    PRECISION: Number of digits to appear after the decimal point,
+;       one less for DEC than RA.
+;
+;    HMS: If set, format with hms or dms.
+;
+; OUTPUT:
+;
+;    st: The formatted string.
+;    
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J.D. Smith): Import from SCORE-era sources.
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 ;; Convert from decimal degrees to a print format
 function radecstring,pos,RA=ra,PRECISION=pres,HMS=hms
   if n_elements(pres) eq 0 then pres=2 else pres=pres>2

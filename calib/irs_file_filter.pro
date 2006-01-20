@@ -1,12 +1,75 @@
-;; Read through headers of passed files and collect into matching
-;; spectral records.  Pointers are created for the FILES structure
-;; member, and must be freed by the caller.  MODULE_ONLY means only
-;; group by module, otherwise group by AOR and FOV (slit).
-;;
-;; Use RETURN_RECORDS to get a list of pointers to each record,
-;; grouped as specified.  The caller is responsible for freeing these
-;; records.  Specify in EXTRA_KEYS a list of extra header keywords to
-;; return with the RECORDS, provided only if RETURN_RECORDS is set.
+;+
+; NAME:
+;
+;    IRS_FILE_FILTER
+;
+; DESCRIPTION:
+;
+;    Group passed files into matching IRS spectral records.
+;
+; CATEGORY:
+;
+;    IRS Spectral Reduction, Analysis and Processing.
+;    File Matching.
+;    
+; CALLING SEQUENCE:
+;
+;    groups=irs_file_filter(files,[COUNT=,MODULE_ONLY=,EXTRA_KEYS=,
+;                                  RETURN_RECORDS=])
+;
+; INPUT PARAMETERS:
+;
+;    files: A list of IRS fits files (BCD or otherwise) to group.
+;
+; INPUT KEYWORD PARAMETERS:
+;
+;    MODULE_ONLY: Group records by module only, instead of grouping by
+;       AOR and FOVID (i.e., which slit/position).
+;
+;    EXTRA_KEYS: List of extra keys to extract from the FITS headers
+;       and add to each record.
+;
+;    RETURN_RECORDS: If set, return individual records, one per file,
+;       instead of grouping records by AOR/module/etc.
+;
+; OUTPUT KEYWORD PARAMETERS:
+;
+;    COUNT: Number of records returned.
+;       
+; OUTPUTS:
+;
+;    groups: A list of structures with grouped or by individual
+;       filename, according to the passed parameters, and the
+;       RETURN_RECORDS keyword.
+;
+; MODIFICATION HISTORY:
+;
+;    2004-09-21 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2004, 2005 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;; Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+  
 function irs_file_filter,files,COUNT=cnt,MODULE_ONLY=mo,EXTRA_KEYS=ek, $
                          RETURN_RECORDS=rr
   if keyword_set(mo) then begin 

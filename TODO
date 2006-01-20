@@ -1,6 +1,67 @@
 
+
+
+- Better treatment of extraction regions: develop a structure or other
+  representation?  Allow drawing other than rectangulars (like
+  circular)?
+
+- Generate ALCF.  Test Dutch vs. Cohen stars.
+
+- Trim to fit
+
+- Update cubeproj__define and TODO, syncing all others down.  
+
+- Include 1D background subtraction in cube build?
+
 - Re-organize file structure, moving common dependencies (like in
   util) to a higher level, or separate module.
+
+Something like: 
+
+irs_tools/cubism
+irs_tools/tvtools
+irs_tools/objtools
+irs_tools/osxirs
+irs_tools/calib
+irs_tools/bin
+irs_tools/utility
+irs_tools/viewspec (???) (possible parent class for cubeviewspec/irsviewspec?)
+
+
+Rename all the view/cube* relevant to all IRS data to irs*,
+e.g. irsbadpix, irsaper, etc.  Factor out all common calibration code.
+Will need to worry about relative auto-discovered directories if
+osxirs is distributed separately from cubism, etc.  Simplest to insist
+on coupling them?  What about for VM distributions?
+
+Possibly too hard to separate is cubeviewspec... fork to irsviewspec?
+Factor out common parent class?  Probably need per-order coloring and
+post-stitching.  Commonality only widget interaction?  No
+peak/continuum regions.
+
+Big Splits: project, cubeviewspec.
+
+Rename all cube* to irs*.
+
+
+=============================
+
+Implementing optimal extraction:
+
+Auto-AOR load/nod-avg... optimal/standard extraction with:
+
+ in-place profile fitting
+ fixed gaussian fitting
+ from-file profile with shift (e.g. from bright star).
+
+Trimmed profile fit ala Horne....  save to disk for later recovery.  
+
+Variance/pixel fraction variant of SCOREX-style optimex.  
+
+Indicate rejected pixels at each profile location: ALLOW VARYING THE
+NOISE-FLOOR CUTOFF with feedback on which pixels are clipped: will
+require some optimization.  NEED THE TRUE RELATIVE NOISE FOR ALL THIS!
+Check with Martin on this.
 
 =============================
 

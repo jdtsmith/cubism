@@ -1,3 +1,76 @@
+;+
+; NAME:  
+;
+;    XPOPDIAG
+;
+; DESCRIPTION:
+;    
+;    Widget for selecting text to display from droplist.
+;    
+; CATEGORY:
+;
+;    Widget Utility
+;
+; CALLING SEQUENCE:
+;
+;    xpopdiag, poplist, ptrlist, [PARENT_GROUP=,DEFAULT=,LABEL=,TOP_LABEL=,
+;                                 BUTTON_TEXT=,MODL=,TSIZE=,FREE_POINTERS=]
+;
+; INPUT PARAMETERS:
+;
+;    poplist: List of popup choices to offer.
+;
+;    ptrlist: Corresponding list of pointers to string arrays to
+;       display.
+;    
+; INPUT KEYWORD PARAMETERS:
+;
+;    PARENT_GROUP: The widget ID of the group leader.
+;
+;    DEFAULT: Which block to show by default.
+;
+;    LABEL: A text label to put next to the popup choice.
+;
+;    TOP_LABEL: A descriptive label to put at the top of the widget.
+;
+;    BUTTON_TEXT: The finished button text, defaults to "OK".
+;
+;    MODAL: Whether to make the popup modal.
+;
+;    TSIZE: Size of the text window, 2 element int array, in
+;       characters (default [80,15]).
+;
+;    FREE_POINTERS: Free the textpointers when done.  By default, the
+;       caller must do this.
+;
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J.D. Smith): Initial import from SCORE-era sources.
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2002-2004 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 pro xpopdiag_kill,id
   widget_control, id, get_uvalue=uv
   if uv.Free then ptr_free,uv.ptr

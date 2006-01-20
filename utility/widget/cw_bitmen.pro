@@ -1,3 +1,73 @@
+;+
+; NAME:  
+;
+;    CW_BITMEN
+;
+; DESCRIPTION:
+;    
+;    Create a menu with a bitmap head.
+;    
+; CATEGORY:
+;
+;    Widget Utility
+;
+; CALLING SEQUENCE:
+;
+;    id=cw_bitmen(parent,bitmap,list,lim,[UVALUE=,XSIZE=,YSIZE=,IDS=]
+;
+; INPUT PARAMETERS:
+;
+;    parent: The parent widget ID in which to root the menu.
+;
+;    bitmap: The bitmap array to draw.  Anything WIDGET_BUTTON can
+;       take as a value.
+;
+;    list: List of menu items to place beneath the bitmap.
+;
+;    lim: Maximum number of menu items to show.
+;    
+; INPUT KEYWORD PARAMETERS:
+;
+;    UVALUE: The uvalue to assign the widget.
+;
+;    (X|Y)SIZE: Size of the top widget button.
+;
+; OUTPUT KEYWORD PARAMETERS:
+; 
+;    IDS: The ids of all menu buttons.
+;
+; OUTPUT:
+;
+;    id: The id of the compound widget.
+;    
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J.D. Smith): Import from SCORE-era sources.
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2002 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 function cw_bitmen_event,ev
    widget_control,ev.id,get_value=value
    return, { ID:ev.handler, TOP:ev.top, HANDLER:0L, value:value }

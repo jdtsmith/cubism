@@ -1,4 +1,81 @@
-;; Translate BMASK codes into conditions
+;+
+; NAME:
+;
+;    IRS_BMASK
+;
+; DESCRIPTION:
+;
+;    Translate BMASK bit values into status string codes, and
+;    optionally return bit set values.
+;
+; CATEGORY:
+;
+;    IRS Spectral Reduction, Analysis and Processing.
+;    Calibration
+;    
+; CALLING SEQUENCE:
+;
+;    irs_bmask,mask_val,[PMASK=,SATURATED=,NO_FLAT=,NO_PLANES=
+;              ONE_PLANE=, CODE_STRING=]
+;
+; INPUT PARAMETERS:
+;
+;    mask_val: A BMASK 16-bit value
+;
+; KEYWORD PARAMETERS:
+;
+;    PMASK: If set, return in the passed variable the boolean value of
+;       pmask flagged.
+;
+;    SATURATED: If set, return in the passed variable the boolean value of
+;       saturated.
+;       
+;    NO_FLAT: If set, return in the passed variable the boolean value of
+;       no flat field.
+;       
+;    NO_PLANES: If set, return in the passed variable the boolean value of
+;       no usable ramp planes.
+;
+;    ONE_PLANE: If set, return in the passed variable the boolean value of
+;       only one usable ramp plane
+;
+;    PMASK: If set, return in the passed variable the boolean value of
+;       pmask flagged.
+;
+;    PMASK: If set, return in the passed variable the boolean value of
+;       pmask flagged.
+;
+;    CODE_STRING: If set, return in the passed variable the string
+;       code corresponding to the mask value passed.
+;       
+; MODIFICATION HISTORY:
+;
+;    2004-01-05 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2004, 2005 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 pro irs_bmask,mask,PMASK=pm,SATURATED=sat,NO_FLAT=nf,NO_PLANES=np, $
               ONE_PLANE=op,CODE_STRING=cs
   flags=bytarr(15)

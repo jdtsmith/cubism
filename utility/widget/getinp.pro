@@ -1,3 +1,66 @@
+;+
+; NAME:  
+;
+;    GETINP
+;
+; DESCRIPTION:
+;    
+;    Widget to prompt for input.
+;    
+; CATEGORY:
+;
+;    Widget Utility
+;
+; CALLING SEQUENCE:
+;
+;    ans=getinp(question,default,[TITLE=,MODAL=,PARENT_GROUP=]
+;
+; INPUT PARAMETERS:
+;
+;    question: The question for input.
+;
+;    default: The default input to enter.
+;    
+; INPUT KEYWORD PARAMETERS:
+;
+;    TITLE: The title to give the popped-up widget.
+;
+;    MODAL: Whether to make the popup modal.
+;
+;    PARENT_GROUP: The widget ID of the group leader.
+;
+; OUTPUT:
+;
+;    ans: The input given.
+;    
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J.D. Smith): Initial import from SCORE-era sources.
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2002-2004 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 pro getinp_event, ev
    widget_control,ev.id,get_uvalue=inpid
    widget_control,ev.top,get_uvalue=val_ptr

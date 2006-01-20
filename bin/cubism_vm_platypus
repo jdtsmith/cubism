@@ -1,5 +1,4 @@
 #!/bin/sh
 
 top=$(dirname $0)
-echo "GOT $@"
 $top/cubism/bin/cubism_vm $2

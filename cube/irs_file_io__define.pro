@@ -1,3 +1,55 @@
+;+
+; NAME:  
+;
+;    IRS_File_IO
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Generic class for implementing IRS map, cube, and spectral IO to
+;    IPAC tables and FITS files.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, File I/O
+;    	
+; INHERITANCE TREE:
+;
+;   IRS_File_IO
+;
+; MODIFICATION HISTORY:
+;    
+;    2005-03-24 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2005 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 function IRS_File_IO::ReportWidget
   if widget_info(self.parent_group,/VALID_ID) then return,self.parent_group $

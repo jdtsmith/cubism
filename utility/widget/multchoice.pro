@@ -1,3 +1,71 @@
+;+
+; NAME:  
+;
+;    MULTCHOICE
+;
+; DESCRIPTION:
+;    
+;    Widget for selecting among multiple choices.
+;    
+; CATEGORY:
+;
+;    Widget Utility
+;
+; CALLING SEQUENCE:
+;
+;    choice=multchoice(text,list,[TITLE=,PARENT_GROUP=,MODAL=,SELECT=,
+;                                 NONEXCLUSIVE=]
+;
+; INPUT PARAMETERS:
+;
+;    text: Text to place at the top of the choice list.
+;
+;    list: A list of choices to offer.
+;    
+; INPUT KEYWORD PARAMETERS:
+;
+;    TITLE: The title to use for the popup.
+;
+;    PARENT_GROUP: The widget ID of the group leader.
+;
+;    MODAL: Whether to make the popup modal.
+;
+;    SELECT: Index of button to select initially.
+;
+;    NONEXCLUSIVE: Allow multiple choices to be selected.
+;
+; OUTPUT:
+;
+;    choice: The index (indices) selected, or -1 if cancelled.
+;    
+; MODIFICATION HISTORY:
+;    
+;    2004-01-05 (J.D. Smith): Initially written.
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2004 J.D. Smith
+;
+;  This file is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published
+;  by the Free Software Foundation; either version 2, or (at your
+;  option) any later version.
+;
+;  This file is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with this file; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 pro multchoice_event,ev
   widget_control, ev.top,GET_UVALUE=ptr
   widget_control, ev.id,GET_UVALUE=uv
