@@ -1,3 +1,77 @@
+;+
+; NAME:  
+;
+;    CUBEVIEW
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://sings.sirtf.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Generic image/cube visualization tool for IRS spectra and
+;    spectral cubes, based on tvTools, plus custom components.
+;    
+; CATEGORY:
+;
+;    CUBISM, Image visualization.
+;    	
+; CALLING SEQUENCE:
+;
+;    cubeview,[SIZE=,/BLOCK,TITLE=,RECORD=,XNAME=,ODRAW=,CUBE=]
+;			
+; INPUT KEYWORD PARAMETERS:
+;
+;    SIZE: The one or two element initial pixel size of the draw
+;       window.  Defaults to 384 pixels.
+;
+;    BLOCK: If set, run as a blocking widget.
+;
+;    TITLE: The title to give the cubeview top level widget.
+;
+;    XNAME: The name to register under.
+;
+;    CUBE: The cube to sign up initially for communication with
+;       CubeRec.
+;
+; OUTPUT KEYWORD PARAMETERS:
+;
+;    RECORD: The output CubeRec object which will handle communication
+;       with CubeProj, etc.
+;
+;    ODRAW: The tvDraw object which handles all image display and
+;       event handling.
+;
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J.D. Smith): Written.
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2002,2005 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 pro cubeview_cleanup,id
   widget_control, id, get_uvalue=objs
   obj_destroy,objs
@@ -46,13 +120,13 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   tool_menu=widget_button(mbar,value="Tools",/MENU)
   
    ;; a display line.
-  line=obj_new('cvLine',base,oDraw,_EXTRA=e) 
+  line=obj_new('cvLine',oDraw,base,_EXTRA=e) 
   
   ;;************ Setup the Exclusive Tools (with icons!) **************
   ;; a color stretcher, with colorbar drawn in cbar, color table
   ;; selector, reserve colors, protected internal colors, and
   ;; mouse-mode (which makes it an exclusive plug-in!)
-  stretcher=obj_new('tvColor',base,oDraw,CBAR=cbar,/PROTECT, $
+  stretcher=obj_new('tvColor',oDraw,base,CBAR=cbar,/PROTECT, $
                     /RESERVE,COL_TABLE_MENU=option_menu,/MOUSE_MODE,$
                     USE_COLORMAPS=[0,1,3,4,6,8,13,32],TOP=!D.TABLE_SIZE-6, $
                     _EXTRA=e)
@@ -68,16 +142,16 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   zoomer=obj_new('tvZoom',oDraw,COLOR=stretcher->GetColor('Green'),_EXTRA=e)
   
   ;; a box statistics tool, yellow
-  stats=obj_new('tvStats',base,oDraw,COLOR=stretcher->GetColor('Yellow'), $
+  stats=obj_new('tvStats',oDraw,base,COLOR=stretcher->GetColor('Yellow'), $
                 HANDLE=2,_EXTRA=e)
   
   ;; a photometry tool, blue: adds to base
-  phot=obj_new('tvPhot',base,oDraw,COLOR=stretcher->GetColor('Blue'), $
+  phot=obj_new('tvPhot',oDraw,base,COLOR=stretcher->GetColor('Blue'), $
                /HIDE,_EXTRA=e)
 
   ;; a Cube record tool for extracting and stacking cubes: adds to base
   ;; and creates aperture and visualize tools as well
-  cuberec=obj_new('CubeRec',base,oDraw,CUBE=cube,APER_OBJECT=aper, $
+  cuberec=obj_new('CubeRec',oDraw,base,CUBE=cube,APER_OBJECT=aper, $
                   COLOR=stretcher->GetColor('Magenta'), $
                   VISUALIZE_OBJECT=irsmapviz, $
                   VISUALIZE_COLOR=stretcher->GetColor(['goldenrod', $
@@ -89,16 +163,16 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   cuberec->MsgSignup,line,/CUBEREC_UPDATE
   
   ;; a cube backtrack tool, green, with updates from cuberec
-  cubeback=obj_new('CubeBackTrack',base,oDraw, $
+  cubeback=obj_new('CubeBackTrack',oDraw,base, $
                    COLOR=stretcher->GetColor('Green'),_EXTRA=e)
   cuberec->MsgSignup,cubeback,/CUBEREC_UPDATE,/CUBEREC_FULL
   
   ;; a bad pixel selector tool, with updates from cuberec
-  cubebadpix=obj_new('CubeBadPix',base,oDraw,_EXTRA=e)
+  cubebadpix=obj_new('CubeBadPix',oDraw,base,_EXTRA=e)
   cuberec->MsgSignup,cubebadpix,/CUBEREC_UPDATE
     
   ;; a pixel table tool (non-exclusive)
-  pixtbl=obj_new('tvPixTbl',base,oDraw,_EXTRA=e)
+  pixtbl=obj_new('tvPixTbl',oDraw,base,_EXTRA=e)
   
   ;; a WavSamp masker (non-exclusive)
   wsmask=obj_new('WSMask',oDraw,_EXTRA=e)
@@ -129,7 +203,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
             {Obj:rose,       keys:'', Exclusive:0b}]
 
   ;; a switcher for switching among the tools using icons or keypresses
-  switcher=obj_new('tvSwitcher',sbase,oDraw,MsgList=[exc_list, tog_list], $
+  switcher=obj_new('tvSwitcher',oDraw,sbase,MsgList=[exc_list, tog_list], $
                    TOOL_MENU=tool_menu,_EXTRA=e)
   
   ;; Various other buttons
