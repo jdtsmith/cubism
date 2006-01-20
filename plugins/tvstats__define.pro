@@ -1,3 +1,73 @@
+;+
+; NAME:
+;
+;    tvStats
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin to display statistics of box regions in images.
+;
+; CATEGORY:
+;
+;    tvTools, Image Statistics
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvStats',oDraw,parent,[FORMAT=,_EXTRA=])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;          parent: The widget ID where the line reporting label will
+;            be placed.
+;	   
+;       INPUT KEYWORD PARAMETERS:
+;
+;          FORMAT: The format code for printing the statistics
+;             information.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvStats
+;
+; MODIFICATION HISTORY:
+;
+;    2001-08-07 (J.D. Smith): Imported from SCORE-era source.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;;**************************OverRiding;;methods********************************
 ;=============================================================================
@@ -134,7 +204,7 @@ end
 ;       Init - Initialize the Stats object.  All tvRBox keywords are
 ;              relevant (see tvrbox).
 ;=============================================================================
-function tvStats::Init,parent,oDraw,FORMAT=form, _EXTRA=e
+function tvStats::Init,oDraw,parent,FORMAT=form, _EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   self.parent=parent
   if n_elements(form) eq 0 then $

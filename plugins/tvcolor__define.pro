@@ -5,15 +5,15 @@
 ;
 ; DESCRIPTION:
 ;    
-;    An all-purpose color manipulation plug-in, which supports
-;    colormap selection from either a menu or droplist, optional
-;    widget sliders for low, high and gamma modifications of the
-;    colormap, and an optional mouse mode, emulating SAOImage with
-;    mouse-based color stretching.
+;    A color manipulation tvPlug plug-in, which supports colormap
+;    selection from either a menu or droplist, optional widget sliders
+;    for low, high and gamma modifications of the colormap, and an
+;    optional mouse mode, emulating SAOImage with mouse-based color
+;    stretching.
 ;    
 ; CATEGORY:
 ;
-;    Color Manipulation, Colormaps
+;    tvTools, Color Manipulation, Colormaps
 ;    	
 ; SIDE EFFECTS:
 ;
@@ -25,7 +25,7 @@
 ;
 ;    On TrueColor display devices, color table changes are not
 ;    reflected in the graphics subsystem, but in an internal IDL
-;    translation table.
+;    translation table, so image update may be slower.
 ;
 ; METHODS:
 ;
@@ -33,16 +33,16 @@
 ;
 ;       CALLING SEQUENCE:
 ;
-;          obj=obj_new('tvColor',parent,oDraw,[/PROTECT,/MOUSE_MODE=,
+;          obj=obj_new('tvColor',oDraw,parent,[/PROTECT,/MOUSE_MODE=,
 ;          	       /SLIDERS,START=,LOW=,HIGH=,WIDTH=,BOTTOM=,TOP=, $
 ;          	       RESERVE=,COL_TABLE_PARENT=,COL_TABLE_MENU=,CBARID=, $
-;                      USE_COLORMAPS=])
+;                      USE_COLORMAPS=,_EXTRA=])
 ;                
 ;       INPUT PARAMETERS:
 ;
-;          parent:  The widget id of the object widget's parent.
-;          
 ;	   oDraw: The tvDraw object.
+;
+;          parent:  The widget id of the object widget's parent.          
 ;          
 ;       INPUT KEYWORD PARAMETERS:
 ;
@@ -108,12 +108,15 @@
 ;                  
 ;          USE_COLORMAPS: A vector of indices into the RSI default
 ;             colormaps (try "loadct") to include in the selection.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
 ;             
 ;    GetColor:
 ;  
 ;	DESCRIPTION:
 ;
-;	   Get reserve color indices by name.
+;	   Get reserved color indices by name.
 ;	
 ;       CALLING SEQUENCE:
 ;
@@ -121,7 +124,8 @@
 ;          
 ;       INPUT PARAMETERS:
 ;
-;          color:  The name of the color to be retrieved.  Case is ignored.
+;          color: The name of the color(s) whose index number is to be
+;             retrieved.  Case is ignored.
 ;
 ;       OUTPUTS:
 ;
@@ -152,7 +156,7 @@
 ;
 ; EXAMPLE:
 ;
-;    cobj=obj_new('tvColor',parent,oDraw,/MOUSE_MODE,/RESERVE,$
+;    cobj=obj_new('tvColor',oDraw,parent,/MOUSE_MODE,/RESERVE,$
 ;                 USE_COLORMAP=[1,2,3])
 ;    
 ; MODIFICATION HISTORY:
@@ -165,10 +169,10 @@
 ;-
 ;    $Id$
 ;##############################################################################
-; 
+;
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002 J.D. Smith
+;  Copyright (C) 2001-2002 J.D. Smith
 ;
 ;  This file is part of tvTools.
 ;
@@ -176,16 +180,16 @@
 ;  under the terms of the GNU General Public License as published by
 ;  the Free Software Foundation; either version 2, or (at your option)
 ;  any later version.
-;  
+;
 ;  tvTools is distributed in the hope that it will be useful, but
 ;  WITHOUT ANY WARRANTY; without even the implied warranty of
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;  General Public License for more details.
-;  
+;
 ;  You should have received a copy of the GNU General Public License
-;  along with tvTools; see the file COPYING.  If not, write to the Free
-;  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-;  02111-1307, USA.
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
 
@@ -471,7 +475,7 @@ end
 ;=============================================================================
 ;  Init -  Initialize the tvColor object
 ;=============================================================================
-function tvColor::Init,parent,oDraw,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
+function tvColor::Init,oDraw,parent,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
                        USE_COLORMAPS=uc,START=strt,MIN=min,MAX=max, $
                        WIDTH=sz,TOP=top,BOTTOM=bot,RESERVE=rsrv,CBARID=cbarid,$
                        MOUSE_MODE=mm,SLIDERS=sld,PROTECT=prt,_EXTRA=e

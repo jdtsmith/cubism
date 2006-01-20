@@ -1,3 +1,86 @@
+;+
+; NAME:
+;
+;    tvPSelect
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin to select planes from an image cube.
+;
+; CATEGORY:
+;
+;    tvTools, Image Cube Plane Selection
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvPSelect',parent,oDraw,image,[/COLUMN,/NOLABEL=,
+;                      START=,PLANES=,SWITCH_KEYS=,_EXTRA=e])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;          parent: The widget ID where the line reporting label will
+;            be placed.
+;
+;          image: The 3D image cube from which to select planes.
+;	   
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLUMN: If passed, orient selection popup as column.
+;
+;          NOLABEL: If passed, don't create a "Planes:" widget label.
+;
+;          START: The starting plane to select.
+;
+;          PLANES: The list of planes to permit selection: defaults to
+;             all.
+;
+;          SWITCH_KEYS: A string array with two elements: the keys to
+;            use to switch planes (defaults to [ ',' , '.' ]).
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvPSelect
+;
+; MODIFICATION HISTORY:
+;
+;    2001-10-10 (J.D. Smith): Imported from SCORE-era source.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001,2004 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 ;=============================================================================
 ;  Message
 ;=============================================================================
@@ -63,7 +146,7 @@ end
 ;=============================================================================
 ;  Init
 ;=============================================================================
-function tvPSelect::Init, parent, oDraw, im,COLUMN=col,NOLABEL=nl, $
+function tvPSelect::Init, oDraw, parent, im,COLUMN=col,NOLABEL=nl, $
                           START=strt,PLANES=pl,SWITCH_KEYs=sk,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   s=size(im,/DIMENSIONS)
@@ -79,7 +162,7 @@ function tvPSelect::Init, parent, oDraw, im,COLUMN=col,NOLABEL=nl, $
   if keyword_set(pl) then self.Planes=ptr_new(pl) else $
      self.Planes=ptr_new(lindgen(s[2]))
   if keyword_set(nl) eq 0b then begin 
-     if keyword_set(column) then base=widget_base(parent,/COL) else $
+     if keyword_set(col) then base=widget_base(parent,/COL) else $
         base=widget_base(parent,/ROW)
      label=widget_label(base,value='Plane:')
   endif else base=parent

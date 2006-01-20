@@ -1,8 +1,90 @@
 ;+
-; tvSwitcher - A tvPlug_lite plugin selector with hotkeys and
-;              (optionally) icons and menus, designed to work with a
-;              tvdraw object and some tvPlug plugins.
+; NAME:
+;
+;    tvSwitcher
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin to manage switching on and off other exclusive
+;    and non-exlusive plugins via hotkeys, icons, and a menu.
+;
+; CATEGORY:
+;
+;    tvTools, Plugin control
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvSwitcher',oDraw,parent,[TOOL_MENU=,/USECASE],
+;                      _EXTRA=e)
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;          parent: The widget ID where the line reporting label will
+;            be placed.
+;	   
+;       INPUT KEYWORD PARAMETERS:
+;
+;          TOOL_MENU: The widget ID of a menu to root the tool
+;             selection menu in.
+;
+;          USECASE: If set, the case of th ehotkey will be considered.
+;             Otherwise not.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;          
+; NOTES
+;
+;    Takes a message signup list (via ObjMsg) of the form
+;
+;      {Obj:obj,keys:'',Exclusive:0b}
+;
+;    to control plugin object "obj" with hotkey keys, either
+;    exclusively (i.e. shutting down other exlusive plugins), or
+;    non-exclusively.
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug_lite-->tvSwitcher
+;
+; MODIFICATION HISTORY:
+;
+;    2001-09-28 (J.D. Smith): Renamed from SCORE-era sources tvHotKey.
+;       
 ;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
+
 ;;**************************OverRiding methods********************************
 ;=============================================================================
 ;  Message - Expecting DRAW_KEY or TVPLUG_ON_OFF message
@@ -198,7 +280,7 @@ end
 ;           to toggle activity on.  Separate exclusive and
 ;           non-exclusive into separate bases.
 ;=============================================================================
-function tvSwitcher::Init,parent,oDraw,TOOL_MENU=tm,USECASE=uc,_EXTRA=e
+function tvSwitcher::Init,oDraw,parent,TOOL_MENU=tm,USECASE=uc,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0
   
   self.UseCase=keyword_set(uc) 
