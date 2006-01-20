@@ -5,8 +5,9 @@
 ;
 ; DESCRIPTION:
 ;    
-;    A pure helper class for reporting errors and warnings in object
-;    programs either in a GUI pop-up, or on the command line.
+;    A pure helper class for reporting errors, warnings, and sttatus
+;    messages in object programs either in a GUI pop-up, or on the
+;    command line.
 ;    
 ; CATEGORY:
 ;
@@ -59,7 +60,10 @@
 ;
 ;       ReportWidget: Returns a widget ID to test for validity in
 ;          order to decide how to report errors. Defaults to
-;          (*self.wInfo).Base.
+;          (*self.wInfo).Base.  
+;
+;       StatusWidget: The widget ID of a text or label widget to
+;          display status messages to.
 ;
 ;       IsWidget: Returns a boolean which determines whether to use
 ;          the widget popup or not.  Can be overridden to default to a
@@ -176,16 +180,25 @@
 ;  
 ;  You should have received a copy of the GNU General Public License
 ;  along with this file; see the file COPYING.  If not, write to the
-;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-;  Boston, MA 02111-1307, USA.
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
 
 ;=============================================================================
 ;  SetProperty 
 ;=============================================================================
-pro ObjReport::SetProperty,TITLE_BASE=tb
+pro ObjReport::SetProperty,REPORT_TITLE_BASE=tb
   if n_elements(tb) ne 0 then self.or_title_base=tb
+end
+
+
+;=============================================================================
+;  SetProperty 
+;=============================================================================
+pro ObjReport::GetProperty,REPORT_TITLE_BASE=tb,REPORT_STATUS=status
+  if arg_present(tb) then tb=self.or_title_base
+  if arg_present(status) then status=self.or_status
 end
 
 ;=============================================================================
@@ -222,6 +235,18 @@ pro ObjReport::Info,msg,PARENT=parent,_EXTRA=e
 end 
 
 ;=============================================================================
+;  Status - Post a single line of status information
+;=============================================================================
+pro ObjReport::Status,msg,CLEAR=clear
+  wStatus=self->StatusWidget()
+  if keyword_set(clear) then self.or_status='' else self.or_status=msg[0]
+  if widget_info(wStatus,/VALID) then $
+     widget_control, wStatus, SET_VALUE=self.or_status $
+  else if ~keyword_set(clear) then $
+     self->orCommandLineReport,self.or_status,/STATUS
+end
+
+;=============================================================================
 ;  orPopupReport - Create a blocking or non-blocking popup with the
 ;                  associated msg
 ;=============================================================================
@@ -251,10 +276,17 @@ end
 ;  orCommandLineReport - Print messages to the command line
 ;=============================================================================
 pro ObjReport::orCommandLineReport,msg,INFO=info,WARNING=warning, $
-                                   ERROR=error,TITLE=title
+                                   ERROR=error,STATUS=status,TITLE=title
   on_error,2
-  title_type=keyword_set(error)?"error":keyword_set(warning)?"warning": $
-             keyword_set(info)?"info":"error"
+  
+  case 1 of 
+     keyword_set(error): title_type="error"
+     keyword_set(warning): title_type="warning"
+     keyword_set(info): title_type="info"
+     keyword_set(status): title_type="status"
+     else: title_type="error"
+  endcase 
+  
   if strlen(self.or_title_base) eq 0 then $
      self.or_title_base=obj_class(self)  
   if n_elements(title) eq 0 then title=self.or_title_base+' '+title_type
@@ -266,9 +298,11 @@ pro ObjReport::orCommandLineReport,msg,INFO=info,WARNING=warning, $
   printmsg=title+': '+msg
   if keyword_set(warning) then message,printmsg,/CONTINUE,/NONAME $
   else if keyword_set(error) then message,printmsg,/NONAME $
-  else if keyword_set(info) then message,printmsg,/INFORMATIONAL,/NONAME
+  else if keyword_set(info) || keyword_set(status) then $
+     message,printmsg,/INFORMATIONAL,/NONAME 
   return
 end
+
 
 ;=============================================================================
 ;  ReportWidget - Return the widget to test the validity of to decide
@@ -285,6 +319,21 @@ function ObjReport::ReportWidget
               "Override the ReportWidget Method?"
   endif
   if ptr_valid(self.wInfo) then return,((*self.wInfo).Base)
+  return,0L
+end
+
+;=============================================================================
+;  StatusWidget - Return the widget for reporting textual status
+;                 messages to.
+;=============================================================================
+function ObjReport::StatusWidget
+  catch, err
+  if err ne 0 then begin 
+     catch,/cancel
+     message, "No class tag pointer `wInfo' with tag `Status' found.  " + $
+              "Override the ReportWidget Method?"
+  endif
+  if ptr_valid(self.wInfo) then return,((*self.wInfo).Status)
   return,0L
 end
 
@@ -309,6 +358,7 @@ end
 pro ObjReport__define
   class={ObjReport, $
          or_title_base:'',$     ;the root of the title
+         or_status:'', $        ;the current status message displayed
          or_widget:0L}          ;the widget, which, if valid, will cause
                                 ;graphicsl messages to appear
 end
