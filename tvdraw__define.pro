@@ -113,27 +113,29 @@
 ; NOTES:
 ;  
 ;    tvDraw, and the related tvPlug parent class, facilitate the
-;    creation of display "plug-ins", which can make use of common
-;    display facilities (like zooming, pan/offset, coordinate
-;    conversion, etc.) tvPlug provides.  See the "tvPlug" class file
-;    for more information on creating plug-ins.
+;    creation of display "plug-ins" to the tvTools image display
+;    suite.  These plug-ins can make use of common display facilities
+;    (like zooming, pan/offset, coordinate conversion, etc.) tvDraw
+;    provides.  See the "tvPlug" class file for more information on
+;    creating tvTools plug-ins.
 ;
 ;    IMAGES:
 ;    
 ;    The tvDraw object holds heap data for three images for external
-;    use, both of the same size (it also possibly keeps one more for
-;    internal use, on visuals without writeable colormaps).  They are:
+;    use, two of the display size, and one of the original size.  They
+;    are:
 ;
-;    Original: The original data displayed, in the original type.  Set
-;       this to display a new image altogether.
+;    Original: The original data displayed, in the original numeric
+;       type.  Set this to display a new image altogether.
 ;    
 ;    Modify: Used only for in-place modification by plug-ins, this
 ;       image is initially seeded with the original image.  Plug-ins
 ;       read from and write to this image to effect modifications
 ;       (scalings, etc.).
-
+;
 ;    Scaled: The byte-scaled image as actually displayed.  Should
-;       *not* be written to.
+;       *not* be written to, but can be read from (e.g. to compute a
+;       color histogram).
 ;
 ;    Typically, a plug-in doesn't need to worry about which image to
 ;    work with, but instead should just use the one passed to it in
@@ -261,8 +263,8 @@
 ;  
 ;  You should have received a copy of the GNU General Public License
 ;  along with tvTools; see the file COPYING.  If not, write to the
-;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-;  Boston, MA 02111-1307, USA.
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
 

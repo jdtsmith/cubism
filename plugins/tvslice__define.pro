@@ -1,3 +1,75 @@
+;+
+; NAME:
+;
+;    tvSlice
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin to form image slices and plot the cuts.
+;
+; CATEGORY:
+;
+;    tvTools, Image Slices
+;
+; SIDE EFFECTS:
+;
+;    Draws a cut line, and pops up a plot widget to diplay the cut,
+;    with motion-based feedback between the pixel position and cut
+;    position.  Right-click to constrain to horizontal/vertical.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvSlice',oDraw,[COLOR=,_EXTRA=e])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: The color to draw the slice line with.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvSlice
+;
+; MODIFICATION HISTORY:
+;
+;    2001-08-07 (J.D. Smith): Imported from SCORE-era source.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001,2003,2004,2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 ;;***************************************************************************
 pro tvSlice::GetProperty, opt=opt, ept=ept
   if arg_present(ept) then ept=self.ept

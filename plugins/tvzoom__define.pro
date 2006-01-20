@@ -1,3 +1,89 @@
+;+
+; NAME:
+;
+;    tvZoom
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin to control zooming an image.
+;
+; CATEGORY:
+;
+;    tvTools, Zooming
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvZoom',oDraw,[COLOR=,_EXTRA=])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: The color to draw the zoom band box with.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;
+; NOTES: Using tvZoom:
+;
+;    Click and drag region: zoom in on selected region to maximum
+;      integer multiple which fits in window.
+;
+;    Left-click: Zoom in 2x and center on clicked spot.
+;
+;    Right-click: Zoom out one level in the zoom stack.
+;
+;    Right-double-click: Zoom all the way out the the first level of
+;       the saved zoom stack.
+;
+;    Middle-click-drag or Control Left-click-drag: pan image when zoomed.
+;
+;    Middle-double-click or Control Left-double-click: Recenter image
+;       at point.
+;
+;          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvZoom
+;
+; MODIFICATION HISTORY:
+;
+;    2001-08-07 (J.D. Smith): Imported from SCORE-era source.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
+
 ;; tvZOOM controls:
 ;; left-click and release: zoom in on spot by factor of 2.
 ;; left-click drag: draw rubber-band region: zoom up region to maximum
@@ -53,12 +139,14 @@ pro tvZoom::Message, msg
                  ;; Control-click == middle-click
                  if msg.press eq 1b && (msg.modifiers AND 2b) ne 0b then $
                     press=2b else press=msg.press
+                 ;; Double middle click: pan re-center
                  if press eq 2b && msg.clicks eq 2 then begin 
                     self->ZoomIt,msg.X,msg.Y,/TRANSLATE
                     self.buttondwn=0b
                     return
                  endif 
                  self.buttondwn=press
+                 ;; Offset Pan
                  if press eq 2b then begin ;middle click drag
                     self.oDraw->GetProperty,offset=offset
                     self.save=offset

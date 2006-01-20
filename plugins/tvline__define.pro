@@ -1,3 +1,76 @@
+;+
+; NAME:
+;
+;    tvLine
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin to display a status line with pixel coordinates
+;    and value information.
+;
+; CATEGORY:
+;
+;    tvTools, Image Status
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvLine',oDraw,parent,[FORMAT=,_EXTRA=e])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;          parent: The widget ID where the line reporting label will
+;            be placed.
+;	   
+;       INPUT KEYWORD PARAMETERS:
+;
+;          FORMAT: The format code for printing pixel coordinates and
+;             value.  Defaults to: '("(",I4,",",I4,") ",G14.8)'
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvLine
+;
+; MODIFICATION HISTORY:
+;
+;    2001-08-07 (J.D. Smith): Imported from SCORE-era source.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001,2003,2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
+
 ;=============================================================================
 ;       Message - Display the vals.  We have signed up for motion and
 ;                 tracking messages
@@ -44,7 +117,7 @@ end
 ;=============================================================================
 ;       Init - Initialize the line.
 ;=============================================================================
-function tvLine::Init,parent,oDraw,FORMAT=form,_EXTRA=e
+function tvLine::Init,oDraw,parent,FORMAT=form,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   ;; set up the format for printing x,y, value
   if n_elements(form) eq 0 then self.form='("(",I4,",",I4,") ",G14.8)' else $

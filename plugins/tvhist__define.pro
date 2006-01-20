@@ -1,3 +1,92 @@
+;+
+; NAME:
+;
+;    tvHist
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin for scaling images and tracking the resulting
+;    color histogram.
+;
+; CATEGORY:
+;
+;    tvTools, Image Scaling, Histograms
+;
+; SIDE EFFECTS:
+;
+;    Draws a histogram in red on the first located tvColor object
+;    window in the same tvDraw plugin group.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvHist',oDraw,[NBINS=,SCALING_MENU=,_EXTRA=e])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;	   
+;       INPUT KEYWORD PARAMETERS:
+;
+;          NBINS: The number of scaling bins to use for histogram
+;            computation.  Default 200.
+;             
+;          SCALING_MENU: A menu widget id, which, if passed will root
+;            the "Scale Image" menu group.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;             
+;    Freeze:
+;  
+;	DESCRIPTION:
+;
+;	   Freeze the low and high scaling range values.
+;	
+;       CALLING SEQUENCE:
+;
+;          obj->Freeze
+;          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvHist
+;
+; MODIFICATION HISTORY:
+;
+;    2005-06-24 (J.D. Smith): Reworked all scaling logic.  Sparse
+;       sampling for large regions.
+;
+;    2001-08-02 (J.D. Smith): Imported from SCORE-era source.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================

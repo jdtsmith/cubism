@@ -1,3 +1,90 @@
+;+
+; NAME:
+;
+;    tvFixedRegion
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin for drawing fixed polygonal regions.
+;
+; CATEGORY:
+;
+;    tvTools, Regions
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvFixedRegion',oDraw,[COLOR=,THICK=,_EXTRA=])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;	   
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: The color to use to draw the region.
+;             
+;          THICK: The thickness used for drawing the lines.
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;             
+;    SetProperty:
+;  
+;	DESCRIPTION:
+;
+;	   Set properties of the object.
+;	
+;       CALLING SEQUENCE:
+;
+;          obj->SetProperty,COLOR=col,REGION=reg
+;          
+;       INPPUT KEYWORD PARAMETERS:
+;
+;          COLOR:  The color to draw the region with.
+;          
+;          REGION: A 2xn list of pixel coordinates which defines the
+;             region.  Does not need to be closed (it will be closed
+;             automatically).
+;          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvFixedRegion
+;
+; MODIFICATION HISTORY:
+;
+;    2004-09-27 (J.D. Smith): Written.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2004 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 pro tvFixedRegion::Message,msg
   self->Draw
 end

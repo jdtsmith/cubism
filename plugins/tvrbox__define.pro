@@ -1,5 +1,72 @@
+;+
+; NAME:
 ;
+;    tvrBox
 ;
+; DESCRIPTION:
+;
+;    A tvTools plugin to manage a resizeable, movable selection box.
+;
+; CATEGORY:
+;
+;    tvTools, Selection Box.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvrBox',oDraw,[COLOR=,THICK=,HANDLE=,
+;                      KNOBRAD=,HSIZE=,CORLEN=,BUTTON=,/CORNERS,
+;                      /HANDCURS,/ON_MOTION,/SNAP,/NO_REDRAW,_EXTRA=e])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;          parent: The widget ID where the line reporting label will
+;            be placed.
+;	   
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: The color to use for drawing.
+;
+;          THICK: The line thickness used for drawing the box.
+;
+;          HANDLE: Type of handle to draw
+;  	 	     0: circle (default)
+;  		     1: triangle
+;  		     2: square
+;
+;          KNOBRAD: Radius around lower right point which defines the
+;                   resize knob if clicked within (default 5 device
+;                   pixels).
+;
+;          HSIZE: Size of handle knob (SYMSIZE, default 1).
+;
+;          BUTTON: Which button to use to move/resize box either
+;             0 (left, default), 1 (middle), 2 (right).
+;
+;          CORNERS: If set, display corners when turned off.
+;
+;          HANDCURS: If set display a hand cursor when moving the box.
+;
+;          ON_MOTION: If set, deliver messages when the box moves (not
+;             just when it is released).
+;
+;          SNAP: If set, snap the box to pixel boundaries at any zoom.
+;
+;          NO_REDRAW: If set, don't attempt to redraw ourselves
+;             (presumably because redraw is being done elsewhere).
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;
+; NOTES
+;
+;   The layout of the tvRBox is:
+;  
 ;   Offset Corner  +----------+
 ;                  |          |
 ;                  |          |
@@ -11,6 +78,41 @@
 ;
 ;
 ;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvrBox
+;
+; MODIFICATION HISTORY:
+;
+;    2001-08-07 (J.D. Smith): Imported from SCORE-era source.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2005 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 
 
 ;;**************************OverRiding methods********************************

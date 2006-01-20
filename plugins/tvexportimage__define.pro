@@ -1,3 +1,73 @@
+;+
+; NAME:
+;
+;    tvExportImage
+;
+; DESCRIPTION:
+;
+;    A tvTools plugin for exporting the current image as PNG.
+;
+; CATEGORY:
+;
+;    tvTools, Image Export.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('tvExportImage',oDraw,menu,[_EXTRA=e])
+;          
+;       INPUT PARAMETERS:
+;
+;	   oDraw: The tvDraw object.
+;
+;          menu: The widget id of the menu in which to place the menu
+;             entry.
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          _EXTRA: Any other ObjMsg initialization keywords
+;             (e.g. message list).
+;                          
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->tvExportImage
+;
+; MODIFICATION HISTORY:
+;
+;    2004-09-27 (J.D. Smith): Written.
+;       
+;-
+;    $Id$
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2004 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
+;;**************************OverRiding methods********************************
+
 pro tvExportImage_Event, ev
   widget_control, ev.id,get_uvalue=self
   self->Export

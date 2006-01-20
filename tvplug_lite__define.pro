@@ -10,20 +10,57 @@
 ;    not send messages themselves.  They are free to use whatever form
 ;    of messages and message lists they want.
 ;
-; CATEGORY: Object-Based Drawing Tool Plug-In
+; CATEGORY:
+;
+;    Object-Based Drawing Tool Plug-In
 ;
 ; NOTES:
 ;
-;    You probaby want to use the full tvPlug, unless you have a reason
-;    not to prefer OMArray messaging.
+;   You probaby want to use the full tvPlug, unless you have a reason
+;   not to prefer OMArray-based messaging.  By itself, a tvPlug_lite
+;   object doesn't do much.  It is intended to serve as a superclass
+;   to plugins (and tvPlug-based plugins) which utilize its
+;   functionalities.
+;
+
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug_Lite
 ;    
 ; MODIFICATION HISTORY:
 ;
 ;    2001-11-01 (J.D. Smith): Initially written: split from tvPlug to
 ;       provide some functionality without imposing OMArray message
-;       lists, and all the ON_OFF stuff.
+;       lists, and all the ON_OFF baggage.
 ;       
 ;-
+;##############################################################################
+;
+; LICENSE
+;
+;  Copyright (C) 2001-2002 J.D. Smith
+;
+;  This file is part of tvTools.
+;
+;  tvTools is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;
+;  tvTools is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;
+;  You should have received a copy of the GNU General Public License
+;  along with tvTools; see the file COPYING.  If not, write to the
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
+
 ;;**************************OverRiding methods********************************
 ;=============================================================================
 ;  Message.  Just return the type for them.
