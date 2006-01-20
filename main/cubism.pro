@@ -65,7 +65,8 @@ pro cubism,pname,_EXTRA=e
                    CANCEL_TEXT='Create New Cube Project', $
                    _EXTRA=e
   if ~obj_valid(opened_project) then begin
-     if n_elements(pname) ne 0 then begin 
+     got_name=n_elements(pname) ne 0 && size(pname,/TYPE) eq 7
+     if got_name then begin 
         ;; Non-existent file passed: create new project
         pname=file_expand_path(pname)
         if file_test(file_dirname(pname),/WRITE) then begin 
@@ -74,6 +75,6 @@ pro cubism,pname,_EXTRA=e
         endif 
      endif 
      project->SetProperty,/SPAWNED 
-     project->Show,/FORCE,SET_NEW_PROJECTNAME=n_elements(pn) eq 0
+     project->Show,/FORCE,SET_NEW_PROJECTNAME=~got_name
   endif else obj_destroy,project
 end
