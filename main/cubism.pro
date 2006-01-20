@@ -60,7 +60,7 @@
 ;##############################################################################
 pro cubism,pname,_EXTRA=e
   project=obj_new('CubeProj')
-  if n_elements(pname) eq 0 || ~file_test(pname,/READ) then $
+  if n_elements(pname) ne 0 && file_test(pname,/READ) then $
      project->Open,pname,PROJECT=opened_project, $
                    CANCEL_TEXT='Create New Cube Project', $
                    _EXTRA=e
