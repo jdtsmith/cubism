@@ -1,3 +1,81 @@
+;+
+; NAME:  
+;
+;    CubeAper
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Cube WAVSAMP editing.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Analysis and Processing.
+;    WAVSAMP.
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('CubeAper',oDraw,parent,COLOR=)
+;
+;       INPUT PARAMETERS:
+;
+;          oDraw: The tvDraw object.
+;
+;          parent: The widget ID of the parent to place the controls into.
+;
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          COLOR: The color ID to use for drawing the WAVSAMP records.
+;             
+; NOTES:
+;  
+;    When editing, 6 editing marks per spectral order are shown.  The central
+;    two can be used to trim the order from one side symmetrically,
+;    the end marks can be used to create a non-symmetric WS.
+;
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug-->CubeAper
+;
+; MODIFICATION HISTORY:
+;    
+;    2003-01-22 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2003-2005 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 ;;**************************OverRiding methods********************************
 ;=============================================================================
 ;  Message - tvDraw and CubeRec messages
@@ -478,7 +556,7 @@ end
 ;=============================================================================
 ;  Init
 ;=============================================================================
-function CubeAper::Init,parent,oDraw,COLOR=color
+function CubeAper::Init,oDraw,parent,COLOR=color
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   self.working_on=-1
   cbase=widget_base(parent,/COLUMN,SPACE=1,/BASE_ALIGN_CENTER,/FRAME)
