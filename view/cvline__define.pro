@@ -1,3 +1,78 @@
+;+
+; NAME:  
+;
+;    CVLine
+;
+; CONTACT:
+;
+;    UPDATED VERSIONS of CUBISM and more information can be found at:
+;       http://spitzer.caltech.edu/cubism
+;
+; DESCRIPTION:
+;    
+;    Write IRS and Cube-related to a status line widget.
+;    
+; CATEGORY:
+;
+;    CUBISM Spectral Reduction, Analysis and Processing.
+;    Status Information
+;
+; METHODS:
+;
+;    Init:  
+;
+;       CALLING SEQUENCE:
+;
+;          obj=obj_new('CVLine',oDraw,parent,[CALIB=,MODULE=])
+;
+;       INPUT PARAMETERS:
+;
+;          oDraw: The tvDraw object.
+;
+;          parent: The widget ID of the parent in which to place the
+;             status widget label.
+;
+;       INPUT KEYWORD PARAMETERS:
+;
+;          CALIB: The calibration object to use.  Will be queried from
+;             the cube we are communicating with by default.
+;
+;          MODULE: The module(s) to update status for (defaults to all).
+;             
+; INHERITANCE TREE:
+;
+;    ObjMsg-->tvPlug_lite-->CubeBackTrack
+;
+; MODIFICATION HISTORY:
+;    
+;    2002-12-06 (J.D. Smith): Written
+;-
+;    $Id$
+;##############################################################################
+; 
+; LICENSE
+;
+;  Copyright (C) 2002-2006 J.D. Smith
+;
+;  This file is part of CUBISM.
+;
+;  CUBISM is free software; you can redistribute it and/or modify it
+;  under the terms of the GNU General Public License as published by
+;  the Free Software Foundation; either version 2, or (at your option)
+;  any later version.
+;  
+;  CUBISM is distributed in the hope that it will be useful, but
+;  WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;  General Public License for more details.
+;  
+;  You should have received a copy of the GNU General Public License
+;  along with CUBISM; see the file COPYING.  If not, write to the Free
+;  Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
+;
+;##############################################################################
+
 ;=============================================================================
 ;  Message - Display the values.  We have signed up for motion and
 ;            tracking messages, and will hear from the CubeRec 
@@ -124,9 +199,11 @@ end
 pro cvLine::UpdateWAVSAMP,MODULE=md
   if ptr_valid(self.PRs) then $
      ptr_free,(*self.PRs).PRs,(*self.PRs).RANGE,self.PRs
-  if obj_valid(self.cube) then $
-     prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords,/FULL,WAVECUT=0) $
-  else if obj_valid(self.calib) then begin 
+  if obj_valid(self.cube) then begin
+     self.cube->GetProperty,CALIB=calib
+     if obj_valid(calib) then self.calib=calib
+     prs=self.cube->PRs(/ALL_ORDERS,ORDERS=ords,/FULL,WAVECUT=0) 
+  endif else if obj_valid(self.calib) then begin
      ords=self.calib->Orders(md)
      prs=ptrarr(n_elements(ords))
      for i=0,n_elements(ords)-1 do $
@@ -214,7 +291,7 @@ end
 ;=============================================================================
 ;  Init - Initialize the line.
 ;=============================================================================
-function cvLine::Init,parent,oDraw,CALIB=calib,MODULE=module,_EXTRA=e
+function cvLine::Init,oDraw,parent,CALIB=calib,MODULE=module,_EXTRA=e
   if (self->tvPlug_lite::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   r=widget_base(parent,/ROW,/SPACE)
   self.wLine=widget_label(r,VALUE=string(FORMAT='(T64,A)',''))
