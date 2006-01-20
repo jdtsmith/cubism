@@ -5,12 +5,12 @@
 ;
 ; DESCRIPTION:
 ;    
-;    A table plugin that displays a 5x5 matrix of the values of
-;    the pixels around the mouse when it is over a tvdraw object.
+;    A tvTools plugin that displays a 5x5 table of the values of the
+;    pixels around the mouse when it is over a tvdraw object.
 ;    
 ; CATEGORY:
 ;
-;    Data display.
+;    tvTools, Data display.
 ;
 ; METHODS:
 ;
@@ -18,13 +18,13 @@
 ;
 ;       CALLING SEQUENCE:
 ;
-;          obj=obj_new('tvPixTbl',parent,odraw, [_EXTRA=]
+;          obj=obj_new('tvPixTbl',oDraw,parent,[_EXTRA=]
 ;
 ;       INPUT PARAMETERS:
 ;
-;          parent:  The widget id of the object widget's parent.
-;          
 ;	   oDraw: The tvDraw object.
+;
+;          parent:  The widget id of the object widget's parent.
 ;
 ;       KEYWORD INPUT PARAMETERS:
 ;
@@ -33,10 +33,6 @@
 ; INHERITANCE TREE:
 ;
 ;    ObjMsg-->tvPlug-->tvPixTbl
-;
-; EXAMPLE:
-;
-;    pixobj = obj_new('tvPixTbl', parent, odraw)
 ;
 ; MODIFICATION HISTORY:
 ; 
@@ -60,7 +56,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001 Nidhi Kalra
+;  Copyright (C) 2001 Nidhi Kalra, 2002 JD Smith
 ;
 ;  This file is part of tvTools.
 ;
@@ -76,8 +72,8 @@
 ;  
 ;  You should have received a copy of the GNU General Public License
 ;  along with tvTools; see the file COPYING.  If not, write to the
-;  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-;  Boston, MA 02111-1307, USA.
+;  Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
 
@@ -198,7 +194,7 @@ end
 ;=============================================================================
 ;       Init - Initialize the PixTbl object.
 ;=============================================================================
-function tvPixTbl::Init,parent,oDraw,_EXTRA=e
+function tvPixTbl::Init,oDraw,parent,_EXTRA=e
   if (self->tvPlug::Init(oDraw, _EXTRA=e) ne 1) then return,0 ; chain up
   self.parent = parent
   self.tblsize = [5,5]
