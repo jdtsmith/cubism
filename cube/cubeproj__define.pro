@@ -6,7 +6,7 @@
 ; CONTACT:
 ;
 ;    UPDATED VERSIONS of CUBISM and more information can be found at:
-;       http://sings.sirtf.edu/cubism
+;       http://ssc.spitzer.caltech.edu/cubism
 ;
 ; DESCRIPTION:
 ;    
@@ -442,17 +442,17 @@ pro CubeProj::ShowEvent, ev
         if self.version ne '' AND cubism_version ne self.version then $
            thiscube=' (Curr. Cube: '+self.version+')' else thiscube=''
         title='CUBISM '+cubism_version
-        tlen=strlen(title) & left=(33-tlen)/2
+        tlen=strlen(title) & left=(39-tlen)/2
         title=strjoin(replicate(' ',left>0)) + title
         self->Info,TITLE='About Cubism', $
-                   ['*********************************', $
-                    title,                               $
-                    thiscube,                            $
-                    '                                 ', $
-                    '   JD Smith and the SINGS Team   ', $
-                    '            2002-2006            ', $
-                    '  http://sings.stsci.edu/cubism  ', $
-                    '*********************************']
+                   ['***************************************', $
+                    title,                                    $
+                    thiscube,                                 $
+                    '                                       ', $
+                    '      JD Smith and the SINGS Team      ', $
+                    '               2002-2006               ', $
+                    ' http://ssc.spitzer.caltech.edu/cubism ', $
+                    '***************************************']
      end
      
      'debug': begin 
