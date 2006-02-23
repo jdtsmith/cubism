@@ -134,9 +134,11 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
   endif else begin 
      if size(fov,/type) eq 7 then begin 
         if keyword_set(sn) then $
-           wh=where_array(strupcase([fov]),strupcase(f.SHORT_NAME),cnt) $
-        else wh=where_array(strupcase([fov]),strupcase(f.NAME),cnt)
-     endif else wh=where_array(long([fov]),f.ID,cnt)
+           wh=where_array(strupcase([fov]),strupcase(f.SHORT_NAME),cnt, $
+                         /PRESERVE_ORDER) $
+        else wh=where_array(strupcase([fov]),strupcase(f.NAME),cnt, $
+                            /PRESERVE_ORDER)
+     endif else wh=where_array(long([fov]),f.ID,cnt,/PRESERVE_ORDER)
   endelse 
   if cnt eq 0 then return,-1
   
