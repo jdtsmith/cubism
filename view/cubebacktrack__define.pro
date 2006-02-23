@@ -129,6 +129,7 @@ pro CubeBackTrack::Message, msg
               if bcdsz[0] ne -1 then self.bcd_size=bcdsz
            endif 
            self->Enable 
+           self->UpdateList
         endif else begin 
            if widget_info(self.wBase,/VALID_ID) then $
               widget_control, self.wBase,/DESTROY
@@ -301,6 +302,7 @@ end
 ;  UpdateList - Update the list of backtracked pixels
 ;=============================================================================
 pro CubeBackTrack::UpdateList
+  if ~widget_info(self.wLabel,/VALID_ID) then return
   msg=self.msg_base+ $
       (self.point[0] eq -1?$
        string(FORMAT='(%" Pix: [--,--] %6.3f um")',self.wavelength): $
