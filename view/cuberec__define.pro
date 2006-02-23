@@ -100,6 +100,7 @@ pro CubeRec::Message, msg
   if widget_info(self.wBase[0],/VALID_ID) eq 0 then return
   self->tvPlug::Message,msg,TYPE=type
   cal_update=0b
+  badpix_update=0b
   free=0b
   case type of
      'BOX': begin 
@@ -179,30 +180,33 @@ pro CubeRec::Message, msg
         
         if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
         if self.mode eq 1 && n_elements(*self.stack_msg) gt 0 then begin 
-           fg=*(*self.stack_msg).foreground
-           if ~array_equal(fg le (cs[2]-1),1b) then $
-              self->SwitchMode,/FULL
+           if ptr_valid((*self.stack_msg).foreground) then begin 
+              fg=*(*self.stack_msg).foreground
+              if ~array_equal(fg le (cs[2]-1),1b) then $
+                 self->SwitchMode,/FULL
+           endif 
         endif 
      end 
+     'CUBEPROJ_BADPIX_UPDATE': badpix_update=1b
      'CUBEPROJ_CALIB_UPDATE': cal_update=1b
      'CUBEPROJ_RECORD_UPDATE': begin 
-        ;; Bring down the whole house of cards
-        if msg.deleted && ~ptr_valid(self.IMAGE) then begin 
+        ;; If our record was destroyed, bring down the whole house of cards
+        ;; otherwise, let other tools handle this if needed.
+        if msg.deleted && ~ptr_valid(self.IMAGE) then $
            obj_destroy,self.oDraw
-           return
-        endif 
+        return
      end 
      else:
   endcase
-  self->UpdateData
+  if ~badpix_update then self->UpdateData
   if n_elements(astr) ne 0 then astr=ptr_new(astr,/NO_COPY) else $
      astr=ptr_new()
   self->MsgSend,{CUBEREC_UPDATE, $
                  self.mode eq 2b,self.mode eq 0b,self.mode eq 3b,$
                  self.cur_wav, self.cube,self.MODULE,self.BCD,self.BCD_BMASK, $
-                 self.UNCERTAINTY, astr,self.rec_set,cal_update}
+                 self.UNCERTAINTY, astr,self.rec_set,cal_update,badpix_update}
   ptr_free,astr
-  self->UpdateView
+  if ~badpix_update then self->UpdateView
 end
 
 ;=============================================================================
@@ -348,8 +352,9 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
         self.oAper->Off,/RESET,/NO_REDRAW
         self.oVis->On
      endelse 
-  endif else begin              ; A cube mode
+  endif else begin              ; A cube mode: full or stack
      if ~self->Enabled() then self->Enable ;need the extraction tool
+     self.oVis->Off
      if obj_valid(self.oView) then $
         self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL, $
                               /CUBEVIEWSPEC_SAVE
@@ -637,8 +642,8 @@ function CubeRec::Init,oDraw,parent,CUBE=cube,APER_OBJECT=aper, $
   ;; listen for this cube's messages
   if obj_valid(cube) then $
      cube->MsgSignup,self,/CUBEPROJ_RECORD,/CUBEPROJ_CUBE,/CUBEPROJ_VISUALIZE,$
-                     /CUBEPROJ_UPDATE,/CUBEPROJ_CALIB_UPDATE, $
-                     /CUBEPROJ_RECORD_UPDATE
+                     /CUBEPROJ_UPDATE,/CUBEPROJ_BADPIX_UPDATE, $
+                     /CUBEPROJ_CALIB_UPDATE,/CUBEPROJ_RECORD_UPDATE
 
   ;; set up the different bases
   b=widget_base(parent,/COLUMN,/FRAME,/BASE_ALIGN_LEFT,SPACE=1, $
@@ -775,5 +780,5 @@ pro CubeRec__define
   msg={CUBEREC_UPDATE,BCD_MODE:0b,FULL_MODE:0b,VISUALIZE_MODE:0b,PLANE:0L, $
        CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new(), $
        UNC: ptr_new(), ASTROMETRY: ptr_new(), RECORD_SET: ptr_new(), $
-       CALIB_UPDATE:0b}
+       CALIB_UPDATE:0b,BADPIX_UPDATE:0b}
 end
