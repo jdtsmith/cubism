@@ -42,6 +42,8 @@
 ;      Fatal BMASK Marks: Red X's
 ;      User global and per-record bad pixels: Cyan/Green X's.
 ;
+;    Shift-right-click to cycle the other direction.
+;
 ; INHERITANCE TREE:
 ;
 ;    ObjMsg-->tvPlug-->CubeBadPix
@@ -104,20 +106,28 @@ pro CubeBadPix::Message, msg
         
      'DRAW_BUTTON': begin 
         if msg.release eq 4b then return
-
+        
         ;; Last button: cycle through group
         if msg.press eq 4b then begin 
-           self.showing=(self.showing+1) mod 4
+           if msg.modifiers AND 1b then $;; Shift
+              self.showing=(self.showing-1) mod 4 $
+           else $
+              self.showing=(self.showing+1) mod 4
            self.oDraw->Redraw,/SNAPSHOT
            return
         endif
         
-        ;; Other buttons, set/clear breakpoints
-        if msg.type eq 1 then begin ;release
+        ;; Other buttons, set/clear bad pix
+        
+        ;; Release
+        if msg.type eq 1 then begin 
            self.oDraw->MsgSignup,self,DRAW_MOTION=0
            self.press=-1b
            self.last_pt=-1
            self.setting=-1
+           self.cuberec->MsgSignup,self,/NONE
+           self.cube->Send,/BADPIX_UPDATE ;let everyone know about our changes
+           self.cuberec->MsgSignup,self,/CUBEREC_UPDATE
            return
         endif 
         
@@ -125,6 +135,7 @@ pro CubeBadPix::Message, msg
         pt=pt[0]
         if pt eq -1 then return
         
+        ;; Shift press
         if msg.press eq 1b && (msg.modifiers AND 2b) ne 0b then $
            press=2b else press=msg.press
         
@@ -154,6 +165,10 @@ pro CubeBadPix::Message, msg
      'TVDRAW_REDRAW': self->MarkAll
      
      'CUBEREC_UPDATE': begin 
+        if msg.badpix_update then begin 
+           self.oDraw->ReDraw,/SNAPSHOT ;we'll pick them up directly
+           return
+        endif 
         if msg.BCD_MODE then begin ; We only work in BCD mode
            self.bmask=msg.BMASK
            self.cube=msg.CUBE
@@ -365,9 +380,10 @@ end
 ;=============================================================================
 ;  Init -  Initialize the CubeBadPix object
 ;=============================================================================
-function CubeBadPix::Init,oDraw,parent,_EXTRA=e
+function CubeBadPix::Init,oDraw,parent,cuberec,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 
   self.parent=parent
+  self.cuberec=cuberec
   return,1
 end
 
@@ -389,5 +405,6 @@ pro CubeBadPix__define
 ;      non_finite:ptr_new(), $   ;where it's non-finite
       showing:0, $              ;showing 0)all 1) all but non-fatal
                                 ;        2)only fatal 3) only user
+      cuberec:obj_new(), $      ;the cuberec object we correspond with.
       parent:0L}
 end
