@@ -88,6 +88,7 @@ function irs_file_filter,files,COUNT=cnt,MODULE_ONLY=mo,EXTRA_KEYS=ek, $
      hdr=headfits(file)
      fov=long(sxpar(hdr,'FOVID'))
      void=irs_fov(fov,MODULE=md)
+     if n_elements(md) eq 0 then continue
      rec={FILE:files[i], $
           AOR:long(sxpar(hdr,'AORKEY')), $
           OBJECT:strtrim(sxpar(hdr,'OBJECT'),2), $
@@ -105,6 +106,11 @@ function irs_file_filter,files,COUNT=cnt,MODULE_ONLY=mo,EXTRA_KEYS=ek, $
      endfor
      if n_elements(all) eq 0 then all=[rec] else all=[all,rec]
   endfor 
+  
+  if n_elements(all) eq 0 then begin 
+     cnt=0
+     return,-1
+  endif 
   
   ;; Group into sets with matching objects first
   uniq_objs=uniq(all.OBJECT,sort(all.OBJECT))
