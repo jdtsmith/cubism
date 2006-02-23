@@ -386,7 +386,7 @@ function IRS_Calib::Info, modules, orders,SHORT=short
                       " orders.":" not loaded."))]
      if no eq 0 then continue
      if n_elements(orders) eq 0 then ords=indgen(no) else $
-        ords=where_array((*self.cal[md]).ORDER,[orders],no,/SWITCHAB)
+        ords=where_array([orders],(*self.cal[md]).ORDER,no,/PRESERVE_ORDER)
      if no eq 0 then continue
      str=[str,'']
      wsf=file_basename(self.WAVSAMP_FILE[md])
