@@ -196,9 +196,14 @@ pro IRSMapVisualize::Message, msg
      end 
      
      'CUBEPROJ_RECORD_UPDATE': begin 
-        if msg.disabled then self->UpdateMapStatus,/CHECK_DISABLED $
-        else self->UpdateMapRecords 
-        self->DrawAllRecords
+        if msg.deleted then begin 
+           self->UpdateMapRecords
+           self.oDraw->ReDraw,/SNAPSHOT 
+        end else begin 
+           if msg.disabled then self->UpdateMapStatus,/CHECK_DISABLED $
+           else self->UpdateMapRecords 
+           self->DrawAllRecords
+        endelse 
      end 
   endcase 
 end
@@ -243,6 +248,13 @@ pro IRSMapVisualize::Select,which,APPEND=app,RANGE=range,NO_DRAW=nd, $
   endelse 
   ;; Sync up cube to our list selection
   self.last=which
+  self->UpdateCubeSelect,_EXTRA=e
+end
+
+;=============================================================================
+;  UpdateCubeSelect - Update the cube and our select status
+;=============================================================================
+pro IRSMapVisualize::UpdateCubeSelect,_EXTRA=e
   self.cube->SetListSelect,where((*self.recs).SELECTED),_EXTRA=e
   self->UpdateSelectStatus
 end
@@ -361,6 +373,7 @@ pro IRSMapVisualize::DrawAllRecords
   if ~ptr_valid(self.recs) then return
   ;; Setup Plot axes
   self.oDraw->GetProperty,OFFSET=off,DISPSIZE=ds,PAN=pan,ZOOM=zm
+  ;; Draw with a double buffer
   self.oDraw->Erase,/DOUBLE,/FULL,/FROM_SCREEN ;be sure to get other's snaps
   plot,[0],[0],XRANGE=[off[0],off[0]+ds[0]],YRANGE=[off[1],off[1]+ds[1]], $
        XSTYLE=5,YSTYLE=5,POSITION=[pan,pan+ds*zm],/DEVICE,/NODATA,/NOERASE
