@@ -57,9 +57,10 @@ pro cubism_vm,pname
         args=call_function('command_line_args',COUNT=cnt)
         ;; only process the args once, in case called interactively
         used_args=1b 
-        if cnt gt 0 then $
+        if cnt gt 0 then begin 
            if file_test(args[0],/READ) && $
            strpos(args[0],'.cpj') eq strlen(args[0])-4 then pname=args[0]
+        endif 
      endif
      catch,/cancel
   endif
