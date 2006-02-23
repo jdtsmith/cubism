@@ -61,8 +61,8 @@ pro CubeAutoBadPix::Event,ev
         widget_control, self.wMinFrac,GET_VALUE=minfrac
         self.with_background=widget_info(self.wWB,/BUTTON_SET)
         self.with_unc=widget_info(self.wWU,/BUTTON_SET)
-        self.maxvar[self.with_background]=float(maxvar)
-        self.minfrac[self.with_background]=float(minfrac)
+        self.maxvar[self.with_background,self.record_only]=float(maxvar)
+        self.minfrac[self.with_background,self.record_only]=float(minfrac)
         widget_control, ev.top,/DESTROY
         return
      end 
@@ -76,8 +76,8 @@ pro CubeAutoBadPix::Event,ev
      'toggleback': begin 
         widget_control, self.wMaxVar,GET_VALUE=maxvar
         widget_control, self.wMinFrac,GET_VALUE=minfrac
-        self.maxvar[self.with_background]=float(maxvar)
-        self.minfrac[self.with_background]=float(minfrac)
+        self.minfrac[self.with_background,self.record_only]=float(minfrac)
+        self.maxvar[self.with_background,self.record_only]=float(maxvar)
      end 
      
      'reset': self->Defaults 
@@ -88,30 +88,40 @@ pro CubeAutoBadPix::Event,ev
   self.with_background=widget_info(self.wWB,/BUTTON_SET)     
   widget_control, self.wMaxVar, $
                   SET_VALUE=string(FORMAT='(F0.2)', $
-                                   self.maxvar[self.with_background])
+                                   self.maxvar[self.with_background, $
+                                               self.record_only])
   widget_control, self.wMinFrac, $
                   SET_VALUE=string(FORMAT='(F0.2)', $
-                                   self.minfrac[self.with_background])
+                                   self.minfrac[self.with_background, $
+                                                self.record_only])
 end
 
 pro CubeAutoBadPix::Prompt,maxvar,minfrac,wb,wu, $
                            DISABLE_WITH_BACKGROUND=dwb, $
-                           DISABLE_WITH_UNC=dwu, _EXTRA=e
+                           DISABLE_WITH_UNC=dwu, RECORD_ONLY=ro, $
+                           _EXTRA=e
   b=widget_base(TITLE='AutoBadPix',/COLUMN,_EXTRA=e)
-  t=widget_label(b,VALUE='Automatic Bad Pixels')
+  self.record_only=keyword_set(ro)
+  self->Defaults
+  t=widget_label(b,VALUE=self.record_only? $
+                 'Automatic Record Bad Pixels': $
+                 'Automatic Global Bad Pixels')
   r=widget_base(b,/ROW)
-  l=widget_label(r,VALUE='Sig-Trim:')
+  l=widget_label(r,VALUE='Sigma-Trim:')
   if keyword_set(dwb) then self.with_background=0b
   if keyword_set(dwu) then self.with_unc=0b
 
   self.wMaxVar=widget_text(r,VALUE=string(FORMAT='(F0.2)', $
-                                          self.maxvar[self.with_background]), $
+                                          self.maxvar[self.with_background, $
+                                                      self.record_only]), $
                            XSIZE=8,/EDITABLE,UNAME='maxvar')
   r=widget_base(b,/ROW)
-  l=widget_label(r,VALUE='Bad-Frac:')
+  l=widget_label(r,VALUE='MinBad-Fac:')
   self.wMinFrac=widget_text(r,XSIZE=8,/EDITABLE,UNAME='minfrac',VALUE= $
                             string(FORMAT='(F0.2)', $
-                                   self.minfrac[self.with_background]))
+                                   self.minfrac[self.with_background, $
+                                                self.record_only]))
+  
   r=widget_base(b,/NONEXCLUSIVE,/ROW)
   self.wWB=widget_button(r,VALUE='BG',UNAME='toggleback')
   self.wWU=widget_button(r,VALUE='UNC',UNAME='toggleunc')
@@ -143,28 +153,30 @@ pro CubeAutoBadPix::Prompt,maxvar,minfrac,wb,wu, $
   endif 
   wb=self.with_background
   wu=self.with_unc
-  maxvar=self.maxvar[wb]
-  minfrac=self.minfrac[wb]
+  maxvar=self.maxvar[wb,self.record_only]
+  minfrac=self.minfrac[wb,self.record_only]
 end
 
 pro CubeAutoBadPix::Defaults
-  self.maxvar=[10.0,5.0]        ;without/with background
-  self.minfrac=[0.5,0.1]
+  if self.defaults_set then return
+  self.maxvar=[[10.0,5.0],$     ;without/with background
+               [10.0,5.0]]      ;record only version
+  self.minfrac=[[0.5,0.1], $
+                [0.75,0.75]]
   self.with_background=0b
-  self.with_unc=1b
+  self.with_unc=self.record_only?0b:1b
+  self.defaults_set=1b
 end
 
-function CubeAutoBadPix::Init
-  self->Defaults
-  return,1
-end
 
 pro cubeautobadpix__define
   st={CubeAutoBadPix, $
-      minfrac:[0.0,0.0], $
-      maxvar: [0.0,0.0], $
+      minfrac:fltarr(2,2), $
+      maxvar: fltarr(2,2), $
+      defaults_set:0b, $
       with_background:0b, $
       with_unc:0b, $
+      record_only: 0b, $
       cancel: 0b, $             ;was the prompt cancelled
       wMinFrac:0L, $
       wMaxVar:0L, $
