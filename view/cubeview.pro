@@ -168,7 +168,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   cuberec->MsgSignup,cubeback,/CUBEREC_UPDATE,/CUBEREC_FULL
   
   ;; a bad pixel selector tool, with updates from cuberec
-  cubebadpix=obj_new('CubeBadPix',oDraw,base,_EXTRA=e)
+  cubebadpix=obj_new('CubeBadPix',oDraw,base,cuberec,_EXTRA=e)
   cuberec->MsgSignup,cubebadpix,/CUBEREC_UPDATE
     
   ;; a pixel table tool (non-exclusive)
