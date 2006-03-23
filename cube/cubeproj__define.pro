@@ -1912,7 +1912,9 @@ pro CubeProj::UpdateButtons
      endelse 
      (*self.wInfo).nsel_sav=nsel
   endif 
-     
+  
+  bg_valid=ptr_valid(self.BACKGROUND) 
+  
   for i=0,n_elements((*self.wInfo).MUST_CAL)-1  do  $
      widget_control,((*self.wInfo).MUST_CAL)[i], SENSITIVE=obj_valid(self.cal)
   
@@ -1934,7 +1936,7 @@ pro CubeProj::UpdateButtons
   
   for i=0,n_elements((*self.wInfo).MUST_BACK)-1 do $ 
      widget_control, (*self.wInfo).MUST_BACK[i], $
-                     SENSITIVE=ptr_valid(self.BACKGROUND)
+                     SENSITIVE=bg_valid
   
   got_comb=ptr_valid(self.BACK_RECS) && size(*self.BACK_RECS,/TYPE) eq 8
   got_back=got_comb?ptr_valid((*self.BACK_RECS).BACKGROUND):[0b,0b]
@@ -1945,7 +1947,7 @@ pro CubeProj::UpdateButtons
   widget_control, (*self.wInfo).MUST_BG_SP,SENSITIVE=ptr_valid(self.BG_SP)
   
   widget_control, (*self.wInfo).MUST_ANY_BACK, $
-                  SENSITIVE=ptr_valid(self.BACKGROUND) || ptr_valid(self.BG_SP)
+                  SENSITIVE=bg_valid || ptr_valid(self.BG_SP)
   
   gbpl=ptr_valid(self.GLOBAL_BAD_PIXEL_LIST)
   
@@ -1982,7 +1984,8 @@ pro CubeProj::UpdateButtons
   
   widget_control, (*self.wInfo).MUST_UNCERTAINTIES, $
                   SENSITIVE=self->CheckRecordUncertainties(/ENABLED) && $
-                  (~self.use_bg || ptr_valid(self.BACKGROUND_UNC))
+                  (~(self.use_bg  && bg_valid) || $
+                   ptr_valid(self.BACKGROUND_UNC))
 end
 
 ;=============================================================================
