@@ -1,0 +1,232 @@
+\input texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename idlwave
+@settitle CUBISM User Manual
+@dircategory CUBISM
+@direntry
+* CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
+@end direntry
+@set EDITION 1.0
+@set VERSION 0.95
+@set IDLVERSIONREQUIRED 6.1
+@set DATE April, 2006
+@set AUTHOR J.D. Smith
+@set AUTHOREMAIL jdsmith@@as.arizona.edu
+@set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
+
+@c %**end of header
+@finalout
+
+@ifinfo 
+This file documents CUBISM, an IDL program for reducing and analyzing
+IRS Spectral Maps.
+
+This is edition @value{EDITION} of the CUBISM User Manual for CUBISM
+@value{VERSION}
+
+Copyright @copyright{} 2006 J.D. Smith
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with the Front-Cover texts being ``A GNU
+Manual'', and with the Back-Cover Texts as in (a) below.  A copy of the
+license is included in the section entitled ``GNU Free Documentation
+License'' in the Emacs manual.
+
+(a) The FSF's Back-Cover Text is: ``You have freedom to copy and modify
+this GNU Manual, like GNU software.  Copies published by the Free
+Software Foundation raise funds for GNU development.''
+
+This document is part of a collection distributed under the GNU Free
+Documentation License.  If you want to distribute this document
+separately from the collection, you can do so by adding a copy of the
+license to the document, as described in section 6 of the license.
+@end ifinfo
+
+@c
+@c Title Page
+@c
+
+@titlepage
+@title CUBISM User Manual
+@subtitle IRS Spectral Map Analysis and Reduction
+@subtitle Edition @value{EDITION}, @value{DATE}
+
+@sp 4
+@center @image{images/logo2,,,Cubism Logo}
+
+@author by J.D. Smith and the SINGS team
+@page
+
+This is edition @value{EDITION} of the @cite{CUBISM User Manual} for
+CUBISM version @value{VERSION}, @value{DATE}.
+@sp 2
+
+@cindex Copyright, of CUBISM
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with the Front-Cover texts being ``A GNU
+Manual'', and with the Back-Cover Texts as in (a) below.  A copy of the
+license is included in the section entitled ``GNU Free Documentation
+License'' in the Emacs manual.
+
+(a) The FSF's Back-Cover Text is: ``You have freedom to copy and modify
+this GNU Manual, like GNU software.  Copies published by the Free
+Software Foundation raise funds for GNU development.''
+
+This document is part of a collection distributed under the GNU Free
+Documentation License.  If you want to distribute this document
+separately from the collection, you can do so by adding a copy of the
+license to the document, as described in section 6 of the license.
+@end titlepage
+
+@contents
+
+@page
+
+@ifnottex
+
+@node Top, Introduction, (dir), (dir)
+
+CUBISM is a package written in the Interactive Data Language (IDL),
+which supports the analaysis and reduction of spectral maps created with
+the @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard
+the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
+
+@end ifnottex
+
+@c menu
+
+@menu
+* Introduction::                
+* Overview::                    
+* Installation::                
+* The Tools::                   
+* Cube Building::               
+* Cube Validation::             
+* Cube Analysis::               
+* CubeProject Reference::       
+* CubeView Reference::          
+* CubeSpec Reference::          
+* Index::                       
+@detailmenu
+
+@detailmenu
+ --- The Detailed Node Listing ---
+
+Cube Building
+
+* Input Files and Calibration::  
+* Backgrounds::                 
+* Bad Pixels::                  
+
+@end detailmenu
+@end menu
+
+@node Introduction, Overview, Top, Top
+@chapter Introduction
+@cindex Introduction
+
+CUBISM is a package written in the Interactive Data Language (IDL),
+which supports the analaysis and reduction of spectral maps created with
+the @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard
+the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
+
+@node Overview, Installation, Introduction, Top
+@chapter Overview
+@cindex Overview
+
+General overview, requirements, etc.
+
+@node Installation, The Tools, Overview, Top
+@chapter Installation
+@cindex Installation
+
+Installing CUBISM, either as binary, source, or (eventually) CVS.
+NasaLib requirements.
+
+@node The Tools, Cube Building, Installation, Top
+@chapter The Tools
+@cindex CubeProject, intro
+@cindex CubeView, intro
+@cindex CubeSpec, intro
+
+A high-level description of CubeProject, CubeView, and CubeSpec.
+
+@node Cube Building, Cube Validation, The Tools, Top
+@chapter Cube Building
+@cindex Cube Building
+
+@menu
+* Input Files and Calibration::  
+* Backgrounds::                 
+* Bad Pixels::                  
+@end menu
+
+A general reference on building cubes from BCD source.
+
+@node Input Files and Calibration, Backgrounds, Cube Building, Cube Building
+@section Input Files and Calibration
+@cindex BCD files
+@cindex Calibration sets
+@cindex Files, input
+@cindex Input files
+
+@node Backgrounds, Bad Pixels, Input Files and Calibration, Cube Building
+@section Backgrounds
+@cindex Background subtraction
+
+Notes on in situ, archive, and other sources for background subtraction,
+including the use of the visualizer for selecting in situ BCDs.
+
+@node Bad Pixels,  , Backgrounds, Cube Building
+@section Bad Pixels
+@cindex Bad Pixels
+@cindex Rogue pixels
+
+An exposition on selecting manual and automatic bad pixels.
+
+@node  Cube Validation, Cube Analysis, Cube Building, Top
+@chapter Cube Validation
+@cindex Cube Validation
+
+A description of backtracking and other means of validating and
+improving the cube, and checking on weak features, etc.
+
+@node  Cube Analysis, CubeProject Reference, Cube Validation, Top
+@chapter Cube Analysis
+@cindex Cube Analysis
+
+A description of cube extraction, map making, map sets, line fitting,
+etc.
+
+
+@c
+@c Appendices
+@c
+
+@node CubeProject Reference, CubeView Reference, Cube Analysis, Top
+@appendix CubeProject Reference
+@cindex CubeProject
+
+A detailed listing of all CubeProject menus etc.
+
+@node CubeView Reference, CubeSpec Reference, CubeProject Reference, Top
+@appendix CubeView Reference
+@cindex CubeView
+
+A detailed listing of all CubeView tools, menus etc.
+
+@node CubeSpec Reference, Index, CubeView Reference, Top
+@appendix CubeSpec Reference
+@cindex CubeSpec
+
+A detailed listing of all CubeSpec, menus etc.
+
+@node Index,  , CubeSpec Reference, Top
+@unnumbered Index
+@printindex cp
+
+@bye
