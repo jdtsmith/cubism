@@ -346,6 +346,23 @@ A general reference on building cubes from BCD source.
 Notes on in situ, archive, and other sources for background subtraction,
 including the use of the visualizer for selecting in situ BCDs.
 
+@subsection In Situ Sky
+
+Subtracting off contemporaneous sky data from your Spitzer IRS target data does more than just remove foreground emission (e.g., zodiacal, Galactic).  It also tremendously reduces the number of "bad pixels" contaminating your data.
+
+If you unfortunately do not have access to dedicated, contemporaneous, off-target sky data, in many instances the physical configuration of the IRS low-resolution modules provides an alternative.  Below is a description of how to define sky data from IRS low-resolution "outrigger" data.  The example given is for short-low (SL) data, but similar steps can be taken for long-low data.
+
+To define the low-resolution sky BCDs, and to create a corresponding .bgl file for data cube construction within CUBISM:
+
+@enumerate
+@item
+Load all the relevant SL (SL1+SL2) frames.  Don't mix data taken more than a few days apart, to minimize the effects of day-to-day changes in the bad pixel population. 
+@item
+Use the AOR visualizer with an 8um image.  After using the histogram box to scale the image such that low-level diffuse emission is apparent, hit 'v' to switch to visualize mode.  To define sky BCDs for SL1, for example, set the cube build order to 2 (Cube-Set Cube Build Order->2) so that SL1 is not on the bright target source, and see which SL1 outriggers conveniently land off your target.  Highlight these outriggers with the mouse.  Save this information into a .bgl file using Background->Save Background Recs->m51_opticallyselected_extranuc_SL1.bgl.
+@item
+Repeat for SL2.
+@end enumerate
+
 @node Bad Pixels,  , Backgrounds, Cube Building
 @section Bad Pixels
 @cindex Bad Pixels
