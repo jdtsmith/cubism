@@ -412,35 +412,40 @@ Only user-set bad pixel marks.
 
 Bad pixels can be identified in CUBISM either 'manually' or in an automatic fashion.  The procedure for automatically identifying bad pixels is described in Section XX.
 
-1. View the stack of relevant BCDs.
-
-2. Show the wavsamp.
-
-3. Click 'BGSub' (if available) to remove many bad pixels using the sky data.
-
-4. Enlarge the stack viewer to the largest possible perspective.
-
-5. Show the current (cyan) bad pixel mask.
-
-6. Set the scaling stretch to show just the very brightest pixels.
-
-7. Mark ~ >4 sigma deviations, but ensure you are not marking line data!
-
-8. Reset the scaling to show the next brightest set of pixels.
-
-9. Mark ~ >4 sigma deviations.
-
-10.Iterate this process until you can clearly see emisison lines, to the point where the viewable pixels are no longer >4 sigma deviations.
-
-11.Save the bad pixel mask.
-
-11.Build the cube with this mask.
-
-12.Inspect each wavelength plane for weird, out-of-place columns/rows.
-
-13.Use the backtrack tool to note any additional pixels to be masked.
-
-14.Finally, extract a 1d spectrum and look for spikes that aren't lines.
+@enumerate
+@item
+ View the stack of relevant BCDs.
+@item
+ Show the wavsamp.
+@item
+ Click 'BGSub' (if available) to remove many bad pixels using the sky
+ data.
+@item
+ Enlarge the stack viewer to the largest possible perspective.
+@item
+ Show the current (cyan) bad pixel mask.
+@item
+ Set the scaling stretch to show just the very brightest pixels.
+@item
+ Mark ~ >4 sigma deviations, but ensure you are not marking line data!
+@item
+ Reset the scaling to show the next brightest set of pixels.
+@item
+ Mark ~ >4 sigma deviations.
+@item
+ Iterate this process until you can clearly see emisison lines, to the
+point where the viewable pixels are no longer >4 sigma deviations.
+@item
+Save the bad pixel mask.
+@item
+Build the cube with this mask.
+@item
+Inspect each wavelength plane for weird, out-of-place columns/rows.
+@item
+Use the backtrack tool to note any additional pixels to be masked.
+@item
+Finally, extract a 1d spectrum and look for spikes that aren't lines.
+@end enumerate
 
 
 @node  Cube Analysis, Cube Validation, Cube Building, Top
