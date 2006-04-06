@@ -21,18 +21,18 @@
 This file documents CUBISM, an IDL program for reducing and analyzing
 IRS Spectral Maps.
 
-This is edition @value{EDITION} of the CUBISM User Manual for CUBISM
-@value{VERSION}
+This is edition @value{EDITION} of the @cite{CUBISM User Manual} for
+CUBISM @value{VERSION}
 
 Copyright @copyright{} 2006 J.D. Smith
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.2 or
 any later version published by the Free Software Foundation; with no
-Invariant Sections, with the Front-Cover texts being ``A GNU
-Manual'', and with the Back-Cover Texts as in (a) below.  A copy of the
-license is included in the section entitled ``GNU Free Documentation
-License'' in the Emacs manual.
+Invariant Sections, with the Front-Cover texts being ``A GNU Manual'',
+and with the Back-Cover Texts as in (a) below.  A copy of the license is
+included in the section entitled ``GNU Free Documentation License'' in
+the Emacs manual.
 
 (a) The FSF's Back-Cover Text is: ``You have freedom to copy and modify
 this GNU Manual, like GNU software.  Copies published by the Free
@@ -101,20 +101,23 @@ the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
 
 @menu
 * Introduction::                
-* Overview::                    
 * Installation::                
-* The Tools::                   
+* Quick Start Guide::           
 * Cube Building::               
-* Cube Validation::             
 * Cube Analysis::               
+* Cube Validation::             
 * CubeProject Reference::       
 * CubeView Reference::          
 * CubeSpec Reference::          
 * Index::                       
-@detailmenu
 
 @detailmenu
  --- The Detailed Node Listing ---
+
+Installation
+
+* Source Installation::         
+* Binary Installation::         
 
 Cube Building
 
@@ -125,7 +128,16 @@ Cube Building
 @end detailmenu
 @end menu
 
-@node Introduction, Overview, Top, Top
+@c=====================================
+@c============= Chapters
+@c=====================================
+
+
+@c
+@c Introduction
+@c
+
+@node Introduction, Installation, Top, Top
 @chapter Introduction
 @cindex Introduction
 
@@ -133,29 +145,173 @@ CUBISM is a package written in the Interactive Data Language (IDL),
 which supports the analaysis and reduction of spectral maps created with
 the @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard
 the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
+CUBISM is designed to allow sets of basic calibrated data (BCDs) from
+IRS mapping observations to be combined into single 3D spectral cubes,
+with two spatial and one spectral dimension.  From these cubes, spectra
+can be extracted over differing apertures, and arbitrary maps can be
+made in spectral features (e.g. a line image).  
 
-@node Overview, Installation, Introduction, Top
-@chapter Overview
-@cindex Overview
+CUBISM consists of three main components, which together form the core
+of its analysis and reduction capabilities:
 
-General overview, requirements, etc.
+@multitable @columnfractions .2 .8
 
-@node Installation, The Tools, Overview, Top
+@item CubeProject
+@tab Manage BCD data, and track all the various information required to
+build cubes, including calibration data, background information, bad
+pixels, aperture information, etc.
+
+@item CubeView
+@tab General purpose viewer with a variety of tools for interacting with
+2D spectral images, full spectral cubes, and visualization overlay FITS
+images.
+
+@item CubeSpec
+@tab View and manipulate extracted spectra, and create maps from
+spectral cubes.
+@end multitable
+
+@noindent CUBISM is not a general purpose spectral analysis tool.  What
+analysis tools it offers are oriented directly towards the task of
+creating, validating, and analyzing spectral cubes.  Since individual
+spectra (perhaps many of them) can be output from a single cube, other
+tools can easily be used for higher order analysis of these products
+(e.g. multiple Gaussian fitting, etc.).
+
+The basics of building and manipulating a spectral cube are very simple.
+This manual is organized as follows.  After discussing the installation
+and requirements of CUBISM in @ref{Installation}, we give a fast start
+guide to building a spectral cube from a mapping data set in @ref{Quick
+Start Guide}.  We then discuss in greater depth the steps required to
+build a cube in @ref{Cube Building}, explain methods of analyzing the
+cube in @ref{Cube Analysis}, and cover validating and improving cubes in
+@ref{Cube Validation}.
+
+Note that this manual does not include information on planning IRS
+spectral mapping observations; see the
+@uref{http://ssc.spitzer.caltech.edu/irs/documents/specmap_bop/, IRS
+Spectral Map HOWTO} for information on observation planning.
+
+
+@c
+@c Installation
+@c
+
+@node Installation, Quick Start Guide, Introduction, Top
 @chapter Installation
 @cindex Installation
 
-Installing CUBISM, either as binary, source, or (eventually) CVS.
-NasaLib requirements.
+CUBISM runs under IDL, so requires a working version of IDL to function.
+There are two means of installing CUBISM: as source @file{.pro} files,
+or as a compiled binary.  The advantages of a source installation are:
 
-@node The Tools, Cube Building, Installation, Top
-@chapter The Tools
-@cindex CubeProject, intro
-@cindex CubeView, intro
-@cindex CubeSpec, intro
+@itemize @bullet
+@item
+Access to CUBISM's code for bug fixing or examining algorithms.
+@item
+Source level feedback when bugs occur (see XXX).
+@item
+Should continue to function with future versions of IDL.
+@end itemize
 
-A high-level description of CubeProject, CubeView, and CubeSpec.
+@noindent The disadvantages are:
 
-@node Cube Building, Cube Validation, The Tools, Top
+@itemize @bullet
+@item
+Must install the AstroLib dependency library, at the required version.
+@item
+Subject to routine name conflicts (e.g. two routines named
+@file{routine.pro}), so you must carefully set your @samp{IDL_PATH} to
+be sure CUBISM's files are found first.  This should not be a common
+problem, but earlier distributions of SMART did have conflicting files.
+@end itemize
+
+@noindent The advantages of installing and running a binary version of CUBISM:
+
+@itemize @bullet
+@item
+All required routines are included in the compiled file; no need to
+install external libraries.
+@item
+No routine name conflicts should occur.
+@item 
+Can be used with the freely available @emph{IDL VM}, if you don't have
+access to an IDL license.
+@end itemize
+
+
+@noindent and the disadvantages:
+
+@itemize @bullet
+@item
+No access to source code level debugging feedback when errors occur.
+@item
+More tied to the IDL version; a given binary may not work with all
+future versions of IDL (though typically binary compatibility between
+IDL versions is quite good).
+@end itemize
+
+@menu
+* Source Installation::         
+* Binary Installation::         
+@end menu
+
+@node Source Installation, Binary Installation, Installation, Installation
+@section Source Installation
+@cindex, Installation, from source
+
+The requirements for CUBISM running from source are:
+
+@enumerate
+@item
+Linux/Solaris/Unix or MacOSX.  Cubism may run under Windows, but has not
+been tested there.
+@item
+A licensed copy of IDL at version @value{IDLVERSIONREQUIRED} or later.
+Download at @uref{http://rsinc.com/idl/,from RSI}.
+@item
+The AstroLib library, available from
+@uref{http://idlastro.gsfc.nasa.gov/, NASA Goddard}.
+@item
+A compiler for C source, typically @samp{gcc}, or whatever the IDL
+routine @samp{MAKE_DLL} looks for.
+@end enumerate
+
+The compiler is required to 
+
+
+@node Binary Installation,  , Source Installation, Installation
+@section Binary Installation
+@cindex, Installation, binary
+
+The requirements for CUBISM running as a binary:
+
+@enumerate
+@item
+Linux/Solaris/Unix or MacOSX.  Cubism may run under Windows, but has not
+been tested there.
+@item
+A copy of IDL at version @value{IDLVERSIONREQUIRED} or later.  This can
+either be a fully licensed copy, or the @emph{IDL VM}, the freely
+available virtual machine.  Download either 
+@uref{http://rsinc.com/idl/,from RSI}.
+@item
+A compiler for C source, typically @samp{gcc}, or whatever the IDL
+routine @samp{MAKE_DLL} looks for.
+@end enumerate
+
+Note that running CUBISM as a binary under the free @emph{IDL VM} does
+not give access to an IDL command line, so that only the graphical
+interface to CUBISM is accessible, and analysis cannot be performed at
+the command line.  Running as a binary under a licensed version of 
+
+@node Quick Start Guide, Cube Building, Installation, Top
+@chapter Quick Start Guide
+@cindex Quick Start
+
+A quick start guide.
+
+@node Cube Building, Cube Analysis, Quick Start Guide, Top
 @chapter Cube Building
 @cindex Cube Building
 
@@ -186,16 +342,64 @@ including the use of the visualizer for selecting in situ BCDs.
 @cindex Bad Pixels
 @cindex Rogue pixels
 
-An exposition on selecting manual and automatic bad pixels.
+An exposition on selecting manual and automatic bad pixels.  Bad pixels
+are bad.  Bad pixels, bad.
 
-@node  Cube Validation, Cube Analysis, Cube Building, Top
-@chapter Cube Validation
-@cindex Cube Validation
+A number of marks are drawn in CubeView to indicate global bad pixels,
+record level bad pixels, and various conditions and flags from the
+pipeline generated mask files @samp{BMASK} and @samp{PMASK}.  The
+various symbols seen when in @samp{Mark Bad Pixel} mode are:
 
-A description of backtracking and other means of validating and
-improving the cube, and checking on weak features, etc.
 
-@node  Cube Analysis, CubeProject Reference, Cube Validation, Top
+@multitable @columnfractions .2 .8
+@item Cyan @samp{x}s
+@tab Global user-defined bad pixels, applying to all records.
+
+@item Green @samp{x}s
+@tab Record-level user bad pixels, applying only to a single record.
+
+@item Blue @samp{+}s
+@tab Locations where the @samp{PMASK} (permanent mask) has any bit set.
+The @samp{PMASK} typically contains a small number of unruly pixels.
+
+@item Red @samp{diamonds}s
+@tab Non-fatal bits set in the @samp{BMASK}.
+
+@item Red @samp{x}s
+@tab Fatal bits set in the @samp{BMASK}, bits 12, 13 and 14, i.e. none
+or only one usable sample in the exposure ramp, or pixel fatally flagged
+in the @samp{PMASK}.
+
+@end multitable
+
+@noindent See the @uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data
+Handbook} for a reference to the individual mask bits which the IRS
+pipeline applies.  Note that despite being a fatal mask value, bit 8 in
+the @samp{BMASK} (not flat fielded) is not marked, since it occurs
+everywhere off the orders.  All @samp{BMASK} values, whether marked or
+not, are indicated in the status display line. 
+
+
+When viewing and setting bad pixels in CubeView, @kbd{Mouse-3} can be
+used to cycle through 4 settings controlling which bad pixels are
+indicated:
+
+@enumerate
+@item
+All mask and user-set bad pixels marks.
+@item
+All mask and user-set bad pixels marks, except for non-fatal
+@samp{BMASK} marks.
+@item
+All fatal @samp{BMASK} mask and user-set bad pixel marks.
+@item
+Only user-set bad pixel marks.
+@end enumerate
+
+@noindent @kbd{Shift-Mouse-3} cycles in the opposite direction.
+
+
+@node  Cube Analysis, Cube Validation, Cube Building, Top
 @chapter Cube Analysis
 @cindex Cube Analysis
 
@@ -203,11 +407,20 @@ A description of cube extraction, map making, map sets, line fitting,
 etc.
 
 
+@node  Cube Validation, CubeProject Reference, Cube Analysis, Top
+@chapter Cube Validation
+@cindex Cube Validation
+
+A description of backtracking and other means of validating and
+improving the cube, and checking on weak features, etc.
+
+
+
 @c
 @c Appendices
 @c
 
-@node CubeProject Reference, CubeView Reference, Cube Analysis, Top
+@node CubeProject Reference, CubeView Reference, Cube Validation, Top
 @appendix CubeProject Reference
 @cindex CubeProject
 
