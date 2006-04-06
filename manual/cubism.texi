@@ -125,6 +125,10 @@ Cube Building
 * Backgrounds::                 
 * Bad Pixels::                  
 
+Bad Pixels
+
+* Selecting/Defining Bad Pixels::  
+
 @end detailmenu
 @end menu
 
@@ -339,6 +343,9 @@ A general reference on building cubes from BCD source.
 @cindex Files, input
 @cindex Input files
 
+File naming convention.
+
+
 @node Backgrounds, Bad Pixels, Input Files and Calibration, Cube Building
 @section Backgrounds
 @cindex Background subtraction
@@ -425,6 +432,11 @@ Only user-set bad pixel marks.
 @noindent @kbd{Shift-Mouse-3} cycles in the opposite direction.
 
 
+@menu
+* Selecting/Defining Bad Pixels::  
+@end menu
+
+@node Selecting/Defining Bad Pixels,  , Bad Pixels, Bad Pixels
 @subsection Selecting/Defining Bad Pixels
 
 Bad pixels can be identified in CUBISM either 'manually' or in an automatic fashion.  The procedure for automatically identifying bad pixels is described in Section XX.
@@ -435,8 +447,8 @@ Bad pixels can be identified in CUBISM either 'manually' or in an automatic fash
 @item
  Show the wavsamp.
 @item
- Click 'BGSub' (if available) to remove many bad pixels using the sky
- data.
+ Click @samp{BGSub} (if available) to remove many bad pixels using the
+ sky background data previously defined.
 @item
  Enlarge the stack viewer to the largest possible perspective.
 @item
