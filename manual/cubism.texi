@@ -214,24 +214,26 @@ Source level feedback when bugs occur (see XXX).
 Should continue to function with future versions of IDL.
 @end itemize
 
-@noindent The disadvantages are:
+@noindent The disadvantages of the source installation are:
 
 @itemize @bullet
 @item
 Must install the AstroLib dependency library, at the required version.
+Some (small) risk of future changes in AstroLib causing problems.
 @item
 Subject to routine name conflicts (e.g. two routines named
-@file{routine.pro}), so you must carefully set your @samp{IDL_PATH} to
-be sure CUBISM's files are found first.  This should not be a common
-problem, but earlier distributions of SMART did have conflicting files.
+@file{routine.pro} on the path), so you must carefully set your
+@samp{IDL_PATH} to be sure CUBISM's files are found first.  This should
+not be a common problem, but earlier distributions of SMART did have
+some conflicting file names.
 @end itemize
 
 @noindent The advantages of installing and running a binary version of CUBISM:
 
 @itemize @bullet
 @item
-All required routines are included in the compiled file; no need to
-install external libraries.
+All required routines are included in the compiled file at the required
+version; no need to install external libraries.
 @item
 No routine name conflicts should occur.
 @item 
@@ -244,11 +246,12 @@ access to an IDL license.
 
 @itemize @bullet
 @item
-No access to source code level debugging feedback when errors occur.
+No access to source code level debugging feedback when errors occur,
+making it harder to track down problems.
 @item
-More tied to the IDL version; a given binary may not work with all
-future versions of IDL (though typically binary compatibility between
-IDL versions is quite good).
+More closely tied to the IDL version; a given binary may not work with
+all future versions of IDL (though typically binary compatibility
+between IDL versions is quite good).
 @end itemize
 
 @menu
@@ -264,21 +267,24 @@ The requirements for CUBISM running from source are:
 
 @enumerate
 @item
-Linux/Solaris/Unix or MacOSX.  Cubism may run under Windows, but has not
-been tested there.
+A Linux/Solaris/Unix or MacOSX platform.  CUBISM may run under Windows,
+but has not been tested there.
 @item
 A licensed copy of IDL at version @value{IDLVERSIONREQUIRED} or later.
-Download at @uref{http://rsinc.com/idl/,from RSI}.
+Download @uref{http://rsinc.com/idl/,from RSI}.
 @item
 The AstroLib library, available from
-@uref{http://idlastro.gsfc.nasa.gov/, NASA Goddard}.
+@uref{http://idlastro.gsfc.nasa.gov/, NASA Goddard}.  Be sure to include
+it on your @samp{IDL_PATH}.
 @item
 A compiler for C source, typically @samp{gcc}, or whatever the IDL
 routine @samp{MAKE_DLL} looks for.
 @end enumerate
 
-The compiler is required to 
-
+The compiler is required to auto-compile a small piece of C code used to
+speed-up the cube building algorithm.  If this compilation fails, and
+IDL version of this algorithm will be used, which gives the same
+results, but operates more slowly.
 
 @node Binary Installation,  , Source Installation, Installation
 @section Binary Installation
@@ -288,12 +294,12 @@ The requirements for CUBISM running as a binary:
 
 @enumerate
 @item
-Linux/Solaris/Unix or MacOSX.  Cubism may run under Windows, but has not
-been tested there.
+A Linux/Solaris/Unix or MacOSX platform.  CUBISM may run under Windows,
+but has not been tested there.
 @item
 A copy of IDL at version @value{IDLVERSIONREQUIRED} or later.  This can
 either be a fully licensed copy, or the @emph{IDL VM}, the freely
-available virtual machine.  Download either 
+available virtual machine.  Download either
 @uref{http://rsinc.com/idl/,from RSI}.
 @item
 A compiler for C source, typically @samp{gcc}, or whatever the IDL
@@ -301,9 +307,12 @@ routine @samp{MAKE_DLL} looks for.
 @end enumerate
 
 Note that running CUBISM as a binary under the free @emph{IDL VM} does
-not give access to an IDL command line, so that only the graphical
-interface to CUBISM is accessible, and analysis cannot be performed at
-the command line.  Running as a binary under a licensed version of 
+not give you access to an IDL command line, so that only the graphical
+interface to CUBISM is accessible.  With this setup, no analysis can be
+performed at the command line, though all files, including spectra,
+maps, and cubes can be output as normal.  Running CUBISM as a binary
+under a licensed version of IDL does not prevent access to the command
+line.
 
 @node Quick Start Guide, Cube Building, Installation, Top
 @chapter Quick Start Guide
@@ -366,18 +375,18 @@ The @samp{PMASK} typically contains a small number of unruly pixels.
 @tab Non-fatal bits set in the @samp{BMASK}.
 
 @item Red @samp{x}s
-@tab Fatal bits set in the @samp{BMASK}, bits 12, 13 and 14, i.e. none
-or only one usable sample in the exposure ramp, or pixel fatally flagged
-in the @samp{PMASK}.
+@tab Fatal bits set in the @samp{BMASK}.  These are bits 12, 13 and 14,
+i.e. none or only one usable sample in the exposure ramp, or pixel
+fatally flagged in the @samp{PMASK}.
 
 @end multitable
 
 @noindent See the @uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data
-Handbook} for a reference to the individual mask bits which the IRS
+Handbook} for a reference on the individual mask bits which the IRS
 pipeline applies.  Note that despite being a fatal mask value, bit 8 in
 the @samp{BMASK} (not flat fielded) is not marked, since it occurs
 everywhere off the orders.  All @samp{BMASK} values, whether marked or
-not, are indicated in the status display line. 
+not, are indicated in the status display line.
 
 
 When viewing and setting bad pixels in CubeView, @kbd{Mouse-3} can be
