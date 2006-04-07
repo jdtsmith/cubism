@@ -118,6 +118,7 @@ Installation
 
 * Source Installation::         
 * Binary Installation::         
+* Upgrading::                   
 
 Cube Building
 
@@ -206,8 +207,12 @@ Spectral Map HOWTO} for information on observation planning.
 @cindex Installation
 
 CUBISM runs under IDL, so requires a working version of IDL to function.
-There are two means of installing CUBISM: as source @file{.pro} files,
-or as a compiled binary.  The advantages of a source installation are:
+There are two means of installing CUBISM: as a set of source @file{.pro}
+files, or as a pre-compiled binary.  Both versions can be found on
+@uref{@value{CUBISMHOMEPAGE}, the CUBISM home page}.
+
+
+The advantages of a source installation are:
 
 @itemize @bullet
 @item
@@ -227,7 +232,7 @@ Some (small) risk of future changes in AstroLib causing problems.
 @item
 Subject to routine name conflicts (e.g. two routines named
 @file{routine.pro} on the path), so you must carefully set your
-@samp{IDL_PATH} to be sure CUBISM's files are found first.  This should
+@code{IDL_PATH} to be sure CUBISM's files are found first.  This should
 not be a common problem, but earlier distributions of SMART did have
 some conflicting file names.
 @end itemize
@@ -261,13 +266,14 @@ between IDL versions is quite good).
 @menu
 * Source Installation::         
 * Binary Installation::         
+* Upgrading::                   
 @end menu
 
 @node Source Installation, Binary Installation, Installation, Installation
 @section Source Installation
 @cindex, Installation, from source
 
-The requirements for CUBISM running from source are:
+The requirements for installing and running CUBISM from source are:
 
 @enumerate
 @item
@@ -279,10 +285,10 @@ Download @uref{http://rsinc.com/idl/,from RSI}.
 @item
 The AstroLib library, available from
 @uref{http://idlastro.gsfc.nasa.gov/, NASA Goddard}.  Be sure to include
-it on your @samp{IDL_PATH}.
+it on your @code{IDL_PATH}.
 @item
-A compiler for C source, typically @samp{gcc}, or whatever the IDL
-routine @samp{MAKE_DLL} looks for.
+A compiler for C source, typically @code{gcc}, or whatever the IDL
+routine @code{MAKE_DLL} looks for.
 @end enumerate
 
 The compiler is required to auto-compile a small piece of C code used to
@@ -290,7 +296,24 @@ speed-up the cube building algorithm.  If this compilation fails, and
 IDL version of this algorithm will be used, which gives the same
 results, but operates more slowly.
 
-@node Binary Installation,  , Source Installation, Installation
+To install CUBISM from source:
+
+@enumerate
+@item
+Unpack the @file{cubism_vX.XX.tgz} file (where @file{X.XX} is the
+version number) in a directory on the IDL path (e.g. @file{~/idl}).
+@item
+Ensure the @file{irs_cubism} directory which is unpacked is on the
+@code{IDL_PATH}, e.g. by:
+
+@code{setenv IDL_PATH <IDL_DEFAULT>:+$HOME/idl}
+
+@end enumerate
+
+@noindent System-wide installation is also possible: just install in a
+location accessible by your entire group.
+
+@node Binary Installation, Upgrading, Source Installation, Installation
 @section Binary Installation
 @cindex, Installation, binary
 
@@ -306,8 +329,8 @@ either be a fully licensed copy, or the @emph{IDL VM}, the freely
 available virtual machine.  Download either
 @uref{http://rsinc.com/idl/,from RSI}.
 @item
-A compiler for C source, typically @samp{gcc}, or whatever the IDL
-routine @samp{MAKE_DLL} looks for.
+A compiler for C source, typically @code{gcc}, or whatever the IDL
+routine @code{MAKE_DLL} looks for.
 @end enumerate
 
 Note that running CUBISM as a binary under the free @emph{IDL VM} does
@@ -318,11 +341,69 @@ maps, and cubes can be output as normal.  Running CUBISM as a binary
 under a licensed version of IDL does not prevent access to the command
 line.
 
+@node Setup
+@section Setup
+@cindex Setting CUBISM Up
+
+CUBISM needs very little setup.  As long as the binary or source
+packages are left intact, CUBISM auto-discovers all the necessary
+calibration and other files it needs.  One basic setup issue relates to
+the color mode.  By default, IDL uses @emph{DECOMPOSED} color, in which
+the RBG value of pixels is directly specified, whereas CUBISM (and most
+astronomy software) relies on color table indices to specify color.  To
+switch modes, try adding the following to the file you specify with
+environment variable @code{IDL_STARTUP}:
+
+@example
+device,DECOMPOSED=0,TRUE_COLOR=24,RETAIN=2
+@end example
+
+@noindent You may not need the @code{RETAIN=2} setting depending on your window
+manager (this forces IDL to keep track of the contents of windows when
+they need to be redrawn).
+
+
+@node Upgrading,  , Binary Installation, Installation
+@section Upgrading
+@cindex Upgrading
+
+Upgrading CUBISM is as simple as replacing the source or binary
+installation directories and restarting IDL.  You can always find out
+what version of CUBISM you are running with the menu @key{Info->About
+Cubism} in the project window.
+
+
 @node Quick Start Guide, Cube Building, Installation, Top
 @chapter Quick Start Guide
 @cindex Quick Start
 
-A quick start guide.
+Building cubes from collections of BCD mapping data sets is a simple
+process: the correct BCDs are collected, the cube build parameters are
+adjusted, and the cube is built.  To get going, type:
+
+@example
+IDL> cubism
+@end example
+
+@noindent and create a new cube, giving it a useful name when prompted.
+Add a full set of mapping data with the @key{Add Data} button.  Just
+navigate to a directory and click @key{OK}, and CUBISM will search for
+all data files at or beneath that directory.  When prompted, choose the
+set of data you are interested in, and they will be loaded in.
+
+Choose @key{Edit->Select All} and then @key{Record->View Record
+Stack...} to popup a viewer displaying a stack of all the records.
+Click @samp{WAVSAMP: Edit} and drag the aperture so that it lies fully
+within the illuminated order, trimming perhaps 1 or 2 pixels from the
+order ends (where the flat-field is problematic).  Back in the main
+CubeProject window, choose @key{Cube->Build Cube}, and watch the build
+progress.  Hit the @key{View Cube} button to show it, and click on the
+@key{Extract} button (a cube with a line in it).  Click and drag an
+extraction region on the cube, and CubeSpec will popup showing you the
+extracted spectrum.  Click @key{Map} and then choose @samp{Region:
+Peak}.  Click twice to define a peak region, and you've just created a
+spectral map.
+
 
 @node Cube Building, Cube Analysis, Quick Start Guide, Top
 @chapter Cube Building
@@ -439,7 +520,9 @@ Only user-set bad pixel marks.
 @node Selecting/Defining Bad Pixels,  , Bad Pixels, Bad Pixels
 @subsection Selecting/Defining Bad Pixels
 
-Bad pixels can be identified in CUBISM either 'manually' or in an automatic fashion.  The procedure for automatically identifying bad pixels is described in Section XX.
+Bad pixels can be identified in CUBISM either 'manually' or in an
+automatic fashion.  The procedure for automatically identifying bad
+pixels is described in Section XX.
 
 @enumerate
 @item
