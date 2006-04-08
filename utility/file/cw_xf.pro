@@ -600,6 +600,7 @@ function cw_xf_event, ev
                selection=strtrim(selection[0],2)
             endif else begin
                widget_control,state.path_id,get_value=path
+               if ~file_test(path,/DIRECTORY) then cd,current=path
                widget_control, state.filelist, get_uvalue=filelist
                list=widget_info(state.files_id,/LIST_SELECT)
                if list[0] ne -1 then begin 
@@ -612,7 +613,6 @@ function cw_xf_event, ev
                endif else selection=''
             endelse 
              
-            
             ;; test final file for validity
             selection=strtrim(selection,2)
             if selection[0] eq '' then begin
@@ -654,6 +654,7 @@ function cw_xf_event, ev
             ;;--- if recentmenu was made then add items to list
             if state.recfiles_id ne 0 then begin
                widget_control, state.path_id, get_value=path
+               if ~file_test(path,/DIRECTORY) then cd,current=path
                ;;--- add file(s) and path to recent file list and recent dir
                ;;    list.
                xf_addrecent,state,selection,path
@@ -786,9 +787,9 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
                NO_SHOW_ALL=nsha, NO_HELP=nh, NO_BUTTONS=nb, SELECT=sel,  $
                SAVEFILE=sf,NO_UPDATE=nu, ON_CLICK=oc,OK_BUTTON=okbut, $
                FILT_FUNC=ff, FFNAME=ffname, KEEP_FOCUS=kf, MULTIPLE=mlt, $
-               DIRECTORY=sd
+               FILE_BOX=selection,DIRECTORY=sd
 
-   common cw_xfblock, sep, recfile
+  common cw_xfblock, sep, recfile
 
 ;------ Keyword Defaults and actions ---------
    IF (N_ELEMENTS(uval) EQ 0)  THEN uval = 0L
@@ -880,7 +881,8 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
       if strmid(start,strlen(start)-1,1) ne sep then begin ;it's a file
          start_file=file_basename(start)
          start=file_dirname(start) ;strip off file
-         if strlen(start) eq 0 then start=curr ;ensure a directory
+         if start eq '.' then start=curr else $
+            if strlen(start) eq 0 then start=curr ;ensure a directory
       endif 
    endif else begin 
       start=curr
@@ -935,6 +937,7 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    pathbase = widget_base(base,/ROW)
    nullid = widget_label(pathbase,VALUE='Directory:')
    state.path_id=widget_text(pathbase,VALUE=start,/EDIT,XSIZE=35)
+   widget_control, state.path_id,SET_TEXT_SELECT=strlen(start)
 
    ;;--- FILTER SELECTION
    filtbase = widget_base(base,/ROW,space=1,/BASE_ALIGN_CENTER)
@@ -986,10 +989,13 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    state.files_id=widget_list(state.filelist,YSIZE=12,XSIZE=22,MULTIPLE=mlt)
 
    ;;--- Selection
-   if NOT keyword_set(mlt) then begin 
-      selection=widget_base(base,/ROW)
-      nullid=widget_label(selection,value='Selection:')
-      state.selection_id=widget_text(selection,/EDIT,value=start_file,XSIZE=35)
+   if ~keyword_set(mlt) then begin 
+      sbase=widget_base(base,/ROW)
+      nullid=widget_label(sbase,value='Selection:')
+      selection=widget_text(sbase,/EDIT,value=start_file,XSIZE=35)
+      state.selection_id=selection
+      f=strpos(start_file,/REVERSE_SEARCH,'.')
+      widget_control, selection,SET_TEXT_SELECT=f gt 0?f+1:strlen(start_file)
    endif 
    
    ;;--- ACTION BUTTONS
@@ -1017,6 +1023,5 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
 
 ;----- Stash the state in the first child -----
    widget_control,widget_info(base,/CHILD),SET_UVALUE=state,/NO_COPY
-
    return,base
 end
