@@ -252,7 +252,7 @@ pro CubeViewSpec::Event,ev
               del=range[1]-range[0]
               range[0]= (nl-1-del) < range[0] > 0
               range[1]=del > range[1] < (nl-1)
-              if range[1]-range[0] lt 1 then self->Delete else $
+              if range[1]-range[0] lt 0 then self->Delete else $
                  (*self.reg[self.seltype])[*,self.selected]=range
               self->MergeRegs
               self->Plot
@@ -767,8 +767,8 @@ end
 pro CubeViewSpec::ShowRegionLine
   if self.got eq -1 then return ; we aren't defining a region
   val=self.pressloc[self.got eq 1]
-  if self.got eq 1 then plots,!X.CRANGE,val,COLOR=self.colors_base $
-  else plots,val,!Y.CRANGE,COLOR=self.colors_base
+  if self.got eq 1 then plots,!X.CRANGE,val,COLOR=self.colors_base,THICK=2 $
+  else plots,val,!Y.CRANGE,COLOR=self.colors_base,THICK=2
 end
 
 ;=============================================================================
@@ -924,13 +924,14 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   if n_elements(*self.lam) eq 0 then return
   wset,self.pixwin              ;Double buffering
   erase
-  plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=5,YSTYLE=4, $
-       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95]
+  plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=5,YSTYLE=5, $
+       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NODATA
+  self->ShowRegions
+  plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,YSTYLE=1, $
+       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NOERASE
   if self.show_error && n_elements(*self.sp_unc) gt 0 then $
      errplot,*self.lam,*self.sp-*self.sp_unc,*self.sp+*self.sp_unc
-  self->ShowRegions
-  plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,/NOERASE, $
-       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95]
+
   self.x_s=!X.S & self.y_s=!Y.S
   
   if self.Info then xyouts,.12,.97,/NORMAL,self.Info,CHARSIZE=1.2
@@ -1012,6 +1013,7 @@ pro CubeViewSpec::ShowRegions
      polyfill,wlam,wght,COLOR=self.colors_base+2
   endif 
   
+  nlam=n_elements(*self.lam)
   ;; Plot the two region types
   for j=do_weights?0:1,0,-1 do begin
      ptr=self.reg[j]
@@ -1019,6 +1021,8 @@ pro CubeViewSpec::ShowRegions
         for i=0,n_elements(*ptr)/2-1 do begin
            reg=(*ptr)[*,i]
            l=(*self.lam)[reg]
+ ;          lout=(*self.lam)[(reg+[-1,1])>0<(nlam-1)]
+ ;          l=(l+lout)/2.
            polyfill,[l[0],l[0],l[1],l[1]],[y[0],y[1],y[1],y[0]], $
                     COLOR=self.colors_base+([0,2])[j],/DATA
         endfor
@@ -1028,6 +1032,8 @@ pro CubeViewSpec::ShowRegions
   if over[0] eq -1 then return
   for i=0,n_elements(over)/2-1 do begin 
      l=(*self.lam)[over[*,i]]
+;     lout=(*self.lam)[(over[*,i]+[-1,1])>0<(nlam-1)]
+;     l=(l+lout)/2.
      polyfill,[l[0],l[0],l[1],l[1]],[y[0],y[1],y[1],y[0]], $
               COLOR=self.colors_base+1,/DATA
   endfor 
@@ -1041,6 +1047,8 @@ pro CubeViewSpec::Outline
   if self.selected eq -1 then return
   range=(*self.reg[self.seltype])[*,self.selected]
   l=(*self.lam)[range]
+;  lout=(*self.lam)[(range+[-1,1])>0<(n_elements(*self.lam)-1)]
+;  l=(l+lout)/2.
   y=!Y.CRANGE
   plots,/DATA,[l[0],l[0],l[1],l[1],l[0]],[y[0],y[1],y[1],y[0],y[0]], $
         COLOR=self.colors_base+3
@@ -1198,7 +1206,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,PARENT_GROUP=grp
   self.wSaveBut=widget_button(file,value='Save Spectrum As...')
   self.wExportBut=widget_button(file,SENSITIVE=~LMGR(/VM,/RUNTIME),  $
                                 value='Export Spectrum to Command Line...')
-  self.wQuit=widget_button(file,value='Quit')
+  self.wQuit=widget_button(file,value='Close')
   maps=widget_button(mbar,value='Maps',/MENU)
   but=widget_button(maps, value='Save Current Map...', $
                     EVENT_PRO='CubeViewSpec_map_event',UVALUE='save')
