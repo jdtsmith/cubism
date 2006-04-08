@@ -73,7 +73,7 @@ pro WSMask::Message,msg
   case type of 
      'CUBEREC_UPDATE': begin    ;cuberec tells us about new bcd's/cubes
         if ~msg.bcd_mode then begin 
-           if self->On() then self->Off,/DISABLE
+           self->Off,/DISABLE
            return
         endif else self->Enable
         ;; Change in cube: update mask
@@ -94,8 +94,9 @@ pro WSMask::Message,msg
 end 
 
 pro WSMask::Off,_EXTRA=e
+  on=self->On()
   self.oDraw->MsgSignup,self,/NONE
-  self.oDraw->Draw
+  if on then self.oDraw->Draw
   self->tvPlug::Off,_EXTRA=e
 end
 
