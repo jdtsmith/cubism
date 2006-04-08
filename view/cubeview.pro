@@ -209,7 +209,7 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   ;; Various other buttons
   resize=obj_new('tvResize',oDraw,SIZE_MENU=option_menu)
   
-  bquit=widget_button(file_menu,value="Quit",UVALUE='quit',/SEPARATOR) 
+  bquit=widget_button(file_menu,value="Close",UVALUE='quit',/SEPARATOR) 
   
   ;; put the tvD into the uvalue, to destroy on cleanup.
   widget_control,base,SET_UVALUE=oDraw,/REALIZE
