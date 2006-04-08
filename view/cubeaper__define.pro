@@ -191,22 +191,19 @@ pro CubeAper::Message, msg
                  r=reform((*vals[val]),2,2*n)
                  dist=total((p-r)^2,1)
                  wh=where(dist le 25.,cnt)
-                 if cnt gt 0 then begin ;hit one!
+                 if cnt gt 0 then begin ;we hit an edit button!
                     if cnt gt 1 then begin 
                        min=min(dist[wh],ind)
                        wh=wh[ind]
                     endif else wh=wh[0]
                     self.working_on=wh/2
                     self.editing=val+1b ;editing WS: top, bottom, sides
-                    self.side=wh mod 2 ;left or right
-;                    print,'Near: ',(['top','bottom','side'])[val], $
-;                          (['left','right'])[self.side],' Order ', $
-;                          self.working_on
+                    self.side=wh mod 2 ;which side: left or right
                     self.save=[msg.X,msg.Y]
-                    erase
-                    self.oDraw->Redraw,/SNAPSHOT
+                    ;; Take the working aperture out of the backing store
+                    self.oDraw->Redraw,/SNAPSHOT,/NO_SHOW
                     self.oDraw->MsgSignup,self,/DRAW_MOTION
-                    self->DrawOneWS,self.working_on
+                    ;;self->DrawOneWS,self.working_on
                     nap=n_elements(*self.aps)
                     ;; Unlock, ensure an aperture for every order
                     if ~(self.mode AND 4b) then begin 
@@ -229,7 +226,7 @@ pro CubeAper::Message, msg
               self.working_on=-1
               self.oDraw->MsgSignup,self,DRAW_MOTION=0 ;turn off motion
               self.editing=0b
-              self.oDraw->ReDraw,/SNAPSHOT
+              self.oDraw->ReDraw,/SNAPSHOT,/NO_SHOW
               ;; Send update message
            end
         endcase 
