@@ -165,10 +165,11 @@
 ;       zoom, etc.  Plugins should only *read* the image passed.
 ;
 ;    TVDRAW_REDRAW: Plug-ins which draw atop the image (e.g., a box or
-;       line) or otherwise need to be alerted when the image is
-;       redrawn should subcribe to TVDRAW_REDRAW.  The scaled image is
-;       passed along, but often won't be needed.  Another options is
-;       to subscript to SNAPSHOT images.
+;       line or other symbol set) or otherwise need to be alerted when
+;       the image is redrawn should subcribe to TVDRAW_REDRAW.  The
+;       scaled image is passed in the message, but often won't be
+;       needed.  Another option (usually better) is to use SNAPSHOT
+;       messages.
 ;
 ;    TVDRAW_SNAPSHOT: An alternative to REDRAW.  For plug-ins which
 ;      draw detailed, but infrequently changing features on top of the
@@ -178,8 +179,8 @@
 ;      would be used *instead of* the normal method of replotting on
 ;      receipt of REDRAW messages, and can significantly reduce
 ;      flicker, especially for complex overplots, since REDRAW
-;      messages occur far more frequently than SNAPSHOT messages
-;      SNAPSHOT's should occur only when a static overpattern is added
+;      messages occur far more frequently than SNAPSHOT messages.
+;      SNAPSHOTs should occur only when a static overpattern is added
 ;      or removed.  The penalty is that the image itself has to be
 ;      fully redrawn (either by side effect, or directly using
 ;      oDraw->Redraw,/SNAPSHOT to initiate) when the overplot is added
@@ -221,10 +222,10 @@
 ;   |               |  pixel (offset[0],offset[1])|    |    |    |  |     |
 ;   |               |    /       center at .5     |    |    |    |  |     |
 ;   | pan[0]        +---/+----+----+----+----+----+----+----+----+  |     |
-;   +---------------+  / |    |    |    |    |    |    |    |    |  |     |
+;   +-------------->+  / |    |    |    |    |    |    |    |    |  |     |
 ;   |               |    |    |    |    |    |    |    |    |    |  |     |
 ;   | device        +--+-+----+----+----+----+----+----+----+----+  ~     |
-;   | coordinates      |                                                  |
+;   | coordinates      ^                                                  |
 ;   |                  | pan[1]                                           |
 ;   +------------------+--------------------------------------------------+
 ;
@@ -555,7 +556,7 @@ end
 ;  EraseBackGround - Set the smooth background color
 ;=============================================================================
 pro tvDraw::EraseBackground
- erase,COLOR=self.bottom+(self.top-self.bottom)/2
+  erase,COLOR=self.bottom+(self.top-self.bottom)/2
 end
   
 ;=============================================================================
@@ -590,10 +591,18 @@ end
 ;=============================================================================
 pro tvDraw::Snapshot
   self->MsgSend,/SNAPSHOT       ;see who wants to get in on the background
+  db=!D.WINDOW eq self.dbwin
   wset,self.pixwin
-  device,copy=[0,0,self.winsize,0,0,self.drawwin]
-  wset,self.dbwin
-  device,copy=[0,0,self.winsize,0,0,self.drawwin]
+  
+  if db then begin 
+     ;; Just copy over from db to the pix backing
+     device,copy=[0,0,self.winsize,0,0,self.dbwin]
+  endif else begin 
+     ;; Copy the draw window to both pixwin and dbwin.
+     device,copy=[0,0,self.winsize,0,0,self.drawwin]
+     wset,self.dbwin
+     device,copy=[0,0,self.winsize,0,0,self.drawwin]
+  endelse 
   wset,self.drawwin
 end
 
@@ -612,21 +621,26 @@ pro tvDraw::FlushRedraws
 end
 
 ;=============================================================================
-;  ReDraw - Quickly redraw the already computed draw image.
+;  ReDraw - Quickly redraw the already computed draw image, to the
+;           double, buffer area if no_show is requested.
 ;=============================================================================
-pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era
+pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era,NO_SHOW=no_show
   snap=keyword_set(snap) 
   if self.redraw_queue then begin ;; queue any redraws
      self.redraw_queue OR= 2b OR (4b*snap)
      return
   endif 
   if snap then begin 
-     self->SetWin
+     no_show=keyword_set(no_show) 
+     if no_show then oldwin=!D.WINDOW
+     ;; do it all to the double buffer
+     self->SetWin,DOUBLE=no_show
      if keyword_set(era) then self->EraseBackground
   endif 
   tv, *self.imdisp, self.pan[0], self.pan[1] 
   if snap then self->Snapshot
   self->SendRedraw
+  if snap && no_show then wset,oldwin
 end
 
 ;=============================================================================
@@ -650,15 +664,10 @@ end
 pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
   if NOT ptr_valid(self.imorig) then return ;gotta have something there.
   if n_elements(pre) eq 0 then pre=1
-  
-  if keyword_set(db) then begin 
-     ;;Direct all drawing to an offscreen pixmap
-     dw=self.drawwin
-     self.drawwin=self.dbwin
-  endif 
+  db=keyword_set(db) 
   
   ;; Set the window
-  self->SetWin
+  self->SetWin,DOUBLE=db
   if obj_valid(self.oColor) then self.oColor->SetColors,/NO_REDRAW
   
   ;; Set the original image
@@ -702,9 +711,8 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
   ;; Send out POSTDRAW and REDRAW messages, and let the plugins play
   self->MsgSend,/POSTDRAW,/REDRAW
   
-  if keyword_set(db) then begin 
-     self.drawwin=dw            ;put it all back, and copy the image over
-     wset,dw
+  if db then begin 
+     self->SetWin
      device,COPY=[0,0,self.winsize,0,0,self.dbwin]
   endif 
 end
