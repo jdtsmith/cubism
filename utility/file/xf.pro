@@ -108,13 +108,15 @@ pro xf,file, _EXTRA=e, TITLE=t, PARENT_GROUP=xfp,GROUP=group, $
     base=widget_base(TITLE = t,/COLUMN,uvalue=fileptr,xoffset=xoff, $
                      yoffset=yoff,MODAL=md)
 
-   fileloader=cw_xf(base,UVALUE='file',_EXTRA=e)
+   fileloader=cw_xf(base,UVALUE='file',FILE_BOX=sel,_EXTRA=e)
    
    button=widget_button(base,value=cancel,uvalue="cancel")
    
    if keyword_set(xfp) then $
       widget_control, base, /REALIZE, CANCEL_BUTTON=button $
    else widget_control, base, /REALIZE
+   if n_elements(sel) gt 0 && widget_info(sel,/VALID_ID) then $
+      widget_control, sel,/INPUT_FOCUS
    
    XManager,'xf', base,GROUP=group,NO_BLOCK=0
    ;; get the value of the filename, and put into file
