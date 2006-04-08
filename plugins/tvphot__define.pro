@@ -167,8 +167,15 @@ function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
   s=size(im,/DIMENSIONS)
   
   ;; regular centroid
-  tm=total(im,2,/NAN) & x=total(tm*(findgen(s[0])+.5),/NAN)/total(tm)
-  tm=total(im,1,/NAN) & y=total(tm*(findgen(s[1])+.5),/NAN)/total(tm)
+  tm=total(im,2,/NAN) & ttm2=total(tm) 
+  tm=total(im,1,/NAN) & ttm1=total(tm)
+  if ttm2 eq 0.0 || ttm1 eq 0.0 then begin 
+     err=1b
+     return,[-1.,-1.]
+  endif 
+  
+  x=total(tm*(findgen(s[0])+.5),/NAN)/ttm2
+  y=total(tm*(findgen(s[1])+.5),/NAN)/ttm1
   
   ;; daophot-style spatial derivative centroid
   x2=round(x) & y2=round(y)     ;central pixel for centroid box (derivatives)
