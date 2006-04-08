@@ -1002,6 +1002,9 @@ pro CubeProj::Initialize
   ;; (e.g. if loaded from file)
   parts=stregex(self.version,'v([0-9.]+)',/SUBEXPR,/EXTRACT)
   version=float(parts[1])
+  if version lt 0.95 then begin ;; Didn't know about IN_CUBE back then
+     if ptr_valid(self.DR) then (*self.DR).IN_CUBE=~(*self.DR).DISABLED
+  endif 
   if version lt 0.91 then self->SetProperty,OVERSAMPLE_FACTOR=1.0
   if version lt 0.89 then self->SetProperty,/LOAD_MASKS
   if version lt 0.87 then self->SetProperty,/USE_BACKGROUND
@@ -2168,6 +2171,9 @@ pro CubeProj::LoadVisualize,SELECT=sel
   im=readfits(self.visualize_file,hdr)
   catch,/cancel
   
+  if size(im,/N_DIMENSIONS) ne 2 then $
+     self->Error,"Failed to read visualization image."
+  
   ptr_free,self.visualize_image,self.visualize_header
   self.visualize_image=ptr_new(im,/NO_COPY)
   self.visualize_header=ptr_new(hdr,/NO_COPY)
@@ -2182,15 +2188,21 @@ end
 function CubeProj::VisualizeAstrom
   if ~ptr_valid(self.visualize_header) then return,-1
   
-  extast,*self.visualize_header,astr,code
+  hdr=*self.visualize_header
+  ;; First precess if necessary
+  if get_equinox(hdr) ne 2000.0 then $
+     hprecess,hdr,2000.0
+ 
+  extast,hdr,astr,code
   if code eq 4 then begin       ;convert from gss to normal header
-     gsss_stdast,*self.visualize_header
-     extast,*self.visualize_header,astr
+     gsss_stdast,hdr
+     extast,hdr,astr
   endif 
   
-  ;; Take care of non-celestial images
+  ;; Take care of non-celestial images (e.g. Galactic)
   if strpos(astr.ctype[0],'RA') ne 0 || strpos(astr.ctype[1],'DEC') ne 0 then $
      heuler,astr,/CELESTIAL
+  
   return,astr
 end
 
