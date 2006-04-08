@@ -69,21 +69,37 @@
 ;##############################################################################
 
 pro tvResize_event,ev
-  widget_control, ev.id,GET_UVALUE=self
+  widget_control, ev.handler,GET_UVALUE=self
   self->Event,ev
 end
 
 pro tvResize::Event,ev
-  widget_control, ev.id,GET_VALUE=val
-  val=fix(val)
-  self.oDraw->SetProperty,WINSIZE=[val,val]
+  widget_control, ev.id,GET_UVALUE=val
+  if size(val,/type) eq 7 then begin 
+     device,get_screen_size=ss
+     self.oDraw->GetProperty,ZOOM=zm,SIZE=sz,WINSIZE=winsize
+     maxsz=ss*2/3
+     targ=zm*sz
+     if ~array_equal(targ lt maxsz,1b) then begin 
+        ;; Image too big, pick another zoom.
+        zm=min(float(maxsz)/sz)
+        if zm lt 1.0 then zm=1./ceil(1./zm) else zm=floor(zm)
+        targ=(zm*sz)>winsize
+     endif 
+     self.oDraw->SetProperty,WINSIZE=targ,OFFSET=[0,0]
+  endif else begin 
+     val=(*self.sizes)[val]
+     self.oDraw->SetProperty,WINSIZE=[val,val]
+  endelse 
 end
 
 pro tvResize::BuildMenu
   if ~ptr_valid(self.sizes) then return
   if ~widget_info(self.wMenu,/VALID_ID) then return
   for i=0,n_elements(*self.sizes)-1 do $
-     b=widget_button(self.wMenu,VALUE=strtrim((*self.sizes)[i],2),UVALUE=self)
+     b=widget_button(self.wMenu,VALUE=strtrim((*self.sizes)[i],2),UVALUE=i)
+  b=widget_button(self.wMenu,VALUE='Wrap',UVALUE='fullzoom', $
+                 /SEPARATOR)
 end
 
 
