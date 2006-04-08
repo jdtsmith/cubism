@@ -206,7 +206,7 @@ pro CubeRec::Message, msg
                  self.cur_wav, self.cube,self.MODULE,self.BCD,self.BCD_BMASK, $
                  self.UNCERTAINTY, astr,self.rec_set,cal_update,badpix_update}
   ptr_free,astr
-  if ~badpix_update then self->UpdateView
+  if ~(cal_update || badpix_update) then self->UpdateView
 end
 
 ;=============================================================================
