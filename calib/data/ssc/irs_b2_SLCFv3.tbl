@@ -2,8 +2,10 @@
 \ comment= Region of integration is X:  464.00:884.00 Y: 660.88:687.12
 \ comment ks 17/08/05  -  v1.0 Derived in August by using STinyTim and assuming slit size 
 \ comment ks 17/08/05        for Long Low of 168 x 10.5 arcsecs
-\comment  ks 17/08/05  - v1.1 -- will need to derive exact slit size from later data
-|wavelength|  correction  |
+\ comment  ks 17/08/05  - v1.1 -- will need to derive exact slit size from later data
+|wavelength|  slcf  |
+| real     |   real |
+| micron   |        |
         13    0.8641
         14    0.8454
         15    0.8251
