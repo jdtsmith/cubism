@@ -5,17 +5,16 @@
 ;
 ; DESCRIPTION:
 ;    
-;    Reads ascii files in the form of IPAC tables, and returns
+;    Reads ASCII files in the form of IPAC tables, and returns
 ;    columnar data in a structure.
 ;    
 ; CATEGORY:
 ;
-;    IRS Spectral Reduction, Analysis and Processing.
 ;    File I/O
 ;    	
 ; CALLING SEQUENCE:
 ;
-;    st=read_ipac_table(file, [hdr], [HEADERS=,UNITS=])
+;    st=read_ipac_table(file, [hdr], [UNITS=])
 ;
 ; INPUT PARAMETERS:
 ;
@@ -23,7 +22,7 @@
 ;			
 ; OPTIONAL OUTPUT PARAMETERS:
 ;
-;    hdr: The headers as string array.
+;    hdr: The header cards as string array.
 ;    
 ; OPTIONAL OUTPUT KEYWORD PARAMETERS:
 ;
