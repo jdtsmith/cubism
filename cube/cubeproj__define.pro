@@ -1529,7 +1529,7 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err,_EXTRA=e
   if size(file,/TYPE) ne 7 then return ;cancelled
   openr,un,file,/GET_LUN
   catch,type
-  if type then begin 
+  if type ne 0 then begin 
      catch,/cancel 
      point_lun,un,0
      bglist=lonarr(file_lines(file),/NOZERO)
@@ -1544,7 +1544,7 @@ pro CubeProj::LoadBackGroundList,file,ERROR=err,_EXTRA=e
      line=''
      readf,un,line
      afrac=0.0 & acnt=0L
-     reads,line,afrac,acnt,FORMAT='(F0,I0)'
+     reads,line,afrac,acnt,FORMAT='(F0,I0)' ; will throw error for "normal" BGL
      alist=lonarr(acnt)
      readf,un,alist
      bfrac=0.0 & bcnt=0L
@@ -3190,7 +3190,8 @@ pro CubeProj::Flux,lam,sp,ORDER=ord,SLCF=do_slcf,PIXEL_OMEGA=solid
   if ord eq 0 then self->Error,'Cannot flux combined multi-order spectrum.'
   self.cal->GetProperty,self.MODULE,ord,FLUXCON=fluxcon,TUNE=tune, $
                         KEY_WAV=key_wav,SLCF=slcf, $
-                        PIXEL_OMEGA=pix_effective_omega
+                        PIXEL_OMEGA=pix_effective_omega, $
+                        DATE_OBS=self->MinObservedDate()
   flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
   
   if keyword_set(do_slcf) then begin 
@@ -3223,7 +3224,9 @@ function CubeProj::FluxImage
   for i=0,n_elements(ords)-1 do begin 
      lam=(*prs[i]).lambda
      self.cal->GetProperty,self.MODULE,ords[i],FLUXCON=fluxcon,TUNE=tune, $
-                           KEY_WAV=key_wav,SLCF=slcf,PIXEL_OMEGA=pix_omega
+                           KEY_WAV=key_wav,SLCF=slcf,PIXEL_OMEGA=pix_omega, $
+                           DATE_OBS=self->MinObservedDate()
+     
      flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
      if ptr_valid(slcf) then begin 
         slcf=*slcf
@@ -3263,6 +3266,16 @@ function CubeProj::FluxUnits,AS_BUILT=as_built,INTEGRATE=int
   return,units
 end
 
+;=============================================================================
+;  MinObservedDate - Find the oldest observed date among non-disabled
+;                    records
+;=============================================================================
+function CubeProj::MinObservedDate
+  if ~ptr_valid(self.DR) then return,-1
+  wh=where(~(*self.DR).DISABLED,good_cnt)
+  if good_cnt eq 0 then return,-1
+  return,min((*self.DR)[wh].DATE_OBS)
+end
 
 ;=============================================================================
 ;  AddMergeRec - Add a merge record for a given order, index and
@@ -4592,7 +4605,7 @@ function CubeProj::GuessBadPix,MAXVAR=maxvar,MINFRAC=minfrac, $
   if n_elements(maxvar) eq 0 then maxvar=wb?5.0:10.0
   if n_elements(minfrac) eq 0 then minfrac=wb?.1:.5 
   
-  use_bg=self.as_built.use_bg && wb
+  use_bg=self.as_built.use_bg && wb && ptr_valid(self.BACKGROUND)
   
   if ~ptr_valid(self.AUTO_BPL.BCD_PIX) then begin 
      ;; Nothing cached, rebuild full cube backtrack
@@ -5999,7 +6012,7 @@ pro CubeProj__define
        COLUMN: 0L,$             ;the step number perpendicular to the slit
        ROW:0L, $                ;the step number parallel to the slit
        DATE:0.0D, $             ;the date this BCD was added
-       DATE_OBS:0.0D, $         ;the date this BCD was observed
+       DATE_OBS:0.0D, $         ;the (julian) date this BCD was observed
        HEADER: ptr_new()}       ;a pointer to a string array
   
   ;; The widget info
