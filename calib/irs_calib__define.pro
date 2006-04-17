@@ -320,7 +320,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
                             PLATE_SCALE=ps,PIXEL_OMEGA=po,PMASK=pmask, $
                             FLUXCON=fluxcon,KEY_WAV=fluxcon_kw,TUNE=tune, $
-                            SLCF=slcf,WAVECUT=wavecut
+                            SLCF=slcf,WAVECUT=wavecut,DATE_OBS=dobs
   if arg_present(pmask) then begin 
      m=irs_module(module)
      pmask=self.PMASK[m]
@@ -339,9 +339,25 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   if arg_present(wmx) then  wmx=rec.WAV_MAX
   if arg_present(ps) then   ps=rec.PLATE_SCALE
   if arg_present(po) then po=rec.PIXEL_OMEGA
-  if arg_present(fluxcon) then fluxcon=rec.FLUXCON
-  if arg_present(fluxcon_kw) then fluxcon_kw=rec.FLUXCON_KEY_WAV
-  if arg_present(tune) then tune=rec.TUNE
+  
+  ;; Date-specific fluxcons
+  if arg_present(fluxcon) || arg_present(fluxcon_kw) || $
+     arg_present(tune) then begin 
+     if ptr_valid(rec.FLUXCON) then begin 
+        dates=(*rec.FLUXCON).VALID_FROM
+        if n_elements(dobs) gt 0 then begin 
+           keep=where(dobs-dates gt 0.0,cnt)
+           if cnt eq 0 then $ ;observed date before any cut-on date
+              message, 'Cannot find valid FLUXCON for this date!'
+           void=min(dobs-dates[keep],pos)
+           keep=keep[pos]
+        endif else void=min(dates,keep) ;assume the original, oldest cal
+        fc=(*rec.FLUXCON)[keep]
+        if arg_present(fluxcon) then fluxcon=fc.FLUXCON
+        if arg_present(fluxcon_kw) then fluxcon_kw=fc.FLUXCON_KEY_WAV
+        if arg_present(tune) then tune=fc.TUNE
+     endif 
+  endif 
   if arg_present(wavecut) then wavecut=rec.WAVECUT  
   ;;if arg_present(sz) then sz=self.detsize[*,0>irs_module(module)<5]
 end
@@ -397,15 +413,27 @@ function IRS_Calib::Info, modules, orders,SHORT=short
      if tif ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'TILT',tif)]
      pmf=file_basename(self.PMASK_FILE[md])
      if pmf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'PMASK',pmf)]
-     fcf=file_basename(self.FLUXCON_FILE[md])
-     if fcf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'FLUXCON',fcf)]
+     
+     fcf=self.FLUXCON_FILE[md]
+     if ptr_valid(fcf) then begin 
+        for f=0,n_elements(*fcf)-1 do begin 
+           fc=file_basename((*fcf)[f])
+           if fc ne '' then $
+              str=[str,string(FORMAT='(A12,": ",A)', $
+                              'FLUXCON' + (f gt 0?strtrim(f+1,2):''), $
+                              fc)]
+        endfor 
+     endif 
+     
      slcff=file_basename(self.SLCF_FILE[md])
      if slcff ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'SLCF',slcff)]
      wcf=file_basename(self.WAVECUT_FILE[md])
      if wcf then str=[str,string(FORMAT='(A12,": ",A)','WAVECUT',wcf)]
-     str=[str,string(FORMAT='(A39,": ",G12.5)',"Plate Scale (deg)", $
+     
+     str=[str,'']
+     str=[str,string(FORMAT='(A37,": ",G12.5)',"Plate Scale (deg)", $
                      (*self.cal[md])[0].PLATE_SCALE)]
-     str=[str,string(FORMAT='(A39,": ",G12.5)', $
+     str=[str,string(FORMAT='(A37,": ",G12.5)', $
                      "Pixel Effective Solid Angle (sr)", $
                      (*self.cal[md])[0].PIXEL_OMEGA)]
      
@@ -419,28 +447,43 @@ function IRS_Calib::Info, modules, orders,SHORT=short
                              rec.Date eq 0.0D?"--":jul2date(rec.Date))]
         nw=ptr_valid(rec.WAVSAMPS)?n_elements(*rec.WAVSAMPS):0
         str=[str, $
-             string(FORMAT='("         Position: Z: ",F8.3," Y:",' + $
+             string(FORMAT='("        Position: Z: ",F8.3," Y:",' + $
                     'F8.3," Angle:",F8.3)',rec.TPF_Z,rec.TPF_Y,REC.TPF_ANGLE)]
         if rec.order eq 0 then continue ;just a stub order
         if rec.RecoveredPolys then $
            str=[str,"          Recovered from WAVSAMP:"]
         str=[str, $
-             "          A:"+strjoin(string(FORMAT='(G11.3)',rec.A)), $
-             "          B:"+strjoin(string(FORMAT='(G11.3)',rec.B)), $
-             "          C:"+strjoin(string(FORMAT='(G11.3)',rec.C)), $
-             "          SLIT_LENGTH:"+string(FORMAT='(G10.3)', $
+             "         A:"+strjoin(string(FORMAT='(G11.3)',rec.A)), $
+             "         B:"+strjoin(string(FORMAT='(G11.3)',rec.B)), $
+             "         C:"+strjoin(string(FORMAT='(G11.3)',rec.C)), $
+             "         SLIT_LENGTH:"+string(FORMAT='(G10.3)', $
                                              rec.SLIT_LENGTH),$
-             "          WAVELENGTH(min,center,max):" + $
+             "         WAVELENGTH(min,center,max):" + $
              string(FORMAT='(3F10.4)',rec.WAV_MIN,rec.WAV_CENTER,rec.WAV_MAX),$
-             "          WAVECUT:" + $
+             "         WAVECUT:" + $
              (array_equal(rec.WAVECUT,0.0)?" none": $
-              string(FORMAT='(" Low: ",F10.4," High:",F10.4)',rec.WAVECUT)), $
-             "          FLUXCON:"+string(FORMAT='(G12.3)',rec.FLUXCON)+ $
-             " KEY WAVLENGTH: "+ string(FORMAT='(G8.3)',rec.FLUXCON_KEY_WAV),$
-             "          TUNE: "+strjoin(string(FORMAT='(G9.3)',rec.TUNE))]
+              string(FORMAT='(" Low: ",F10.4," High:",F10.4)',rec.WAVECUT))]
+        
+        
+        if ptr_valid(rec.FLUXCON) then begin 
+           for f=0,n_elements(*rec.FLUXCON)-1 do begin 
+              fc=(*rec.FLUXCON)[f]
+              add=f gt 0?strtrim(f,2)+': ':' : '
+              if fc.VALID_FROM gt 0.0D then $
+                 str=[str,'         -- FC'+strtrim(f,2)+ $
+                      ' Valid from: '+jul2date(fc.VALID_FROM)]
+              str=[str,$
+                   "          FLUXCON"+add+string(FORMAT='(G12.5)', $
+                                                  fc.FLUXCON), $
+                   "         KEY WAVE"+add+string(FORMAT='(G8.4)', $
+                                                fc.FLUXCON_KEY_WAV),$
+                   "             TUNE"+add+strjoin(string(FORMAT='(G9.4)', $
+                                                       fc.TUNE))]
+           endfor 
+        endif 
         if nw gt 0 then $
-           str=[str,"          Apertures:"] else $
-           str=[str,"       No Apertures"]
+           str=[str,"         Apertures:"] else $
+           str=[str,"      No Apertures"]
         for k=0,nw-1 do begin 
            flags=""
            ws=(*rec.WAVSAMPS)[k]
@@ -1115,7 +1158,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
      cals=cals[which]           ;only these cals are to be used
      version=version[which]
   endif 
-
+  
   if n_elements(module) ne 0 then modules=[irs_module(module)] $
   else modules=indgen(4)        ;do them all, by default
   
@@ -1124,6 +1167,10 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
      for j=0,scnt-1 do begin 
+        ;; Free FLUXCON point if asked for and already in place
+        if cals[singles[j]].name eq 'FLUXCON' && ptr_valid(self.cal[i]) then $
+           ptr_free,(*self.cal[i]).FLUXCON
+        
         ;; Skip ORDFIND and LINETILT if we are recovering them from WS
         if keyword_set(rcvfws) then $
            if cals[singles[j]].name eq 'ORDFIND' || $
@@ -1170,25 +1217,26 @@ function IRS_Calib::CalibrationFileVersion,base,version,name,type,md
   @cubism_dir                    ;get irs_calib_dir
   ;; A specific version was requested, check it
   if version gt 0 then begin 
-     cfile=filepath(ROOT_DIR=irs_calib_dir,SUBDIRECTORY='ssc', $
-                    base+strtrim(version,2)+'.'+type)
-     if ~file_test(cfile,/READ,/REGULAR) then $
-        message,'No such calibration file: '+cfile
-  endif 
-        
-  ;; Find all versions for this module
-  if version eq 0 then begin 
-     cal_files=findfile(COUNT=fcnt,filepath(ROOT=irs_calib_dir, $
-                                            SUBDIR="ssc",base+"*."+type))
+     all_vers=file_search(filepath(ROOT_DIR=irs_calib_dir,SUBDIRECTORY='ssc', $
+                                   base+strtrim(version,2)+'*.'+type))
+     wh=where(file_test(all_vers,/READ,/REGULAR),cnt)
+     if cnt eq 0 then message,'No such calibration file: '+cfile
+     cfile=all_vers[wh]
+  endif else begin 
+     ;; Find all versions for this modul
+     cal_files=file_search(filepath(ROOT=irs_calib_dir,SUBDIRECTORY='ssc', $
+                                    base+"*."+type),COUNT=fcnt)
      if fcnt eq 0 then begin 
         message,/CONTINUE,"Didn't find any calibration files: " +$
                 name+(n_elements(md) ne 0?(' for '+irs_module(md,/TO_NAME)):"")
         return,-1
      endif
-     vers=max(fix((stregex(cal_files,base+"([0-9]+)"+"."+type+"$",$
-                           /EXTRACT,/SUBEXPR))[1,*]),mpos)
-     cfile=cal_files[mpos]      ;use the latest version
-  endif 
+     major_version=fix((stregex(cal_files,base+"([0-9]+)[a-z]*"+"."+type+"$",$
+                                /EXTRACT,/SUBEXPR))[1,*])
+     mx=max(major_version)
+     wh=where(major_version eq mx,cnt)
+     cfile=cal_files[wh]      ;use the latest version
+  endelse
   return,cfile
 end
 
@@ -1415,16 +1463,26 @@ end
 ;=============================================================================
 pro IRS_Calib::ParseFluxcon,file,module
   m=irs_module(module)
-  data=read_ipac_table(file)
-  for i=0,n_elements(data.ORDER)-1 do begin 
-     rec=self->GetRecord(m,data[i].ORDER)
-     rec.TUNE=[data[i].a0,data[i].a1,data[i].a2,data[i].a3, $
-               data[i].a4,data[i].a5]
-     rec.FLUXCON=data[i].fluxcon
-     rec.FLUXCON_KEY_WAV=data[i].key_wavelength
-     self->SetRecord,rec
-  endfor
-  self.FLUXCON_FILE[m]=file 
+  for f=0,n_elements(file)-1 do begin 
+     data=read_ipac_table(file[f],h)
+     valid_from=ipac_table_xpar(h,'VALIDFROM',COUNT=vcnt)
+  
+     for i=0,n_elements(data.ORDER)-1 do begin 
+        rec=self->GetRecord(m,data[i].ORDER)
+        fc={IRS_FLUXCON}        ;new fluxcon record
+        if vcnt then fc.VALID_FROM=valid_from ;else leave 0.0D
+        fc.TUNE=[data[i].a0,data[i].a1,data[i].a2,data[i].a3, $
+                 data[i].a4,data[i].a5]
+        fc.FLUXCON=data[i].fluxcon
+        fc.FLUXCON_KEY_WAV=data[i].key_wavelength
+        if ptr_valid(rec.FLUXCON) then *rec.FLUXCON=[*rec.FLUXCON,fc] $
+        else rec.FLUXCON=ptr_new(fc)
+        self->SetRecord,rec
+     endfor
+  endfor 
+  if ptr_valid(self.FLUXCON_FILE[m]) then $
+     *self.FLUXCON_FILE[m]=[*self.FLUXCON_FILE[m],file] $
+  else self.FLUXCON_FILE[m]=ptr_new(file)
 end
 
 ;=============================================================================
@@ -1518,13 +1576,14 @@ end
 pro IRS_Calib::Cleanup
   for i=0,3 do begin 
      if ptr_valid(self.cal[i]) then begin
+        ptr_free,(*self.cal[i]).FLUXCON
         ws_list=(*self.cal[i]).WAVSAMPS
         for j=0,n_elements(ws_list)-1 do $
            if ptr_valid(ws_list[j]) then self->CleanWAVSAMP,*ws_list[j]
         ptr_free,ws_list,self.cal[i]
      endif 
   endfor 
-  ptr_free,self.PMASK
+  ptr_free,self.PMASK,self.SLCF,self.FLUXCON_FILE
 end
 
 ;=============================================================================
@@ -1546,21 +1605,22 @@ end
 ;  IRS_Calib__define - Define the IRS_Calib class
 ;=============================================================================
 pro IRS_Calib__define
-  class={IRS_Calib, $         
-         Name: '', $            ;A name for this IRS Calibration object
-         PLATESCALE_FILE:'', $  ;The name of the plate scale file
-         PIXEL_OMEGA_FILE: '', $ ;Name of the pixel solid angle file
-         FRAMETABLE_FILE:'', $  ;name for frametable file
-         WAVSAMP_FILE:strarr(5), $ ;the names of the wavsamp files (WAVSAMP)
-         TILT_FILE:strarr(5),$  ;the name of the LINETILT file (c)
-         ORDER_FILE:strarr(5),$ ;the name of the ORDFIND file (a's & b's)
-         FLUXCON_FILE:strarr(5),$ ;the name of the FLUXCON coefficient file
-         PMASK_FILE:strarr(5),$ ;the name of the pmask files   
-         SLCF_FILE:strarr(5), $ ;name of the SLCF files
-         WAVECUT_FILE:strarr(5), $ ;the name of the WAVECUT files (if any)
-         PMASK:ptrarr(5), $     ;the pmask, one for each module
-         SLCF: ptrarr(5), $     ;SLCF for each module (at most)
-         cal: ptrarr(5)}        ;Lists of IRS_CalibRec structs, one list
+  c={IRS_Calib, $         
+     Name: '', $                ;A name for this IRS Calibration object
+     PLATESCALE_FILE:'', $      ;The name of the plate scale file
+     PIXEL_OMEGA_FILE: '', $    ;Name of the pixel solid angle file
+     FRAMETABLE_FILE:'', $      ;name for frametable file
+     WAVSAMP_FILE:strarr(5), $  ;the names of the wavsamp files (WAVSAMP)
+     TILT_FILE:strarr(5),$      ;the name of the LINETILT file (c)
+     ORDER_FILE:strarr(5),$     ;the name of the ORDFIND file (a's & b's)
+     FLUXCON_FILE:ptrarr(5),$   ;the name of the FLUXCON coefficient file
+                                ; may be multiple per order (time forking).
+     PMASK_FILE:strarr(5),$     ;the name of the pmask files   
+     SLCF_FILE:strarr(5), $     ;name of the SLCF files
+     WAVECUT_FILE:strarr(5), $  ;the name of the WAVECUT files (if any)
+     PMASK:ptrarr(5), $         ;the pmask, one for each module
+     SLCF: ptrarr(5), $         ;SLCF for each module (at most)
+     cal: ptrarr(5)}            ;Lists of IRS_CalibRec structs, one list
                                 ;for each module: 0:LH, 1:LL, 2:SH, 3:SL 4:MSED
   
   ;; The complete calibration set for a single order in one module.
@@ -1584,11 +1644,17 @@ pro IRS_Calib__define
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
        C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
        RecoveredPolys: 0,$      ;recovered ordfind/linetilt from WS
-       FLUXCON:0.0, $           ;the fluxcon value for this order e/s/Jy
-       FLUXCON_KEY_WAV:0.0,$    ;fluxcon reference wavelength
-       TUNE:fltarr(6),$         ;fluxcon tuning coefficients "a"
+       FLUXCON: ptr_new(), $    ;a list of 1 or more IRS_FLUXCON records
        WAVSAMPS: ptr_new()}     ;A list of IRS_WAVSAMP structs
                                 ; (cached for various apertures, etc.)
+  
+  ;; Fluxcon set with optional julian date of validity start
+  fc={IRS_FLUXCON, $
+      VALID_FROM: 0.0D, $        ;the Julian data this fluxcon set is valid from
+      FLUXCON:0.0, $
+      FLUXCON_KEY_WAV: 0.0, $
+      TUNE: fltarr(6)}
+  
   
   ;; A wavsamp set for a single order and a given aperture, either
   ;; "traditional" (from the WAVSAMP file), or "pixel-based"
