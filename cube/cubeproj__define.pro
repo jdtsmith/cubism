@@ -431,6 +431,7 @@ pro CubeProj::ShowEvent, ev
                          TITLE=self->ProjectName()+': As-Built Parameters'
      
      'calset': begin 
+        self->LoadCalib
         info=ptrarr(4) & modules=strarr(4)
         for md=0,3 do begin 
            modules[md]=irs_module(md,/TO_NAME)
@@ -681,8 +682,8 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).MUST_MODULE= $
      widget_button(cube,value='Set Cube Build Order...',UVALUE='setorder', $
                    /SEPARATOR)
-  wMustCal=widget_button(cube,VALUE='Aperture(s)...',UVALUE='showaperture')
-  
+  (*self.wInfo).MUST_CAL=widget_button(cube,VALUE='Aperture(s)...', $
+                                       UVALUE='showaperture')
   
   ;;*** Background menu    
   background=widget_button(mbar,VALUE='Background',/MENU)
@@ -759,9 +760,8 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   info=widget_button(mbar,VALUE='Info',/MENU)
   b1=widget_button(info,VALUE='Project Parameters...',UVALUE='phist')
   b2=widget_button(info,VALUE='As-Built Parameters...',UVALUE='pasbuilt')
-  (*self.wInfo).MUST_CAL= $
-     [wMustCal, $
-      widget_button(info,VALUE='Calibration Set Details...',UVALUE='calset')]
+  (*self.wInfo).MUST_CAL_FILE= $
+     widget_button(info,VALUE='Calibration Set Details...',UVALUE='calset')
   ;;-------------
   b1=widget_button(info,VALUE='Debug Cubism',UVALUE='debug',/SEPARATOR, $
                    /CHECKED_MENU)
@@ -1920,6 +1920,10 @@ pro CubeProj::UpdateButtons
   
   for i=0,n_elements((*self.wInfo).MUST_CAL)-1  do  $
      widget_control,((*self.wInfo).MUST_CAL)[i], SENSITIVE=obj_valid(self.cal)
+  
+  for i=0,n_elements((*self.wInfo).MUST_CAL_FILE)-1  do  $
+     widget_control,((*self.wInfo).MUST_CAL_FILE)[i], $
+                    SENSITIVE=logical_true(self.cal_file)
   
   for i=0,n_elements((*self.wInfo).MUST_PROJ)-1  do  $
      widget_control, (*self.wInfo).MUST_PROJ[i], SENSITIVE=got_dr
@@ -6031,7 +6035,8 @@ pro CubeProj__define
          feedback_window: 0, $  ;window id of feedback
          background_menu: 0L, $ ;widget ID of background menu bar
          MUST_MODULE:lonarr(1),$ ;must have a module set
-         MUST_CAL:lonarr(2), $  ;Must have a calibration set loaded
+         MUST_CAL:lonarr(1), $   ;Must have a calibration set loaded
+         MUST_CAL_FILE:0L, $     ;Must have a calibration set specified.
          MUST_SELECT:lonarr(18),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
          MUST_PROJ:lonarr(6), $ ;SW button which requires a valid project
