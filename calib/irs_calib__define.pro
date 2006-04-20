@@ -343,8 +343,8 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   ;; Date-specific fluxcons
   if arg_present(fluxcon) || arg_present(fluxcon_kw) || $
      arg_present(tune) then begin 
-     if ptr_valid(rec.FLUXCON) then begin 
-        dates=(*rec.FLUXCON).VALID_FROM
+     if ptr_valid(rec.FLUXCON_RECS) then begin 
+        dates=(*rec.FLUXCON_RECS).VALID_FROM
         if n_elements(dobs) gt 0 then begin 
            keep=where(dobs-dates gt 0.0,cnt)
            if cnt eq 0 then $ ;observed date before any cut-on date
@@ -352,7 +352,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
            void=min(dobs-dates[keep],pos)
            keep=keep[pos]
         endif else void=min(dates,keep) ;assume the original, oldest cal
-        fc=(*rec.FLUXCON)[keep]
+        fc=(*rec.FLUXCON_RECS)[keep]
         if arg_present(fluxcon) then fluxcon=fc.FLUXCON
         if arg_present(fluxcon_kw) then fluxcon_kw=fc.FLUXCON_KEY_WAV
         if arg_present(tune) then tune=fc.TUNE
@@ -415,9 +415,10 @@ function IRS_Calib::Info, modules, orders,SHORT=short
      if pmf ne '' then str=[str,string(FORMAT='(A12,": ",A)', 'PMASK',pmf)]
      
      fcf=self.FLUXCON_FILE[md]
-     if ptr_valid(fcf) then begin 
-        for f=0,n_elements(*fcf)-1 do begin 
-           fc=file_basename((*fcf)[f])
+     if fcf then begin 
+        fcf=strsplit(fcf,string(10b),/EXTRACT)
+        for f=0,n_elements(fcf)-1 do begin 
+           fc=file_basename(fcf[f])
            if fc ne '' then $
               str=[str,string(FORMAT='(A12,": ",A)', $
                               'FLUXCON' + (f gt 0?strtrim(f+1,2):''), $
@@ -465,9 +466,9 @@ function IRS_Calib::Info, modules, orders,SHORT=short
               string(FORMAT='(" Low: ",F10.4," High:",F10.4)',rec.WAVECUT))]
         
         
-        if ptr_valid(rec.FLUXCON) then begin 
-           for f=0,n_elements(*rec.FLUXCON)-1 do begin 
-              fc=(*rec.FLUXCON)[f]
+        if ptr_valid(rec.FLUXCON_RECS) then begin 
+           for f=0,n_elements(*rec.FLUXCON_RECS)-1 do begin 
+              fc=(*rec.FLUXCON_RECS)[f]
               add=f gt 0?strtrim(f,2)+': ':' : '
               if fc.VALID_FROM gt 0.0D then $
                  str=[str,'         -- FC'+strtrim(f,2)+ $
@@ -1169,7 +1170,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
      for j=0,scnt-1 do begin 
         ;; Free FLUXCON point if asked for and already in place
         if cals[singles[j]].name eq 'FLUXCON' && ptr_valid(self.cal[i]) then $
-           ptr_free,(*self.cal[i]).FLUXCON
+           ptr_free,(*self.cal[i]).FLUXCON_RECS
         
         ;; Skip ORDFIND and LINETILT if we are recovering them from WS
         if keyword_set(rcvfws) then $
@@ -1475,14 +1476,15 @@ pro IRS_Calib::ParseFluxcon,file,module
                  data[i].a4,data[i].a5]
         fc.FLUXCON=data[i].fluxcon
         fc.FLUXCON_KEY_WAV=data[i].key_wavelength
-        if ptr_valid(rec.FLUXCON) then *rec.FLUXCON=[*rec.FLUXCON,fc] $
-        else rec.FLUXCON=ptr_new(fc)
+        if ptr_valid(rec.FLUXCON_RECS) then $
+           *rec.FLUXCON_RECS=[*rec.FLUXCON_RECS,fc] $
+        else rec.FLUXCON_RECS=ptr_new(fc)
         self->SetRecord,rec
      endfor
   endfor 
-  if ptr_valid(self.FLUXCON_FILE[m]) then $
-     *self.FLUXCON_FILE[m]=[*self.FLUXCON_FILE[m],file] $
-  else self.FLUXCON_FILE[m]=ptr_new(file)
+  
+  if self.FLUXCON_FILE[m] then self.FLUXCON_FILE[m]+=string(10b)+file $
+  else self.FLUXCON_FILE[m]=strjoin(file,string(10b))
 end
 
 ;=============================================================================
@@ -1576,14 +1578,14 @@ end
 pro IRS_Calib::Cleanup
   for i=0,3 do begin 
      if ptr_valid(self.cal[i]) then begin
-        ptr_free,(*self.cal[i]).FLUXCON
+        ptr_free,(*self.cal[i]).FLUXCON_RECS
         ws_list=(*self.cal[i]).WAVSAMPS
         for j=0,n_elements(ws_list)-1 do $
            if ptr_valid(ws_list[j]) then self->CleanWAVSAMP,*ws_list[j]
         ptr_free,ws_list,self.cal[i]
      endif 
   endfor 
-  ptr_free,self.PMASK,self.SLCF,self.FLUXCON_FILE
+  ptr_free,self.PMASK,self.SLCF
 end
 
 ;=============================================================================
@@ -1591,6 +1593,28 @@ end
 ;=============================================================================
 function IRS_Calib::Name
   return,self.Name
+end
+
+
+;=============================================================================
+;  Validate the current cube
+;=============================================================================
+pro IRS_Calib::Validate
+  for i=0,n_elements(self.cal)-1 do begin 
+     if ptr_valid(self.cal[i]) then begin 
+        for j=0,n_elements(*self.cal[i])-1 do begin 
+           if ~ptr_valid((*self.cal[i])[j].FLUXCON_RECS) then begin 
+              ;; Update to new records
+              (*self.cal[i])[j].FLUXCON_RECS= $
+                 ptr_new({IRS_FLUXCON, $
+                          0.0D, $
+                          (*self.cal[i])[j].FLUXCON, $
+                          (*self.cal[i])[j].FLUXCON_KEY_WAV, $
+                          (*self.cal[i])[j].TUNE})
+           endif 
+        endfor 
+     end 
+  endfor 
 end
 
 ;=============================================================================
@@ -1613,7 +1637,7 @@ pro IRS_Calib__define
      WAVSAMP_FILE:strarr(5), $  ;the names of the wavsamp files (WAVSAMP)
      TILT_FILE:strarr(5),$      ;the name of the LINETILT file (c)
      ORDER_FILE:strarr(5),$     ;the name of the ORDFIND file (a's & b's)
-     FLUXCON_FILE:ptrarr(5),$   ;the name of the FLUXCON coefficient file
+     FLUXCON_FILE:strarr(5),$   ;the name of the FLUXCON coefficient file
                                 ; may be multiple per order (time forking).
      PMASK_FILE:strarr(5),$     ;the name of the pmask files   
      SLCF_FILE:strarr(5), $     ;name of the SLCF files
@@ -1644,16 +1668,19 @@ pro IRS_Calib__define
        B:fltarr(6), $           ;y(lambda)=sum_i b_i lambda^i
        C:fltarr(4), $           ;tilt_ang(s)=sum_i c_i s^i
        RecoveredPolys: 0,$      ;recovered ordfind/linetilt from WS
-       FLUXCON: ptr_new(), $    ;a list of 1 or more IRS_FLUXCON records
-       WAVSAMPS: ptr_new()}     ;A list of IRS_WAVSAMP structs
+       FLUXCON_RECS: ptr_new(),$  ;a list of 1 or more IRS_FLUXCON records
+       FLUXCON:0.0, $             ;Vestigial entries for older cal sets.
+       FLUXCON_KEY_WAV:0.0,$      ; see FLUXCON_RECS
+       TUNE:fltarr(6),$           ;
+       WAVSAMPS: ptr_new()}       ;A list of IRS_WAVSAMP structs
                                 ; (cached for various apertures, etc.)
   
   ;; Fluxcon set with optional julian date of validity start
   fc={IRS_FLUXCON, $
       VALID_FROM: 0.0D, $        ;the Julian data this fluxcon set is valid from
-      FLUXCON:0.0, $
-      FLUXCON_KEY_WAV: 0.0, $
-      TUNE: fltarr(6)}
+      FLUXCON:0.0, $             ;the fluxcon value for this order e/s/Jy
+      FLUXCON_KEY_WAV: 0.0, $    ;fluxcon reference wavelength
+      TUNE: fltarr(6)}           ;fluxcon tuning coefficients "a"
   
   
   ;; A wavsamp set for a single order and a given aperture, either
