@@ -93,6 +93,7 @@ function irs_restore_calib, cfile,NON_CACHED=nc,RECENT=recent
   endif else keep_cnt=0
   
   cal=restore_object(file,'IRS_Calib',OTHER_CLASSES='irs_aperture')
+  cal->Validate
   
   ;; Store to the cache
   if ~keyword_set(nc) then begin 
