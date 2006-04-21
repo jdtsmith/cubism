@@ -188,8 +188,9 @@
 ;=============================================================================
 ;  SetProperty 
 ;=============================================================================
-pro ObjReport::SetProperty,REPORT_TITLE_BASE=tb
+pro ObjReport::SetProperty,REPORT_TITLE_BASE=tb,REPORT_QUIET=qt
   if n_elements(tb) ne 0 then self.or_title_base=tb
+  if n_elements(qt) ne 0 then self.or_quiet=keyword_set(qt) 
 end
 
 
@@ -278,7 +279,7 @@ end
 pro ObjReport::orCommandLineReport,msg,INFO=info,WARNING=warning, $
                                    ERROR=error,STATUS=status,TITLE=title
   on_error,2
-  
+  if self.or_quiet then return
   case 1 of 
      keyword_set(error): title_type="error"
      keyword_set(warning): title_type="warning"
@@ -359,6 +360,7 @@ pro ObjReport__define
   class={ObjReport, $
          or_title_base:'',$     ;the root of the title
          or_status:'', $        ;the current status message displayed
-         or_widget:0L}          ;the widget, which, if valid, will cause
+         or_widget:0L, $        ;the widget, which, if valid, will cause
                                 ;graphicsl messages to appear
+         or_quiet:0b}
 end
