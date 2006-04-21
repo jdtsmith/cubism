@@ -1965,7 +1965,8 @@ pro CubeProj::UpdateButtons
   
   for i=0,n_elements((*self.wInfo).MUST_ANY_BPL)-1 do $
     widget_control, (*self.wInfo).MUST_ANY_BPL[i],SENSITIVE= $
-                    (got_dr && ~array_equal(ptr_valid((*self.DR).BAD_PIXEL_LIST),0b)) || $
+                    (got_dr && $
+                     ~array_equal(ptr_valid((*self.DR).BAD_PIXEL_LIST),0b)) || $
                     gbpl
   
   for i=0,n_elements((*self.wInfo).MUST_REC_UNC)-1 do $
@@ -2600,7 +2601,7 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
   this=keyword_set(as_built)?self.AS_BUILT:self
   
   str=['IRS Spectral Cube: '+self->ProjectName()+ $
-       ((~keyword_set(cur) && ((self.ACCOUNTS_VALID AND 6b) ne 6b))? $
+       ((~keyword_set(as_built) && ((self.ACCOUNTS_VALID AND 6b) ne 6b))? $
      " (needs rebuilding)":"")]
   if keyword_set(as_built) then begin 
      str=[str,'Cube Created: '+ $
