@@ -282,8 +282,11 @@ pro tvDraw::Message,msg
      self->Resize,self.winsize+diff
      self->Draw
      widget_control, msg.id,/CLEAR_EVENTS ;get rid of accumulated events
-  endif else begin 
-     if msg.enter && ~self.entered then self->Focus
+  endif else begin                        ; Tracking Events
+     if msg.enter && ~self.entered then begin 
+        self->Focus
+        self->SetWin
+     endif 
      self.entered=msg.enter
   endelse 
 end
