@@ -78,33 +78,42 @@ end
 ;  On
 ;=============================================================================
 pro tvPlug::On
+  active=self.active
   self.active=self.active OR 1b
-  if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,1b}
+  if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,self.active, $
+                                     active ne self.active}
 end
 
 ;=============================================================================
 ;  Off 
 ;=============================================================================
 pro tvPlug::Off,DISABLE=dis
+  active=self.active
   self.active=self.active AND NOT 1b 
-  if keyword_set(dis) then self.active=self.active OR 2b
-  if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,self.active}
+  ;; set the disable bit
+  if keyword_set(dis) then self.active=self.active OR 2b 
+  if self.on_off then self->MsgSend,{TVPLUG_ON_OFF,self,self.active, $
+                                     active ne self.active}
 end
 
 ;=============================================================================
 ;  Disable
 ;=============================================================================
 pro tvPlug::Disable
+  active=self.active
   self.active=self.active OR 2b
-  if self.on_off then self->MsgSend,{TVPLUG_ENABLE_DISABLE,self,self.active}
+  if self.on_off then self->MsgSend,{TVPLUG_ENABLE_DISABLE,self,self.active,$
+                                     active ne self.active}
 end
 
 ;=============================================================================
 ;  Enable
 ;=============================================================================
 pro tvPlug::Enable
+  active=self.active
   self.active=self.active AND NOT 2b ;take off the disable bit
-  if self.on_off then self->MsgSend,{TVPLUG_ENABLE_DISABLE,self,self.active}
+  if self.on_off then self->MsgSend,{TVPLUG_ENABLE_DISABLE,self,self.active,$ $
+                                     active ne self.active}
 end
 
 ;=============================================================================
@@ -157,7 +166,7 @@ pro tvPlug__define
       INHERITS tvPlug_lite, $   ;we're extending the lite version 
       INHERITS ObjReport, $     ;make it a reporter
       on_off:0b, $              ;are we using on_off messages?
-      active:0b}                ;flag: whether we're active (off,on,disabled)
-  message={TVPLUG_ON_OFF, Object:obj_new(), Status:0b} ;an on or off message.
-  message={TVPLUG_ENABLE_DISABLE, Object:obj_new(), Status:0b}
+      active:0b}                ;flag: whether we're active (off/on,disabled)
+  msg={TVPLUG_ON_OFF, Object:obj_new(), Status:0b, Changed:0b} 
+  msg={TVPLUG_ENABLE_DISABLE, Object:obj_new(), Status:0b, Changed:0b}
 end
