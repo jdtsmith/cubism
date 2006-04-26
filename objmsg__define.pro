@@ -329,10 +329,10 @@ pro ObjMsg::MsgSend,msg
 ;   if tag_names(msg,/STRUCTURE_NAME) eq 'CUBEPROJ_BADPIX_UPDATE' then begin 
 ;  if stregex(tag_names(msg,/STRUCTURE_NAME),'cube',/BOOLEAN,/FOLD_CASE) $
 ;  then begin 
-;   if tag_names(msg,/STRUCTURE_NAME) ne 'DRAW_MOTION' then begin 
-;   print,obj_class(self),': sending to: ',sendlist, ' message'
+;   if ~stregex(tag_names(msg,/STRUCTURE_NAME),'(DRAW|TRACKING)',/BOOLEAN) then begin 
+;      print,obj_class(self),': sending to: ',sendlist, ' message'
 ;      help,/st,msg
-;      ;;help, /TRACEBAC
+;      help, /TRACEBAC
 ;  endif 
                                 ;send all the messages
   for i=0,n_elements(sendlist)-1 do if obj_valid(sendlist[i]) then $
