@@ -107,7 +107,7 @@ pro CubeBadPix::Message, msg
      'DRAW_BUTTON': begin 
         if msg.release eq 4b then return
         
-        ;; Last button: cycle through group
+        ;; Right button: cycle through group
         if msg.press eq 4b then begin 
            if msg.modifiers AND 1b then $;; Shift
               self.showing=(self.showing-1) mod 4 $
@@ -123,11 +123,14 @@ pro CubeBadPix::Message, msg
         if msg.type eq 1 then begin 
            self.oDraw->MsgSignup,self,DRAW_MOTION=0
            self.press=-1b
+           got_one=self.last_pt ne -1
            self.last_pt=-1
            self.setting=-1
-           self.cuberec->MsgSignup,self,/NONE
-           self.cube->Send,/BADPIX_UPDATE ;let everyone know about our changes
-           self.cuberec->MsgSignup,self,/CUBEREC_UPDATE
+           if got_one then begin 
+              self.cuberec->MsgSignup,self,/NONE
+              self.cube->Send,/BADPIX_UPDATE ;let everyone but us know about changes
+              self.cuberec->MsgSignup,self,/CUBEREC_UPDATE
+           endif 
            return
         endif 
         
@@ -135,7 +138,7 @@ pro CubeBadPix::Message, msg
         pt=pt[0]
         if pt eq -1 then return
         
-        ;; Shift press
+        ;; Shift press, rewrite as middle-click
         if msg.press eq 1b && (msg.modifiers AND 2b) ne 0b then $
            press=2b else press=msg.press
         
@@ -143,7 +146,10 @@ pro CubeBadPix::Message, msg
            if ptr_valid(self.rec_set) then begin 
               if n_elements(*self.rec_set) gt 1 then return
               this_rec=(*self.rec_set)[0]
-           endif else return
+           endif else begin 
+              self.last_pt=-1
+              return
+           endelse 
         endif 
         
         self.press=press
@@ -165,10 +171,6 @@ pro CubeBadPix::Message, msg
      'TVDRAW_REDRAW': self->MarkAll
      
      'CUBEREC_UPDATE': begin 
-        if msg.badpix_update then begin 
-           self.oDraw->ReDraw,/SNAPSHOT ;we'll pick them up directly
-           return
-        endif 
         if msg.BCD_MODE then begin ; We only work in BCD mode
            self.bmask=msg.BMASK
            self.cube=msg.CUBE
@@ -176,8 +178,14 @@ pro CubeBadPix::Message, msg
            self.rec_set=msg.record_set
            self.pmask=pm
            self->Enable
-        endif else self->Reset,/DISABLE,/NO_REDRAW ;cube mode
-        ;; Cuberec will redraw for us.
+        endif else begin 
+           self->Reset,/DISABLE,/NO_REDRAW ;cube mode
+           return
+        endelse 
+        if msg.badpix_update then begin 
+           self.oDraw->ReDraw,/SNAPSHOT ;we'll pick them up directly
+           return
+        endif 
      end
   endcase
 end
@@ -348,9 +356,10 @@ pro CubeBadPix::DrawMark,ind,ERASE=erase,SINGLE_REC=sr
      self.oDraw->Erase,pt-self.zoom/2,[self.zoom,self.zoom]+2
      ;; put the static mark back if necessary
      if self.showing lt 3 then self->MarkStatic,ind       
-  endif else $
+  endif else begin
      plots,pt[0],pt[1],/DEVICE,COLOR=self.color[keyword_set(sr)?3:2],PSYM=7, $
            SYMSIZE=self.zoom/7,THICK=self.zoom ge 4?2.:1.
+  endelse 
 end
 
 ;=============================================================================
