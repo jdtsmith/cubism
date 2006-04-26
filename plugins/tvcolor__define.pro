@@ -253,7 +253,7 @@ pro tvColor::Message,msg
      
      'TLB_WIDGET_TRACKING':  begin 
         if msg.enter then begin 
-           self.oDraw->SetWin 
+           ;;self.oDraw->SetWin 
            self->SetColors,/NO_REDRAW
         endif
      end
@@ -273,8 +273,8 @@ end
 ;=============================================================================
 ;  Off - Possibly keep getting tracking messages.
 ;=============================================================================
-pro tvColor::Off
-  self->tvPlug::Off
+pro tvColor::Off,_EXTRA=e
+  self->tvPlug::Off,_EXTRA=e
   self.oDraw->MsgSignup,self,/NONE,TLB_WIDGET_TRACKING=self.protect, $
                         /TVDRAW_RESIZE
 end
@@ -334,13 +334,14 @@ end
 ;             for the colorbar is realized.  Draws colorbar only for
 ;             given range (bottom:top) in colormap.
 ;=============================================================================
-pro tvColor::DrawCbar, WIN=win,NO_RESET_WIN=nrw,NO_UPDATE=nm
+pro tvColor::DrawCbar, WIN=win,NO_UPDATE=nm
   if self.wBar eq 0L then return
+  oldwin=!D.WINDOW
   self->SetWin,WIN=win
   tv,self.bottom+bytscl(lindgen(self.bSize[0],self.bSize[1])  $
                         mod self.bSize[0],  $
                         TOP=self.topval-self.bottom-self.nreserve)
-  if keyword_set(nrw) eq 0 then self.oDraw->SetWin
+  wset,oldwin
   if keyword_set(nm) eq 0 then self->MsgSend,{TVCOLOR_REDRAW,self.need_redraw}
 end
 
