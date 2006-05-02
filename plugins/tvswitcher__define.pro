@@ -97,8 +97,8 @@ pro tvSwitcher::Message, msg
      if cnt gt 0 then self->SetButton,msg.Object,wh[0] else return
      if type eq 'TVPLUG_ENABLE_DISABLE' then return
      ;; If an exclusive has reported turning on (from off), turn all others off
-     if (*self.MsgList)[wh[0]].Exclusive && msg.Status && msg.Changed then $
-        self->Exclusive,wh[0]
+     if (*self.MsgList)[wh[0]].Exclusive && (msg.Status AND 1b) && $
+        msg.Changed then self->Exclusive,wh[0]
      return
   endif 
   
