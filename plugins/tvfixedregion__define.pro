@@ -117,7 +117,6 @@ end
 
 pro tvFixedRegion::Draw
   if ~ptr_valid(self.region) then return
-  self.oDraw->Setwin
   x=-1 & y=-1
   n=n_elements(*self.region)/2
   x=lonarr(n+1) & y=lonarr(n+1)
