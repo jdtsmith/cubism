@@ -156,7 +156,7 @@ pro IRSMapVisualize::Message, msg
               ;;Append with control key, range with Shift key
               self->Select,got,APPEND=logical_true(msg.modifiers AND 2b), $
                            RANGE=msg.modifiers AND 1b,/NO_DRAW,/NO_UPDATE
-              self->DrawAllRecords
+              self->DrawAllRecords,/DOUBLE_BUFFER
            end
            1: begin
               self.drawing=0b
@@ -166,7 +166,7 @@ pro IRSMapVisualize::Message, msg
         
      end 
      
-     'TVDRAW_SNAPSHOT': self->DrawAllRecords
+     'TVDRAW_SNAPSHOT': self->DrawAllRecords ;already buffered for us
      
      'CUBEREC_UPDATE': begin 
         if ~msg.visualize_mode then begin 
@@ -187,11 +187,11 @@ pro IRSMapVisualize::Message, msg
      
      'CUBEPROJ_SELECT': begin 
         if msg.single_select ne -1 then begin 
-           self.oDraw->SetWin
+           ;;self.oDraw->SetWin
            self->Select,msg.single_select,/DCEID,/NO_UPDATE
         endif else begin        ; just redraw everything
            self->UpdateMapStatus
-           self->DrawAllRecords
+           self->DrawAllRecords,/DOUBLE_BUFFER
         endelse 
      end 
      
@@ -202,7 +202,7 @@ pro IRSMapVisualize::Message, msg
         end else begin 
            if msg.disabled then self->UpdateMapStatus,/CHECK_DISABLED $
            else self->UpdateMapRecords 
-           self->DrawAllRecords
+           self->DrawAllRecords,/DOUBLE_BUFFER
         endelse 
      end 
   endcase 
@@ -369,12 +369,15 @@ end
 ;=============================================================================
 ;  DrawAllRecords - Draw all the region records
 ;=============================================================================
-pro IRSMapVisualize::DrawAllRecords
+pro IRSMapVisualize::DrawAllRecords,DOUBLE_BUFFER=db
   if ~ptr_valid(self.recs) then return
   ;; Setup Plot axes
   self.oDraw->GetProperty,OFFSET=off,DISPSIZE=ds,PAN=pan,ZOOM=zm
   ;; Draw with a double buffer
-  self.oDraw->Erase,/DOUBLE,/FULL,/FROM_SCREEN ;be sure to get other's snaps
+  db=keyword_set(db) 
+  if db then $
+     self.oDraw->Erase,/DOUBLE,/FULL,/FROM_SCREEN ;be sure to get other's snaps
+
   plot,[0],[0],XRANGE=[off[0],off[0]+ds[0]],YRANGE=[off[1],off[1]+ds[1]], $
        XSTYLE=5,YSTYLE=5,POSITION=[pan,pan+ds*zm],/DEVICE,/NODATA,/NOERASE
   self.csave=[!X.S,!Y.S]
@@ -383,7 +386,7 @@ pro IRSMapVisualize::DrawAllRecords
                  NCOMPLEMENT=ncnt,scnt)
   for i=0,ncnt-1 do self->DrawOneRecord,not_selected[i]
   for i=0,scnt-1 do self->DrawOneRecord,selected[i]
-  self.oDraw->DBRefresh,/FULL
+  if db then self.oDraw->DBRefresh,/FULL
 end
 
 ;=============================================================================
