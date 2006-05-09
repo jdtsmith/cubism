@@ -187,7 +187,7 @@ pro IRSMapVisualize::Message, msg
      
      'CUBEPROJ_SELECT': begin 
         if msg.single_select ne -1 then begin 
-           ;;self.oDraw->SetWin
+           self.oDraw->SetWin
            self->Select,msg.single_select,/DCEID,/NO_UPDATE
         endif else begin        ; just redraw everything
            self->UpdateMapStatus
