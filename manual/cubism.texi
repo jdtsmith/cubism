@@ -206,11 +206,12 @@ Spectral Map HOWTO} for information on observation planning.
 @chapter Installation
 @cindex Installation
 
-CUBISM runs under IDL, so requires a working version of IDL to function.
-There are two means of installing CUBISM: as a set of source @file{.pro}
-files, or as a pre-compiled binary.  Both versions can be found on
-@uref{@value{CUBISMHOMEPAGE}, the CUBISM home page}.
-
+CUBISM runs under IDL, and requires a working version of IDL to
+function.  There are two means of installing CUBISM: as a set of source
+@file{.pro} files which IDL finds on its search path, or as a
+pre-compiled binary, which can be loaded as a single entity.  Both
+versions can be found on @uref{@value{CUBISMHOMEPAGE}, the CUBISM home
+page}.
 
 The advantages of a source installation are:
 
@@ -227,8 +228,9 @@ Should continue to function with future versions of IDL.
 
 @itemize @bullet
 @item
-Must install the AstroLib dependency library, at the required version.
-Some (small) risk of future changes in AstroLib causing problems.
+Must install the @code{AstroLib} dependency library, at the required
+version.  Some (small) risk of future changes in @code{AstroLib} causing
+problems.
 @item
 Subject to routine name conflicts (e.g. two routines named
 @file{routine.pro} on the path), so you must carefully set your
@@ -283,7 +285,7 @@ but has not been tested there.
 A licensed copy of IDL at version @value{IDLVERSIONREQUIRED} or later.
 Download @uref{http://rsinc.com/idl/,from RSI}.
 @item
-The AstroLib library, available from
+The @code{AstroLib} library, available from
 @uref{http://idlastro.gsfc.nasa.gov/, NASA Goddard}.  Be sure to include
 it on your @code{IDL_PATH}.
 @item
@@ -310,8 +312,8 @@ Ensure the @file{irs_cubism} directory which is unpacked is on the
 
 @end enumerate
 
-@noindent System-wide installation is also possible: just install in a
-location accessible by your entire group.
+@noindent System-wide installation is also possible: just install CUBISM
+in a location accessible by your entire group.
 
 @node Binary Installation, Upgrading, Source Installation, Installation
 @section Binary Installation
@@ -337,16 +339,16 @@ Note that running CUBISM as a binary under the free @emph{IDL VM} does
 not give you access to an IDL command line, so that only the graphical
 interface to CUBISM is accessible.  With this setup, no analysis can be
 performed at the command line, though all files, including spectra,
-maps, and cubes can be output as normal.  Running CUBISM as a binary
-under a licensed version of IDL does not prevent access to the command
-line.
+maps, and cubes can be output as normal.  Running the binary
+distribution of CUBISM in a licensed version of IDL does not prevent
+access to the command line.
 
 @node Setup
 @section Setup
 @cindex Setting CUBISM Up
 
-CUBISM needs very little setup.  As long as the binary or source
-packages are left intact, CUBISM auto-discovers all the necessary
+CUBISM needs very little setup.  As long as the binary or source file
+structure is left intact, CUBISM auto-discovers all the necessary
 calibration and other files it needs.  One basic setup issue relates to
 the color mode.  By default, IDL uses @emph{DECOMPOSED} color, in which
 the RBG value of pixels is directly specified, whereas CUBISM (and most
@@ -360,7 +362,16 @@ device,DECOMPOSED=0,TRUE_COLOR=24,RETAIN=2
 
 @noindent You may not need the @code{RETAIN=2} setting depending on your window
 manager (this forces IDL to keep track of the contents of windows when
-they need to be redrawn).
+they need to be redrawn, and is typically required under Linux).
+
+Another potential issue relates to the @code{IDL_PATH}.  If you have a
+source distribution of CUBISM, you will need to ensure that the
+directories containing CUBISM are on your @code{IDL_PATH}.
+Occasionally, two different packages will each define the same routine
+in two files with the same names (a so-called @emph{name space
+conflict}).  If you encounter this problem, move the CUBISM directories
+higher on your @code{IDL_PATH}, or use the binary distribution, which
+doesn't suffer name space conflicts.
 
 
 @node Upgrading,  , Binary Installation, Installation
@@ -373,13 +384,22 @@ what version of CUBISM you are running with the menu @key{Info->About
 Cubism} in the project window.
 
 
+@c Quick Start Guide   
+
 @node Quick Start Guide, Cube Building, Installation, Top
 @chapter Quick Start Guide
 @cindex Quick Start
 
-Building cubes from collections of BCD mapping data sets is a simple
-process: the correct BCDs are collected, the cube build parameters are
-adjusted, and the cube is built.  To get going, type:
+CUBISM addresses two main issues: building cubes from IRS Spectral
+Mapping data sets, and analyzing those cubes.  Building cubes from
+collections of mapping data sets is in principle a simple process: the
+correct BCDs are collected together in a project, the cube build
+parameters are adjusted, and the cube is built.  With the assembled
+cube, you can then extract spectra in specific areas and build spectral
+maps.  There are many details which can affect the cube assembly
+process, and impact the quality of the final assembled product.  Here we
+will quickly go through the basic steps required to build a cube,
+extract a spectrum, and build a spectral map.  To get going, type:
 
 @example
 IDL> cubism
@@ -388,8 +408,10 @@ IDL> cubism
 @noindent and create a new cube, giving it a useful name when prompted.
 Add a full set of mapping data with the @key{Add Data} button.  Just
 navigate to a directory and click @key{OK}, and CUBISM will search for
-all data files at or beneath that directory.  When prompted, choose the
-set of data you are interested in, and they will be loaded in.
+all data files at or beneath that directory.  After selecting the
+directory, CUBISM will group all discovered files by object and mapping
+AOR.  When prompted, choose the set of data you are interested in, and
+they will be loaded into the project.
 
 Choose @key{Edit->Select All} and then @key{Record->View Record
 Stack...} to popup a viewer displaying a stack of all the records.
@@ -397,12 +419,13 @@ Click @samp{WAVSAMP: Edit} and drag the aperture so that it lies fully
 within the illuminated order, trimming perhaps 1 or 2 pixels from the
 order ends (where the flat-field is problematic).  Back in the main
 CubeProject window, choose @key{Cube->Build Cube}, and watch the build
-progress.  Hit the @key{View Cube} button to show it, and click on the
-@key{Extract} button (a cube with a line in it).  Click and drag an
-extraction region on the cube, and CubeSpec will popup showing you the
-extracted spectrum.  Click @key{Map} and then choose @samp{Region:
-Peak}.  Click twice to define a peak region, and you've just created a
-spectral map.
+progress.  Hit the @key{View Cube} button to display the cube in the
+same viewer window, and click on the @key{Extract} button (a cube with a
+line in it), or select @key{Tools->Extract Spectra and Stack Cubes}.
+Click and drag an extraction region, from upper left to lower right, on
+the cube, and CubeSpec will popup showing you the extracted spectrum.
+Click @key{Map} and then choose @samp{Region: Peak}.  Click twice to
+define a peak region, and you've just created a spectral map.
 
 
 @node Cube Building, Cube Analysis, Quick Start Guide, Top
@@ -436,17 +459,36 @@ including the use of the visualizer for selecting in situ BCDs.
 
 @subsection In Situ Sky
 
-Subtracting off contemporaneous sky data from your Spitzer IRS target data does more than just remove foreground emission (e.g., zodiacal, Galactic).  It also tremendously reduces the number of "bad pixels" contaminating your data.
+Subtracting off contemporaneous sky data from your Spitzer IRS target
+data does more than just remove foreground emission (e.g., zodiacal,
+Galactic).  It also tremendously reduces the number of "bad pixels"
+contaminating your data.
 
-If you unfortunately do not have access to dedicated, contemporaneous, off-target sky data, in many instances the physical configuration of the IRS low-resolution modules provides an alternative.  Below is a description of how to define sky data from IRS low-resolution "outrigger" data.  The example given is for short-low (SL) data, but similar steps can be taken for long-low data.
+If you unfortunately do not have access to dedicated, contemporaneous,
+off-target sky data, in many instances the physical configuration of the
+IRS low-resolution modules provides an alternative.  Below is a
+description of how to define sky data from IRS low-resolution
+"outrigger" data.  The example given is for short-low (SL) data, but
+similar steps can be taken for long-low data.
 
-To define the low-resolution sky BCDs, and to create a corresponding .bgl file for data cube construction within CUBISM:
+To define the low-resolution sky BCDs, and to create a corresponding
+.bgl file for data cube construction within CUBISM:
 
 @enumerate
 @item
-Load all the relevant SL (SL1+SL2) frames.  Don't mix data taken more than a few days apart, to minimize the effects of day-to-day changes in the bad pixel population. 
+Load all the relevant SL (SL1+SL2) frames.  Don't mix data taken more
+than a few days apart, to minimize the effects of day-to-day changes in
+the bad pixel population.
 @item
-Use the AOR visualizer with an 8um image.  After using the histogram box to scale the image such that low-level diffuse emission is apparent, hit 'v' to switch to visualize mode.  To define sky BCDs for SL1, for example, set the cube build order to 2 (Cube-Set Cube Build Order->2) so that SL1 is not on the bright target source, and see which SL1 outriggers conveniently land off your target.  Highlight these outriggers with the mouse.  Save this information into a .bgl file using Background->Save Background Recs->m51_opticallyselected_extranuc_SL1.bgl.
+Use the AOR visualizer with an 8um image.  After using the histogram box
+to scale the image such that low-level diffuse emission is apparent, hit
+'v' to switch to visualize mode.  To define sky BCDs for SL1, for
+example, set the cube build order to 2 (Cube-Set Cube Build Order->2) so
+that SL1 is not on the bright target source, and see which SL1
+outriggers conveniently land off your target.  Highlight these
+outriggers with the mouse.  Save this information into a .bgl file using
+Background->Save Background
+Recs->m51_opticallyselected_extranuc_SL1.bgl.
 @item
 Repeat for SL2.
 @end enumerate
