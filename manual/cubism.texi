@@ -103,7 +103,8 @@ the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
 * Introduction::                
 * Installation::                
 * Quick Start Guide::           
-* Cube Building::               
+* The Tools::                   
+* Cube Assembly::               
 * Cube Analysis::               
 * Cube Validation::             
 * CubeProject Reference::       
@@ -118,11 +119,16 @@ Installation
 
 * Source Installation::         
 * Binary Installation::         
+* Setup::                       
 * Upgrading::                   
 
-Cube Building
+The Tools
 
-* Input Files and Calibration::  
+* CUBISM Project::              
+
+Cube Assembly
+
+* Input Files and Calibration::  Backgrounds:: Bad Pixels::
 * Backgrounds::                 
 * Bad Pixels::                  
 
@@ -161,7 +167,7 @@ of its analysis and reduction capabilities:
 
 @multitable @columnfractions .2 .8
 
-@item CubeProject
+@item CUBISM Project
 @tab Manage BCD data, and track all the various information required to
 build cubes, including calibration data, background information, bad
 pixels, aperture information, etc.
@@ -178,19 +184,19 @@ spectral cubes.
 
 @noindent CUBISM is not a general purpose spectral analysis tool.  What
 analysis tools it offers are oriented directly towards the task of
-creating, validating, and analyzing spectral cubes.  Since individual
-spectra (perhaps many of them) can be output from a single cube, other
-tools can easily be used for higher order analysis of these products
-(e.g. multiple Gaussian fitting, etc.).
+creating, validating, and dissecting spectral cubes.  Since individual
+spectra, spectral maps, and full spectral cubes can be output from a
+single cube project, other tools can easily be used for higher order
+analysis of these products (e.g. multiple Gaussian fitting, etc.).
 
-The basics of building and manipulating a spectral cube are very simple.
 This manual is organized as follows.  After discussing the installation
-and requirements of CUBISM in @ref{Installation}, we give a fast start
+and requirements of CUBISM in @ref{Installation}, we give a quick start
 guide to building a spectral cube from a mapping data set in @ref{Quick
-Start Guide}.  We then discuss in greater depth the steps required to
-build a cube in @ref{Cube Building}, explain methods of analyzing the
-cube in @ref{Cube Analysis}, and cover validating and improving cubes in
-@ref{Cube Validation}.
+Start Guide}.  We then cover in detail the menu options and capabilities
+of the three main tools which comprise CUBISM.  Then we discuss in
+greater depth the steps required to build a cube in @ref{Cube Assembly},
+explain methods of analyzing the cube in @ref{Cube Analysis}, and cover
+validating and improving cubes in @ref{Cube Validation}.
 
 Note that this manual does not include information on planning IRS
 spectral mapping observations; see the
@@ -268,6 +274,7 @@ between IDL versions is quite good).
 @menu
 * Source Installation::         
 * Binary Installation::         
+* Setup::                       
 * Upgrading::                   
 @end menu
 
@@ -315,7 +322,7 @@ Ensure the @file{irs_cubism} directory which is unpacked is on the
 @noindent System-wide installation is also possible: just install CUBISM
 in a location accessible by your entire group.
 
-@node Binary Installation, Upgrading, Source Installation, Installation
+@node Binary Installation, Setup, Source Installation, Installation
 @section Binary Installation
 @cindex, Installation, binary
 
@@ -343,7 +350,7 @@ maps, and cubes can be output as normal.  Running the binary
 distribution of CUBISM in a licensed version of IDL does not prevent
 access to the command line.
 
-@node Setup
+@node Setup, Upgrading, Binary Installation, Installation
 @section Setup
 @cindex Setting CUBISM Up
 
@@ -374,19 +381,19 @@ higher on your @code{IDL_PATH}, or use the binary distribution, which
 doesn't suffer name space conflicts.
 
 
-@node Upgrading,  , Binary Installation, Installation
+@node Upgrading,  , Setup, Installation
 @section Upgrading
 @cindex Upgrading
 
 Upgrading CUBISM is as simple as replacing the source or binary
 installation directories and restarting IDL.  You can always find out
-what version of CUBISM you are running with the menu @key{Info->About
+what version of CUBISM you are running with the menu @kbd{Info->About
 Cubism} in the project window.
 
 
 @c Quick Start Guide   
 
-@node Quick Start Guide, Cube Building, Installation, Top
+@node Quick Start Guide, The Tools, Installation, Top
 @chapter Quick Start Guide
 @cindex Quick Start
 
@@ -399,48 +406,100 @@ cube, you can then extract spectra in specific areas and build spectral
 maps.  There are many details which can affect the cube assembly
 process, and impact the quality of the final assembled product.  Here we
 will quickly go through the basic steps required to build a cube,
-extract a spectrum, and build a spectral map.  To get going, type:
+extract a spectrum, and build a spectral map.  
+
+To get going, type:
 
 @example
 IDL> cubism
 @end example
 
 @noindent and create a new cube, giving it a useful name when prompted.
-Add a full set of mapping data with the @key{Add Data} button.  Just
-navigate to a directory and click @key{OK}, and CUBISM will search for
+Add a full set of mapping data with the @kbd{Add Data} button.  Just
+navigate to a directory and click @kbd{OK}, and CUBISM will search for
 all data files at or beneath that directory.  After selecting the
 directory, CUBISM will group all discovered files by object and mapping
 AOR.  When prompted, choose the set of data you are interested in, and
 they will be loaded into the project.
 
-Choose @key{Edit->Select All} and then @key{Record->View Record
+Choose @kbd{Edit->Select All} and then @kbd{Record->View Record
 Stack...} to popup a viewer displaying a stack of all the records.
 Click @samp{WAVSAMP: Edit} and drag the aperture so that it lies fully
 within the illuminated order, trimming perhaps 1 or 2 pixels from the
 order ends (where the flat-field is problematic).  Back in the main
-CubeProject window, choose @key{Cube->Build Cube}, and watch the build
-progress.  Hit the @key{View Cube} button to display the cube in the
-same viewer window, and click on the @key{Extract} button (a cube with a
-line in it), or select @key{Tools->Extract Spectra and Stack Cubes}.
-Click and drag an extraction region, from upper left to lower right, on
-the cube, and CubeSpec will popup showing you the extracted spectrum.
-Click @key{Map} and then choose @samp{Region: Peak}.  Click twice to
-define a peak region, and you've just created a spectral map.
+CubeProject window, choose @kbd{Cube->Build Cube}, and watch the build
+progress.  When the cube is complete, hit the @kbd{View Cube} button to
+display the cube in the same viewer window.  In this window, click on
+the @kbd{Extract} button (a cube with a line through it), or select
+@kbd{Tools->Extract Spectra and Stack Cubes}.  Click and drag a
+rectangular extraction region, from upper left to lower right, on the
+cube, and CubeSpec will popup showing you the extracted spectrum.  In
+CubeSpec, click @kbd{Map} and then choose @samp{Region: Peak}.  Click
+once at a low and high wavelength to define a peak region, and you've
+just created a spectral map, which should now be displayed in CubeSpec.
 
+Congratulations, you've just gone quickly through the most important
+steps of cube assembly and analysis.  Read on to learn more about
+building higher quality cubes, and more sophisticated analysis.
 
-@node Cube Building, Cube Analysis, Quick Start Guide, Top
-@chapter Cube Building
-@cindex Cube Building
+@node The Tools, Cube Assembly, Quick Start Guide, Top
+@chapter The Tools
+@cindex Cubism Tools
+
+Cubism consists of three main components, which are used together for
+building and analyzing spectral cubes: CUBISM Project, CubeView, and
+CubeSpec.  We will give here a description of the purpose and reference
+of the features of each of the tools.  
+
+@c For a complete reference on the
+@c capabilities and features of each tool, see the appropriate Appendix:
+@c @ref{CubeProject Reference}, @ref{CubeView Reference}, @ref{CubeSpec
+@c Reference}.
+
 
 @menu
-* Input Files and Calibration::  
+* CUBISM Project::              
+@end menu
+
+@node CUBISM Project,  , The Tools, The Tools
+@section CUBISM Project
+
+The CUBISM Project is the central storehouse of all information relating
+to a single cube.  This is where the data are collected, calibration
+parameters managed, and cube assembled, and outputs saved.  A single
+CUBISM project contains only information for one spectral cube.  There
+is a separate project window for each open cube.  CUBISM projects, with
+all their associated information, can be saved to and recovered from
+disk.  In a sense, the ``project'' is the fundamental file type of
+CUBISM, and can be manipulated as a ``document'' in other applications
+(Open/Close/Save/etc.).
+
+Here is a CUBISM Project window, populated with a mapping data set:
+
+@float Figure, fig:pop_proj
+@center @image{images/populated_project,6in,,Populated Cubism
+     Project}
+@caption{CUBISM Project Main Window}  
+@end float
+
+Four records have been selected
+
+
+@node Cube Assembly, Cube Analysis, The Tools, Top
+@chapter Cube Assembly
+@cindex Cube Assembly
+
+@menu
+* Input Files and Calibration::  Backgrounds:: Bad Pixels::
 * Backgrounds::                 
 * Bad Pixels::                  
 @end menu
 
-A general reference on building cubes from BCD source.
 
-@node Input Files and Calibration, Backgrounds, Cube Building, Cube Building
+
+
+
+@node Input Files and Calibration, Backgrounds, Cube Assembly, Cube Assembly
 @section Input Files and Calibration
 @cindex BCD files
 @cindex Calibration sets
@@ -450,12 +509,16 @@ A general reference on building cubes from BCD source.
 File naming convention.
 
 
-@node Backgrounds, Bad Pixels, Input Files and Calibration, Cube Building
+@node Backgrounds, Bad Pixels, Input Files and Calibration, Cube Assembly
 @section Backgrounds
 @cindex Background subtraction
 
+
+
 Notes on in situ, archive, and other sources for background subtraction,
 including the use of the visualizer for selecting in situ BCDs.
+
+
 
 @subsection In Situ Sky
 
@@ -493,7 +556,7 @@ Recs->m51_opticallyselected_extranuc_SL1.bgl.
 Repeat for SL2.
 @end enumerate
 
-@node Bad Pixels,  , Backgrounds, Cube Building
+@node Bad Pixels,  , Backgrounds, Cube Assembly
 @section Bad Pixels
 @cindex Bad Pixels
 @cindex Rogue pixels
@@ -602,7 +665,7 @@ Finally, extract a 1d spectrum and look for spikes that aren't lines.
 @end enumerate
 
 
-@node  Cube Analysis, Cube Validation, Cube Building, Top
+@node  Cube Analysis, Cube Validation, Cube Assembly, Top
 @chapter Cube Analysis
 @cindex Cube Analysis
 
