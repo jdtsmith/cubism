@@ -104,9 +104,7 @@ the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
 * Installation::                
 * Quick Start Guide::           
 * The Tools::                   
-* Cube Assembly::               
-* Cube Analysis::               
-* Cube Validation::             
+* The Techniques::              
 * CubeProject Reference::       
 * CubeView Reference::          
 * CubeSpec Reference::          
@@ -125,6 +123,20 @@ Installation
 The Tools
 
 * CUBISM Project::              
+* CubeView::                    
+* CubeSpec::                    
+
+CUBISM Project
+
+* Data Records::                
+* Menus::                       
+* Button Bar::                  
+
+The Techniques
+
+* Cube Assembly::               
+* Cube Analysis::               
+* Cube Validation::             
 
 Cube Assembly
 
@@ -457,7 +469,7 @@ analysis.
 @c The Tools
 @c
 
-@node The Tools, Cube Assembly, Quick Start Guide, Top
+@node The Tools, The Techniques, Quick Start Guide, Top
 @chapter The Tools
 @cindex Cubism Tools
 
@@ -474,9 +486,11 @@ of the features of each of the tools.
 
 @menu
 * CUBISM Project::              
+* CubeView::                    
+* CubeSpec::                    
 @end menu
 
-@node CUBISM Project,  , The Tools, The Tools
+@node CUBISM Project, CubeView, The Tools, The Tools
 @section CUBISM Project
 @cindex Project, CUBISM
 @cindex CUBISM Project
@@ -505,7 +519,13 @@ is an example CUBISM Project window, populated with a mapping data set:
 @caption{CUBISM Project Main Window}  
 @end float
 
-@node Data Records
+@menu
+* Data Records::                
+* Menus::                       
+* Button Bar::                  
+@end menu
+
+@node Data Records, Menus, CUBISM Project, CUBISM Project
 @subsection Data Records
 @cindex Data Records
 @cindex @code{BCD} Records
@@ -600,7 +620,7 @@ the button associated with each header word, e.g. to sort by RA, click
 @samp{RA}.
 
 
-@node Menus
+@node Menus, Button Bar, Data Records, CUBISM Project
 @subsection Menus
 @cindex Project Window Menus
 @cindex Menus, Project Window
@@ -609,7 +629,7 @@ Most of the options for assembling and saving information from the cube
 are available in the menus of CUBISM Project.
 
 
-@node Button Bar
+@node Button Bar,  , Menus, CUBISM Project
 @subsection Button Bar
 @cindex Project Window Buttons
 @cindex Buttons, Project Window
@@ -618,7 +638,7 @@ are available in the menus of CUBISM Project.
 
 
 
-@node CubeView
+@node CubeView, CubeSpec, CUBISM Project, The Tools
 @section CubeView
 @cindex CubeView
 @cindex Viewing Cubes
@@ -632,7 +652,7 @@ cubes.
 
 
 
-@node CubeSpec
+@node CubeSpec,  , CubeView, The Tools
 @section CubeSpec
 @cindex CubeSpec
 @cindex Spectra, Viewing
@@ -643,8 +663,18 @@ cubes.
 
 
 
-@node Cube Assembly, Cube Analysis, The Tools, Top
-@chapter Cube Assembly
+@node The Techniques, CubeProject Reference, The Tools, Top
+@chapter The Techniques
+
+
+@menu
+* Cube Assembly::               
+* Cube Analysis::               
+* Cube Validation::             
+@end menu
+
+@node Cube Assembly, Cube Analysis, The Techniques, The Techniques
+@section Cube Assembly
 @cindex Cube Assembly
 
 @menu
@@ -658,7 +688,7 @@ cubes.
 
 
 @node Input Files and Calibration, Backgrounds, Cube Assembly, Cube Assembly
-@section Input Files and Calibration
+@subsection Input Files and Calibration
 @cindex @code{BCD} files
 @cindex Calibration sets
 @cindex Files, input
@@ -668,7 +698,7 @@ File naming convention.
 
 
 @node Backgrounds, Bad Pixels, Input Files and Calibration, Cube Assembly
-@section Backgrounds
+@subsection Backgrounds
 @cindex Background subtraction
 
 
@@ -678,7 +708,7 @@ including the use of the visualizer for selecting in situ @code{BCDs}.
 
 
 
-@subsection In Situ Sky
+@subsubsection In Situ Sky
 
 Subtracting off contemporaneous sky data from your Spitzer IRS target
 data does more than just remove foreground emission (e.g., zodiacal,
@@ -715,7 +745,7 @@ Repeat for SL2.
 @end enumerate
 
 @node Bad Pixels,  , Backgrounds, Cube Assembly
-@section Bad Pixels
+@subsection Bad Pixels
 @cindex Bad Pixels
 @cindex Rogue pixels
 
@@ -781,7 +811,7 @@ Only user-set bad pixel marks.
 @end menu
 
 @node Selecting/Defining Bad Pixels,  , Bad Pixels, Bad Pixels
-@subsection Selecting/Defining Bad Pixels
+@subsubsection Selecting/Defining Bad Pixels
 
 Bad pixels can be identified in CUBISM either 'manually' or in an
 automatic fashion.  The procedure for automatically identifying bad
@@ -823,16 +853,16 @@ Finally, extract a 1d spectrum and look for spikes that aren't lines.
 @end enumerate
 
 
-@node  Cube Analysis, Cube Validation, Cube Assembly, Top
-@chapter Cube Analysis
+@node  Cube Analysis, Cube Validation, Cube Assembly, The Techniques
+@section Cube Analysis
 @cindex Cube Analysis
 
 A description of cube extraction, map making, map sets, line fitting,
 etc.
 
 
-@node  Cube Validation, CubeProject Reference, Cube Analysis, Top
-@chapter Cube Validation
+@node  Cube Validation,  , Cube Analysis, The Techniques
+@section Cube Validation
 @cindex Cube Validation
 
 A description of backtracking and other means of validating and
@@ -844,7 +874,7 @@ improving the cube, and checking on weak features, etc.
 @c Appendices
 @c
 
-@node CubeProject Reference, CubeView Reference, Cube Validation, Top
+@node CubeProject Reference, CubeView Reference, The Techniques, Top
 @appendix CubeProject Reference
 @cindex CubeProject
 
