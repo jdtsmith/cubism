@@ -9,7 +9,7 @@
 @set EDITION 1.0
 @set VERSION 0.95
 @set IDLVERSIONREQUIRED 6.1
-@set DATE April, 2006
+@set DATE May, 2006
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jdsmith@@as.arizona.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -156,7 +156,7 @@ CUBISM is a package written in the Interactive Data Language (IDL),
 which supports the analaysis and reduction of spectral maps created with
 the @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard
 the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
-CUBISM is designed to allow sets of basic calibrated data (BCDs) from
+CUBISM is designed to allow sets of basic calibrated data (@code{BCDs}) from
 IRS mapping observations to be combined into single 3D spectral cubes,
 with two spatial and one spectral dimension.  From these cubes, spectra
 can be extracted over differing apertures, and arbitrary maps can be
@@ -168,7 +168,7 @@ of its analysis and reduction capabilities:
 @multitable @columnfractions .2 .8
 
 @item CUBISM Project
-@tab Manage BCD data, and track all the various information required to
+@tab Manage @code{BCD} data, and track all the various information required to
 build cubes, including calibration data, background information, bad
 pixels, aperture information, etc.
 
@@ -390,23 +390,31 @@ installation directories and restarting IDL.  You can always find out
 what version of CUBISM you are running with the menu @kbd{Info->About
 Cubism} in the project window.
 
-
+@c
 @c Quick Start Guide   
+@c
 
 @node Quick Start Guide, The Tools, Installation, Top
 @chapter Quick Start Guide
 @cindex Quick Start
 
-CUBISM addresses two main issues: building cubes from IRS Spectral
-Mapping data sets, and analyzing those cubes.  Building cubes from
-collections of mapping data sets is in principle a simple process: the
-correct BCDs are collected together in a project, the cube build
-parameters are adjusted, and the cube is built.  With the assembled
-cube, you can then extract spectra in specific areas and build spectral
-maps.  There are many details which can affect the cube assembly
-process, and impact the quality of the final assembled product.  Here we
-will quickly go through the basic steps required to build a cube,
-extract a spectrum, and build a spectral map.  
+CUBISM has two major themes: building cubes from IRS Spectral Mapping
+data sets, and analyzing those cubes.  Building cubes from collections
+of mapping data sets is in principle a simple process: the correct @code{BCDs}
+are collected together in a project, the cube build parameters are
+adjusted, and the cube is built.  With the assembled cube, you can then
+perform a variety of post-cube analysis including extracting spectra in
+specific regions and building spectral maps.  There are many details
+which can affect the cube assembly process, and impact the quality of
+the final assembled product.  Here we will quickly go through the basic
+steps required to build a cube, extract a spectrum, and build a spectral
+map, leaving all of the (important) details aside for now.
+
+An important note before we begin concerns the scope of a CUBISM
+project.  Each CUBISM project pertains to a single order of a single IRS
+module, e.g. LL1.  For data sets with mapping observations in all four
+low-resolution orders, 4 individual cubes will likely be built, and
+analzyed together.
 
 To get going, type:
 
@@ -419,8 +427,10 @@ Add a full set of mapping data with the @kbd{Add Data} button.  Just
 navigate to a directory and click @kbd{OK}, and CUBISM will search for
 all data files at or beneath that directory.  After selecting the
 directory, CUBISM will group all discovered files by object and mapping
-AOR.  When prompted, choose the set of data you are interested in, and
-they will be loaded into the project.
+AOR, and allow you to select among them.  When prompted, choose the set
+of data you are interested in, and they will be loaded into the project.
+If you are warned that no calibration set has been loaded, and that the
+latest is being used, simply acknowledge the warning.
 
 Choose @kbd{Edit->Select All} and then @kbd{Record->View Record
 Stack...} to popup a viewer displaying a stack of all the records.
@@ -440,7 +450,12 @@ just created a spectral map, which should now be displayed in CubeSpec.
 
 Congratulations, you've just gone quickly through the most important
 steps of cube assembly and analysis.  Read on to learn more about
-building higher quality cubes, and more sophisticated analysis.
+building higher quality cubes, and more sophisticated methods of
+analysis.
+
+@c
+@c The Tools
+@c
 
 @node The Tools, Cube Assembly, Quick Start Guide, Top
 @chapter The Tools
@@ -449,7 +464,7 @@ building higher quality cubes, and more sophisticated analysis.
 Cubism consists of three main components, which are used together for
 building and analyzing spectral cubes: CUBISM Project, CubeView, and
 CubeSpec.  We will give here a description of the purpose and reference
-of the features of each of the tools.  
+of the features of each of the tools.
 
 @c For a complete reference on the
 @c capabilities and features of each tool, see the appropriate Appendix:
@@ -463,18 +478,26 @@ of the features of each of the tools.
 
 @node CUBISM Project,  , The Tools, The Tools
 @section CUBISM Project
+@cindex Project, CUBISM
+@cindex CUBISM Project
 
 The CUBISM Project is the central storehouse of all information relating
-to a single cube.  This is where the data are collected, calibration
-parameters managed, and cube assembled, and outputs saved.  A single
-CUBISM project contains only information for one spectral cube.  There
-is a separate project window for each open cube.  CUBISM projects, with
-all their associated information, can be saved to and recovered from
-disk.  In a sense, the ``project'' is the fundamental file type of
-CUBISM, and can be manipulated as a ``document'' in other applications
-(Open/Close/Save/etc.).
+to a single spectral cube.  This is where the raw data are collected,
+the calibration parameters are loaded and managed, preferences are set,
+the cube is assembled, and outputs are saved.  A single CUBISM project
+contains only information for one spectral cube.  There is a separate
+project window for each open cube.  CUBISM projects, with all their
+associated information, can be saved to and recovered from disk.  In a
+sense, the ``project'' is the fundamental file type of CUBISM, and can
+be manipulated in a similar way as a ``document'' in other applications
+(Open/Close/Save/Revert/etc.).  You can have as many CUBISM projects
+open at once as your memory will allow (though all ancillary other
+windows associated with a given project can quickly overwhelm your
+screen).
 
-Here is a CUBISM Project window, populated with a mapping data set:
+Any given CUBISM project can be read from and saved to disk, manipulated
+from the command line, or interacted with via the GUI interface.  Here
+is an example CUBISM Project window, populated with a mapping data set:
 
 @float Figure, fig:pop_proj
 @center @image{images/populated_project,6in,,Populated Cubism
@@ -482,7 +505,142 @@ Here is a CUBISM Project window, populated with a mapping data set:
 @caption{CUBISM Project Main Window}  
 @end float
 
-Four records have been selected
+@node Data Records
+@subsection Data Records
+@cindex Data Records
+@cindex @code{BCD} Records
+@cindex Record Information
+
+A CUBISM projects holds all of the data records necessary for building a
+given cube, either the data, or a reference to the data on file (which
+it loads on demand).  In @ref{fig:pop_proj}, four records have been
+selected, and a variety of information is shown for each record:
+
+@multitable @columnfractions .15 .85
+
+@item @code{ID}
+@tab A (hopefully) unique ID formed from filename.
+
+@item @code{Exp}
+@tab The @code{BCD} exposure time in seconds (from the headers).
+
+@item @code{Observed}
+@tab The date and time the @code{BCD} observation (GMT).
+@item @code{Added}
+@tab The date and time this data record was added to the project (local
+time zone).
+
+@item @code{Type}
+@tab The type of the record, encoded as @samp{tMMO_pos}, with
+
+@itemize @bullet
+@item @samp{t}: The type of data record -- @samp{d} for @samp{DROOPRES},
+@samp{c} for @samp{COADD}, @samp{f} for @samp{FLATAP}, or blank for the
+(by far most common) @code{BCD}.  For information on these other flavors
+of pipeline-produced IRS data see
+@uref{http://ssc.spitzer.caltech.edu/irs/dh/,the IRS Data Handbook}.
+
+@item @samp{M}: The module -- @samp{SL}, @samp{SH}, @samp{LL}, or @samp{LH}.
+
+@item @samp{O}: The targeted order -- @samp{1}, @samp{2}, or blank, for
+high-res or full-slit low-res (e.g. @samp{LLBoth}) targeting.
+
+@item @samp{pos}: The position within the slit which was targeted --
+@samp{cen}: the slit center, @samp{a}: nod position 1, @samp{b}: nod
+position 2).  @samp{b}: nod position 2.
+@end itemize
+
+@item @code{Step}
+@tab The step sequence within the map as @samp{I[X,Y]}, where @samp{I}
+is the @samp{EXPID} of this step, and @samp{X} and @samp{Y} are the row
+and column positions within the map.
+
+@end multitable
+
+@noindent A secondary page of information is available by clicking on the
+right angle button at the extreme right edge of the header bar.  This
+page includes:
+
+@multitable @columnfractions .15 .85
+
+@item @code{RA}
+@tab RA targetted by the slit field of view position (J2000).
+
+@item @code{DEC}
+@tab DEC targetted by the slit field of view position (J2000).
+
+@item @code{DATA}
+@tab Whether the data for this record are loaded, rather than just a
+link to the file.  Data are loaded on demand.
+
+@item @code{UNC}
+@tab Whether the associated uncertainty data for this record are
+loaded.  These are discovered automatically alongside the primary data
+products and loaded..
+
+@item @code{BMSK}
+@tab Whether the associated @code{BMASK} mask data for this record are
+loaded.  The @code{BMASKs} are discovered automatically alongside the
+primary data products and loaded.
+
+@item @code{ACCT}
+@tab Whether the ``accounting information'' for this record is cached,
+mapping @code{BCD} pixels to sky pixels.
+
+@item @code{BPL}
+@tab Whether any record level bad pixels exist for this record
+@pxref{Bad Pixels}.
+
+@end multitable
+
+Note that reference to the term @code{BCD} is inclusive of the other,
+less commonly used files types (@samp{FLATAP}, @samp{DROOPRES}).  The
+records can be sorted by any of the available data fields by clicking
+the button associated with each header word, e.g. to sort by RA, click
+@samp{RA}.
+
+
+@node Menus
+@subsection Menus
+@cindex Project Window Menus
+@cindex Menus, Project Window
+
+Most of the options for assembling and saving information from the cube
+are available in the menus of CUBISM Project.
+
+
+@node Button Bar
+@subsection Button Bar
+@cindex Project Window Buttons
+@cindex Buttons, Project Window
+
+
+
+
+
+@node CubeView
+@section CubeView
+@cindex CubeView
+@cindex Viewing Cubes
+@cindex Viewing Maps
+
+
+View and manipulate extracted spectra, and create maps from spectral
+cubes.
+
+
+
+
+
+@node CubeSpec
+@section CubeSpec
+@cindex CubeSpec
+@cindex Spectra, Viewing
+
+View and manipulate extracted spectra, and create maps from spectral
+cubes.
+
+
 
 
 @node Cube Assembly, Cube Analysis, The Tools, Top
@@ -501,7 +659,7 @@ Four records have been selected
 
 @node Input Files and Calibration, Backgrounds, Cube Assembly, Cube Assembly
 @section Input Files and Calibration
-@cindex BCD files
+@cindex @code{BCD} files
 @cindex Calibration sets
 @cindex Files, input
 @cindex Input files
@@ -516,7 +674,7 @@ File naming convention.
 
 
 Notes on in situ, archive, and other sources for background subtraction,
-including the use of the visualizer for selecting in situ BCDs.
+including the use of the visualizer for selecting in situ @code{BCDs}.
 
 
 
@@ -534,7 +692,7 @@ description of how to define sky data from IRS low-resolution
 "outrigger" data.  The example given is for short-low (SL) data, but
 similar steps can be taken for long-low data.
 
-To define the low-resolution sky BCDs, and to create a corresponding
+To define the low-resolution sky @code{BCDs}, and to create a corresponding
 .bgl file for data cube construction within CUBISM:
 
 @enumerate
@@ -545,7 +703,7 @@ the bad pixel population.
 @item
 Use the AOR visualizer with an 8um image.  After using the histogram box
 to scale the image such that low-level diffuse emission is apparent, hit
-'v' to switch to visualize mode.  To define sky BCDs for SL1, for
+'v' to switch to visualize mode.  To define sky @code{BCDs} for SL1, for
 example, set the cube build order to 2 (Cube-Set Cube Build Order->2) so
 that SL1 is not on the bright target source, and see which SL1
 outriggers conveniently land off your target.  Highlight these
@@ -566,7 +724,7 @@ are bad.  Bad pixels, bad.
 
 A number of marks are drawn in CubeView to indicate global bad pixels,
 record level bad pixels, and various conditions and flags from the
-pipeline generated mask files @samp{BMASK} and @samp{PMASK}.  The
+pipeline generated mask files @code{BMASK} and @code{PMASK}.  The
 various symbols seen when in @samp{Mark Bad Pixel} mode are:
 
 
@@ -578,24 +736,24 @@ various symbols seen when in @samp{Mark Bad Pixel} mode are:
 @tab Record-level user bad pixels, applying only to a single record.
 
 @item Blue @samp{+}s
-@tab Locations where the @samp{PMASK} (permanent mask) has any bit set.
-The @samp{PMASK} typically contains a small number of unruly pixels.
+@tab Locations where the @code{PMASK} (permanent mask) has any bit set.
+The @code{PMASK} typically contains a small number of unruly pixels.
 
 @item Red @samp{diamonds}s
-@tab Non-fatal bits set in the @samp{BMASK}.
+@tab Non-fatal bits set in the @code{BMASK}.
 
 @item Red @samp{x}s
-@tab Fatal bits set in the @samp{BMASK}.  These are bits 12, 13 and 14,
+@tab Fatal bits set in the @code{BMASK}.  These are bits 12, 13 and 14,
 i.e. none or only one usable sample in the exposure ramp, or pixel
-fatally flagged in the @samp{PMASK}.
+fatally flagged in the @code{PMASK}.
 
 @end multitable
 
 @noindent See the @uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data
 Handbook} for a reference on the individual mask bits which the IRS
 pipeline applies.  Note that despite being a fatal mask value, bit 8 in
-the @samp{BMASK} (not flat fielded) is not marked, since it occurs
-everywhere off the orders.  All @samp{BMASK} values, whether marked or
+the @code{BMASK} (not flat fielded) is not marked, since it occurs
+everywhere off the orders.  All @code{BMASK} values, whether marked or
 not, are indicated in the status display line.
 
 
@@ -608,9 +766,9 @@ indicated:
 All mask and user-set bad pixels marks.
 @item
 All mask and user-set bad pixels marks, except for non-fatal
-@samp{BMASK} marks.
+@code{BMASK} marks.
 @item
-All fatal @samp{BMASK} mask and user-set bad pixel marks.
+All fatal @code{BMASK} mask and user-set bad pixel marks.
 @item
 Only user-set bad pixel marks.
 @end enumerate
@@ -631,7 +789,7 @@ pixels is described in Section XX.
 
 @enumerate
 @item
- View the stack of relevant BCDs.
+ View the stack of relevant @code{BCDs}.
 @item
  Show the wavsamp.
 @item
