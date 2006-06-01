@@ -137,6 +137,7 @@ The Techniques
 * Cube Assembly::               
 * Cube Analysis::               
 * Cube Validation::             
+* Cookbook::
 
 Cube Assembly
 
@@ -867,6 +868,44 @@ etc.
 
 A description of backtracking and other means of validating and
 improving the cube, and checking on weak features, etc.
+
+@node Cookbook, , Cube Validation, The Techniques
+@section Cookbook
+@cindex Cookbook
+
+@center The 10 Steps To Build A Spectral Cube 
+@enumerate
+@item
+Admit that you have a cube.  Prepare yourself.  We tend to chose a 20+ year old whisky, preferably Speyside.  
+@item
+We assume that you have already followed the Quick Start Guide and started CUBISM with the following command.  
+@example
+IDL> cubism
+@end example
+@item 
+If this is your first start of CUBISM, you will have a menu window asking you to @strong{Load Cube Project...}.  In that case, you can open an old cube project (ending in .cpj) or press the bottom button @strong{Create New Cube Project}.  For a new project, you must first 
+name the project.  A @strong{New Project Name} window pops up and this is where you type its name.  Click @strong{OK} when you are done.  
+@item
+Click on the @strong{Record} menu tab.  Highlight then click the @strong{Load Record Uncertainties}.  After this, the @strong{Record} menu closes.  Open it again and you will see a square next to @strong{Load Record Uncertainties}.  
+@item
+With the @strong{Record} menu tab still open, click on @strong{Import Data by Module}.  This brings up another window.  You want to click @strong{BCD...}.  This brings up yet another window entitled @strong{Select BCD AOR Directory}.  You just need to highlight the top directory where the data are.  Since you can only load one type of data in one project, you can highlight the r###### directory that you get when unzipping data from the SSC.  If you do not know which r###### directory has which data, highlight the next directory down on the directory tree (with / being the base of the directory tree).  Click @strong{OK} and CUBISM will bring up another window entitled @strong{Load Group}. Click on the square next to the data that you want.  The window tells you what object, module (SL, LL, SH, LH), and how many files for each module.  Click @strong{OK} when you are ready.  
+
+@item
+Click on the @strong{Cube} menu tab.  There are several points under this menu that need to be checked (producing a square like that for @strong{Load Record Uncertainties} in Step 4).  Check the following: @strong{Build Cube with FLUXCON}, @strong{Build in MJy/sr}, @strong{Build Cube with SLCF}, @strong{Trim Wavelengths}, and @strong{Build Cube Uncertainties} (you will not be able to highlight this unless you clicked on @strong{Load Record Uncertainties} earlier).  There is also @strong{Subtract Background} that needs to be checked if you are getting rid of the background.  That is your preference.  This text will not be clickable until you have set the background records.  
+
+@item
+Now, time to set the background records.  You will have to add the background spectra using the @strong{Record} menu tab and clicking @strong{Import Data by Module} and then @strong{BCD} (just like before).  In the main cube project window, highlight the file names that are for the background.  Once the file names are highlighted, click on the @strong{Background} menu tab.  Under this menu, click on @strong{Set Background from Rec(s)...}.  A window will appear with either one option, if you only have 2 background files, or two options.  The two options to choose are @strong{Average} (for both 2 or greater number of files) and @strong{Average + Min/Max Trim} (for only greater than 2 background files).  Now, under the @strong{Cube} menu tab, you can now highlight and then click @strong{Subtract Background}.  
+
+@item
+It is time to build your cube.  Go into the @strong{Cube} menu tab and click on @strong{Build Cube}.  A new window producing multicolored rectangles will appear.  Then, the white grid will become bold when each “pixel” is generated.  Congratulations!  You have a cube.  
+
+@item
+Now, you can start deleting bad pixels or have the program do it for you.  It all depends on how much time that you want to spend on the cube.  I will not tell you how to delete bad pixels.  That is saved for another section.  For those wishing to have CUBISM do it, click on the @strong{Bad Pixel} menu tab and then click on @strong{Auto-Gen Global Bad Pixels...}.  You can also click on @strong{Auto-Gen Record Bad Pixels...}, but this option is not discussed here.  After hitting the Global button, a new window pops up.  First, unclick the @strong{UNC} button.  Second, if you have subtracted a background, click the @stong{BG} button to account for the background use.  The default sigma and fraction that come up are very good.  Click @strong{OK}.  We cannot give you default numbers of bad pixels that will be produced by the program.  It depends on when your observations were taken, if you used background subtraction, and the parameters for the Auto-Gen.  
+
+@item
+Finally, rebuild your cube.  The Auto-Gen Bad Pixel program will always leave a few bad pixels.  So, you will have to subtract a few.  If the program doesn't leave a few, then you have probably deleted some of your science.  @strong{BE FOREWARNED!}  However, you can now view the cube, extract spectra, and save them as .tbl files.  Enjoy your new life with a spectral cube!  
+@end enumerate
+
 
 
 
