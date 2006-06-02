@@ -7,9 +7,9 @@
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
 @set EDITION 1.0
-@set VERSION 0.95
+@set VERSION 1.13
 @set IDLVERSIONREQUIRED 6.1
-@set DATE May, 2006
+@set DATE June, 2006
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jdsmith@@as.arizona.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -672,6 +672,7 @@ cubes.
 * Cube Assembly::               
 * Cube Analysis::               
 * Cube Validation::             
+* Cookbook::
 @end menu
 
 @node Cube Assembly, Cube Analysis, The Techniques, The Techniques
@@ -906,8 +907,64 @@ Now, you can start deleting bad pixels or have the program do it for you.  It al
 Finally, rebuild your cube.  The Auto-Gen Bad Pixel program will always leave a few bad pixels.  So, you will have to subtract a few.  If the program doesn't leave a few, then you have probably deleted some of your science.  @strong{BE FOREWARNED!}  However, you can now view the cube, extract spectra, and save them as .tbl files.  Enjoy your new life with a spectral cube!  
 @end enumerate
 
-
-
+@center GOTCHA!!! --- Things That Will Waste Your Time When You Do Them
+Here, we present a list of things to remember, especially if you just resave your
+first project (using @strong{Save As...} under the @strong{File} menu tab).  
+@enumerate
+@item
+If you just resave a project, like SL1 and then use it for SL2, then remember to 
+change the @strong{Set Cube Build Order...} under the @strong{Cube} menu tab.  
+@item
+If you just resave a project, like SH and then use it for LH, then remember to 
+erase all your previous bad pixels.  These bad pixel numbers are saved in each 
+project.  Use @strong{Clear All Bad Pixels} under the @strong{BadPix} menu tab.
+@item
+If you resave a project, you will NOT have to change the background files, for SL1
+to SL2.  However, you WILL have to clear the background records if you switch from 
+SH to LH.  Use @strong{Remove Background} under the @strong{Background} menu tab.
+@item
+SAVE OFTEN!!!  You can also save your bad pixel and background records in separate
+files from your project (.cpj) file.  These are typically .bpl (for bad pixels) and
+.bgl (for backgrounds).  You can then load these files into a new project file and
+save yourself time, if you are breaking a large Project into several smaller 
+project files.  
+@sp 1
+OR what could happen is that you get drunk and type 'rm -f *.cpj' in the directory
+where you are working.  All that work lost, but before you throw yourself from the 
+building, just load up the science files again and then load up the .bpl and 
+.bgl files.  NOTE: The background science files have to be loaded prior to 
+loading the .bgl file.  
+@item 
+When SSC moves onto S14, S15, etc., they change the last number in the science fits
+files.  Thus, your project files will not be portable
+@sp 1
+NNNNNNNNNNNNNNNOOOOOOOOOOOOOOOOOOOOO!!!!!!!!!!!!!!!!!
+@sp 1 
+But wait!  Go to the @strong{Edit} menu tab and click on @strong{Select All}.  
+Then, under the @strong{Edit} menu tab, there is the great button called 
+@strong{Replace File Subtring}.  This brings up, essentially, the Find and Replace
+window from Windows.  Just type in _1_ in the Find line.  Then, type _2_ in the 
+Replace line.  Click @strong{OK}.  Thus, all your old work is saved.  
+@item
+If you get an error message about missing a calibration file and so using something
+older, don't panic.  It's fine but you probably need an update of your CUBISM, or
+you need to wait for the SSC to come up with a newer calibration file.  
+@item
+If CUBISM ever freezes, close everything and restart.  Before redoing the error, 
+click on @strong{Debug Cubism} under the @strong{Info} menu tab.  Then, redo 
+the error.  Send the "barf" that occured in your IDL window to the appropriate 
+authorities.  That will help the Help Desk more than anything and speed up their 
+response.  
+@item
+If you want to View your cube and visualize your AORs, then you want to use the 
+(new viewer) commands of the same name (e.g., View Cube (new viewer)...).  These
+(new viewer) commands are found under the @strong{Record} menu tab and 
+@strong{Cube} menu tab.  Hitting these buttons will save you the frustration of 
+seeing what you want disappear.  This is not so bad for viewing a cube but it will
+save you a few moments when you are visualizing an AOR.  
+@item
+If you can think of any more, you are smarter than us.  
+@end enumerate
 
 @c
 @c Appendices
