@@ -14,6 +14,22 @@
 @set AUTHOREMAIL jdsmith@@as.arizona.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
 
+@macro callout {text}
+@quotation
+@cartouche
+@strong{\text\ }
+@end cartouche
+@end quotation
+@end macro
+
+@macro screenshot {label,name,text,size,caption}
+@float Figure, fig:\label\
+@center @image{images/\name\,\size\,,\text\}
+@caption{\caption\}
+@end float
+@end macro
+
+
 @c %**end of header
 @finalout
 
@@ -105,9 +121,6 @@ the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
 * Quick Start Guide::           
 * The Tools::                   
 * The Techniques::              
-* CubeProject Reference::       
-* CubeView Reference::          
-* CubeSpec Reference::          
 * Index::                       
 
 @detailmenu
@@ -132,18 +145,36 @@ CUBISM Project
 * Menus::                       
 * Button Bar::                  
 
+Menus
+
+* File Menu::                   
+* Edit Menu::                   
+* Record Menu::                 
+* Cube Menu::                   
+* Background Menu::             
+* BadPix Menu::                 
+* Info Menu::                   
+
 The Techniques
 
 * Cube Assembly::               
 * Cube Analysis::               
 * Cube Validation::             
-* Cookbook::
+* Cookbook::                    
 
 Cube Assembly
 
 * Input Files and Calibration::  Backgrounds:: Bad Pixels::
 * Backgrounds::                 
 * Bad Pixels::                  
+
+Backgrounds
+
+* In Situ Background::          
+* Archive Background::          
+* 1D Sky Spectrum Background::  
+* No Background::               
+* Background Tips and Visualization::  
 
 Bad Pixels
 
@@ -240,7 +271,7 @@ Access to CUBISM's code for bug fixing or examining algorithms.
 @item
 Source level feedback when bugs occur (see XXX).
 @item
-Should continue to function with future versions of IDL.
+Should continue to function with all future versions of IDL.
 @end itemize
 
 @noindent The disadvantages of the source installation are:
@@ -281,7 +312,7 @@ making it harder to track down problems.
 @item
 More closely tied to the IDL version; a given binary may not work with
 all future versions of IDL (though typically binary compatibility
-between IDL versions is quite good).
+between IDL versions within a few versions is quite good).
 @end itemize
 
 @menu
@@ -314,8 +345,8 @@ routine @code{MAKE_DLL} looks for.
 @end enumerate
 
 The compiler is required to auto-compile a small piece of C code used to
-speed-up the cube building algorithm.  If this compilation fails, and
-IDL version of this algorithm will be used, which gives the same
+speed-up the main cube building algorithm.  If this compilation fails,
+an IDL version of this algorithm will be used, which gives the same
 results, but operates more slowly.
 
 To install CUBISM from source:
@@ -477,7 +508,7 @@ analysis.
 Cubism consists of three main components, which are used together for
 building and analyzing spectral cubes: CUBISM Project, CubeView, and
 CubeSpec.  We will give here a description of the purpose and reference
-of the features of each of the tools.
+of the features of each of these three tools.
 
 @c For a complete reference on the
 @c capabilities and features of each tool, see the appropriate Appendix:
@@ -497,28 +528,33 @@ of the features of each of the tools.
 @cindex CUBISM Project
 
 The CUBISM Project is the central storehouse of all information relating
-to a single spectral cube.  This is where the raw data are collected,
-the calibration parameters are loaded and managed, preferences are set,
-the cube is assembled, and outputs are saved.  A single CUBISM project
-contains only information for one spectral cube.  There is a separate
-project window for each open cube.  CUBISM projects, with all their
-associated information, can be saved to and recovered from disk.  In a
-sense, the ``project'' is the fundamental file type of CUBISM, and can
-be manipulated in a similar way as a ``document'' in other applications
-(Open/Close/Save/Revert/etc.).  You can have as many CUBISM projects
-open at once as your memory will allow (though all ancillary other
-windows associated with a given project can quickly overwhelm your
-screen).
+to a single spectral cube.  This is where the raw spectral data are
+collected, the calibration parameters are loaded and managed,
+preferences are set, the cube is assembled, and outputs are saved.  
+
+@callout{A single CUBISM project contains information for only one
+spectral cube, corresponding to a single IRS module and order.}
+
+@noindent This includes sub-slits for single IRS modules, e.g. SL1 and SL2 would
+be two separate cubes.  There is a separate project window for each open
+cube. For information on how to extract spectra from matched areas in
+multiple overlapping cubes, see XXX.
+
+CUBISM projects, with all their associated meta-data, can be saved to
+and recovered from disk, with the default file extension @file{.cpj}
+(for ``Cubism Project'').  In a sense, the ``project'' is the
+fundamental file type of CUBISM, and can be manipulated in a similar way
+as a ``document'' in other applications (Open/Close/Save/Revert/etc.).
+You can have as many CUBISM projects open at once as your memory will
+allow (though all ancillary other windows associated with a given
+project can quickly overwhelm your screen).
 
 Any given CUBISM project can be read from and saved to disk, manipulated
 from the command line, or interacted with via the GUI interface.  Here
 is an example CUBISM Project window, populated with a mapping data set:
 
-@float Figure, fig:pop_proj
-@center @image{images/populated_project,6in,,Populated Cubism
-     Project}
-@caption{CUBISM Project Main Window}  
-@end float
+@screenshot{pop_proj,populated_project,Populated Cubism Project, 6in, CUBISM
+Project Main Window}
 
 @menu
 * Data Records::                
@@ -532,10 +568,11 @@ is an example CUBISM Project window, populated with a mapping data set:
 @cindex @code{BCD} Records
 @cindex Record Information
 
-A CUBISM projects holds all of the data records necessary for building a
-given cube, either the data, or a reference to the data on file (which
-it loads on demand).  In @ref{fig:pop_proj}, four records have been
-selected, and a variety of information is shown for each record:
+A CUBISM projects holds all of the data records (often called simply
+@emph{BCDs}) necessary for building a given cube, either including the
+data directly, or a reference to the data on file (which it loads on
+demand).  In @ref{fig:pop_proj}, four records have been selected.  A
+variety of information is shown for each record:
 
 @multitable @columnfractions .15 .85
 
@@ -621,22 +658,431 @@ the button associated with each header word, e.g. to sort by RA, click
 @samp{RA}.
 
 
+@c
+@c CUBISM Project Menus
+@c
+
+
 @node Menus, Button Bar, Data Records, CUBISM Project
 @subsection Menus
 @cindex Project Window Menus
 @cindex Menus, Project Window
 
 Most of the options for assembling and saving information from the cube
-are available in the menus of CUBISM Project.
+are available from the menus of CUBISM Project, which are documented
+here in order of their appearance.
 
+@menu
+* File Menu::                   
+* Edit Menu::                   
+* Record Menu::                 
+* Cube Menu::                   
+* Background Menu::             
+* BadPix Menu::                 
+* Info Menu::                   
+@end menu
+
+@node File Menu, Edit Menu, Menus, Menus
+@subsubsection File Menu
+@cindex File Menu
+
+@table @code
+@item New...
+Create a new CUBISM project, prompting for the name.
+
+@item Open...
+Open an existing CUBISM project.
+
+@item Save Setup
+
+@table @code
+@item Save Data with Project
+Save all record data with the project (which can greatly increase the
+project size on disk).
+
+@item Save Clip Accounts with Project
+Save all clipping information, which enables pixel backtracking, and
+rapid cube rebuilds, with the project.  This will increase the project
+size on disk.
+@end table
+
+@item Save
+Save the project, prompting for a file to save to if not already set.
+
+@item Save As...
+Save the project as an alternate file.
+
+@item Revert to Saved...
+Recover the last saved version of the project from disk, discarding
+current changes.
+
+@item Write FITS Cube...
+Write out the assembled cube (if any) as a FITS cube, along with an
+associated uncertainty cube (if built).
+
+@item Rename Project...
+Rename the project (which doesn't affect the file to which the project
+is saved).
+
+@item Export to Command Line...
+Export the full CUBISM Project object to the IDL command line, prompting
+for the variable name.
+
+@item Load New Calibration Set...
+Load an alternate calibration set.
+
+@item Close
+Close the project window, prompting to save if changes have been made.
+
+@end table
+
+@node Edit Menu, Record Menu, File Menu, Menus
+@subsubsection Edit Menu
+@cindex Edit Menu
+
+@table @code
+@item Select All
+Select all the records.
+
+@item Select By Filename
+Select records with files matching a given expression.
+
+@item Select By Keyword
+Select records with keyword matching a given expression.
+
+@item Invert Selection
+Select an non-selected records, and de-select all selected records.
+
+@item Deselect Disabled
+Deselect any selected record which is disabled.
+
+@item Replace File Substring...
+Replace a given substring in the file names of the selected records with
+another string.
+
+@end table
+
+
+@node Record Menu, Cube Menu, Edit Menu, Menus
+@subsubsection Record Menu
+@cindex Record Menu
+
+@table @code
+@item Add Data...
+
+@item Import Data from Mapping AOR
+Import data from entire mapping AORs, selecting among the AORs present
+at or below the selected directory.
+
+@table @code
+@item BCD...
+Import BCD data (flat-fielded and straylight-corrected).
+
+@item DroopRes...
+Import DroopRes data (not flat-fielded, not straylight-corrected).
+
+@item FlatAp...
+Import FlatAp data (flat-fielded, not straylight-corrected).
+
+@end table
+
+@item Import Data by module
+Import all records found at or below the selected directory, grouped by
+module (independent of any AOR).
+
+@table @code
+@item BCD...
+Import BCD data (flat-fielded and straylight-corrected).
+
+@item DroopRes...
+Import DroopRes data (not flat-fielded, not straylight-corrected).
+
+@item FlatAp...
+Import FlatAp data (flat-fielded, not straylight-corrected).
+
+@end table
+
+@item Load Record Masks
+Load the BMASKs associated with any newly added records.
+
+@item Load Record Uncertainties
+Load the BCD uncertainty files for any newly added records.
+
+@item Switch Record Data Type...
+Prompt for and wwitch the data type of the selected records among BCD,
+FlatAp, and DroopRes.
+
+@item Restore All Record Data
+Recover from file the data for all records (these are normally recovered
+on demand).
+
+@item View Record/View Stack...
+View the selected record, or an average stack of records if more than
+one is selected, using a pre-existing viewer window if available.  Note
+that double-clicking a record or hitting @key{RETURN} on a selected
+record has the same effect.
+
+@item View Record (new viewer)/View Stack (new viewer)...
+View the selected record, or an average stack of records if more than
+one is selected, using a new viewer window.
+
+@item View Uncertainty...
+View the associated uncertainty image of the selected record, or the
+quadrature sum of uncertainties if more than one is selected, using a
+pre-existing record viewer window if available.
+
+@item View Uncertainty (new viewer)...
+View the associated uncertainty image of the selected record, or the
+quadrature sum of uncertainties if more than one is selected, using a
+new viewer window.
+
+@item Delete
+Delete the selected record(s) from the project.
+
+@item Rename
+Change the ID of the first select record.
+
+@item Disable
+Disable the selected record(s), preventing them from being built in the
+cube.
+
+@item Enable
+Enable the selected record(s), allowing them to be built in the cube.
+
+@item Show Filenames...
+Show the filenames associated with the selected record(s).
+
+@item Show Header...
+Show the header(s) of the selected record(s).
+
+@item Show Keyword Value(s)...
+Show the value(s) of a selected FITS header keyword for the selected
+record(s).
+
+@item Visualize AORs...
+Load a FITS image and visualize the mapping AORs on it, using a
+pre-existing visualization viewer window if available.
+
+@item Visualize AORs (new viewer)...
+Load a FITS image and visualize the mapping AORs on it in a new viewer
+window.
+
+@item Load New Visualization Image...
+Load an alternate image for visualizing AORs.
+
+@end table
+
+
+@node Cube Menu, Background Menu, Record Menu, Menus
+@subsubsection Cube Menu
+@cindex Cube Menu
+
+@table @code
+@item Build Cube
+Build the cube from the enable records.
+
+@item Reset Accounts
+Reset the clipping accounts (which speed cube re-build and enable pixel
+backtracking).
+
+@item View Cube...
+View the cube in a pre-existing cube viewer window, if available.
+
+@item View Cube (new viewer)...
+View the cube in a new viewer window.
+
+@item Show Cube Build Feedback
+If enabled, plot cube build feedback while the cube builds.
+
+@item Build Cube with FLUXCON
+Build the cube using flux calibration.
+
+@item Build Cube with SLCF
+Apply the slit loss correction function to the assembled cube, to
+correct for differential diffractive slit losses for extended sources.
+
+@item Subtract Background
+Subtract the set background from each record when building the cube.
+
+@item Trim Wavelengths
+Trim the unreliable ends of the orders, omitting those wavelength planes
+from the cube.
+
+@item Use Reconstructed Positions
+Use positions reconstructed from the spacecraft telemetry, rather than
+the commanded positions.
+
+@item Build Uncertainty Cube
+Build an associated uncertainty cube, if record-level uncertainties are
+available.
+
+
+@item Set Cube Build Order...
+Set the cube build order.
+
+@item Aperture(s)...
+Show the WAVSAMP apertures used for the various orders.
+
+@end table
+
+
+
+@node Background Menu, BadPix Menu, Cube Menu, Menus
+@subsubsection Background Menu
+@cindex Background Menu
+
+@table @code
+@item Set Background from Rec(s)...
+Set the record-level background from the selected records, prompting for
+an average of trimmed-average combination.
+
+@item Load Background Rec(s)...
+Load a saved list of background records to use from a @file{.bgl} file.
+
+@item Background Blend
+@table @code
+@item Set and Scale Background A...
+Set the first background in a blend from the selected records,
+specifying its fiducial point.
+
+@item Set and Scale Background B...
+Set the second background in a blend from the selected records,
+specifying its fiducial point.
+
+@item Blend A and B Backgrounds...
+Create a final background by blending backgrounds A and B according to
+weights calculated from a target fiducial value.
+
+@item View Background A...
+View the first blend background, and select the records associated with it.
+
+@item View Background B...
+View the second blend background, and select the records associated with it.
+@end table
+
+@item Save Background Rec(s)...
+Save the list of backgrounds records used as a @file{.bgl} file.
+
+@item View Background...
+View the record background, if any, in a pre-existing record viewer
+window, if available.
+
+@item View Background (new viewer)...
+View the record background, if any, in a new record menu.
+
+@item Remove Background
+Remove the assembled background.
+
+@item Rebuild Background
+Recreate background from its associated record data.
+
+@item Load Background Spectrum...
+Load a 1D background spectrum from an extracted @file{.tbl} file.
+
+@item Remove Background Spectrum
+Remove any loaded 1D background spectrum.
+
+@end table
+
+@node BadPix Menu, Info Menu, Background Menu, Menus
+@subsubsection BadPix Menu
+@cindex BadPix Menu
+
+@table @code
+@item Load Bad Pixels...
+Load a saved list of bad pixels from a @file{.bpl} file, replacing any
+existing bad pixels already set.
+
+@item Load and Append Bad Pixels...
+Load a saved list of bad pixels from a @file{.bpl} file, appending to
+any existing bad pixels already set.
+
+@item Save Bad Pixels...
+Save the list of global and record-level bad pixels to a @file{.bpl}
+text file.
+
+@item Clear Global Bad Pixels
+Clear all global bad pixels.
+
+@item Clear Record Bad Pixels
+Clear all record-specific bad pixels.
+
+@item Clear All Bad Pixels
+Clear all global and record-level bad pixels.
+
+@item Auto-Gen Global Bad Pixels...
+Attempt to automatically generate global bad pixels from redundant
+information in well sampled cubes, prompting for detection parameters.
+
+@item Auto-Gen Record Bad Pixels...
+Attempt to automatically generate record-level bad pixels for all
+records, prompting for detection parameters.
+
+@end table
+
+
+@node Info Menu,  , BadPix Menu, Menus
+@subsubsection Info Menu
+@cindex Info Menu
+
+@table @code
+@item Project Parameters...
+Display the currently configured project parameters.
+
+@item As-Built Parameters...
+Display the project parameters at the time the most recent cube was
+assembled.
+
+@item Calibration Set Details...
+Show the details of the currently loaded calibration set.
+
+@item Debug Cubism
+Enable CUBISM debugging, so that errors will halt at the command line
+with full traceback information.
+
+@item About Cubism
+Show the current CUBISM version, and the version which was used to
+assemble the loaded project (if different).
+
+@end table
 
 @node Button Bar,  , Menus, CUBISM Project
 @subsection Button Bar
 @cindex Project Window Buttons
 @cindex Buttons, Project Window
 
+The button bar at the base of the CUBISM Project window provides
+convenient access to common functions, also available with menu options
+or mouse shortcuts.
 
+@table @code
+@item Enable
+Enable the selected record(s).
 
+@item Disable
+Disable the selected record(s).
+
+@item Header
+Show the header(s) for the selected record(s).
+
+@item View Record/View Stack
+View the selected record, or an average stack of the selected records,
+if more than one selected.
+
+@item View Cube
+View the assembled cube, if available.
+
+@item Import AOR
+Import BCD records from full mapping AORs found at or beneath the
+selected directory.
+
+@item Save
+Save the current project, prompting for a file if not yet set.
+
+@item Close
+Close the current project, prompting to save any unsaved changes.
+
+@end table
 
 
 @node CubeView, CubeSpec, CUBISM Project, The Tools
@@ -651,20 +1097,17 @@ cubes.
 
 
 
-
-
 @node CubeSpec,  , CubeView, The Tools
 @section CubeSpec
 @cindex CubeSpec
 @cindex Spectra, Viewing
 
-View and manipulate extracted spectra, and create maps from spectral
-cubes.
+CubeSpec is the tool which permites viewing and manipulating extracted
+spectra, and create maps from spectral cubes.
 
 
 
-
-@node The Techniques, CubeProject Reference, The Tools, Top
+@node The Techniques, Index, The Tools, Top
 @chapter The Techniques
 
 
@@ -672,7 +1115,7 @@ cubes.
 * Cube Assembly::               
 * Cube Analysis::               
 * Cube Validation::             
-* Cookbook::
+* Cookbook::                    
 @end menu
 
 @node Cube Assembly, Cube Analysis, The Techniques, The Techniques
@@ -684,9 +1127,6 @@ cubes.
 * Backgrounds::                 
 * Bad Pixels::                  
 @end menu
-
-
-
 
 
 @node Input Files and Calibration, Backgrounds, Cube Assembly, Cube Assembly
@@ -703,47 +1143,158 @@ File naming convention.
 @subsection Backgrounds
 @cindex Background subtraction
 
+All IRS observations are affected at some level by the foreground or
+background emission of zodiacal dust and Galactic cirrus.  For faint
+sources, subtracting off a local ``sky background'' 2D BCD frame from
+data obtained nearby in position and time is the most effective method
+for removing the astrophysical background.  It also tremendously reduces
+the number of bad ``rogue'' pixels contaminating your data, especially
+at longer wavelengths, and is a recommended step for all cubes.  Here we
+explore a variety of options for background subtraction, in decreasing
+order of preference.
+
+@callout{Subtracting a 2D background frame can greatly improve the
+quality of the assembled cube, especially for faint sources.}
+
+@menu
+* In Situ Background::          
+* Archive Background::          
+* 1D Sky Spectrum Background::  
+* No Background::               
+* Background Tips and Visualization::  
+@end menu
+
+@node In Situ Background, Archive Background, Backgrounds, Backgrounds
+@subsubsection In Situ Background
+@cindex Background, In Situ
+
+The primary and recommended technique for assembling a background frame
+is to use dedicated background observations you scheduled along with
+your mapping AOR, or to use data obtained as part of your mapping
+observations which went off the source.  For dedicated sky observations,
+simply load the records (for example, with @kbd{Record->Import Data by
+Module->BCD}), disable them, and @kbd{Background->Set Background from
+Recs...}.  For backgrounds which appear among the mapping data set,
+simply select these records and choose @kbd{Background->Set Background
+from Recs...}.
+
+Finding full records which are uncontaminated by source emission, either
+within the spectral map itself, or as part of a dedicated background AOR
+grouped with the main observations, is the goal.  This is aided in maps
+using the low-resolution modules by the fact that each low-res slit (LL
+and SL) is comprised of two sub-slits which define the different
+spectral orders.  For small object, less than the size of one sub-slit,
+it is common to map first with one sub-slit, and then with the other
+(e.g. a SL1 map and, separately, a SL2 map).  In this case, the
+``outrigger'' data from the data collected when the source was placed in
+the other order can be used as a background set.  Even if the full slit
+was used to map a source, the fact that the two orders extend away from
+the map center to either side can allow useful background frames to be
+found.
 
 
-Notes on in situ, archive, and other sources for background subtraction,
-including the use of the visualizer for selecting in situ @code{BCDs}.
+@node Archive Background, 1D Sky Spectrum Background, In Situ Background, Backgrounds
+@subsubsection Archive Background
+@cindex Background, Archive
+
+If you didn't obtain dedicated sky observations, and none of the records
+in your map are free from source emission, you can still recover 2D
+level BCD maps by ``borrowing'' suitable data from the Spitzer archives.
+Useful sky data would have been obtained with the same instrument
+module, using (ideally) the same exposure time, targeted within roughly
+10 degrees in ecliptic latitude from your source, and within 2-3 days.
+
+The efficacy of archive sky subtraction can vary widely, and depends on
+the level of the background at your source, and the historical behavior
+of the IRS detectors at the time of your observations.  The closer in
+time and ecliptic coordinate the data, the better the subtraction will
+be (both in terms of removing the astrophysical foreground, and
+mitigating the effects of rogue pixels).  The complete
+@uref{http://ssc.spitzer.caltech.edu/approvdprog/sched/obs/alltogether.txt,log
+of all Spitzer observations} can be useful for identifying potential
+data sets which could contain useful background data.  Remember that you
+must decide yourself whether a given BCD record constitutes a valid
+background frame, i.e. is free from source emission.  For low resolution
+data, often the safest bet is the ``outrigger'' order from a staring
+mode observation (which often target unresolved sources) --- e.g. SL2
+from a SL1 targetted observation.  The disadvantage of this technique is
+that the data must be available in the archive.
+
+A related technique is the ``Background Blend'', in which a pair of
+observations from the archive (or elsewhere) which bracket the
+background as observed at the target are blended together to approximate
+a local background.  To use this, load the two data sets, ensuring their
+records are disabled to avoid having them built into the cube.  Select
+the subset of the first which you want to include in the background, and
+select @code{Background->Background Blend->Set and Scale Background
+A...}.  The selected background is displayed, with @samp{BackgroundA}
+indicated.  Enter a fiducial background value when prompted.  This value
+serves as the interpolant for determining the weights of the two
+backgrounds in the blend.  For SL data, it is convenient to use the flux
+measured in the Peak-Up Blue image at 16 microns, if it is clear of
+source contamination.  The box statistics tool can be useful (e.g. use
+the 3-sigma clipped average of a large section of the PU field).  Do
+similarly for @samp{BackroundB}, and then select
+@code{Background->Background Blend->Blend A and B Backgrounds...},
+entering a fiducial of your target data set, formed in the same way
+(e.g. in the PU field).  Another potentially useful fiducial is the
+predicted background at the source position and date, as available in
+Spot.
 
 
+@node 1D Sky Spectrum Background, No Background, Archive Background, Backgrounds
+@subsubsection 1D Sky Spectrum
+@cindex Sky, 1D Spectrum
 
-@subsubsection In Situ Sky
+If no 2D data are available for subtraction, some of the benefits can be
+obtained by specifying a 1D spectrum to subtract from all the cube
+planes.  You could build a cube, extract a spectrum from an area thought
+to be free from source contamination, and use this extracted spectrum as
+a 1D level background.  
 
-Subtracting off contemporaneous sky data from your Spitzer IRS target
-data does more than just remove foreground emission (e.g., zodiacal,
-Galactic).  It also tremendously reduces the number of "bad pixels"
-contaminating your data.
+@callout{Note that 1D background data must be in raw, e/s units,
+extracted from cubes built without FLUXCON.}
 
-If you unfortunately do not have access to dedicated, contemporaneous,
-off-target sky data, in many instances the physical configuration of the
-IRS low-resolution modules provides an alternative.  Below is a
-description of how to define sky data from IRS low-resolution
-"outrigger" data.  The example given is for short-low (SL) data, but
-similar steps can be taken for long-low data.
+This method does not help mitigate rogue pixels, and is equivalent to
+extracting spectra and differencing them after the fact, but operates on
+the entire cube at once.
 
-To define the low-resolution sky @code{BCDs}, and to create a corresponding
-.bgl file for data cube construction within CUBISM:
+@node No Background, Background Tips and Visualization, 1D Sky Spectrum Background, Backgrounds
+@subsubsection No Background
+
+Using no background is a reasonable last resort option for brighter
+sources, though the number of bad pixels in the raw unsubtracted data is
+much higher, so more work will be required to identify them (see XXX).
+The physical background flux will remain in the final assembled cube,
+which may affect analysis of extracted spectra or maps.
+
+@node Background Tips and Visualization,  , No Background, Backgrounds
+@subsubsection Background Tips and Visualization
+
+It can be convenient to select suitable records for inclusion in the
+background frame using the AOR visualization of an IRAC or MIPS (or
+other zodiacal and/or cirrus sensitive waveband) image of the target
+region.  Here we describe how to use the ``outrigger'' method to select
+suitable records from a set of low-resolution observations in the SL
+module (LL would be similar).
 
 @enumerate
 @item
-Load all the relevant SL (SL1+SL2) frames.  Don't mix data taken more
-than a few days apart, to minimize the effects of day-to-day changes in
-the bad pixel population.
+Load all the relevant SL (SL1+SL2) frames, which may span more than one
+AOR.  Using @kbd{Import AOR} will permit selecting more than one AOR at
+once.  Don't mix data taken more than a few days apart, to minimize the
+effects of day-to-day changes in the pixel response of the detectors.
 @item
-Use the AOR visualizer with an 8um image.  After using the histogram box
-to scale the image such that low-level diffuse emission is apparent, hit
-'v' to switch to visualize mode.  To define sky @code{BCDs} for SL1, for
-example, set the cube build order to 2 (Cube-Set Cube Build Order->2) so
-that SL1 is not on the bright target source, and see which SL1
-outriggers conveniently land off your target.  Highlight these
-outriggers with the mouse.  Save this information into a .bgl file using
-Background->Save Background
-Recs->m51_opticallyselected_extranuc_SL1.bgl.
+Visualize the AORs using, e.g., an 8 micron IRAC image (see XXX).  After
+using the histogram box to scale the image such that low-level diffuse
+emission is apparent, hit @kbd{v} to switch to visualize mode.  To
+define sky BCDs for, e.g., SL1, for example, set the cube build order to
+1 (@kbd{Cube->Set Cube Build Order}) so that SL1 is not on the bright
+target source, and see which records land off your target.  Highlight
+these outriggers with the mouse by click and drag.
 @item
-Repeat for SL2.
+For reference, save the resulting record set into a @file{.bgl} file
+using @kbd{Background->Save Background Recs...}.
 @end enumerate
 
 @node Bad Pixels,  , Backgrounds, Cube Assembly
@@ -863,105 +1414,176 @@ A description of cube extraction, map making, map sets, line fitting,
 etc.
 
 
-@node  Cube Validation,  , Cube Analysis, The Techniques
+@node  Cube Validation, Cookbook, Cube Analysis, The Techniques
 @section Cube Validation
 @cindex Cube Validation
 
 A description of backtracking and other means of validating and
 improving the cube, and checking on weak features, etc.
 
-@node Cookbook, , Cube Validation, The Techniques
+@node Cookbook,  , Cube Validation, The Techniques
 @section Cookbook
 @cindex Cookbook
+
+NOTE: This info will likely be re-organized and scattered around the
+previous sections.
 
 @center The 10 Steps To Build A Spectral Cube 
 @enumerate
 @item
-Admit that you have a cube.  Prepare yourself.  We tend to chose a 20+ year old whisky, preferably Speyside.  
+Admit that you have a cube.  Prepare yourself.  We tend to chose a 20+
+year old whisky, preferably Speyside.
 @item
-We assume that you have already followed the Quick Start Guide and started CUBISM with the following command.  
+We assume that you have already followed the Quick Start Guide and
+started CUBISM with the following command.
 @example
 IDL> cubism
 @end example
 @item 
-If this is your first start of CUBISM, you will have a menu window asking you to @strong{Load Cube Project...}.  In that case, you can open an old cube project (ending in .cpj) or press the bottom button @strong{Create New Cube Project}.  For a new project, you must first 
-name the project.  A @strong{New Project Name} window pops up and this is where you type its name.  Click @strong{OK} when you are done.  
+If this is your first start of CUBISM, you will have a menu window
+asking you to @kbd{Load Cube Project...}.  In that case, you can open an
+old cube project (ending in .cpj) or press the bottom button @kbd{Create
+New Cube Project}.  For a new project, you must first name the project.
+A @kbd{New Project Name} window pops up and this is where you type its
+name.  Click @kbd{OK} when you are done.
 @item
-Click on the @strong{Record} menu tab.  Highlight then click the @strong{Load Record Uncertainties}.  After this, the @strong{Record} menu closes.  Open it again and you will see a square next to @strong{Load Record Uncertainties}.  
+Click on the @kbd{Record} menu tab.  Highlight then click the
+@kbd{Load Record Uncertainties}.  After this, the @kbd{Record}
+menu closes.  Open it again and you will see a square next to
+@kbd{Load Record Uncertainties}.
 @item
-With the @strong{Record} menu tab still open, click on @strong{Import Data by Module}.  This brings up another window.  You want to click @strong{BCD...}.  This brings up yet another window entitled @strong{Select BCD AOR Directory}.  You just need to highlight the top directory where the data are.  Since you can only load one type of data in one project, you can highlight the r###### directory that you get when unzipping data from the SSC.  If you do not know which r###### directory has which data, highlight the next directory down on the directory tree (with / being the base of the directory tree).  Click @strong{OK} and CUBISM will bring up another window entitled @strong{Load Group}. Click on the square next to the data that you want.  The window tells you what object, module (SL, LL, SH, LH), and how many files for each module.  Click @strong{OK} when you are ready.  
+With the @kbd{Record} menu tab still open, click on @kbd{Import
+Data by Module}.  This brings up another window.  You want to click
+@kbd{BCD...}.  This brings up yet another window entitled
+@kbd{Select BCD AOR Directory}.  You just need to highlight the top
+directory where the data are.  Since you can only load one type of data
+in one project, you can highlight the r###### directory that you get
+when unzipping data from the SSC.  If you do not know which r######
+directory has which data, highlight the next directory down on the
+directory tree (with / being the base of the directory tree).  Click
+@kbd{OK} and CUBISM will bring up another window entitled
+@kbd{Load Group}. Click on the square next to the data that you want.
+The window tells you what object, module (SL, LL, SH, LH), and how many
+files for each module.  Click @kbd{OK} when you are ready.
 
 @item
-Click on the @strong{Cube} menu tab.  There are several points under this menu that need to be checked (producing a square like that for @strong{Load Record Uncertainties} in Step 4).  Check the following: @strong{Build Cube with FLUXCON}, @strong{Build in MJy/sr}, @strong{Build Cube with SLCF}, @strong{Trim Wavelengths}, and @strong{Build Cube Uncertainties} (you will not be able to highlight this unless you clicked on @strong{Load Record Uncertainties} earlier).  There is also @strong{Subtract Background} that needs to be checked if you are getting rid of the background.  That is your preference.  This text will not be clickable until you have set the background records.  
+Click on the @kbd{Cube} menu tab.  There are several points under this
+menu that need to be checked (producing a square like that for @kbd{Load
+Record Uncertainties} in Step 4).  Check the following: @kbd{Build Cube
+with FLUXCON}, @kbd{Build in MJy/sr}, @kbd{Build Cube with SLCF},
+@kbd{Trim Wavelengths}, and @kbd{Build Cube Uncertainties} (you will not
+be able to highlight this unless you clicked on @kbd{Load Record
+Uncertainties} earlier).  There is also @kbd{Subtract Background} that
+needs to be checked if you are getting rid of the background.  That is
+your preference.  This text will not be clickable until you have set the
+background records.
 
 @item
-Now, time to set the background records.  You will have to add the background spectra using the @strong{Record} menu tab and clicking @strong{Import Data by Module} and then @strong{BCD} (just like before).  In the main cube project window, highlight the file names that are for the background.  Once the file names are highlighted, click on the @strong{Background} menu tab.  Under this menu, click on @strong{Set Background from Rec(s)...}.  A window will appear with either one option, if you only have 2 background files, or two options.  The two options to choose are @strong{Average} (for both 2 or greater number of files) and @strong{Average + Min/Max Trim} (for only greater than 2 background files).  Now, under the @strong{Cube} menu tab, you can now highlight and then click @strong{Subtract Background}.  
+Now, time to set the background records.  You will have to add the
+background spectra using the @kbd{Record} menu tab and clicking
+@kbd{Import Data by Module} and then @kbd{BCD} (just like before).
+In the main cube project window, highlight the file names that are for
+the background.  Once the file names are highlighted, click on the
+@kbd{Background} menu tab.  Under this menu, click on @kbd{Set
+Background from Rec(s)...}.  A window will appear with either one
+option, if you only have 2 background files, or two options.  The two
+options to choose are @kbd{Average} (for both 2 or greater number of
+files) and @kbd{Average + Min/Max Trim} (for only greater than 2
+background files).  Now, under the @kbd{Cube} menu tab, you can now
+highlight and then click @kbd{Subtract Background}.
 
 @item
-It is time to build your cube.  Go into the @strong{Cube} menu tab and click on @strong{Build Cube}.  A new window producing multicolored rectangles will appear.  Then, the white grid will become bold when each “pixel” is generated.  Congratulations!  You have a cube.  
+It is time to build your cube.  Go into the @kbd{Cube} menu tab and
+click on @kbd{Build Cube}.  A new window producing multicolored
+rectangles will appear.  Then, the white grid will become bold when each
+``pixel'' is generated.  Congratulations!  You have a cube.
 
 @item
-Now, you can start deleting bad pixels or have the program do it for you.  It all depends on how much time that you want to spend on the cube.  I will not tell you how to delete bad pixels.  That is saved for another section.  For those wishing to have CUBISM do it, click on the @strong{Bad Pixel} menu tab and then click on @strong{Auto-Gen Global Bad Pixels...}.  You can also click on @strong{Auto-Gen Record Bad Pixels...}, but this option is not discussed here.  After hitting the Global button, a new window pops up.  First, unclick the @strong{UNC} button.  Second, if you have subtracted a background, click the @stong{BG} button to account for the background use.  The default sigma and fraction that come up are very good.  Click @strong{OK}.  We cannot give you default numbers of bad pixels that will be produced by the program.  It depends on when your observations were taken, if you used background subtraction, and the parameters for the Auto-Gen.  
+Now, you can start deleting bad pixels or have the program do it for
+you.  It all depends on how much time that you want to spend on the
+cube.  I will not tell you how to delete bad pixels.  That is saved for
+another section.  For those wishing to have CUBISM do it, click on the
+@kbd{Bad Pixel} menu tab and then click on @kbd{Auto-Gen Global
+Bad Pixels...}.  You can also click on @kbd{Auto-Gen Record Bad
+Pixels...}, but this option is not discussed here.  After hitting the
+Global button, a new window pops up.  First, unclick the @kbd{UNC}
+button.  Second, if you have subtracted a background, click the
+@kbd{BG} button to account for the background use.  The default sigma
+and fraction that come up are very good.  Click @kbd{OK}.  We cannot
+give you default numbers of bad pixels that will be produced by the
+program.  It depends on when your observations were taken, if you used
+background subtraction, and the parameters for the Auto-Gen.
 
 @item
-Finally, rebuild your cube.  The Auto-Gen Bad Pixel program will always leave a few bad pixels.  So, you will have to subtract a few.  If the program doesn't leave a few, then you have probably deleted some of your science.  @strong{BE FOREWARNED!}  However, you can now view the cube, extract spectra, and save them as .tbl files.  Enjoy your new life with a spectral cube!  
+Finally, rebuild your cube.  The Auto-Gen Bad Pixel program will always
+leave a few bad pixels.  So, you will have to subtract a few.  If the
+program doesn't leave a few, then you have probably deleted some of your
+science.  @strong{BE FOREWARNED!}  However, you can now view the cube,
+extract spectra, and save them as .tbl files.  Enjoy your new life with
+a spectral cube!
 @end enumerate
 
 @center GOTCHA!!! --- Things That Will Waste Your Time When You Do Them
-Here, we present a list of things to remember, especially if you just resave your
-first project (using @strong{Save As...} under the @strong{File} menu tab).  
+Here, we present a list of things to remember, especially if you just
+resave your first project (using @kbd{Save As...} under the
+@kbd{File} menu tab).
 @enumerate
 @item
 If you just resave a project, like SL1 and then use it for SL2, then remember to 
-change the @strong{Set Cube Build Order...} under the @strong{Cube} menu tab.  
+change the @kbd{Set Cube Build Order...} under the @kbd{Cube} menu tab.  
 @item
-If you just resave a project, like SH and then use it for LH, then remember to 
-erase all your previous bad pixels.  These bad pixel numbers are saved in each 
-project.  Use @strong{Clear All Bad Pixels} under the @strong{BadPix} menu tab.
+If you just resave a project, like SH and then use it for LH, then
+remember to erase all your previous bad pixels.  These bad pixel numbers
+are saved in each project.  Use @kbd{Clear All Bad Pixels} under the
+@kbd{BadPix} menu tab.
 @item
-If you resave a project, you will NOT have to change the background files, for SL1
-to SL2.  However, you WILL have to clear the background records if you switch from 
-SH to LH.  Use @strong{Remove Background} under the @strong{Background} menu tab.
+If you resave a project, you will NOT have to change the background
+files, for SL1 to SL2.  However, you WILL have to clear the background
+records if you switch from SH to LH.  Use @kbd{Remove Background}
+under the @kbd{Background} menu tab.
 @item
-SAVE OFTEN!!!  You can also save your bad pixel and background records in separate
-files from your project (.cpj) file.  These are typically .bpl (for bad pixels) and
-.bgl (for backgrounds).  You can then load these files into a new project file and
-save yourself time, if you are breaking a large Project into several smaller 
-project files.  
+SAVE OFTEN!!!  You can also save your bad pixel and background records
+in separate files from your project (.cpj) file.  These are typically
+.bpl (for bad pixels) and .bgl (for backgrounds).  You can then load
+these files into a new project file and save yourself time, if you are
+breaking a large Project into several smaller project files.
 @sp 1
-OR what could happen is that you get drunk and type 'rm -f *.cpj' in the directory
-where you are working.  All that work lost, but before you throw yourself from the 
-building, just load up the science files again and then load up the .bpl and 
-.bgl files.  NOTE: The background science files have to be loaded prior to 
-loading the .bgl file.  
+OR what could happen is that you get drunk and type 'rm -f *.cpj' in the
+directory where you are working.  All that work lost, but before you
+throw yourself from the building, just load up the science files again
+and then load up the .bpl and .bgl files.  NOTE: The background science
+files have to be loaded prior to loading the .bgl file.
 @item 
-When SSC moves onto S14, S15, etc., they change the last number in the science fits
-files.  Thus, your project files will not be portable
+When SSC moves onto S14, S15, etc., they change the last number in the
+science fits files.  Thus, your project files will not be portable
 @sp 1
 NNNNNNNNNNNNNNNOOOOOOOOOOOOOOOOOOOOO!!!!!!!!!!!!!!!!!
 @sp 1 
-But wait!  Go to the @strong{Edit} menu tab and click on @strong{Select All}.  
-Then, under the @strong{Edit} menu tab, there is the great button called 
-@strong{Replace File Subtring}.  This brings up, essentially, the Find and Replace
-window from Windows.  Just type in _1_ in the Find line.  Then, type _2_ in the 
-Replace line.  Click @strong{OK}.  Thus, all your old work is saved.  
+But wait!  Go to the @kbd{Edit} menu tab and click on @kbd{Select
+All}.  Then, under the @kbd{Edit} menu tab, there is the great button
+called @kbd{Replace File Subtring}.  This brings up, essentially, the
+Find and Replace window from Windows.  Just type in _1_ in the Find
+line.  Then, type _2_ in the Replace line.  Click @kbd{OK}.  Thus,
+all your old work is saved.
 @item
-If you get an error message about missing a calibration file and so using something
-older, don't panic.  It's fine but you probably need an update of your CUBISM, or
-you need to wait for the SSC to come up with a newer calibration file.  
+If you get an error message about missing a calibration file and so
+using something older, don't panic.  It's fine but you probably need an
+update of your CUBISM, or you need to wait for the SSC to come up with a
+newer calibration file.
 @item
-If CUBISM ever freezes, close everything and restart.  Before redoing the error, 
-click on @strong{Debug Cubism} under the @strong{Info} menu tab.  Then, redo 
-the error.  Send the "barf" that occured in your IDL window to the appropriate 
-authorities.  That will help the Help Desk more than anything and speed up their 
-response.  
+If CUBISM ever freezes, close everything and restart.  Before redoing
+the error, click on @kbd{Debug Cubism} under the @kbd{Info} menu
+tab.  Then, redo the error.  Send the "barf" that occured in your IDL
+window to the appropriate authorities.  That will help the Help Desk
+more than anything and speed up their response.
 @item
-If you want to View your cube and visualize your AORs, then you want to use the 
-(new viewer) commands of the same name (e.g., View Cube (new viewer)...).  These
-(new viewer) commands are found under the @strong{Record} menu tab and 
-@strong{Cube} menu tab.  Hitting these buttons will save you the frustration of 
-seeing what you want disappear.  This is not so bad for viewing a cube but it will
-save you a few moments when you are visualizing an AOR.  
+If you want to View your cube and visualize your AORs, then you want to
+use the (new viewer) commands of the same name (e.g., View Cube (new
+viewer)...).  These (new viewer) commands are found under the
+@kbd{Record} menu tab and @kbd{Cube} menu tab.  Hitting these
+buttons will save you the frustration of seeing what you want disappear.
+This is not so bad for viewing a cube but it will save you a few moments
+when you are visualizing an AOR.
 @item
 If you can think of any more, you are smarter than us.  
 @end enumerate
@@ -970,25 +1592,25 @@ If you can think of any more, you are smarter than us.
 @c Appendices
 @c
 
-@node CubeProject Reference, CubeView Reference, The Techniques, Top
-@appendix CubeProject Reference
-@cindex CubeProject
+@c @node CubeProject Reference, CubeView Reference, The Techniques, Top
+@c @appendix CubeProject Reference
+@c @cindex CubeProject
 
-A detailed listing of all CubeProject menus etc.
+@c A detailed listing of all CubeProject menus etc.
 
-@node CubeView Reference, CubeSpec Reference, CubeProject Reference, Top
-@appendix CubeView Reference
-@cindex CubeView
+@c @node CubeView Reference, CubeSpec Reference, CubeProject Reference, Top
+@c @appendix CubeView Reference
+@c @cindex CubeView
 
-A detailed listing of all CubeView tools, menus etc.
+@c A detailed listing of all CubeView tools, menus etc.
 
-@node CubeSpec Reference, Index, CubeView Reference, Top
-@appendix CubeSpec Reference
-@cindex CubeSpec
+@c @node CubeSpec Reference, Index, CubeView Reference, Top
+@c @appendix CubeSpec Reference
+@c @cindex CubeSpec
 
-A detailed listing of all CubeSpec, menus etc.
+@c A detailed listing of all CubeSpec, menus etc.
 
-@node Index,  , CubeSpec Reference, Top
+@node Index,  , The Techniques, Top
 @unnumbered Index
 @printindex cp
 
