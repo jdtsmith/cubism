@@ -21,7 +21,7 @@ CONVERT = convert
 
 TEXIFILE  = cubism.texi
 INFOFILES = cubism
-PNGIMAGEFILES = logo2.png populated_project.png
+PNGIMAGEFILES := $(wildcard images/*.png)
 PDFIMAGEFILES = $(PNGIMAGEFILES:.png=.pdf)
 EPSIMAGEFILES = $(PNGIMAGEFILES:.png=.eps)
 
