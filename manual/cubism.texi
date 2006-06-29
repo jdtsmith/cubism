@@ -1,6 +1,6 @@
 \input texinfo @c -*-texinfo-*-
 @c %**start of header
-@setfilename idlwave
+@setfilename cubism
 @settitle CUBISM User Manual
 @dircategory CUBISM
 @direntry
@@ -17,20 +17,13 @@
 @macro callout {text}
 @quotation
 @cartouche
-@strong{\text\ }
+@strong{\text\}
 @end cartouche
 @end quotation
 @end macro
 
-@macro screenshot {label,name,text,size,caption}
-@float Figure, fig:\label\
-@center @image{images/\name\,\size\,,\text\}
-@caption{\caption\}
-@end float
-@end macro
-
-
 @c %**end of header
+
 @finalout
 
 @ifinfo 
@@ -121,6 +114,7 @@ the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
 * Quick Start Guide::           
 * The Tools::                   
 * The Techniques::              
+* Tips and Troubleshooting::    
 * Index::                       
 
 @detailmenu
@@ -135,25 +129,83 @@ Installation
 
 The Tools
 
+* Tool Inter-Communication::    
+* General Interface Tips::      
 * CUBISM Project::              
 * CubeView::                    
 * CubeSpec::                    
 
+General Interface Tips
+
+* List Selection::              
+* Scrolling::                   
+* Mouse Shortcuts::             
+
 CUBISM Project
 
+* Project Title::               
+* CUBISM Project Menus::        
 * Data Records::                
-* Menus::                       
+* Status Bar::                  
 * Button Bar::                  
 
 Menus
 
-* File Menu::                   
-* Edit Menu::                   
-* Record Menu::                 
-* Cube Menu::                   
-* Background Menu::             
-* BadPix Menu::                 
-* Info Menu::                   
+* CUBISM Project File Menu::    
+* CUBISM Project Edit Menu::    
+* CUBISM Project Record Menu::  
+* CUBISM Project Cube Menu::    
+* CUBISM Project Background Menu::  
+* CUBISM Project BadPix Menu::  
+* CUBISM Project Info Menu::    
+
+Info Menu
+
+* Data Records::                
+* Project Title::               
+* Menus::                       
+* Button Bar::                  
+
+Data Records
+
+* Record Info::                 
+* Record Enabled State::        
+* Record Data Types::           
+* Operating on Records::        
+
+CubeView
+
+* CubeView Title Bar::          
+* CubeView Menus::              
+* CubeView Tools::              
+* CubeView Colorbar::           
+* CubeView Status Display Line::  
+* CubeView Image Info Block::   
+* CubeView WAVSamp Pane::       
+
+Menus
+
+* CubeView File Menu::          
+* CubeView Options Menu::       
+* CubeView Tools Menu::         
+
+CubeView Tools
+
+* Tool Interaction::            
+* Box Regions::                 
+* Tool Overview::               
+* Zoom Tool::                   
+* Histogram Tool::              
+* Color Tool::                  
+* Image Slicing Tool::          
+* Box Statistics Tool::         
+* Aperture Photometry Tool::    
+* Cube Extraction Tool::        
+* Pixel Backtracking Tool::     
+* Bad Pixel Tool::              
+* Pixel Table Tool::            
+* Order Mask Tool::             
+* Compass Rose Tool::           
 
 The Techniques
 
@@ -172,6 +224,7 @@ Backgrounds
 
 * In Situ Background::          
 * Archive Background::          
+* Background Blend::            
 * 1D Sky Spectrum Background::  
 * No Background::               
 * Background Tips and Visualization::  
@@ -179,6 +232,10 @@ Backgrounds
 Bad Pixels
 
 * Selecting/Defining Bad Pixels::  
+
+Tips and Troubleshooting
+
+* Debugging CUBISM::            
 
 @end detailmenu
 @end menu
@@ -197,14 +254,20 @@ Bad Pixels
 @cindex Introduction
 
 CUBISM is a package written in the Interactive Data Language (IDL),
-which supports the analaysis and reduction of spectral maps created with
+which supports the analysis and reduction of spectral maps created with
 the @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard
 the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
-CUBISM is designed to allow sets of basic calibrated data (@code{BCDs}) from
-IRS mapping observations to be combined into single 3D spectral cubes,
-with two spatial and one spectral dimension.  From these cubes, spectra
-can be extracted over differing apertures, and arbitrary maps can be
-made in spectral features (e.g. a line image).  
+CUBISM is designed to allow sets of basic calibrated data (@code{BCDs})
+from IRS mapping observations to be combined into single 3D spectral
+cubes, with two spatial and one spectral dimension.  From these cubes,
+spectra can be extracted over differing apertures, and arbitrary maps
+can be made in spectral features (e.g. a continuum-subtracted line
+image).
+
+CUBISM was developed at the University of Arizona by the Spitzer
+Infrared Nearby Galaxies Survey (SINGS) team, in partial fulfillment of
+its Spitzer Legacy commitments.  It is distributed and supported by the
+Spitzer Science Center at Caltech.
 
 CUBISM consists of three main components, which together form the core
 of its analysis and reduction capabilities:
@@ -228,10 +291,10 @@ spectral cubes.
 
 @noindent CUBISM is not a general purpose spectral analysis tool.  What
 analysis tools it offers are oriented directly towards the task of
-creating, validating, and dissecting spectral cubes.  Since individual
+creating, validating, and analyzing spectral cubes.  Since individual
 spectra, spectral maps, and full spectral cubes can be output from a
 single cube project, other tools can easily be used for higher order
-analysis of these products (e.g. multiple Gaussian fitting, etc.).
+analysis of these outputs (e.g. multiple Gaussian fitting, etc.).
 
 This manual is organized as follows.  After discussing the installation
 and requirements of CUBISM in @ref{Installation}, we give a quick start
@@ -246,7 +309,6 @@ Note that this manual does not include information on planning IRS
 spectral mapping observations; see the
 @uref{http://ssc.spitzer.caltech.edu/irs/documents/specmap_bop/, IRS
 Spectral Map HOWTO} for information on observation planning.
-
 
 @c
 @c Installation
@@ -386,13 +448,13 @@ A compiler for C source, typically @code{gcc}, or whatever the IDL
 routine @code{MAKE_DLL} looks for.
 @end enumerate
 
-Note that running CUBISM as a binary under the free @emph{IDL VM} does
-not give you access to an IDL command line, so that only the graphical
-interface to CUBISM is accessible.  With this setup, no analysis can be
-performed at the command line, though all files, including spectra,
-maps, and cubes can be output as normal.  Running the binary
-distribution of CUBISM in a licensed version of IDL does not prevent
-access to the command line.
+Note that running CUBISM from the binary @file{.sav} file under the free
+@emph{IDL VM} does not give you access to an IDL command line, so that
+only the graphical interface to CUBISM is accessible.  With this setup,
+no analysis can be performed at the command line, though all files,
+including spectra, maps, and cubes can be output as normal.  Running the
+binary distribution of CUBISM in a licensed version of IDL does not
+prevent access to the command line.
 
 @node Setup, Upgrading, Binary Installation, Installation
 @section Setup
@@ -420,10 +482,9 @@ source distribution of CUBISM, you will need to ensure that the
 directories containing CUBISM are on your @code{IDL_PATH}.
 Occasionally, two different packages will each define the same routine
 in two files with the same names (a so-called @emph{name space
-conflict}).  If you encounter this problem, move the CUBISM directories
-higher on your @code{IDL_PATH}, or use the binary distribution, which
-doesn't suffer name space conflicts.
-
+conflict}).  If you encounter this problem, move the directory
+containing CUBISM higher on your @code{IDL_PATH}, or use the binary
+distribution, which doesn't suffer such name space conflicts.
 
 @node Upgrading,  , Setup, Installation
 @section Upgrading
@@ -442,23 +503,28 @@ Cubism} in the project window.
 @chapter Quick Start Guide
 @cindex Quick Start
 
-CUBISM has two major themes: building cubes from IRS Spectral Mapping
+CUBISM has two major purposes: building cubes from IRS Spectral Mapping
 data sets, and analyzing those cubes.  Building cubes from collections
-of mapping data sets is in principle a simple process: the correct @code{BCDs}
-are collected together in a project, the cube build parameters are
-adjusted, and the cube is built.  With the assembled cube, you can then
-perform a variety of post-cube analysis including extracting spectra in
-specific regions and building spectral maps.  There are many details
-which can affect the cube assembly process, and impact the quality of
-the final assembled product.  Here we will quickly go through the basic
-steps required to build a cube, extract a spectrum, and build a spectral
-map, leaving all of the (important) details aside for now.
+of mapping data sets is in principle a simple process: the correct
+@code{BCDs} are collected together in a project, the cube build
+parameters are adjusted, and the cube is built.  Further refinement of
+the cube includes identifying bad pixels to exclude from the cube build,
+selecting and creating an appropriate background frame, configuring the
+calibration details and cube build options, etc.
+
+With the assembled cube, you can perform a variety of post-cube
+analyses, including extracting spectra in specific regions and building
+spectral maps.  There are many details which can affect the cube
+assembly process, and impact the quality of the final assembled product.
+Here we will quickly go through the basic steps required to build a
+cube, extract a spectrum, and build a spectral map, leaving all of the
+(important) details aside for now.
 
 An important note before we begin concerns the scope of a CUBISM
 project.  Each CUBISM project pertains to a single order of a single IRS
 module, e.g. LL1.  For data sets with mapping observations in all four
 low-resolution orders, 4 individual cubes will likely be built, and
-analzyed together.
+analzyed as a set.
 
 To get going, type:
 
@@ -467,14 +533,16 @@ IDL> cubism
 @end example
 
 @noindent and create a new cube, giving it a useful name when prompted.
-Add a full set of mapping data with the @kbd{Add Data} button.  Just
-navigate to a directory and click @kbd{OK}, and CUBISM will search for
-all data files at or beneath that directory.  After selecting the
-directory, CUBISM will group all discovered files by object and mapping
-AOR, and allow you to select among them.  When prompted, choose the set
-of data you are interested in, and they will be loaded into the project.
-If you are warned that no calibration set has been loaded, and that the
-latest is being used, simply acknowledge the warning.
+Add a full set of mapping data with the @kbd{Import AOR} button.  Just
+navigate to a directory containing your archive-downloaded data set and
+click @kbd{OK}.  CUBISM will search for all IRS data files at or beneath
+that directory, and group all discovered data files by object and
+mapping AOR, allowing you to select among them.  When prompted, choose
+the set of data you are interested in (more than one is allowed, but
+they must be from the same instrument module).  All the relevant files
+will then be loaded into the project.  If you are warned that no
+calibration set has been loaded, and that the latest is being used,
+simply acknowledge the warning.
 
 Choose @kbd{Edit->Select All} and then @kbd{Record->View Record
 Stack...} to popup a viewer displaying a stack of all the records.
@@ -489,8 +557,9 @@ the @kbd{Extract} button (a cube with a line through it), or select
 rectangular extraction region, from upper left to lower right, on the
 cube, and CubeSpec will popup showing you the extracted spectrum.  In
 CubeSpec, click @kbd{Map} and then choose @samp{Region: Peak}.  Click
-once at a low and high wavelength to define a peak region, and you've
-just created a spectral map, which should now be displayed in CubeSpec.
+and release once at a low and high wavelength to define a peak region,
+and you've just created a spectral map, which should now be displayed in
+CubeSpec.
 
 Congratulations, you've just gone quickly through the most important
 steps of cube assembly and analysis.  Read on to learn more about
@@ -508,21 +577,107 @@ analysis.
 Cubism consists of three main components, which are used together for
 building and analyzing spectral cubes: CUBISM Project, CubeView, and
 CubeSpec.  We will give here a description of the purpose and reference
-of the features of each of these three tools.
-
-@c For a complete reference on the
-@c capabilities and features of each tool, see the appropriate Appendix:
-@c @ref{CubeProject Reference}, @ref{CubeView Reference}, @ref{CubeSpec
-@c Reference}.
+of the features of each of these three tools, after some general tips on
+using the interface, and background on the communication paths among the
+tools.
 
 
 @menu
+* Tool Inter-Communication::    
+* General Interface Tips::      
 * CUBISM Project::              
 * CubeView::                    
 * CubeSpec::                    
 @end menu
 
-@node CUBISM Project, CubeView, The Tools, The Tools
+@node Tool Inter-Communication, General Interface Tips, The Tools, The Tools
+@section Tool Inter-Communication
+
+The tools which comprise CUBISM constantly communicate with each other,
+so that updates in one are immediately reflected in the others.  For
+example, when selecting bad pixels @pxref{Bad Pixel Tool}, the bad pixel
+list for the associated CUBISM Project is immediately updated, or if a
+new list is loaded from file, the viewer is updated.  Similar high level
+communication occurs between all of the sub-tools, so that typically you
+can regard a CUBISM project and all its associated windows and tools as
+in a single, consistent state.
+
+
+@node General Interface Tips, CUBISM Project, Tool Inter-Communication, The Tools
+@section General Interface Tips
+@cindex Interface Tips
+
+The interactive component of CUBISM is based on IDL widgets, which, at
+least on the Unix/OSX systems where CUBISM is tested, are derived from
+the Motif widget set.  As such, a variety of common keyboard and mouse
+shortcuts are available which can simplify interactive operations.
+
+@menu
+* List Selection::              
+* Scrolling::                   
+* Mouse Shortcuts::             
+@end menu
+
+@node List Selection, Scrolling, General Interface Tips, General Interface Tips
+@subsection List Selection
+
+@float Figure,fig:pop_sel
+@center @image{images/project_selection,6in,,Example List Selection}
+@caption{List with multiple regions selected.}
+@end float
+
+In any list (e.g. the CUBISM Project window, @pxref{CUBISM Project}),
+individal list elements can be selected by clicking with the left mouse
+button.  A range of elements can be selected by click-dragging.
+Alternatively, the first element in a range can be selected, and then
+the last element clicked while holding the @key{Shift} key.
+Non-contiguous regions can be selected by holding the @key{Control}.
+These methods can be combined, e.g. to select two non-adjacent regions,
+click the first, scroll to and @key{Shift}-click the second, scroll to
+and @key{Control}-click the third, and finally @key{Shift}-click the
+last.  The arrow keys scroll the selection up or down, and the @key{Page
+Up} and @key{Page Down} keys skip entire pages full of list items.
+
+
+
+@node Scrolling, Mouse Shortcuts, List Selection, General Interface Tips
+@subsection Scrolling
+
+Though not required, list items can be made to respond to mouse scroll
+wheel input by modifying a set of resources associated with the X11
+windows environment.  To do so, add the following to your
+@file{~/.Xdefaults} file:
+
+@smallexample
+*XmList.baseTranslations:       #augment Shift<Btn5Down>: ListNextItem()\n\
+        Shift<Btn4Down>: ListPrevItem()\n\
+        <Btn5Down>: ListNextPage()\n\
+        <Btn4Down>: ListPrevPage()\n
+
+*XmScrollBar.baseTranslations:  #augment <Btn4Down>: IncrementUpOrLeft(0) IncrementUpOrLeft(1)\n\
+        <Btn5Down>: IncrementDownOrRight(0) IncrementDownOrRight(1)\n
+
+*XmText.baseTranslations:       #augment Shift<Btn4Down>: page-left()\n\
+        Shift<Btn5Down>: page-right()\n\
+        <Btn4Down>: scroll-one-line-up()\n\
+        <Btn5Down>: scroll-one-line-down()\n 
+@end smallexample
+
+@noindent and restart your X environment.
+
+@node Mouse Shortcuts,  , Scrolling, General Interface Tips
+@subsection Mouse Shortcuts
+
+Double-clicking on a list item often results in some action being
+performed on that item (e.g., view a record in the CUBISM Project
+window).  The same effect results when @key{Return} is pressed with a
+selected item.  In graphics windows (e.g. the CubeView window,
+@pxref{CubeView}), mouse presses perform specific actions depending on
+context.  Typically the left-mouse button performs the default options.
+See the documentation for these tools for more information.
+
+
+@node CUBISM Project, CubeView, General Interface Tips, The Tools
 @section CUBISM Project
 @cindex Project, CUBISM
 @cindex CUBISM Project
@@ -550,112 +705,36 @@ allow (though all ancillary other windows associated with a given
 project can quickly overwhelm your screen).
 
 Any given CUBISM project can be read from and saved to disk, manipulated
-from the command line, or interacted with via the GUI interface.  Here
-is an example CUBISM Project window, populated with a mapping data set:
+from the command line, or interacted with via the GUI interface.
+Internally, and on disk, a full CUBISM project is a single IDL object,
+which contains a rich nested heirarchy of data and other information.
+Typically, a project is interacted with via the graphical interface,
+though it can be used directly from the command line as well.  Here is
+an example CUBISM Project window, populated with a mapping data set:
 
-@screenshot{pop_proj,populated_project,Populated Cubism Project, 6in, CUBISM
-Project Main Window}
+@float Figure,fig:pop_proj
+@center @image{images/populated_project,6in,,Populated Cubism Project}
+@caption{CUBISM Project Main Window, with selected and disabled records.}
+@end float
 
 @menu
+* Project Title::               
+* CUBISM Project Menus::        
 * Data Records::                
-* Menus::                       
+* Status Bar::                  
 * Button Bar::                  
 @end menu
 
-@node Data Records, Menus, CUBISM Project, CUBISM Project
-@subsection Data Records
-@cindex Data Records
-@cindex @code{BCD} Records
-@cindex Record Information
+@node Project Title, CUBISM Project Menus, CUBISM Project, CUBISM Project
+@subsection Project Title
+@cindex Title Bar, Project
 
-A CUBISM projects holds all of the data records (often called simply
-@emph{BCDs}) necessary for building a given cube, either including the
-data directly, or a reference to the data on file (which it loads on
-demand).  In @ref{fig:pop_proj}, four records have been selected.  A
-variety of information is shown for each record:
-
-@multitable @columnfractions .15 .85
-
-@item @code{ID}
-@tab A (hopefully) unique ID formed from filename.
-
-@item @code{Exp}
-@tab The @code{BCD} exposure time in seconds (from the headers).
-
-@item @code{Observed}
-@tab The date and time the @code{BCD} observation (GMT).
-@item @code{Added}
-@tab The date and time this data record was added to the project (local
-time zone).
-
-@item @code{Type}
-@tab The type of the record, encoded as @samp{tMMO_pos}, with
-
-@itemize @bullet
-@item @samp{t}: The type of data record -- @samp{d} for @samp{DROOPRES},
-@samp{c} for @samp{COADD}, @samp{f} for @samp{FLATAP}, or blank for the
-(by far most common) @code{BCD}.  For information on these other flavors
-of pipeline-produced IRS data see
-@uref{http://ssc.spitzer.caltech.edu/irs/dh/,the IRS Data Handbook}.
-
-@item @samp{M}: The module -- @samp{SL}, @samp{SH}, @samp{LL}, or @samp{LH}.
-
-@item @samp{O}: The targeted order -- @samp{1}, @samp{2}, or blank, for
-high-res or full-slit low-res (e.g. @samp{LLBoth}) targeting.
-
-@item @samp{pos}: The position within the slit which was targeted --
-@samp{cen}: the slit center, @samp{a}: nod position 1, @samp{b}: nod
-position 2).  @samp{b}: nod position 2.
-@end itemize
-
-@item @code{Step}
-@tab The step sequence within the map as @samp{I[X,Y]}, where @samp{I}
-is the @samp{EXPID} of this step, and @samp{X} and @samp{Y} are the row
-and column positions within the map.
-
-@end multitable
-
-@noindent A secondary page of information is available by clicking on the
-right angle button at the extreme right edge of the header bar.  This
-page includes:
-
-@multitable @columnfractions .15 .85
-
-@item @code{RA}
-@tab RA targetted by the slit field of view position (J2000).
-
-@item @code{DEC}
-@tab DEC targetted by the slit field of view position (J2000).
-
-@item @code{DATA}
-@tab Whether the data for this record are loaded, rather than just a
-link to the file.  Data are loaded on demand.
-
-@item @code{UNC}
-@tab Whether the associated uncertainty data for this record are
-loaded.  These are discovered automatically alongside the primary data
-products and loaded..
-
-@item @code{BMSK}
-@tab Whether the associated @code{BMASK} mask data for this record are
-loaded.  The @code{BMASKs} are discovered automatically alongside the
-primary data products and loaded.
-
-@item @code{ACCT}
-@tab Whether the ``accounting information'' for this record is cached,
-mapping @code{BCD} pixels to sky pixels.
-
-@item @code{BPL}
-@tab Whether any record level bad pixels exist for this record
-@pxref{Bad Pixels}.
-
-@end multitable
-
-Note that reference to the term @code{BCD} is inclusive of the other,
-less commonly used files types (@samp{FLATAP}, @samp{DROOPRES}).  The
-records can be sorted by any of the available data fields by clicking
-the button associated with each header word, e.g. to sort by RA, click
-@samp{RA}.
+The titlebar of the CUBISM Project encodes the name of the project,
+surrounded by @samp{*}, if there are unsaved changes, as well as the
+file name the project is saved to in @samp{<>} (angle brackets), or
+@samp{<(unsaved)>} is the project is not yet saved.  Note that the file
+name of a saved project, and the project name are distinct, though by
+convention usually they are kept similar or the same.
 
 
 @c
@@ -663,7 +742,7 @@ the button associated with each header word, e.g. to sort by RA, click
 @c
 
 
-@node Menus, Button Bar, Data Records, CUBISM Project
+@node CUBISM Project Menus, Data Records, Project Title, CUBISM Project
 @subsection Menus
 @cindex Project Window Menus
 @cindex Menus, Project Window
@@ -673,18 +752,18 @@ are available from the menus of CUBISM Project, which are documented
 here in order of their appearance.
 
 @menu
-* File Menu::                   
-* Edit Menu::                   
-* Record Menu::                 
-* Cube Menu::                   
-* Background Menu::             
-* BadPix Menu::                 
-* Info Menu::                   
+* CUBISM Project File Menu::    
+* CUBISM Project Edit Menu::    
+* CUBISM Project Record Menu::  
+* CUBISM Project Cube Menu::    
+* CUBISM Project Background Menu::  
+* CUBISM Project BadPix Menu::  
+* CUBISM Project Info Menu::    
 @end menu
 
-@node File Menu, Edit Menu, Menus, Menus
+@node CUBISM Project File Menu, CUBISM Project Edit Menu, CUBISM Project Menus, CUBISM Project Menus
 @subsubsection File Menu
-@cindex File Menu
+@cindex File Menu, CUBISM Project
 
 @table @code
 @item New...
@@ -736,9 +815,9 @@ Close the project window, prompting to save if changes have been made.
 
 @end table
 
-@node Edit Menu, Record Menu, File Menu, Menus
+@node CUBISM Project Edit Menu, CUBISM Project Record Menu, CUBISM Project File Menu, CUBISM Project Menus
 @subsubsection Edit Menu
-@cindex Edit Menu
+@cindex Edit Menu, CUBISM Project
 
 @table @code
 @item Select All
@@ -763,9 +842,9 @@ another string.
 @end table
 
 
-@node Record Menu, Cube Menu, Edit Menu, Menus
+@node CUBISM Project Record Menu, CUBISM Project Cube Menu, CUBISM Project Edit Menu, CUBISM Project Menus
 @subsubsection Record Menu
-@cindex Record Menu
+@cindex Record Menu, CUBISM Project
 
 @table @code
 @item Add Data...
@@ -819,7 +898,7 @@ on demand).
 @item View Record/View Stack...
 View the selected record, or an average stack of records if more than
 one is selected, using a pre-existing viewer window if available.  Note
-that double-clicking a record or hitting @key{RETURN} on a selected
+that double-clicking a record or hitting @key{Return} on a selected
 record has the same effect.
 
 @item View Record (new viewer)/View Stack (new viewer)...
@@ -873,9 +952,9 @@ Load an alternate image for visualizing AORs.
 @end table
 
 
-@node Cube Menu, Background Menu, Record Menu, Menus
+@node CUBISM Project Cube Menu, CUBISM Project Background Menu, CUBISM Project Record Menu, CUBISM Project Menus
 @subsubsection Cube Menu
-@cindex Cube Menu
+@cindex Cube Menu, CUBISM Project
 
 @table @code
 @item Build Cube
@@ -927,9 +1006,9 @@ Show the WAVSAMP apertures used for the various orders.
 
 
 
-@node Background Menu, BadPix Menu, Cube Menu, Menus
+@node CUBISM Project Background Menu, CUBISM Project BadPix Menu, CUBISM Project Cube Menu, CUBISM Project Menus
 @subsubsection Background Menu
-@cindex Background Menu
+@cindex Background Menu, CUBISM Project
 
 @table @code
 @item Set Background from Rec(s)...
@@ -984,9 +1063,9 @@ Remove any loaded 1D background spectrum.
 
 @end table
 
-@node BadPix Menu, Info Menu, Background Menu, Menus
+@node CUBISM Project BadPix Menu, CUBISM Project Info Menu, CUBISM Project Background Menu, CUBISM Project Menus
 @subsubsection BadPix Menu
-@cindex BadPix Menu
+@cindex BadPix Menu, CUBISM Project
 
 @table @code
 @item Load Bad Pixels...
@@ -1021,9 +1100,9 @@ records, prompting for detection parameters.
 @end table
 
 
-@node Info Menu,  , BadPix Menu, Menus
+@node CUBISM Project Info Menu,  , CUBISM Project BadPix Menu, CUBISM Project Menus
 @subsubsection Info Menu
-@cindex Info Menu
+@cindex Info Menu, CUBISM Project
 
 @table @code
 @item Project Parameters...
@@ -1046,7 +1125,183 @@ assemble the loaded project (if different).
 
 @end table
 
-@node Button Bar,  , Menus, CUBISM Project
+
+
+@menu
+* Data Records::                
+* Project Title::               
+* Menus::                       
+* Button Bar::                  
+@end menu
+
+@node Data Records, Status Bar, CUBISM Project Menus, CUBISM Project
+@subsection Data Records
+@cindex Data Records
+@cindex @code{BCD} Records
+@cindex Record Information
+
+A CUBISM projects holds all of the data records (often called simply
+@emph{BCDs} --- see below) necessary for building a given cube.  The
+records either include the data directly, or hold a file reference to
+the data on disk, which is loaded on demand.  In @ref{fig:pop_proj}, two
+records have been selected.  In addition to the spectrum data frame,
+each record holds (optionally) the associated uncertainty frame, and the
+@code{BMASK} pixel mask frame.
+
+@menu
+* Record Info::                 
+* Record Enabled State::        
+* Record Data Types::           
+* Operating on Records::        
+@end menu
+
+@node Record Info, Record Enabled State, Data Records, Data Records
+@subsubsection Record Info
+@cindex Record Information
+
+A variety of information is shown for each record, and the records can
+be sorted by individual columns clicking on the column's header.  The
+information recorded is:
+
+@multitable @columnfractions .15 .85
+
+@item @code{ID}
+@tab A (hopefully) unique ID formed from filename.
+
+@item @code{Exp}
+@tab The @code{BCD} exposure time in seconds (from the headers).
+
+@item @code{Observed}
+@tab The date and time the @code{BCD} observation (GMT).
+@item @code{Added}
+@tab The date and time this data record was added to the project (local
+time zone).
+
+@item @code{Type}
+@tab The type of the record, encoded as @samp{tMMO_pos}, with
+
+@itemize @bullet
+@item @samp{t}: The type of data record -- @samp{d} for @samp{DROOPRES},
+@samp{c} for @samp{COADD}, @samp{f} for @samp{FLATAP}, or blank for the
+(by far most common) @code{BCD}.  For information on these other flavors
+of pipeline-produced IRS data see
+@uref{http://ssc.spitzer.caltech.edu/irs/dh/,the IRS Data Handbook}.
+
+@item @samp{M}: The module -- @samp{SL}, @samp{SH}, @samp{LL}, or @samp{LH}.
+
+@item @samp{O}: The targeted order -- @samp{1}, @samp{2}, or blank, for
+high-res or full-slit low-res (e.g. @samp{LLBoth}) targeting.
+
+@item @samp{pos}: The position within the slit which was targeted --
+@samp{cen}: the slit center, @samp{a}: nod position 1, @samp{b}: nod
+position 2).  @samp{b}: nod position 2.
+@end itemize
+
+@item @code{Step}
+@tab The step sequence within the map as @samp{I[X,Y]}, where @samp{I}
+is the @samp{EXPID} of this step, and @samp{X} and @samp{Y} are the row
+and column positions within the map.
+
+@end multitable
+
+@noindent A secondary page of information is available by clicking on the
+right angle toggle button at the extreme right edge of the header bar.
+This page includes:
+
+@multitable @columnfractions .15 .85
+
+@item @code{RA}
+@tab RA targetted by the slit field of view position (J2000).
+
+@item @code{DEC}
+@tab DEC targetted by the slit field of view position (J2000).
+
+@item @code{DATA}
+@tab Whether the data for this record are loaded, rather than just a
+link to the file.  Data are loaded on demand.
+
+@item @code{UNC}
+@tab Whether the associated uncertainty data for this record are
+loaded.  These are discovered automatically alongside the primary data
+products and loaded.
+
+@item @code{BMSK}
+@tab Whether the associated @code{BMASK} mask data for this record are
+loaded.  The @code{BMASKs} are discovered automatically alongside the
+primary data products and loaded.
+
+@item @code{ACCT}
+@tab Whether the ``accounting information'' for this record is cached,
+mapping @code{BCD} pixels to sky pixels.
+
+@item @code{BPL}
+@tab Whether any record level bad pixels exist for this record
+@pxref{Bad Pixels}.
+
+@end multitable
+
+The records can be sorted by any of the available data fields by
+clicking the button associated with each header word, e.g. to sort by
+RA, click @samp{RA}.
+
+@node Record Enabled State, Record Data Types, Record Info, Data Records
+@subsubsection Record Enabled State
+@cindex Enabled, Records
+@cindex Disabled, Records
+
+All data records can either be @emph{enabled} or @emph{disabled}.
+Disabled records have lines drawn through them in the project display
+(@pxref{fig:pop_proj}).  Disabled records can be viewed and interacted
+with normally, but are not included in the assembled cube.  This can be
+useful to omit the rare frame with garbled data, or to include data in
+the project solely for the purpose of constructing a background.  Note
+that failing to disable records which are not associated with the AOR(s)
+constituting the map can cause the cube created to be very large or even
+fail.
+
+@node Record Data Types, Operating on Records, Record Enabled State, Data Records
+@subsubsection Record Data Types
+@cindex BCD
+@cindex FlatAp
+@cindex DroopRes
+
+The IRS pipeline produces a variety of different types of output
+spectral data with differing levels of processing applied.  The standard
+product which CUBISM uses is the @code{BCD}, or basic calibrated data.
+In addition, however, CUBISM can operate on @code{DroopRes} (not
+flat-fielded or straylight-corrected) and @code{FlatAp} (not
+straylight-corrected) data files.  See
+@uref{http://ssc.spitzer.caltech.edu/irs/dh/,the IRS Data Handbook} for
+more information on these different data products.  Typically, they
+would be used in CUBISM to test results only if problems with the
+flat-field or straylight-correction (SL) were suspected.
+
+Note that reference to the term @code{BCD} throughout this manual is
+inclusive of the other, less commonly used files types (@samp{FlatAp},
+@samp{DroopRes}).
+
+@node Operating on Records,  , Record Data Types, Data Records
+@subsubsection Operating on Records
+@cindex Record Operations
+
+Individual records or groups of records can be examined for header
+information, renamed, deleted, enabled/disabled, viewed as an individual
+or a stack, averaged into a background frame, and much more.  Most of
+these options are accessible from the @code{Record} menu (@pxref{CUBISM
+Project Record Menu}).  A very common operation is to view a record,
+which is done by simply double-clicking it, or selecting one or more
+records and hitting the @code{View Stack} button.
+
+
+@node Status Bar, Button Bar, Data Records, CUBISM Project
+@subsection Status Bar
+
+Beneath the record list, a text-based status bar gives feedback on the
+state of completion of the current operation, the number of selected
+records, etc.
+
+
+@node Button Bar,  , Status Bar, CUBISM Project
 @subsection Button Bar
 @cindex Project Window Buttons
 @cindex Buttons, Project Window
@@ -1085,6 +1340,7 @@ Close the current project, prompting to save any unsaved changes.
 @end table
 
 
+
 @node CubeView, CubeSpec, CUBISM Project, The Tools
 @section CubeView
 @cindex CubeView
@@ -1092,8 +1348,624 @@ Close the current project, prompting to save any unsaved changes.
 @cindex Viewing Maps
 
 
-View and manipulate extracted spectra, and create maps from spectral
-cubes.
+The CubeView tool is a custom viewer, with general purpose as well as
+IRS-specific tools and configuration options.  It is used to view BCD
+records, stacks of records, or special frames like the background frame,
+full spectral cubes --- as individual planes or maps created from the
+cube --- and AOR visualization images.  You can have as many instances
+of the viewer as you want, and each can be configured differently.  By
+default, individual CUBISM projects attempt to target their own set of
+viewer windows, only creating a new window if none is presently
+available.
+
+@menu
+* CubeView Title Bar::          
+* CubeView Menus::              
+* CubeView Tools::              
+* CubeView Colorbar::           
+* CubeView Status Display Line::  
+* CubeView Image Info Block::   
+* CubeView WAVSamp Pane::       
+@end menu
+
+@node CubeView Title Bar, CubeView Menus, CubeView, CubeView
+@subsection Title Bar
+
+The title bar of CubeView gives an indication of what is currently being
+displayed.  An example is @samp{Record: ngc5194 <Average of 36 recs>}.
+This information will change depending on whether a record, background
+record, cube, map, or visualization image is shown.  The same
+information is repeated below the line status bar in the image info
+block.
+
+@node CubeView Menus, CubeView Tools, CubeView Title Bar, CubeView
+@subsection Menus
+
+@menu
+* CubeView File Menu::          
+* CubeView Options Menu::       
+* CubeView Tools Menu::         
+@end menu
+
+@node CubeView File Menu, CubeView Options Menu, CubeView Menus, CubeView Menus
+@subsubsection File Menu
+@cindex File Menu, CubeView
+
+@table @code
+@item Save as PNG...
+Save the current image as a PNG file.
+
+@item Save Map as FITS...
+Save the current spectral map (if available) as a FITS file, with
+complete WCS header information.
+
+@item Export to Command Line...
+Export the current image as an array variable on the IDL command line.
+
+@item Extract Region from File...
+Extract a spectrum from the current cube using the extraction region
+encoded in the header of an existing extracted spectrum (@file{.tbl}
+file).
+
+@item Close
+Close the viewer Window
+
+@end table
+
+@node CubeView Options Menu, CubeView Tools Menu, CubeView File Menu, CubeView Menus
+@subsubsection Options Menu
+@cindex Options Menu, CubeView
+
+@table @code
+@item Colormaps
+Change the display color map for the image and color bar.
+
+@item Scale Image
+@table @code
+@item Linear
+Scale image linearly between the clipping limits.
+
+@item Square Root
+Scale image as the square root between the clipping limits.
+
+@item Logarithmic
+Scale image logarithmically between the clipping limits.
+
+@item Histogram Equalization
+Scale image between the clipping limits to generate a flat final color
+histogram.
+
+@item Trim 1%, 5%
+Before scaling, first trim 1%, 5% from the distribtion of pixel values being
+scaled (full image or histogram box).
+@end table
+
+@item Set Scale Range...
+Explicitly set and lock the low and high scale clipping limits.
+
+@item Freeze Scaling 
+Lock/Unlock the low and high scale clipping limits at their current value.
+This can also be done with @key{Space}.
+
+@item Set Size
+@table @code
+
+@item 256,384,512,768
+Set the size of the display image to this width.
+
+@item Wrap
+Enlarge the display image size to show the entire image at the current
+zoom (up to the size of the monitor).
+
+@end table
+@end table
+
+
+@node CubeView Tools Menu,  , CubeView Options Menu, CubeView Menus
+@subsubsection Tools Menu
+@cindex Tools Menu, CubeView
+
+The tools menu provides an alternative means of selecting among the
+viewer tools in the tool palette at the top of the CubeView viewer
+window.  @xref{CubeView Tools}.
+
+@node CubeView Tools, CubeView Colorbar, CubeView Menus, CubeView
+@subsection CubeView Tools
+@cindex Tools, CubeView
+@cindex Tool Palette, CubeView
+
+
+The viewer offers a number of individual tools for interacting with the
+viewed data, some of which are generic and always available, and others
+of which are specific to certain data types.  The tools are accessible
+via the palette, through keyboard shortcuts, and via the @code{Tools}
+menu.  Other tools accessible below the displayed window will be
+discussed in the next section.
+
+An example CubeView showing a stack average of 36 records is shown
+@ref{fig:cv_recs}.
+
+@float Figure,fig:cv_recs
+@center @image{images/cubeview_recs,4.332in,,CubeView Showing Stack}
+@caption{CubeView, showing a stack of 36 records, with histogram scaling
+box and WAVSamp display.}
+@end float
+
+
+@menu
+* Tool Interaction::            
+* Box Regions::                 
+* Tool Overview::               
+* Zoom Tool::                   
+* Histogram Tool::              
+* Color Tool::                  
+* Image Slicing Tool::          
+* Box Statistics Tool::         
+* Aperture Photometry Tool::    
+* Cube Extraction Tool::        
+* Pixel Backtracking Tool::     
+* Bad Pixel Tool::              
+* Pixel Table Tool::            
+* Order Mask Tool::             
+* Compass Rose Tool::           
+@end menu
+
+@node Tool Interaction, Box Regions, CubeView Tools, CubeView Tools
+@subsubsection Tool Interaction
+
+Their are two categories of main CubeView tools, @emph{exclusive} tools,
+which require exclusive control of the mouse inputs, and
+@emph{non-exclusive} tools, any number of which can be active at any
+time.  These two types are separated in the tool palette, with exclusive
+tools grouped at left, and non-exclusive tools grouped at right
+@pxref{fig:cv_recs}.  Selecting an exclusive tool enters a mode of
+operation in which mouse inputs are interpreted by that tool alone.  
+
+Cubeview tools can be toggled on or off by clicking the button,
+selecting the @kbd{Tools} menu item, or using the key shortcuts.  The
+currently active tool(s) (if any) are indicated by depressed buttons in
+the tool palette, and with tick marks in the @kbd{Tools} menu.  If an
+exclusive tool is already active, toggling it on again (as opposed to
+simply selecting another tool) serves as a ``reset'', which restores it
+to its initial state, for instance removing any box area which has been
+defined.  Other tools which draw marks or annotations on top of the
+image keep those marks drawn even when they are not active.  An example
+is the bad pixel tool, which continues to display bad pixel marks even
+when it is not the active tool.  To remove these displays, @emph{reset}
+the tool as described.
+
+Tooltips identifying the tool, its key shortcut, and associated mouse
+operations (encoded as @samp{[left | middle | right]}) can be displayed
+by hovering the mouse over the tool button in the tool palette.
+
+@node Box Regions, Tool Overview, Tool Interaction, CubeView Tools
+@subsubsection Box Regions
+
+Multiple tools make use of box regions, for instance to define an area
+for computing statistics or scaling the image (see, e.g., the red box in
+@ref{fig:cv_recs}).  When another tool is activated, these tools leave
+behind ``corners'' of the box area to indicate their selection.
+Reactivating the tool restores this preexisting box.  Click and drag
+from upper left to lower right to define a box area initially.  Click
+and drag within the box to move it, or on the ``handle'' at lower right
+to resize it.  The arrow keys also move the position of the box, by one
+pixel at a time.  Reset the box as described in @ref{Tool Interaction}.
+
+@node Tool Overview, Zoom Tool, Box Regions, CubeView Tools
+@subsubsection Tool Overview
+
+The individual exclusive tools with their button icons are:
+
+@multitable @columnfractions .1 .3 .4 .2
+@headitem Button @tab Tool @tab Purpose @tab Shortcut
+
+@item @image{images/cvp_zoom} 
+@tab Zooming
+@tab Zoom in and out of images
+@tab @kbd{z}
+
+@item @image{images/cvp_hist}
+@tab Histogram Scaling
+@tab Re-scale image to highlight local features
+@tab @kbd{h}
+
+@item @image{images/cvp_color}
+@tab Color Table
+@tab Adjust color table end points and gamma
+@tab @kbd{c}
+
+@item @image{images/cvp_slice}
+@tab Image Slicing
+@tab Plot data slices through images, with position feedback
+@tab @kbd{l}
+
+@item @image{images/cvp_stats}
+@tab Box Statistics
+@tab Calculate and report statistics in box
+@tab @kbd{s}
+
+@item @image{images/cvp_phot}
+@tab Aperture Photometry
+@tab Perform simple circular aperture photometry on sources
+@tab @kbd{p}
+
+@item @image{images/cvp_extract}
+@tab Cube Extraction
+@tab Extract spectra from rectangular regions from the cube
+@tab @kbd{x}
+
+@item @image{images/cvp_bt}
+@tab Pixel Backtracking
+@tab Backtrack cube pixels to contributing BCD pixels
+@tab @kbd{t}
+
+@item @image{images/cvp_badpix}
+@tab Bad Pixel
+@tab Examine and edit the global and record level bad pixels
+@tab @kbd{p}
+
+@item @image{images/cvp_viz}
+@tab Visualization 
+@tab Overlay AOR slit positions and permit selecting records from the overlay
+@tab @kbd{v}
+
+@end multitable
+
+The non-exclusive tools are:
+
+@multitable @columnfractions .1 .3 .4 
+@headitem Button @tab Tool @tab Purpose 
+
+@item @image{images/cvpne_pxtbl}
+@tab Pixel Table
+@tab Display a grid of pixel values under the cursor
+
+@item @image{images/cvpne_mask}
+@tab Order Mask
+@tab Mask out all data outside the orders
+
+@item @image{images/cvpne_rose}
+@tab Compass Rose
+@tab Display a compass rose
+@end multitable
+
+Among the tools, Cube Extraction can only be used when viewing a cube,
+pixel backtracking can only be used when viewing a single cube plane,
+bad pixels and order masking are enabled only when viewing BCD data,
+Visualization is only possible with a visualization image, and the
+Compass Rose is disabled except with cubes and visualization images
+(i.e. images with WCS information).
+
+
+@node Zoom Tool, Histogram Tool, Tool Overview, CubeView Tools
+@subsubsection Zoom Tool
+@cindex Zooming Images
+
+The zoom tool allow arbitrary zooming in on image regions.  By default,
+images are display at the maximum zoom which fits the entire image in
+the display window.  To zoom in, drag a rectangular region around the
+area of interest, or simply left-click to double the zoom level and
+center on the clicked region.  To zoom out, right-click.  All zoom
+levels are saved onto a ``zoom stack'', which is navigated backwards one
+step at a time.  To zoom all the way out, right double-click.
+
+When an image is zoomed in, middle-click dragging (or Control-click
+dragging) pans the image.  If the display canvas is resized (either
+using the @kbd{Set Size} menu item, see @ref{CubeView Options Menu}, or
+by re-sizing the entire CubeView window), the image is re-zoomed.
+
+The zoom tool's key shortcut is @kbd{z}.
+
+@node Histogram Tool, Color Tool, Zoom Tool, CubeView Tools
+@subsubsection Histogram Tool
+@cindex Histogram Tool
+@cindex Image Scaling
+
+The histogram tool is actually an image rescaling tool.  It allows you
+to identify a region of the image, and re-scale the image to emphasize
+it.  Simply create a box area, or move and resize an existing box area,
+to the region of interest.  The scaling mode can be linear, square root,
+logarithmic, or histogram equalizing, with 1% or 5% trimming available,
+in the @kbd{Options->Scale Image} menu.  By default, the entire image is
+scaled.  This tool also draws a histogram of the resulting image colors
+on the colorbar (see XXX), and gives the scaling range.  The scale
+clipping limits can be frozen with @key{Space}, or set directly using
+@kbd{Options->Set Scale Range}.  It can be convenient to ``reset'' the
+histogram tool to remove it's box area and define a new one, in
+particular if you are zoomed in on a different region of the image.  To
+quickly reset and turn it back on, hit the key shortcut twice. The box
+region for the statistics tool is red, and can be seen in
+@ref{fig:cv_recs}.
+
+The histogram tool's key shortcut is @kbd{h}.  
+
+@node Color Tool, Image Slicing Tool, Histogram Tool, CubeView Tools
+@subsubsection Color Tool
+
+The histogram tool provides a much more direct means to bring out detail
+in a given image area, but the color tool enables the
+SAOImage/DS9-esque, click and drag method of adjusting the color map
+directly.  Simply left-click and drag.  Moving down narrows the map, up
+widens, left shifts it to lower color values, and right shifts it to
+higher.  Right-clicking resets the color map.  If you find yourself
+using this tool often, try out the histogram tool instead and see if you
+prefer it.
+
+The color tool's key shortcut if @kbd{c}.
+
+@node Image Slicing Tool, Box Statistics Tool, Color Tool, CubeView Tools
+@subsubsection Image Slicing Tool
+@cindex Image Slicing Tool
+@cindex Slicer Tool
+
+
+
+@float Figure,fig:cv_slice
+@center @image{images/cubeview_slice,5.617in,,CubeView Slice Window}
+@caption{A plot of a slice through an image.}
+@end float
+
+The image slicing tool allows slices to be taken through any image at
+arbitrary angles.  Just left-click and drag to define a slice, or
+right-click and drag to define horizontal or vertical slices.  A plot
+window with the pixel values along the slice vector is displayed, and
+mousing over it highlights simultaneously the value and pixel position
+within the image.  Turning the tool off or selecting another removes the
+slice line, and click-dragging a new slice replaces the existing line.
+An example slice plot is shown in @ref{fig:cv_slice}.
+
+The image slicing tool's key shortcut is @kbd{l}.
+
+@node Box Statistics Tool, Aperture Photometry Tool, Image Slicing Tool, CubeView Tools
+@subsubsection Box Statistics Tool
+@cindex Box Statistics Tool
+@cindex Statistics, Image
+
+@float Figure,fig:cv_stats
+@center @image{images/cubeview_stats,4.332in,,CubeView Statistics Example}
+@caption{Example CubeView statistics computed in the yellow box.}
+@end float
+
+The statistics tools extends the CubeView window, adding a panel of
+statistics information at the bottom, including mininum/maximum,
+average, median, standard deviations, and 3-sigma trimmed average and
+standard deviation.  Simply create or modify a box region @pxref{Box
+Regions} to view the statistics within that box.  The box region for the
+statistics tool is yellow.  An example of the tool's output is show in
+@ref{fig:cv_stats}.
+
+The box statistics tool's key shortcut is @kbd{s}.
+
+
+@node Aperture Photometry Tool, Cube Extraction Tool, Box Statistics Tool, CubeView Tools
+@subsubsection Aperture Photometry Tool
+@cindex Photometry, Aperture
+@cindex Aperture Photometry Tool
+
+@float Figure,fig:cv_phot
+@center @image{images/cubeview_phot,4.332in,,CubeView Photometry Example}
+@caption{Example CubeView aperture photometry, centered on the centroid
+found in the box area.}
+@end float
+
+The aperture photometry tool performs simple circular aperture
+photometry with a sky annulus.  It extends the CubeView window to report
+the photometry results.  A box is drawn (blue, for this tool), and the
+centroid of the source in the box is computed, and used to center two
+circular apertures, source and sky.  If the @kbd{Centroid} option at
+bottom is de-selected, the center of the box is used as the center of
+the circular apertures instead.  The total flux inside the inner
+circular aperture, minus the scaled sky flux (reported as the average
+within the sky annulus) is given. An example of the tool's output is
+show in @ref{fig:cv_phot}.
+
+The aperture photometry tool's key shortcut is @kbd{p}.
+
+
+@node Cube Extraction Tool, Pixel Backtracking Tool, Aperture Photometry Tool, CubeView Tools
+@subsubsection Cube Extraction Tool
+
+The cube extraction tool is used to extract spectra from rectangular
+regions within a cube, and can only be used when a cube is being
+displayed.  @xref{Box Regions} for more on defining and manipulating a
+box region, which is magenta for this tool.  Once an extraction region
+is defined, the spectrum is diplayed in the CubeSpec tool.
+@xref{CubeSpec}.
+
+The cube extraction tool's key shortcut is @kbd{x}.
+
+@node Pixel Backtracking Tool, Bad Pixel Tool, Cube Extraction Tool, CubeView Tools
+@subsubsection Pixel Backtracking Tool
+@cindex Backtracking Tool
+@cindex Pixel Backtracking
+
+@float Figure,fig:cv_backtrack
+@center @image{images/cubeview_backtrack,6in,,CubeView Backtrack Window}
+@caption{The backtracking window of CubeView, showing contribution from
+6 pixels among 2 BCD records to the cube pixel, one of which is flagged
+as a bad pixel.}
+@end float
+
+The pixel backtracking tool is an advanced cube analysis and
+verification tool.  It is enabled only when viewing a single plane of a
+spectral cube.  For the pixel under the cursor, it displays a list of
+input BCD pixel fragments which contributed to that pixel.  The more
+pixel redundancy built into your map, the greater the number of records
+and record pixels which contributed (also, high-res cubes typically have
+more, since there is overlap among the multiple high-res orders).  The
+information displayed includes the record ID, the pixel within that
+record, the fractional contribution to the cube pixel, the value of the
+BCD pixel (with uncertainty, if available), the value of the background,
+and the difference, along with any pipeline or user set pixel flags (see
+XXX).
+
+Simply turn the tool on and mouse around.  The BCDs which contributed to
+the given cube pixel are highlighted in the associated CUBISM Project
+window.  Left-clicking freezes on an individual cube pixel, marking it
+with a green @samp{x}, while right-clicking restores the free motion.
+In the BackTracking window, right clicking on any individual list item
+allows the associated BCD pixel to be set as a global or record-level
+bad pixel (see XXX).  You can continue to navigate through the cube
+while backtracking is active (see XXX).
+
+The pixel backtracking tool's key shortcut is @kbd{t}.
+
+
+@node Bad Pixel Tool, Pixel Table Tool, Pixel Backtracking Tool, CubeView Tools
+@subsubsection Bad Pixel Tool
+@cindex Bad Pixel Tool
+
+@float Figure,fig:cv_badpix
+@center @image{images/cubeview_badpix,4.332in,,CubeView Bad Pixel Display}
+@caption{A record stack with bad pixels displayed.}
+@end float
+
+The bad pixel tools marks individual bad pixels, either user-flagged, or
+pipeline-produced, and allows global and record-level user bad pixels to
+be added or removed (see @ref{Bad Pixels}, for more information on
+different types of user-level bad pixels, and tips on selecting them).
+It is only available when BCD images are being displayed.  To use,
+simply left-click to set or remove a given bad pixel from the global bad
+pixel list, clicking and dragging to set or unset multiple pixels at
+once.  Middle-click (or @key{Control}-left-click) instead to set to
+record-level bad pixels.
+
+A number of marks are drawn in CubeView to indicate global bad pixels,
+record level bad pixels, and various conditions and flags from the
+pipeline generated mask files @code{BMASK} and @code{PMASK}.  The
+various symbols seen when the Bad Pixel Tool is enabled are:
+
+@multitable @columnfractions .2 .8
+@item Cyan @samp{x}s
+@tab Global user-defined bad pixels, applying to all records.
+
+@item Green @samp{x}s
+@tab Record-level user bad pixels, applying only to a single record.
+
+@item Blue @samp{+}s
+@tab Locations where the @code{PMASK} (permanent mask) has any bit set.
+The @code{PMASK} typically contains a small number of unruly pixels.
+
+@item Red @samp{diamonds}s
+@tab Non-fatal bits set in the @code{BMASK}.
+
+@item Red @samp{x}s
+@tab Fatal bits set in the @code{BMASK}.  These are bits 12, 13 and 14,
+i.e. none or only one usable sample in the exposure ramp, or pixel
+fatally flagged in the @code{PMASK}.
+
+@end multitable
+
+@noindent See the @uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data
+Handbook} for a reference on the individual mask bits which the IRS
+pipeline applies.  Note that despite being a fatal mask value, bit 8 in
+the @code{BMASK} (not flat fielded) is not marked, since it occurs
+everywhere off the orders.  All @code{BMASK} values, whether marked or
+not, are indicated in the status display line @pxref{CubeView Status Display
+Line}.
+
+When viewing and setting bad pixels in CubeView, the right mouse button
+can be used to cycle through 4 settings controlling which bad pixels are
+indicated:
+
+@enumerate
+@item
+All mask and user-set bad pixels marks.
+@item
+All mask and user-set bad pixels marks, except for non-fatal
+@code{BMASK} marks.
+@item
+All fatal @code{BMASK} mask and user-set bad pixel marks.
+@item
+Only user-set bad pixel marks.
+@end enumerate
+
+@noindent @key{Shift}-right-click cycles in the opposite direction.
+
+The bad pixel tool's key shortcut is @kbd{b}.
+
+
+@node Pixel Table Tool, Order Mask Tool, Bad Pixel Tool, CubeView Tools
+@subsubsection Pixel Table Tool
+@cindex Pixel Table Tool
+
+The pixel table tool can be activated at any time, and displays a group
+of pixel values around the cursor position.
+
+@node Order Mask Tool, Compass Rose Tool, Pixel Table Tool, CubeView Tools
+@subsubsection Order Mask Tool
+@cindex Order Mask Tool
+
+The order mask tool sets to zero all pixels outside the order, as
+defined by the @code{WAVSAMP} aperture @pxref{WAVSAMP}.  It is useful
+when checking for bad pixels, and is only available when BCD record data
+are displayed.
+
+@node Compass Rose Tool,  , Order Mask Tool, CubeView Tools
+@subsubsection Compass Rose Tool
+@cindex Compass Rose Tool
+
+The compass rose draws NE compass lines on images data with available
+astrometry (cubes, maps, and visualization images).
+
+
+@node CubeView Colorbar, CubeView Status Display Line, CubeView Tools, CubeView
+@subsection Colorbar
+@cindex Colorbar
+
+The colorbar shows the currently selected colormap (as adjusted by
+@kbd{Options->Colormap} menu, and the Color tool --- see @ref{Color
+Tool}), along with a plot of the current color pixel histogram of the
+displayed image region, and the scale clipping limits.  @xref{Histogram
+Tool}.
+
+@node CubeView Status Display Line, CubeView Image Info Block, CubeView Colorbar, CubeView
+@subsection Status Display Line
+@cindex Status Line, CubeView
+
+Below the display window, a status display line reports the pixel
+position and value (with uncertainty), and depending on the data being
+viewed, either 
+
+@enumerate
+@item (BCD images, see, e.g., @ref{fig:cv_badpix}) Wavelength and order of the cursor position, along
+with a flag code identifying the bad pixel type (see XXX, for
+information on the flag codes).
+@item (Cubes and Visualization Images, e.g. @ref{fig:cv_phot}) 
+Coordinates of the current position from the WCS information.
+@end enumerate
+
+@node CubeView Image Info Block, CubeView WAVSamp Pane, CubeView Status Display Line, CubeView
+@subsection Image Info Block
+
+Information on the image being displayed is provided here, the same as
+is shown in the title bar @pxref{CubeView Title Bar}.
+
+@node CubeView WAVSamp Pane,  , CubeView Image Info Block, CubeView
+@subsection WAVSamp Pane
+
+Below the image info block, when a BCD record is being displayed, is the
+@emph{WAVSamp Pane}, where the @code{WAVSAMP} @pxref{WAVSAMP} can be
+manipulated.  @kbd{Show} overlays the current @code{WAVSAMP} for the
+current build order, @kbd{Edit} adds handles which can be used to adjust
+either side or end of the @code{WAVSAMP}.  The normalized aperture
+coordinates of the 4 corners of the @code{WAVSAMP} are shown for each
+order.  The @kbd{Lock} toggle controls whether all orders are set to the
+same @code{WAVSAMP} aperture.  The @kbd{WvScl} toggle creates a
+@code{WAVSAMP} aperture which grows linearly with wavelength.   The
+@kbd{Reset} button reset the full aperture.
+
+Editing the @code{WAVSAMP} involves clicking on one of the 6 adjustment
+handles and dragging.  When in @kbd{WvScl} mode, only the central
+controls adjust the width of the aperture, and the central wavelength.
+Otherwise, all controls change the width, either at one end, or both
+ends together.  @key{Shift}-click and drag moves both sides of the
+aperture at once.
+
+@xref{WAVSAMP} for more information about when and how to edit the
+@code{WAVSAMP}.  See @ref{fig:cv_recs} for an example displayed
+@code{WAVSAMP}.
+
 
 
 
@@ -1107,7 +1979,7 @@ spectra, and create maps from spectral cubes.
 
 
 
-@node The Techniques, Index, The Tools, Top
+@node The Techniques, Tips and Troubleshooting, The Tools, Top
 @chapter The Techniques
 
 
@@ -1145,13 +2017,18 @@ File naming convention.
 
 All IRS observations are affected at some level by the foreground or
 background emission of zodiacal dust and Galactic cirrus.  For faint
-sources, subtracting off a local ``sky background'' 2D BCD frame from
-data obtained nearby in position and time is the most effective method
-for removing the astrophysical background.  It also tremendously reduces
-the number of bad ``rogue'' pixels contaminating your data, especially
-at longer wavelengths, and is a recommended step for all cubes.  Here we
-explore a variety of options for background subtraction, in decreasing
-order of preference.
+sources, subtracting off a local ``sky background'' in the form of a 2D
+BCD frame constructed from data obtained nearby in position and time is
+the most effective method for removing the astrophysical background.  In
+addition, BCD-level background subtraction also tremendously reduces the
+number of bad or ``rogue'' pixels contaminating IRS data, especially in
+the longer wavelength models, and effectively reduces residual
+systematic uncertainties which dominate at low flux intensity (often in
+the form of correlated patterns, bands, etc.).  2D level background
+subtraction is a recommended step for all cubes.
+
+Here we explore a variety of options for background subtraction, in
+decreasing order of preference.
 
 @callout{Subtracting a 2D background frame can greatly improve the
 quality of the assembled cube, especially for faint sources.}
@@ -1159,6 +2036,7 @@ quality of the assembled cube, especially for faint sources.}
 @menu
 * In Situ Background::          
 * Archive Background::          
+* Background Blend::            
 * 1D Sky Spectrum Background::  
 * No Background::               
 * Background Tips and Visualization::  
@@ -1193,7 +2071,7 @@ the map center to either side can allow useful background frames to be
 found.
 
 
-@node Archive Background, 1D Sky Spectrum Background, In Situ Background, Backgrounds
+@node Archive Background, Background Blend, In Situ Background, Backgrounds
 @subsubsection Archive Background
 @cindex Background, Archive
 
@@ -1202,7 +2080,8 @@ in your map are free from source emission, you can still recover 2D
 level BCD maps by ``borrowing'' suitable data from the Spitzer archives.
 Useful sky data would have been obtained with the same instrument
 module, using (ideally) the same exposure time, targeted within roughly
-10 degrees in ecliptic latitude from your source, and within 2-3 days.
+10 degrees in ecliptic latitude from your source, and within 2--3 days
+of the target observation.
 
 The efficacy of archive sky subtraction can vary widely, and depends on
 the level of the background at your source, and the historical behavior
@@ -1218,46 +2097,59 @@ background frame, i.e. is free from source emission.  For low resolution
 data, often the safest bet is the ``outrigger'' order from a staring
 mode observation (which often target unresolved sources) --- e.g. SL2
 from a SL1 targetted observation.  The disadvantage of this technique is
-that the data must be available in the archive.
+that the data must be available in the archive, which for many program
+requires waiting for the proprietary period to expire.
 
-A related technique is the ``Background Blend'', in which a pair of
-observations from the archive (or elsewhere) which bracket the
-background as observed at the target are blended together to approximate
-a local background.  To use this, load the two data sets, ensuring their
+@node Background Blend, 1D Sky Spectrum Background, Archive Background, Backgrounds
+@subsubsection Background Blend
+@cindex Background, Blended
+
+A related technique to the archive background is the ``Background
+Blend'', useful if a set of observations from the archive which closely
+match the background properties of your source cannot be identified.  In
+this method, a pair of observations from the archive (or elsewhere)
+which bracket the target background are linearly blended together to
+approximate a local 2D background.  The same constraints on data of
+exposure apply: ideally all background observations would have been
+obtained within 2--3 days of the target observations, to maximize the
+effectiveness of mitigating rogue pixels (the behavior of which drifts
+on the timescale of days).
+
+To use this method, load the two data background sets, ensuring their
 records are disabled to avoid having them built into the cube.  Select
 the subset of the first which you want to include in the background, and
-select @code{Background->Background Blend->Set and Scale Background
+select @kbd{Background->Background Blend->Set and Scale Background
 A...}.  The selected background is displayed, with @samp{BackgroundA}
-indicated.  Enter a fiducial background value when prompted.  This value
-serves as the interpolant for determining the weights of the two
-backgrounds in the blend.  For SL data, it is convenient to use the flux
-measured in the Peak-Up Blue image at 16 microns, if it is clear of
-source contamination.  The box statistics tool can be useful (e.g. use
-the 3-sigma clipped average of a large section of the PU field).  Do
-similarly for @samp{BackroundB}, and then select
-@code{Background->Background Blend->Blend A and B Backgrounds...},
-entering a fiducial of your target data set, formed in the same way
-(e.g. in the PU field).  Another potentially useful fiducial is the
-predicted background at the source position and date, as available in
-Spot.
+indicated in the image info block @pxref{CubeView Image Info Block}.
+Enter a fiducial background value when prompted.  This value serves as
+the interpolant for determining the weights of the two backgrounds in
+the blend.  For SL data, it is convenient to use the flux measured in
+the Peak-Up Blue image at 16 microns (the lower of the 2 peak-up fields
+visible in all SL BCD iamges), if it is clear of source contamination.
+The box statistics tool can be useful (e.g. use as a fiducial value the
+3-sigma clipped average of a large section of the PU field).  Do the
+same for @samp{BackroundB}, and then select @kbd{Background->Background
+Blend->Blend A and B Backgrounds...}, entering a fiducial of your target
+data set, formed in the same way (e.g. in from the PU field statistics).
+Another potentially useful fiducial is the predicted background at the
+source position and date, as available in Spot.
 
 
-@node 1D Sky Spectrum Background, No Background, Archive Background, Backgrounds
+@node 1D Sky Spectrum Background, No Background, Background Blend, Backgrounds
 @subsubsection 1D Sky Spectrum
 @cindex Sky, 1D Spectrum
 
-If no 2D data are available for subtraction, some of the benefits can be
-obtained by specifying a 1D spectrum to subtract from all the cube
-planes.  You could build a cube, extract a spectrum from an area thought
-to be free from source contamination, and use this extracted spectrum as
-a 1D level background.  
+If no 2D BCD-level data are available for subtraction, some of the same
+benefits can be obtained by specifying a 1D spectrum to subtract from
+all the cube planes.  You can build a raw, non-fluxed cube, extract a
+spectrum from an area believed to be free from source contamination, and
+use this extracted spectrum as a 1D level background.
 
-@callout{Note that 1D background data must be in raw, e/s units,
-extracted from cubes built without FLUXCON.}
+@callout{Note that 1D background spectra must be in raw, @samp{e/s} units, extracted from cubes built without FLUXCON.}
 
-This method does not help mitigate rogue pixels, and is equivalent to
-extracting spectra and differencing them after the fact, but operates on
-the entire cube at once.
+This method does @emph{not} help mitigate rogue pixels, and is
+essentially equivalent to extracting spectra and differencing them after
+the fact, but operates on the entire cube at once.
 
 @node No Background, Background Tips and Visualization, 1D Sky Spectrum Background, Backgrounds
 @subsubsection No Background
@@ -1265,14 +2157,14 @@ the entire cube at once.
 Using no background is a reasonable last resort option for brighter
 sources, though the number of bad pixels in the raw unsubtracted data is
 much higher, so more work will be required to identify them (see XXX).
-The physical background flux will remain in the final assembled cube,
-which may affect analysis of extracted spectra or maps.
+The physical background flux will also of course remain in the final
+assembled cube, which may affect analysis of extracted spectra or maps.
 
 @node Background Tips and Visualization,  , No Background, Backgrounds
 @subsubsection Background Tips and Visualization
 
 It can be convenient to select suitable records for inclusion in the
-background frame using the AOR visualization of an IRAC or MIPS (or
+background frame by using the AOR visualization of an IRAC or MIPS (or
 other zodiacal and/or cirrus sensitive waveband) image of the target
 region.  Here we describe how to use the ``outrigger'' method to select
 suitable records from a set of low-resolution observations in the SL
@@ -1289,9 +2181,9 @@ Visualize the AORs using, e.g., an 8 micron IRAC image (see XXX).  After
 using the histogram box to scale the image such that low-level diffuse
 emission is apparent, hit @kbd{v} to switch to visualize mode.  To
 define sky BCDs for, e.g., SL1, for example, set the cube build order to
-1 (@kbd{Cube->Set Cube Build Order}) so that SL1 is not on the bright
-target source, and see which records land off your target.  Highlight
-these outriggers with the mouse by click and drag.
+1 (@kbd{Cube->Set Cube Build Order}), and see which records land off
+your target.  Highlight these outriggers with the mouse by click and
+drag.
 @item
 For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
@@ -1302,61 +2194,6 @@ using @kbd{Background->Save Background Recs...}.
 @cindex Bad Pixels
 @cindex Rogue pixels
 
-An exposition on selecting manual and automatic bad pixels.  Bad pixels
-are bad.  Bad pixels, bad.
-
-A number of marks are drawn in CubeView to indicate global bad pixels,
-record level bad pixels, and various conditions and flags from the
-pipeline generated mask files @code{BMASK} and @code{PMASK}.  The
-various symbols seen when in @samp{Mark Bad Pixel} mode are:
-
-
-@multitable @columnfractions .2 .8
-@item Cyan @samp{x}s
-@tab Global user-defined bad pixels, applying to all records.
-
-@item Green @samp{x}s
-@tab Record-level user bad pixels, applying only to a single record.
-
-@item Blue @samp{+}s
-@tab Locations where the @code{PMASK} (permanent mask) has any bit set.
-The @code{PMASK} typically contains a small number of unruly pixels.
-
-@item Red @samp{diamonds}s
-@tab Non-fatal bits set in the @code{BMASK}.
-
-@item Red @samp{x}s
-@tab Fatal bits set in the @code{BMASK}.  These are bits 12, 13 and 14,
-i.e. none or only one usable sample in the exposure ramp, or pixel
-fatally flagged in the @code{PMASK}.
-
-@end multitable
-
-@noindent See the @uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data
-Handbook} for a reference on the individual mask bits which the IRS
-pipeline applies.  Note that despite being a fatal mask value, bit 8 in
-the @code{BMASK} (not flat fielded) is not marked, since it occurs
-everywhere off the orders.  All @code{BMASK} values, whether marked or
-not, are indicated in the status display line.
-
-
-When viewing and setting bad pixels in CubeView, @kbd{Mouse-3} can be
-used to cycle through 4 settings controlling which bad pixels are
-indicated:
-
-@enumerate
-@item
-All mask and user-set bad pixels marks.
-@item
-All mask and user-set bad pixels marks, except for non-fatal
-@code{BMASK} marks.
-@item
-All fatal @code{BMASK} mask and user-set bad pixel marks.
-@item
-Only user-set bad pixel marks.
-@end enumerate
-
-@noindent @kbd{Shift-Mouse-3} cycles in the opposite direction.
 
 
 @menu
@@ -1588,6 +2425,54 @@ when you are visualizing an AOR.
 If you can think of any more, you are smarter than us.  
 @end enumerate
 
+
+@c
+@c Troubleshooting
+@c
+
+@node Tips and Troubleshooting, Index, The Techniques, Top
+@chapter Tips and Troubleshooting
+@cindex Troubleshooting
+
+You may occassionally encounter problems with CUBISM.  Here we document
+standard issues which are commonly encountered, and provide tips on
+debugging CUBISM and providing useful feedback to the SSC.
+
+@menu
+* Debugging CUBISM::            
+@end menu
+
+@node Debugging CUBISM,  , Tips and Troubleshooting, Tips and Troubleshooting
+@section Debugging CUBISM
+@cindex Debugging CUBISM
+
+By default, CUBISM traps and reports all errors which occur.  The
+resulting error message may or may not allow you to determine the cause
+of the error.  To debug CUBISM yourself, or to provide useful
+information to the SSC helpdesk to allow them to investigate the
+problem, enable debugging with @kbd{Info->Debug Cubism} in the CUBISM
+Project window.  This requires access to the IDL command line, which
+will not be available for versions of CUBISM running under the IDLVM
+@pxref{Binary Installation}.  After enabling debugging, repeat the
+action which generated the error.  Instead of trapping the error with a
+prompt, IDL will halt, with a full traceback message showing the exact
+code path which led to the error.  This code path might be enough to
+give you a hint as to the nature of the problem, but is also useful for
+the upstream maintainers for debugging purposes.  
+
+Report problems to @url{mailto:help@spitzer.caltech.edu,the SSC Help
+Desk}, including, at minimum:
+
+@enumerate
+@item A brief statement of the problem.
+@item A detailed description of the steps which can lead to the problem.
+@item Example inputs which trigger the problem, if applicable.
+@item The full traceback message reported after you have enabled
+Debugging.
+@end enumerate
+
+
+
 @c
 @c Appendices
 @c
@@ -1610,7 +2495,7 @@ If you can think of any more, you are smarter than us.
 
 @c A detailed listing of all CubeSpec, menus etc.
 
-@node Index,  , The Techniques, Top
+@node Index,  , Tips and Troubleshooting, Top
 @unnumbered Index
 @printindex cp
 
