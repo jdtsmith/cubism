@@ -197,6 +197,7 @@ CubeView Tools
 * Cube Extraction Tool::        
 * Pixel Backtracking Tool::     
 * Bad Pixel Tool::              
+* AOR Visualization Tool::      
 * Pixel Table Tool::            
 * Order Mask Tool::             
 * Compass Rose Tool::           
@@ -222,7 +223,7 @@ Backgrounds
 * Background Blend::            
 * 1D Sky Spectrum Background::  
 * No Background::               
-* Background Tips and Visualization::  
+* Background Selection Using Visualization::  
 
 Bad Pixels
 
@@ -253,7 +254,7 @@ supports the analysis and reduction of spectral maps created with the
 @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard the
 @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.  It is
 written in the Interactive Data Language (IDL).  CUBISM is designed to
-allow sets of basic calibrated data (@code{BCDs}) from IRS mapping
+allow sets of basic calibrated data (@samp{BCDs}) from IRS mapping
 observations to be combined into single 3D spectral cubes, with two
 spatial and one spectral dimension.  From these cubes, spectra can be
 extracted over differing apertures, and arbitrary maps can be made in
@@ -270,7 +271,7 @@ of its analysis and reduction capabilities:
 @multitable @columnfractions .2 .8
 
 @item CUBISM Project
-@tab Manage @code{BCD} data, and track all the various information required to
+@tab Manage @samp{BCD} data, and track all the various information required to
 build cubes, including calibration data, background information, bad
 pixels, aperture information, etc.
 
@@ -502,7 +503,7 @@ Cubism} in the project window.  New versions of CUBISM are available at
 CUBISM has two major purposes: building cubes from IRS Spectral Mapping
 data sets, and analyzing those cubes.  Building cubes from collections
 of mapping data sets is in principle a simple process: the correct
-@code{BCDs} are collected together in a project, the cube build
+@samp{BCDs} are collected together in a project, the cube build
 parameters are adjusted, and the cube is built.  Further refinement of
 the cube includes identifying bad pixels to exclude from the cube build,
 selecting and creating an appropriate background frame, configuring the
@@ -775,6 +776,11 @@ Open an existing CUBISM project.
 Save all record data with the project (which can greatly increase the
 project size on disk).
 
+@item Relative File Names
+Modify record filenames to be relative to the project path.  Useful for
+distributing a project file and data set together, without including the
+record data in the project itself.
+
 @item Save Clip Accounts with Project
 Save all clipping information, which enables pixel backtracking, and
 rapid cube rebuilds, with the project.  This will increase the project
@@ -844,6 +850,8 @@ another string.
 
 @table @code
 @item Add Data...
+Add individual data records.  Usually not as convenient as adding full
+AOR data sets at once using one of the following commands.
 
 @item Import Data from Mapping AOR
 Import data from entire mapping AORs, selecting among the AORs present
@@ -863,11 +871,14 @@ Import FlatAp data (flat-fielded, not straylight-corrected).
 
 @item Import Data by module
 Import all records found at or below the selected directory, grouped by
-module (independent of any AOR).
+module (independent of any AOR).  Can be useful for loading archive
+backgrounds which aren't grouped into mapping AORs @pxref{Archive
+Background}.
 
 @table @code
 @item BCD...
-Import BCD data (flat-fielded and straylight-corrected).
+Import BCD data (flat-fielded and straylight-corrected).  The default
+data type CUBISM uses.
 
 @item DroopRes...
 Import DroopRes data (not flat-fielded, not straylight-corrected).
@@ -884,8 +895,8 @@ Load the BMASKs associated with any newly added records.
 Load the BCD uncertainty files for any newly added records.
 
 @item Switch Record Data Type...
-Prompt for and wwitch the data type of the selected records among BCD,
-FlatAp, and DroopRes.
+Prompt for and switch the data type of the selected records among @samp{BCD},
+@samp{FlatAp}, and @samp{DroopRes}.
 
 @item Restore All Record Data
 Recover from file the data for all records (these are normally recovered
@@ -936,7 +947,8 @@ record(s).
 
 @item Visualize AORs...
 Load a FITS image and visualize the mapping AORs on it, using a
-pre-existing visualization viewer window if available.
+pre-existing visualization viewer window if available.  Reuse any image
+which has already been loaded.  See also @ref{AOR Visualization Tool}.
 
 @item Visualize AORs (new viewer)...
 Load a FITS image and visualize the mapping AORs on it in a new viewer
@@ -1125,7 +1137,7 @@ assemble the loaded project (if different).
 @node Data Records, Status Bar, CUBISM Project Menus, CUBISM Project
 @subsection Data Records
 @cindex Data Records
-@cindex @code{BCD} Records
+@cindex @samp{BCD} Records
 @cindex Record Information
 
 A CUBISM projects holds all of the data records (often called simply
@@ -1134,7 +1146,7 @@ records either include the data directly, or hold a file reference to
 the data on disk, which is loaded on demand.  In @ref{fig:pop_proj}, two
 records have been selected.  In addition to the spectrum data frame,
 each record holds (optionally) the associated uncertainty frame, and the
-@code{BMASK} pixel mask frame.
+@samp{BMASK} pixel mask frame.
 
 @menu
 * Record Info::                 
@@ -1153,25 +1165,25 @@ information recorded is:
 
 @multitable @columnfractions .15 .85
 
-@item @code{ID}
+@item @samp{ID}
 @tab A (hopefully) unique ID formed from filename.
 
-@item @code{Exp}
-@tab The @code{BCD} exposure time in seconds (from the headers).
+@item @samp{Exp}
+@tab The @samp{BCD} exposure time in seconds (from the headers).
 
-@item @code{Observed}
-@tab The date and time the @code{BCD} observation (GMT).
-@item @code{Added}
+@item @samp{Observed}
+@tab The date and time the @samp{BCD} observation (GMT).
+@item @samp{Added}
 @tab The date and time this data record was added to the project (local
 time zone).
 
-@item @code{Type}
+@item @samp{Type}
 @tab The type of the record, encoded as @samp{tMMO_pos}, with
 
 @itemize @bullet
 @item @samp{t}: The type of data record -- @samp{d} for @samp{DROOPRES},
 @samp{c} for @samp{COADD}, @samp{f} for @samp{FLATAP}, or blank for the
-(by far most common) @code{BCD} (@pxref{Record Data Types}).
+(by far most common) @samp{BCD} (@pxref{Record Data Types}).
 
 @item @samp{M}: The module -- @samp{SL}, @samp{SH}, @samp{LL}, or @samp{LH}.
 
@@ -1183,7 +1195,7 @@ high-res or full-slit low-res (e.g. @samp{LLBoth}) targeting.
 position 2).  @samp{b}: nod position 2.
 @end itemize
 
-@item @code{Step}
+@item @samp{Step}
 @tab The step sequence within the map as @samp{I[X,Y]}, where @samp{I}
 is the @samp{EXPID} of this step, and @samp{X} and @samp{Y} are the row
 and column positions within the map.
@@ -1196,31 +1208,31 @@ This page includes:
 
 @multitable @columnfractions .15 .85
 
-@item @code{RA}
+@item @samp{RA}
 @tab RA targetted by the slit field of view position (J2000).
 
-@item @code{DEC}
+@item @samp{DEC}
 @tab DEC targetted by the slit field of view position (J2000).
 
-@item @code{DATA}
+@item @samp{DATA}
 @tab Whether the data for this record are loaded, rather than just a
 link to the file.  Data are loaded on demand.
 
-@item @code{UNC}
+@item @samp{UNC}
 @tab Whether the associated uncertainty data for this record are
 loaded.  These are discovered automatically alongside the primary data
 products and loaded.
 
-@item @code{BMSK}
-@tab Whether the associated @code{BMASK} mask data for this record are
-loaded.  The @code{BMASKs} are discovered automatically alongside the
+@item @samp{BMSK}
+@tab Whether the associated @samp{BMASK} mask data for this record are
+loaded.  The @samp{BMASKs} are discovered automatically alongside the
 primary data products and loaded.
 
-@item @code{ACCT}
+@item @samp{ACCT}
 @tab Whether the ``accounting information'' for this record is cached,
-mapping @code{BCD} pixels to sky pixels.
+mapping @samp{BCD} pixels to sky pixels.
 
-@item @code{BPL}
+@item @samp{BPL}
 @tab Whether any record level bad pixels exist for this record
 (@pxref{Bad Pixels}).
 
@@ -1253,16 +1265,16 @@ fail.
 
 The IRS pipeline produces a variety of different types of output
 spectral data with differing levels of processing applied.  The standard
-product which CUBISM uses is the @code{BCD}, or basic calibrated data.
-In addition, however, CUBISM can operate on @code{DroopRes} (not
-flat-fielded or straylight-corrected) and @code{FlatAp} (not
+product which CUBISM uses is the @samp{BCD}, or basic calibrated data.
+In addition, however, CUBISM can operate on @samp{DroopRes} (not
+flat-fielded or straylight-corrected) and @samp{FlatAp} (not
 straylight-corrected) data files.  See
 @uref{http://ssc.spitzer.caltech.edu/irs/dh/,the IRS Data Handbook} for
 more information on these different data products.  Typically, they
 would be used in CUBISM to test results only if problems with the
 flat-field or straylight-correction (SL) were suspected.
 
-Note that reference to the term @code{BCD} throughout this manual is
+Note that reference to the term @samp{BCD} throughout this manual is
 inclusive of the other, less commonly used files types (@samp{FlatAp},
 @samp{DroopRes}).
 
@@ -1273,10 +1285,10 @@ inclusive of the other, less commonly used files types (@samp{FlatAp},
 Individual records or groups of records can be examined for header
 information, renamed, deleted, enabled/disabled, viewed as an individual
 or a stack, averaged into a background frame, and much more.  Most of
-these options are accessible from the @code{Record} menu (@pxref{CUBISM
+these options are accessible from the @kbd{Record} menu (@pxref{CUBISM
 Project Record Menu}).  A very common operation is to view a record,
 which is done by simply double-clicking it, or selecting one or more
-records and hitting the @code{View Stack} button.
+records and hitting the @kbd{View Stack} button.
 
 
 @node Status Bar, Button Bar, Data Records, CUBISM Project
@@ -1464,7 +1476,7 @@ window.  @xref{CubeView Tools}.
 The viewer offers a number of individual tools for interacting with the
 viewed data, some of which are generic and always available, and others
 of which are specific to certain data types.  The tools are accessible
-via the palette, through keyboard shortcuts, and via the @code{Tools}
+via the palette, through keyboard shortcuts, and via the @kbd{Tools}
 menu.  Other tools accessible below the displayed window will be
 discussed in the next section.
 
@@ -1491,6 +1503,7 @@ box and WAVSamp display.}
 * Cube Extraction Tool::        
 * Pixel Backtracking Tool::     
 * Bad Pixel Tool::              
+* AOR Visualization Tool::      
 * Pixel Table Tool::            
 * Order Mask Tool::             
 * Compass Rose Tool::           
@@ -1635,10 +1648,11 @@ center on the clicked region.  To zoom out, right-click.  All zoom
 levels are saved onto a ``zoom stack'', which is navigated backwards one
 step at a time.  To zoom all the way out, right double-click.
 
-When an image is zoomed in, middle-click dragging (or Control-click
-dragging) pans the image.  If the display canvas is resized (either
-using the @kbd{Set Size} menu item, see @ref{CubeView Options Menu}, or
-by re-sizing the entire CubeView window), the image is re-zoomed.
+When an image is zoomed in, middle-click dragging (or
+@key{Control}-click dragging) pans the image.  If the display canvas is
+resized (either using the @kbd{Set Size} menu item, see @ref{CubeView
+Options Menu}, or by re-sizing the entire CubeView window), the image is
+re-zoomed.
 
 The zoom tool's key shortcut is @kbd{z}.
 
@@ -1797,7 +1811,7 @@ while backtracking is active (see XXX).
 The pixel backtracking tool's key shortcut is @kbd{t}.
 
 
-@node Bad Pixel Tool, Pixel Table Tool, Pixel Backtracking Tool, CubeView Tools
+@node Bad Pixel Tool, AOR Visualization Tool, Pixel Backtracking Tool, CubeView Tools
 @subsubsection Bad Pixel Tool
 @cindex Bad Pixel Tool
 
@@ -1818,7 +1832,7 @@ record-level bad pixels.
 
 A number of marks are drawn in CubeView to indicate global bad pixels,
 record level bad pixels, and various conditions and flags from the
-pipeline generated mask files @code{BMASK} and @code{PMASK}.  The
+pipeline generated mask files @samp{BMASK} and @samp{PMASK}.  The
 various symbols seen when the Bad Pixel Tool is enabled are:
 
 @multitable @columnfractions .2 .8
@@ -1829,24 +1843,24 @@ various symbols seen when the Bad Pixel Tool is enabled are:
 @tab Record-level user bad pixels, applying only to a single record.
 
 @item Blue @samp{+}s
-@tab Locations where the @code{PMASK} (permanent mask) has any bit set.
-The @code{PMASK} typically contains a small number of unruly pixels.
+@tab Locations where the @samp{PMASK} (permanent mask) has any bit set.
+The @samp{PMASK} typically contains a small number of unruly pixels.
 
 @item Red @samp{diamonds}s
-@tab Non-fatal bits set in the @code{BMASK}.
+@tab Non-fatal bits set in the @samp{BMASK}.
 
 @item Red @samp{x}s
-@tab Fatal bits set in the @code{BMASK}.  These are bits 12, 13 and 14,
+@tab Fatal bits set in the @samp{BMASK}.  These are bits 12, 13 and 14,
 i.e. none or only one usable sample in the exposure ramp, or pixel
-fatally flagged in the @code{PMASK}.
+fatally flagged in the @samp{PMASK}.
 
 @end multitable
 
 @noindent See the @uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data
 Handbook} for a reference on the individual mask bits which the IRS
 pipeline applies.  Note that despite being a fatal mask value, bit 8 in
-the @code{BMASK} (not flat fielded) is not marked, since it occurs
-everywhere off the orders.  All @code{BMASK} values, whether marked or
+the @samp{BMASK} (not flat fielded) is not marked, since it occurs
+everywhere off the orders.  All @samp{BMASK} values, whether marked or
 not, are indicated in the status display line (@pxref{CubeView Status Display
 Line}).
 
@@ -1859,9 +1873,9 @@ indicated:
 All mask and user-set bad pixels marks.
 @item
 All mask and user-set bad pixels marks, except for non-fatal
-@code{BMASK} marks.
+@samp{BMASK} marks.
 @item
-All fatal @code{BMASK} mask and user-set bad pixel marks.
+All fatal @samp{BMASK} mask and user-set bad pixel marks.
 @item
 Only user-set bad pixel marks.
 @end enumerate
@@ -1871,7 +1885,39 @@ Only user-set bad pixel marks.
 The bad pixel tool's key shortcut is @kbd{b}.
 
 
-@node Pixel Table Tool, Order Mask Tool, Bad Pixel Tool, CubeView Tools
+
+@node AOR Visualization Tool, Pixel Table Tool, Bad Pixel Tool, CubeView Tools
+@subsubsection AOR Visualization Tool
+@cindex Visualizing AORs
+@cindex AOR Visualization
+
+It can be useful to look at a graphical representation of the AOR layout
+as observed on top of an image.  The Visualization tool can be activated
+from the CUBISM Project window by choosing @kbd{Record->Visualize
+AORs...} @pxref{CUBISM Project Record Menu}.  This will prompt for an
+image to use for visualization (if none is set).  Select a FITS image
+with valid astrometry (DSS, 2MASS, Spitzer IRAC/MIPS, etc.), and the
+records will be shown, as in @ref{fig:cv_viz}.
+
+When this tool is active, records can be selected directly in the image
+itself.  Click on a record to activate it, at which point it is drawn in
+white.  Click and drag to select contiguous records.  @key{Shift}-click
+to select the range of records from the last selected, and
+@key{Control}-click to select non-contiguous ranges (similar semantics
+as described in @ref{List Selection}).  Click outside the record
+overlays to deselect all records.  Direct selection on the image can be
+very useful from defining background records directly from an infrared
+image @pxref{Background Selection Using Visualization}.
+
+Disabled records are shown in gray.  
+
+@float Figure,fig:cv_viz
+@center @image{images/cubeview_visualize,4.332in,,CubeView Visualize}
+@caption{A visualization of the records on an IRAC 8 micron image of
+M51, with 13 records selected.}
+@end float
+
+@node Pixel Table Tool, Order Mask Tool, AOR Visualization Tool, CubeView Tools
 @subsubsection Pixel Table Tool
 @cindex Pixel Table Tool
 
@@ -1883,7 +1929,7 @@ of pixel values around the cursor position.
 @cindex Order Mask Tool
 
 The order mask tool sets to zero all pixels outside the order, as
-defined by the @code{WAVSAMP} aperture (@pxref{WAVSAMP}).  It is useful
+defined by the @samp{WAVSAMP} aperture (@pxref{WAVSAMP}).  It is useful
 when checking for bad pixels, and is only available when BCD record data
 are displayed.
 
@@ -1931,17 +1977,17 @@ is shown in the title bar (@pxref{CubeView Title Bar}).
 @subsection WAVSamp Pane
 
 Below the image info block, when a BCD record is being displayed, is the
-@emph{WAVSamp Pane}, where the @code{WAVSAMP} (@pxref{WAVSAMP}) can be
-manipulated.  @kbd{Show} overlays the current @code{WAVSAMP} for the
+@emph{WAVSamp Pane}, where the @samp{WAVSAMP} (@pxref{WAVSAMP}) can be
+manipulated.  @kbd{Show} overlays the current @samp{WAVSAMP} for the
 current build order, @kbd{Edit} adds handles which can be used to adjust
-either side or end of the @code{WAVSAMP}.  The normalized aperture
-coordinates of the 4 corners of the @code{WAVSAMP} are shown for each
+either side or end of the @samp{WAVSAMP}.  The normalized aperture
+coordinates of the 4 corners of the @samp{WAVSAMP} are shown for each
 order.  The @kbd{Lock} toggle controls whether all orders are set to the
-same @code{WAVSAMP} aperture.  The @kbd{WvScl} toggle creates a
-@code{WAVSAMP} aperture which grows linearly with wavelength.   The
+same @samp{WAVSAMP} aperture.  The @kbd{WvScl} toggle creates a
+@samp{WAVSAMP} aperture which grows linearly with wavelength.   The
 @kbd{Reset} button reset the full aperture.
 
-Editing the @code{WAVSAMP} involves clicking on one of the 6 adjustment
+Editing the @samp{WAVSAMP} involves clicking on one of the 6 adjustment
 handles and dragging.  When in @kbd{WvScl} mode, only the central
 controls adjust the width of the aperture, and the central wavelength.
 Otherwise, all controls change the width, either at one end, or both
@@ -1949,8 +1995,8 @@ ends together.  @key{Shift}-click and drag moves both sides of the
 aperture at once.
 
 @xref{WAVSAMP}, for more information about when and how to edit the
-@code{WAVSAMP}.  See @ref{fig:cv_recs} for an example displayed
-@code{WAVSAMP}.
+@samp{WAVSAMP}.  See @ref{fig:cv_recs} for an example displayed
+@samp{WAVSAMP}.
 
 
 
@@ -1990,13 +2036,12 @@ spectra, and create maps from spectral cubes.
 
 @node Input Files and Calibration, Backgrounds, Cube Assembly, Cube Assembly
 @subsection Input Files and Calibration
-@cindex @code{BCD} files
+@cindex @samp{BCD} files
 @cindex Calibration sets
 @cindex Files, input
 @cindex Input files
 
 File naming convention.
-
 
 @node Backgrounds, Bad Pixels, Input Files and Calibration, Cube Assembly
 @subsection Backgrounds
@@ -2026,7 +2071,7 @@ quality of the assembled cube, especially for faint sources.}
 * Background Blend::            
 * 1D Sky Spectrum Background::  
 * No Background::               
-* Background Tips and Visualization::  
+* Background Selection Using Visualization::  
 @end menu
 
 @node In Situ Background, Archive Background, Backgrounds, Backgrounds
@@ -2138,7 +2183,7 @@ This method does @emph{not} help mitigate rogue pixels, and is
 essentially equivalent to extracting spectra and differencing them after
 the fact, but operates on the entire cube at once.
 
-@node No Background, Background Tips and Visualization, 1D Sky Spectrum Background, Backgrounds
+@node No Background, Background Selection Using Visualization, 1D Sky Spectrum Background, Backgrounds
 @subsubsection No Background
 
 Using no background is a reasonable last resort option for brighter
@@ -2147,15 +2192,17 @@ much higher, so more work will be required to identify them (see XXX).
 The physical background flux will also of course remain in the final
 assembled cube, which may affect analysis of extracted spectra or maps.
 
-@node Background Tips and Visualization,  , No Background, Backgrounds
-@subsubsection Background Tips and Visualization
+@node Background Selection Using Visualization,  , No Background, Backgrounds
+@subsubsection Background Selection Using Visualization
+@cindex Visualization, Background Selection
 
 It can be convenient to select suitable records for inclusion in the
 background frame by using the AOR visualization of an IRAC or MIPS (or
 other zodiacal and/or cirrus sensitive waveband) image of the target
-region.  Here we describe how to use the ``outrigger'' method to select
-suitable records from a set of low-resolution observations in the SL
-module (LL would be similar).
+region.  @xref{AOR Visualization Tool}, for more information on the
+visualization tool.  Here we describe how to use the ``outrigger''
+method to select suitable records from a set of low-resolution
+observations in the SL module (LL would be similar).
 
 @enumerate
 @item
@@ -2196,7 +2243,7 @@ pixels is described in Section XX.
 
 @enumerate
 @item
- View the stack of relevant @code{BCDs}.
+ View the stack of relevant @samp{BCDs}.
 @item
  Show the wavsamp.
 @item
@@ -2232,6 +2279,69 @@ point where the viewable pixels are no longer >4 sigma deviations.
 @node  Saving the Project,  , Bad Pixels, Cube Assembly
 @subsection Saving the Project
 @cindex Saving Projects
+
+Saving the project to a @file{.cpj} project file records all of the
+information presented in a CUBISM Project window, including data
+records, background settings, bad pixels, cube build preferences,
+calibration set details, etc., and allows you to recover a cube project
+from disk to continue working on it.  Saving the cube can be
+accomplished with menu option @kbd{File->Save}, or @kbd{File->Save
+As...} to save a version under a different name, or with the convenient
+button below the record pane.  @kbd{File->Revert to Saved...} allows you
+to discard any changes to the project, and restore the version saved on
+disk.
+
+Not all of the data is saved with the project by default.  There are
+three options related to saving the project file, accessible in the
+@kbd{File->Save Setup} menu:
+
+@enumerate
+@item
+@kbd{Save Data with Project}: This saves a copy of all the loaded data
+(including @samp{BCD}, associated masks, and uncertainties) into the
+project.  This adds approximately 192kB per record to the size of the
+project file, and is only necessary when you intend to distribute the
+file independent of the data directories.  This can be useful for
+sharing @file{.cpj} files colleagues without access to the Spitzer
+archives, but can result in large files when many tens or hundreds of
+records are involved, and is redundant when the data files themselves
+are available.
+
+@item
+@kbd{Relative File Names}: By default, the absolute path to the data
+files is stored in the project, and, if the data itself is not stored,
+it will be recalled from disk when needed.  Unfortunately, this makes
+cube project files non-portable (leading to an error like ``Couldn't
+restore data from file''), unless the absolute path to the @samp{BCD}
+files is fixed on all systems where the cube is loaded.  While you can
+easily replace the root directory from the file names to fix this (see
+XXXX), another method is to use this option to specify that all path
+names will be recorded relative to the path of the @file{.cpj} file
+itself.  Then, as long as the relative file layout of the project file
+and data files remains the same, all record data should load with no
+problem.
+
+@item
+@kbd{Save Accounts with Project}: The clipping accounts consist of all
+the information which maps @samp{BCD} pixels to the sky grid.  When the
+accounts are valid, (you don't see @emph{needs rebuilding} in the
+@kbd{Info->Project Parameters...} page), the cube can be rebuilt
+quickly, and pixel backtracking works without a re-build (see XXX).
+Saving this account information to disk gives these benefits to cube
+projects loaded from disk as well, but comes with a steep cost in terms
+of disk space: approximately 400--700kB per record.
+
+@end enumerate
+
+For distributing @file{.cpj} files, it's easiest to save without data or
+accounts (the default), since this produces the smallest files by far,
+but this requires everyone to have access to the data, in the same path
+(for absolute file names), or with the same relative path layout (for
+relative file names) as on the build host.  A reasonable approach is to
+use relative file names, and bundle the @file{.cpj} together with the
+data directories in a distribution package.  For users who simply wish
+to examine the cube itself (extract spectra, make maps), access to the
+record data isn't necessary.
 
 
 @node  Cube Analysis, Cube Validation, Cube Assembly, The Techniques
