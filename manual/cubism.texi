@@ -2046,8 +2046,12 @@ averages of multiple records):
 @item *
 The pixel was flagged in the @samp{PMASK}.
 
+@item s
+The pixel was saturated during the read ramp, but the value was
+recovered.
+
 @item S
-The pixel was saturated, but the value was recovered.
+The pixel was saturated and uncorrectable.
 
 @item F
 No flat field was applied to the pixel.
