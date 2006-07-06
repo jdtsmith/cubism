@@ -56,10 +56,11 @@
 ;
 ;##############################################################################
 
-function make_filename_relative,path,root
+function make_filename_relative,path,root_in
   up=0L
   sep=path_sep()
   if strmid(path,0,1) eq '.' then return,path
+  root=root_in
   while root ne sep do begin 
      match=path
      while match ne sep do begin 
