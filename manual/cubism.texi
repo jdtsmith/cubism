@@ -504,28 +504,56 @@ Cubism} in the project window.  New versions of CUBISM are available at
 @chapter Quick Start Guide
 @cindex Quick Start
 
-CUBISM has two major purposes: building cubes from IRS Spectral Mapping
+CUBISM has two major functions: building cubes from IRS Spectral Mapping
 data sets, and analyzing those cubes.  Building cubes from collections
 of mapping data sets is in principle a simple process: the correct
 @samp{BCDs} are collected together in a project, the cube build
 parameters are adjusted, and the cube is built.  Further refinement of
 the cube includes identifying bad pixels to exclude from the cube build,
 selecting and creating an appropriate background frame, configuring the
-calibration details and cube build options, etc.
+calibration details and cube build options, etc.  Although simple, this
+process can take a good deal of time.  Users should expect to spend 
+between one-half and one hour, per IRS slit, building and cleaning 
+(flagging and removing bad pixels) their cubes.  Therefore, building
+the cubes for a complete low-res and/or high-res spectral map of a single
+target can take several hours.
 
 With the assembled cube, you can perform a variety of post-cube
-analyses, including extracting spectra in specific regions and building
-spectral maps.  There are many details which can affect the cube
+analyses, including extracting 1D spectra in specific regions and building
+2D spectral maps.  There are many details which can affect the cube
 assembly process, and impact the quality of the final assembled product.
 Here we will quickly go through the basic steps required to build a
 cube, extract a spectrum, and build a spectral map, leaving all of the
 (important) details aside for now.
 
-An important note before we begin concerns the scope of a CUBISM
-project.  Each CUBISM project pertains to a single order of a single IRS
-module, e.g. LL1.  For data sets with mapping observations in all four
-low-resolution orders, 4 individual cubes will likely be built, and
-analzyed as a set.
+An important note before we begin concerns the scope of a CUBISM project.
+Each CUBISM project pertains to a single IRS slit, e.g.  Long-Low order 1
+(LL1), Short-Low order 2 (SL2) or Short-High (SH).  Each of the low-res
+slits are a single spectral order, but the high-res slits have 10 orders,
+each.  Just as a reminder, there are four IRS modules (SL, LL, SH, and LH),
+with each low-res module containing two slits and each high-res module
+containing one slit.  For data sets with mapping observations in all four
+low-resolution orders (SL1, SL2, LL1 and LL2), four individual cubes will
+be built, and analzyed as a set.  A full low-res and high-res IRS map will
+therefore produce six spectral cubes (the four for low-res and two
+additional for SH and LH) and there will be six CUBISM project (*cpj) files.
+
+Below we take the user through the process of building a cube with two
+examples.  In the first case, we describe the key steps to setting up the project, 
+including adding data, selecting backgrounds, flagging bad pixels, and building the cube.
+A partially complete project will be read in, and the user will specify additional
+files that contain information on the backgrounds, bad pixels, etc.
+In the second case, the user will build a cube with a completely pre-packaged
+project which already includes all the information about background files, 
+bad pixels, etc.  The goal here is to quickly build a good cube and become
+familiar with the windows and tools in CUBISM.  When you build your own cubes,
+the *cpj files that you save will be similar to these, containing all the information
+needed to build a cube from your spectral mapping data (including, if you desire, the
+actual BCDs themselves).  In both cases, we will build a Short-Low order 1 (SL1) cube 
+from the NGC 3049 SINGS data.
+
+@index
+Using background (*bgl) and bad pixel (*bpl) files:
 
 To get going, type:
 
@@ -533,7 +561,9 @@ To get going, type:
 IDL> cubism
 @end example
 
-@noindent and create a new cube, giving it a useful name when prompted.
+@noindent and create a new cube project, giving it a useful name when prompted.
+As you build each cube and save your work, you will be prompted for the names
+of the individual *cpj files corresponding to each set of IRS data (slit).
 Add a full set of mapping data with the @kbd{Import AOR} button.  Just
 navigate to a directory containing your archive-downloaded data set and
 click @kbd{OK}.  CUBISM will search for all IRS data files at or beneath
@@ -556,16 +586,36 @@ display the cube in the same viewer window.  In this window, click on
 the @kbd{Extract} button (a cube with a line through it), or select
 @kbd{Tools->Extract Spectra and Stack Cubes}.  Click and drag a
 rectangular extraction region, from upper left to lower right, on the
-cube, and CubeSpec will popup showing you the extracted spectrum.  In
-CubeSpec, click @kbd{Map} and then choose @samp{Region: Peak}.  Click
+cube, and the CubeSpec window will appear showing you the extracted spectrum.  In
+the CubeSpec window, click @kbd{Map} and then choose @samp{Region: Peak}.  Click
 and release once at a low and high wavelength to define a peak region,
 and you've just created a spectral map, which should now be displayed in
-CubeSpec.
+the CubeSpec window.
 
-Congratulations, you've just gone quickly through the most important
-steps of cube assembly and analysis.  Read on to learn more about
-building higher quality cubes, and more sophisticated methods of
-analysis.
+
+@index
+Using a complete cube project (*cpj) file:
+
+As above, to get going, type:
+
+@example
+IDL> cubism
+@end example
+
+@noindent and create a new cube project.  Here, under the ``File" pulldown
+menu, select ``Open" and choose the pre-packaged SL1 file, NGC3049_SL1.cpj
+from the menu.  This will bring up the list of records that are part of the 
+cube, including the background files (which should have dashed lines across
+them indicating they have been ``disabled" from the final science cube.  Since
+all the information is already stored in the NGC3049_SL1.cpj file, simply go 
+ahead and select @kbd{Build Cube} from the @kbd{Cube} pulldown menu.  The cube will
+then begin building.  You can also, as above, display the records (BCDs) in a
+new CubeView window as individual files, or as a complete stack of all the data.
+Make sure to click the @kbd{BGSub} button in the CubeView window before stretching
+the data and looking for the object trace in the data.  A square-root stretch, with a histogram
+scaling box that excludes the peakup windows, is also recommended for viewing
+relatively faint SL spectra.  One the cube is built, you can view it in a new
+viewer as above.
 
 @c
 @c The Tools
@@ -2832,11 +2882,12 @@ using something older, don't panic.  It's fine but you probably need an
 update of your CUBISM, or you need to wait for the SSC to come up with a
 newer calibration file.
 @item
-If CUBISM ever freezes, close everything and restart.  Before redoing
-the error, click on @kbd{Debug Cubism} under the @kbd{Info} menu
-tab.  Then, redo the error.  Send the "barf" that occured in your IDL
-window to the appropriate authorities.  That will help the Help Desk
-more than anything and speed up their response.
+If CUBISM ever freezes, close everything and restart.  Before running CUBISM again,
+click on @kbd{Debug Cubism} under the @kbd{Info} menu
+tab.  Then, run through the steps that generated the error in the first place.  
+Send the error messages in your IDL
+window to the SSC Help Desk.  The debug information will help the Science User Support
+team assess the problem.
 @item
 If you want to View your cube and visualize your AORs, then you want to
 use the (new viewer) commands of the same name (e.g., View Cube (new
