@@ -82,16 +82,18 @@ pro irs_bmask,mask,PMASK=pm,SATURATED=sat,NO_FLAT=nf,NO_PLANES=np, $
   for i=0,14 do flags[i]=(mask AND 2U^i) ne 0
   pm =flags[14] ne 0b           ;pmask flagged 
   sat=flags[10] ne 0b           ;saturated
+  digsat=flags[2] ne 0b         ;correctable saturation
   nf=flags[8] ne 0b             ;No flat
   op=flags[12] ne 0b            ;One plane
   np=flags[13] ne 0b            ;No planes
   rh=flags[3] ne 0b             ;Radiation Hit
   
+  
   if arg_present(cs) then begin 
-     cs=(pm?'*':'')+(sat?'S':'')+(nf?'F':'')+(rh?'R':'')+ $
+     cs=(pm?'*':'')+(sat?'S':'')+(digsat?'s':'')+(nf?'F':'')+(rh?'R':'')+ $
         (op?'1':(np?'0':''))
-     if (mask AND 35575U) gt 0 then begin 
-        flags[[14,10,8,13,12,3]]=0b
+     if (mask AND 35571U) gt 0 then begin 
+        flags[[14,10,8,13,12,3,2]]=0b
         cs+="["+strjoin(strtrim(where(flags),2),",")+"]"
      endif 
   endif
