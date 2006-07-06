@@ -204,6 +204,24 @@ CubeView Tools
 * Order Mask Tool::             
 * Compass Rose Tool::           
 
+CubeSpec
+
+* CubeSpec Title Bar::          
+* CubeSpec Menus::              
+* CubeSpec Buttons::            
+
+Menus
+
+* CubeSpec File Menu::          
+* CubeSpec Maps Menu::          
+
+CubeSpec Buttons
+
+* Upper Left Button Group::     
+* Lower Left Button Group::     
+* Upper Middle Button Group::   
+* Right Button Group::          
+
 The Techniques
 
 * Cube Assembly::               
@@ -552,7 +570,6 @@ needed to build a cube from your spectral mapping data (including, if you desire
 actual BCDs themselves).  In both cases, we will build a Short-Low order 1 (SL1) cube 
 from the NGC 3049 SINGS data.
 
-@index
 Using background (*bgl) and bad pixel (*bpl) files:
 
 To get going, type:
@@ -592,9 +609,7 @@ and release once at a low and high wavelength to define a peak region,
 and you've just created a spectral map, which should now be displayed in
 the CubeSpec window.
 
-
-@index
-Using a complete cube project (*cpj) file:
+Using a complete cube project @file{.cpj} file:
 
 As above, to get going, type:
 
@@ -1847,16 +1862,19 @@ pixel redundancy built into your map, the greater the number of records
 and record pixels which contributed (also, high-res cubes typically have
 more, since there is overlap among the multiple high-res orders).  The
 information displayed includes the record ID, the pixel within that
-record, the fractional contribution to the cube pixel, the value of the
-BCD pixel (with uncertainty, if available), the value of the background,
-and the difference, along with any pipeline or user set pixel flags (see
-XXX).
+record, the fractional contribution to the cube pixel being backtracked.
+It also lists the value of the BCD pixel (with uncertainty, if
+available), the value of the background, and the @samp{Val-BG}
+difference.  At right is any @samp{BMASK} flag with the same notation as
+the status line (@pxref{CubeView Status Display Line}), augmented by the
+flags @samp{BP} or @samp{BP(1)} for global and record level bad pixels
+(@pxref{Global and Record Level Bad Pixels}).
 
 Simply turn the tool on and mouse around.  The BCDs which contributed to
 the given cube pixel are highlighted in the associated CUBISM Project
 window.  Left-clicking freezes on an individual cube pixel, marking it
 with a green @samp{x}, while right-clicking restores the free motion.
-In the BackTracking window, right clicking on any individual list item
+In the BackTracking window, right-clicking on any individual list item
 allows the associated BCD pixel to be set as a global or record-level
 bad pixel (see XXX).  You can continue to navigate through the cube
 while backtracking is active (see XXX).
@@ -2010,15 +2028,45 @@ Tool}.
 
 Below the display window, a status display line reports the pixel
 position and value (with uncertainty), and depending on the data being
-viewed, either 
+viewed:
 
 @enumerate
-@item (BCD images, see, e.g., @ref{fig:cv_badpix}) Wavelength and order of the cursor position, along
-with a flag code identifying the bad pixel type (see XXX, for
-information on the flag codes).
-@item (Cubes and Visualization Images, e.g. @ref{fig:cv_phot}) 
-Coordinates of the current position from the WCS information.
+@item @strong{BCD images} (see, e.g., @ref{fig:cv_badpix}) Wavelength and order of the cursor position, along
+with a flag code identifying the bad pixel type.
+@item @strong{Cubes and Visualization FITS Images}, 
+(see, e.g. @ref{fig:cv_phot}) Coordinates of the current position from
+the WCS information.
 @end enumerate
+
+The flag code at the far right of the status display line indicates the
+common mask values from the @samp{BMASK} (@code{OR}'d together for
+averages of multiple records):
+
+@table @code
+@item *
+The pixel was flagged in the @samp{PMASK}.
+
+@item S
+The pixel was saturated, but the value was recovered.
+
+@item F
+No flat field was applied to the pixel.
+
+@item R
+The pixel suffered a radhit, but it was corrected.
+
+@item 0
+No samples in the read ramp were valid.
+
+@item 1
+Only one sample in the read ramp was valid.
+@end table
+
+All relevant flags are listed together, and for bit values from the
+@samp{BMASK} not listed here, one or more numeric bit value is listed in
+brackets, like @samp{[2,4]}.  See the
+@uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data Handbook} for a
+reference of the @samp{BMASK} mask bits.
 
 @node CubeView Image Info Block, CubeView WAVSamp Pane, CubeView Status Display Line, CubeView
 @subsection Image Info Block
@@ -2064,7 +2112,7 @@ IRS-specific tools and configuration options.  It is used to view one dimensiona
 @menu
 * CubeSpec Title Bar::          
 * CubeSpec Menus::              
-* CubeSpec Buttons::              
+* CubeSpec Buttons::            
 @end menu
 
 @node CubeSpec Title Bar, CubeSpec Menus, CubeSpec, CubeSpec
@@ -2075,12 +2123,12 @@ displayed.  An example is @samp{CubeSpec: Extracted from ngc2403_extranuc00,[2,1
 This information will change depending on which cube was extracted from.  The same
 information is repeated as the title in the plot.  
 
-@node CubeSpec Menus, CubeSpec Tools, CubeSpec Title Bar, CubeSpec
+@node CubeSpec Menus, CubeSpec Buttons, CubeSpec Title Bar, CubeSpec
 @subsection Menus
 
 @menu
 * CubeSpec File Menu::          
-* CubeSpec Maps Menu::       
+* CubeSpec Maps Menu::          
 @end menu
 
 @node CubeSpec File Menu, CubeSpec Maps Menu, CubeSpec Menus, CubeSpec Menus
@@ -2178,10 +2226,10 @@ by hovering the mouse over the tool button in the tool palette.
 
 
 @menu
-* Upper Left Button Group::
-* Lower Left Button Group::
-* Upper Middle Button Group::
-* Right Button Group::            
+* Upper Left Button Group::     
+* Lower Left Button Group::     
+* Upper Middle Button Group::   
+* Right Button Group::          
 @end menu
 
 @node Upper Left Button Group, Lower Left Button Group, CubeSpec Buttons, CubeSpec Buttons
@@ -2197,7 +2245,7 @@ This button makes the CubeView window show the map image produced from the Upper
 @end table
 
 
-@node Lower Left Button Group, Upper Left Button Group, Upper Middle Button Group, CubeSpec Buttons
+@node Lower Left Button Group, Upper Middle Button Group, Upper Left Button Group, CubeSpec Buttons
 @subsubsection Lower Left Button Group
 
 @table @code
@@ -2215,7 +2263,7 @@ This button tells the Fit button in the Right Button Group how to fit the contin
 
 @end table
 
-@node Upper Middle Button Group, Lower Left Button Group, Right Button Group, CubeSpec Buttons
+@node Upper Middle Button Group, Right Button Group, Lower Left Button Group, CubeSpec Buttons
 @subsubsection Upper Middle Button Group
 
 @table @code
@@ -2237,7 +2285,7 @@ I have no clue what this button is for.
 
 @end table
 
-@node Right Button Group, Upper Middle Button Group,  , CubeSpec Buttons
+@node Right Button Group,  , Upper Middle Button Group, CubeSpec Buttons
 @subsubsection Right Button Group
 
 @table @code
