@@ -319,7 +319,7 @@ pro tvSlice::PlotSlice
   n=n_elements(x) 
   if ptr_valid(self.plotvec) then *self.plotvec=x+y*sz[0] else  $
      self.plotvec=ptr_new(x+y*sz[0])
-  ttl=string(FORMAT='("[",I3,",",I3,"] to [",I3,",",I3,"]")', $
+  ttl=string(FORMAT='("[",I4,",",I4,"] to [",I4,",",I4,"]")', $
              x[0],y[0],x[n-1],y[n-1])
   plot,indgen(n),(*io)[*self.plotvec],xtitle="Slice Index",ytitle='Value',$
        TITLE=ttl,xstyle=16,XMINOR=n lt 10?-1:0
