@@ -7,7 +7,7 @@
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
 @set EDITION 1.0
-@set VERSION 1.13
+@set VERSION 0.99
 @set IDLVERSIONREQUIRED 6.1
 @set DATE June, 2006
 @set AUTHOR J.D. Smith
@@ -65,7 +65,7 @@ license to the document, as described in section 6 of the license.
 @sp 4
 @center @image{images/logo2,,,Cubism Logo}
 
-@author by J.D. Smith and the SINGS team
+@author by J.D. Smith, L. Armus, B. Buckalew, D. Dale, K. Sheth
 @page
 
 This is edition @value{EDITION} of the @cite{CUBISM User Manual} for
@@ -99,10 +99,11 @@ license to the document, as described in section 6 of the license.
 
 @node Top, Introduction, (dir), (dir)
 
-CUBISM is a package written in the Interactive Data Language (IDL),
-which supports the analaysis and reduction of spectral maps created with
-the @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard
-the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
+CUBISM, the CUbe Builder for IRS Spectral Mapping, is a package written
+in the Interactive Data Language (IDL), which supports the analysis and
+reduction of spectral maps created with the
+@uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard the
+@uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
 
 @end ifnottex
 
@@ -159,13 +160,6 @@ Menus
 * CUBISM Project BadPix Menu::  
 * CUBISM Project Info Menu::    
 
-Info Menu
-
-* Data Records::                
-* Project Title::               
-* Menus::                       
-* Button Bar::                  
-
 Data Records
 
 * Record Info::                 
@@ -219,6 +213,7 @@ Cube Assembly
 * Input Files and Calibration::  Backgrounds:: Bad Pixels::
 * Backgrounds::                 
 * Bad Pixels::                  
+* Saving the Project::          
 
 Backgrounds
 
@@ -240,9 +235,9 @@ Tips and Troubleshooting
 @end detailmenu
 @end menu
 
-@c=====================================
-@c============= Chapters
-@c=====================================
+@c =====================================
+@c ============= Chapters
+@c =====================================
 
 
 @c
@@ -253,16 +248,16 @@ Tips and Troubleshooting
 @chapter Introduction
 @cindex Introduction
 
-CUBISM is a package written in the Interactive Data Language (IDL),
-which supports the analysis and reduction of spectral maps created with
-the @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard
-the @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
-CUBISM is designed to allow sets of basic calibrated data (@code{BCDs})
-from IRS mapping observations to be combined into single 3D spectral
-cubes, with two spatial and one spectral dimension.  From these cubes,
-spectra can be extracted over differing apertures, and arbitrary maps
-can be made in spectral features (e.g. a continuum-subtracted line
-image).
+CUBISM, the CUbe Builder for IRS Spectral Mapping, is a package which
+supports the analysis and reduction of spectral maps created with the
+@uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard the
+@uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.  It is
+written in the Interactive Data Language (IDL).  CUBISM is designed to
+allow sets of basic calibrated data (@code{BCDs}) from IRS mapping
+observations to be combined into single 3D spectral cubes, with two
+spatial and one spectral dimension.  From these cubes, spectra can be
+extracted over differing apertures, and arbitrary maps can be made in
+spectral features (e.g. a continuum-subtracted line image).
 
 CUBISM was developed at the University of Arizona by the Spitzer
 Infrared Nearby Galaxies Survey (SINGS) team, in partial fulfillment of
@@ -386,7 +381,7 @@ between IDL versions within a few versions is quite good).
 
 @node Source Installation, Binary Installation, Installation, Installation
 @section Source Installation
-@cindex, Installation, from source
+@cindex Installation, from source
 
 The requirements for installing and running CUBISM from source are:
 
@@ -430,7 +425,7 @@ in a location accessible by your entire group.
 
 @node Binary Installation, Setup, Source Installation, Installation
 @section Binary Installation
-@cindex, Installation, binary
+@cindex Installation, binary
 
 The requirements for CUBISM running as a binary:
 
@@ -493,7 +488,8 @@ distribution, which doesn't suffer such name space conflicts.
 Upgrading CUBISM is as simple as replacing the source or binary
 installation directories and restarting IDL.  You can always find out
 what version of CUBISM you are running with the menu @kbd{Info->About
-Cubism} in the project window.
+Cubism} in the project window.  New versions of CUBISM are available at
+@uref{@value{CUBISMHOMEPAGE}}.
 
 @c
 @c Quick Start Guide   
@@ -595,7 +591,7 @@ tools.
 
 The tools which comprise CUBISM constantly communicate with each other,
 so that updates in one are immediately reflected in the others.  For
-example, when selecting bad pixels @pxref{Bad Pixel Tool}, the bad pixel
+example, when selecting bad pixels (@pxref{Bad Pixel Tool}), the bad pixel
 list for the associated CUBISM Project is immediately updated, or if a
 new list is loaded from file, the viewer is updated.  Similar high level
 communication occurs between all of the sub-tools, so that typically you
@@ -1126,14 +1122,6 @@ assemble the loaded project (if different).
 @end table
 
 
-
-@menu
-* Data Records::                
-* Project Title::               
-* Menus::                       
-* Button Bar::                  
-@end menu
-
 @node Data Records, Status Bar, CUBISM Project Menus, CUBISM Project
 @subsection Data Records
 @cindex Data Records
@@ -1183,9 +1171,7 @@ time zone).
 @itemize @bullet
 @item @samp{t}: The type of data record -- @samp{d} for @samp{DROOPRES},
 @samp{c} for @samp{COADD}, @samp{f} for @samp{FLATAP}, or blank for the
-(by far most common) @code{BCD}.  For information on these other flavors
-of pipeline-produced IRS data see
-@uref{http://ssc.spitzer.caltech.edu/irs/dh/,the IRS Data Handbook}.
+(by far most common) @code{BCD} (@pxref{Record Data Types}).
 
 @item @samp{M}: The module -- @samp{SL}, @samp{SH}, @samp{LL}, or @samp{LH}.
 
@@ -1236,7 +1222,7 @@ mapping @code{BCD} pixels to sky pixels.
 
 @item @code{BPL}
 @tab Whether any record level bad pixels exist for this record
-@pxref{Bad Pixels}.
+(@pxref{Bad Pixels}).
 
 @end multitable
 
@@ -1518,7 +1504,7 @@ which require exclusive control of the mouse inputs, and
 @emph{non-exclusive} tools, any number of which can be active at any
 time.  These two types are separated in the tool palette, with exclusive
 tools grouped at left, and non-exclusive tools grouped at right
-@pxref{fig:cv_recs}.  Selecting an exclusive tool enters a mode of
+(@pxref{fig:cv_recs}).  Selecting an exclusive tool enters a mode of
 operation in which mouse inputs are interpreted by that tool alone.  
 
 Cubeview tools can be toggled on or off by clicking the button,
@@ -1729,8 +1715,8 @@ The image slicing tool's key shortcut is @kbd{l}.
 The statistics tools extends the CubeView window, adding a panel of
 statistics information at the bottom, including mininum/maximum,
 average, median, standard deviations, and 3-sigma trimmed average and
-standard deviation.  Simply create or modify a box region @pxref{Box
-Regions} to view the statistics within that box.  The box region for the
+standard deviation.  Simply create or modify a box region (@pxref{Box
+Regions}) to view the statistics within that box.  The box region for the
 statistics tool is yellow.  An example of the tool's output is show in
 @ref{fig:cv_stats}.
 
@@ -1767,7 +1753,7 @@ The aperture photometry tool's key shortcut is @kbd{p}.
 
 The cube extraction tool is used to extract spectra from rectangular
 regions within a cube, and can only be used when a cube is being
-displayed.  @xref{Box Regions} for more on defining and manipulating a
+displayed.  @xref{Box Regions}, for more on defining and manipulating a
 box region, which is magenta for this tool.  Once an extraction region
 is defined, the spectrum is diplayed in the CubeSpec tool.
 @xref{CubeSpec}.
@@ -1861,8 +1847,8 @@ Handbook} for a reference on the individual mask bits which the IRS
 pipeline applies.  Note that despite being a fatal mask value, bit 8 in
 the @code{BMASK} (not flat fielded) is not marked, since it occurs
 everywhere off the orders.  All @code{BMASK} values, whether marked or
-not, are indicated in the status display line @pxref{CubeView Status Display
-Line}.
+not, are indicated in the status display line (@pxref{CubeView Status Display
+Line}).
 
 When viewing and setting bad pixels in CubeView, the right mouse button
 can be used to cycle through 4 settings controlling which bad pixels are
@@ -1897,7 +1883,7 @@ of pixel values around the cursor position.
 @cindex Order Mask Tool
 
 The order mask tool sets to zero all pixels outside the order, as
-defined by the @code{WAVSAMP} aperture @pxref{WAVSAMP}.  It is useful
+defined by the @code{WAVSAMP} aperture (@pxref{WAVSAMP}).  It is useful
 when checking for bad pixels, and is only available when BCD record data
 are displayed.
 
@@ -1939,13 +1925,13 @@ Coordinates of the current position from the WCS information.
 @subsection Image Info Block
 
 Information on the image being displayed is provided here, the same as
-is shown in the title bar @pxref{CubeView Title Bar}.
+is shown in the title bar (@pxref{CubeView Title Bar}).
 
 @node CubeView WAVSamp Pane,  , CubeView Image Info Block, CubeView
 @subsection WAVSamp Pane
 
 Below the image info block, when a BCD record is being displayed, is the
-@emph{WAVSamp Pane}, where the @code{WAVSAMP} @pxref{WAVSAMP} can be
+@emph{WAVSamp Pane}, where the @code{WAVSAMP} (@pxref{WAVSAMP}) can be
 manipulated.  @kbd{Show} overlays the current @code{WAVSAMP} for the
 current build order, @kbd{Edit} adds handles which can be used to adjust
 either side or end of the @code{WAVSAMP}.  The normalized aperture
@@ -1962,7 +1948,7 @@ Otherwise, all controls change the width, either at one end, or both
 ends together.  @key{Shift}-click and drag moves both sides of the
 aperture at once.
 
-@xref{WAVSAMP} for more information about when and how to edit the
+@xref{WAVSAMP}, for more information about when and how to edit the
 @code{WAVSAMP}.  See @ref{fig:cv_recs} for an example displayed
 @code{WAVSAMP}.
 
@@ -1998,6 +1984,7 @@ spectra, and create maps from spectral cubes.
 * Input Files and Calibration::  Backgrounds:: Bad Pixels::
 * Backgrounds::                 
 * Bad Pixels::                  
+* Saving the Project::          
 @end menu
 
 
@@ -2120,7 +2107,7 @@ records are disabled to avoid having them built into the cube.  Select
 the subset of the first which you want to include in the background, and
 select @kbd{Background->Background Blend->Set and Scale Background
 A...}.  The selected background is displayed, with @samp{BackgroundA}
-indicated in the image info block @pxref{CubeView Image Info Block}.
+indicated in the image info block (@pxref{CubeView Image Info Block}).
 Enter a fiducial background value when prompted.  This value serves as
 the interpolant for determining the weights of the two backgrounds in
 the blend.  For SL data, it is convenient to use the flux measured in
@@ -2189,7 +2176,7 @@ For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
 @end enumerate
 
-@node Bad Pixels,  , Backgrounds, Cube Assembly
+@node Bad Pixels, Saving the Project, Backgrounds, Cube Assembly
 @subsection Bad Pixels
 @cindex Bad Pixels
 @cindex Rogue pixels
@@ -2231,16 +2218,20 @@ pixels is described in Section XX.
  Iterate this process until you can clearly see emisison lines, to the
 point where the viewable pixels are no longer >4 sigma deviations.
 @item
-Save the bad pixel mask.
+ Save the bad pixel mask.
 @item
-Build the cube with this mask.
+ Build the cube with this mask.
 @item
-Inspect each wavelength plane for weird, out-of-place columns/rows.
+ Inspect each wavelength plane for weird, out-of-place columns/rows.
 @item
-Use the backtrack tool to note any additional pixels to be masked.
+ Use the backtrack tool to note any additional pixels to be masked.
 @item
-Finally, extract a 1d spectrum and look for spikes that aren't lines.
+ Finally, extract a 1d spectrum and look for spikes that aren't lines.
 @end enumerate
+
+@node  Saving the Project,  , Bad Pixels, Cube Assembly
+@subsection Saving the Project
+@cindex Saving Projects
 
 
 @node  Cube Analysis, Cube Validation, Cube Assembly, The Techniques
@@ -2561,15 +2552,15 @@ information to the SSC helpdesk to allow them to investigate the
 problem, enable debugging with @kbd{Info->Debug Cubism} in the CUBISM
 Project window.  This requires access to the IDL command line, which
 will not be available for versions of CUBISM running under the IDLVM
-@pxref{Binary Installation}.  After enabling debugging, repeat the
+(@pxref{Binary Installation}).  After enabling debugging, repeat the
 action which generated the error.  Instead of trapping the error with a
 prompt, IDL will halt, with a full traceback message showing the exact
 code path which led to the error.  This code path might be enough to
 give you a hint as to the nature of the problem, but is also useful for
 the upstream maintainers for debugging purposes.  
 
-Report problems to @url{mailto:help@spitzer.caltech.edu,the SSC Help
-Desk}, including, at minimum:
+Report problems to @url{mailto:help@@spitzer.caltech.edu,the SSC Help Desk},
+including, at minimum:
 
 @enumerate
 @item A brief statement of the problem.
