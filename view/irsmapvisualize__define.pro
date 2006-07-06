@@ -56,7 +56,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2005 J.D. Smith
+;  Copyright (C) 2005, 2006 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -174,8 +174,10 @@ pro IRSMapVisualize::Message, msg
            return
         endif else self->Enable
         ;; Cube or visualize mode
-        if ptr_valid(msg.astrometry) then $
+        if ptr_valid(msg.astrometry) then begin 
            self.astrometry=ptr_new(*msg.astrometry)
+           self->UpdateMapRecords
+        endif 
         if self.cube ne msg.cube then begin 
            self.cube=msg.cube
            if self->On() then $
