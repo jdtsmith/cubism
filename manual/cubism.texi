@@ -6,10 +6,10 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.0
+@set EDITION 1.1
 @set VERSION 0.99
 @set IDLVERSIONREQUIRED 6.1
-@set DATE June, 2006
+@set DATE July, 2006
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jdsmith@@as.arizona.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -65,7 +65,9 @@ license to the document, as described in section 6 of the license.
 @sp 4
 @center @image{images/logo2,,,Cubism Logo}
 
-@author by J.D. Smith, L. Armus, B. Buckalew, D. Dale, K. Sheth
+@author{by J.D. Smith, Lee Armus, Brent Buckalew, Danny Dale,}
+@author{@w{ } @w{ } @w{ }George Helou, Helene Roussel & Kartik Sheth}
+
 @page
 
 This is edition @value{EDITION} of the @cite{CUBISM User Manual} for
@@ -227,7 +229,9 @@ Backgrounds
 
 Bad Pixels
 
-* Selecting/Defining Bad Pixels::  
+* Global and Record Level Bad Pixels::  
+* Automatic Bad Pixels::        
+* Tips for Selecting Bad Pixels::  
 
 Tips and Troubleshooting
 
@@ -454,7 +458,7 @@ prevent access to the command line.
 
 @node Setup, Upgrading, Binary Installation, Installation
 @section Setup
-@cindex Setting CUBISM Up
+@cindex Setting CUBISM up
 
 CUBISM needs very little setup.  As long as the binary or source file
 structure is left intact, CUBISM auto-discovers all the necessary
@@ -569,7 +573,7 @@ analysis.
 
 @node The Tools, The Techniques, Quick Start Guide, Top
 @chapter The Tools
-@cindex Cubism Tools
+@cindex Cubism tools
 
 Cubism consists of three main components, which are used together for
 building and analyzing spectral cubes: CUBISM Project, CubeView, and
@@ -602,7 +606,7 @@ in a single, consistent state.
 
 @node General Interface Tips, CUBISM Project, Tool Inter-Communication, The Tools
 @section General Interface Tips
-@cindex Interface Tips
+@cindex Interface tips
 
 The interactive component of CUBISM is based on IDL widgets, which, at
 least on the Unix/OSX systems where CUBISM is tested, are derived from
@@ -677,7 +681,7 @@ See the documentation for these tools for more information.
 @node CUBISM Project, CubeView, General Interface Tips, The Tools
 @section CUBISM Project
 @cindex Project, CUBISM
-@cindex CUBISM Project
+@cindex CUBISM project
 
 The CUBISM Project is the central storehouse of all information relating
 to a single spectral cube.  This is where the raw spectral data are
@@ -724,7 +728,7 @@ an example CUBISM Project window, populated with a mapping data set:
 
 @node Project Title, CUBISM Project Menus, CUBISM Project, CUBISM Project
 @subsection Project Title
-@cindex Title Bar, Project
+@cindex Title bar, project
 
 The titlebar of the CUBISM Project encodes the name of the project,
 surrounded by @samp{*}, if there are unsaved changes, as well as the
@@ -741,8 +745,8 @@ convention usually they are kept similar or the same.
 
 @node CUBISM Project Menus, Data Records, Project Title, CUBISM Project
 @subsection Menus
-@cindex Project Window Menus
-@cindex Menus, Project Window
+@cindex Project window menus
+@cindex Menus, project window
 
 Most of the options for assembling and saving information from the cube
 are available from the menus of CUBISM Project, which are documented
@@ -760,7 +764,7 @@ here in order of their appearance.
 
 @node CUBISM Project File Menu, CUBISM Project Edit Menu, CUBISM Project Menus, CUBISM Project Menus
 @subsubsection File Menu
-@cindex File Menu, CUBISM Project
+@cindex File menu, CUBISM project
 
 @table @code
 @item New...
@@ -819,7 +823,7 @@ Close the project window, prompting to save if changes have been made.
 
 @node CUBISM Project Edit Menu, CUBISM Project Record Menu, CUBISM Project File Menu, CUBISM Project Menus
 @subsubsection Edit Menu
-@cindex Edit Menu, CUBISM Project
+@cindex Edit menu, CUBISM project
 
 @table @code
 @item Select All
@@ -846,7 +850,7 @@ another string.
 
 @node CUBISM Project Record Menu, CUBISM Project Cube Menu, CUBISM Project Edit Menu, CUBISM Project Menus
 @subsubsection Record Menu
-@cindex Record Menu, CUBISM Project
+@cindex Record menu, CUBISM project
 
 @table @code
 @item Add Data...
@@ -962,7 +966,7 @@ Load an alternate image for visualizing AORs.
 
 @node CUBISM Project Cube Menu, CUBISM Project Background Menu, CUBISM Project Record Menu, CUBISM Project Menus
 @subsubsection Cube Menu
-@cindex Cube Menu, CUBISM Project
+@cindex Cube menu, CUBISM project
 
 @table @code
 @item Build Cube
@@ -1016,7 +1020,7 @@ Show the WAVSAMP apertures used for the various orders.
 
 @node CUBISM Project Background Menu, CUBISM Project BadPix Menu, CUBISM Project Cube Menu, CUBISM Project Menus
 @subsubsection Background Menu
-@cindex Background Menu, CUBISM Project
+@cindex Background menu, CUBISM project
 
 @table @code
 @item Set Background from Rec(s)...
@@ -1073,7 +1077,7 @@ Remove any loaded 1D background spectrum.
 
 @node CUBISM Project BadPix Menu, CUBISM Project Info Menu, CUBISM Project Background Menu, CUBISM Project Menus
 @subsubsection BadPix Menu
-@cindex BadPix Menu, CUBISM Project
+@cindex BadPix menu, CUBISM project
 
 @table @code
 @item Load Bad Pixels...
@@ -1110,7 +1114,7 @@ records, prompting for detection parameters.
 
 @node CUBISM Project Info Menu,  , CUBISM Project BadPix Menu, CUBISM Project Menus
 @subsubsection Info Menu
-@cindex Info Menu, CUBISM Project
+@cindex Info menu, CUBISM project
 
 @table @code
 @item Project Parameters...
@@ -1136,9 +1140,8 @@ assemble the loaded project (if different).
 
 @node Data Records, Status Bar, CUBISM Project Menus, CUBISM Project
 @subsection Data Records
-@cindex Data Records
-@cindex @samp{BCD} Records
-@cindex Record Information
+@cindex Data records
+@cindex @samp{BCD} records
 
 A CUBISM projects holds all of the data records (often called simply
 @emph{BCDs} --- see below) necessary for building a given cube.  The
@@ -1157,7 +1160,7 @@ each record holds (optionally) the associated uncertainty frame, and the
 
 @node Record Info, Record Enabled State, Data Records, Data Records
 @subsubsection Record Info
-@cindex Record Information
+@cindex Record information
 
 A variety of information is shown for each record, and the records can
 be sorted by individual columns clicking on the column's header.  The
@@ -1244,8 +1247,8 @@ RA, click @samp{RA}.
 
 @node Record Enabled State, Record Data Types, Record Info, Data Records
 @subsubsection Record Enabled State
-@cindex Enabled, Records
-@cindex Disabled, Records
+@cindex Enabled, records
+@cindex Disabled, records
 
 All data records can either be @emph{enabled} or @emph{disabled}.
 Disabled records have lines drawn through them in the project display
@@ -1259,9 +1262,9 @@ fail.
 
 @node Record Data Types, Operating on Records, Record Enabled State, Data Records
 @subsubsection Record Data Types
-@cindex BCD
-@cindex FlatAp
-@cindex DroopRes
+@cindex @samp{BCD}
+@cindex @samp{FlatAp}
+@cindex @samp{DroopRes}
 
 The IRS pipeline produces a variety of different types of output
 spectral data with differing levels of processing applied.  The standard
@@ -1280,7 +1283,7 @@ inclusive of the other, less commonly used files types (@samp{FlatAp},
 
 @node Operating on Records,  , Record Data Types, Data Records
 @subsubsection Operating on Records
-@cindex Record Operations
+@cindex Record operations
 
 Individual records or groups of records can be examined for header
 information, renamed, deleted, enabled/disabled, viewed as an individual
@@ -1301,8 +1304,8 @@ records, etc.
 
 @node Button Bar,  , Status Bar, CUBISM Project
 @subsection Button Bar
-@cindex Project Window Buttons
-@cindex Buttons, Project Window
+@cindex Project window buttons
+@cindex Buttons, project window
 
 The button bar at the base of the CUBISM Project window provides
 convenient access to common functions, also available with menu options
@@ -1342,8 +1345,8 @@ Close the current project, prompting to save any unsaved changes.
 @node CubeView, CubeSpec, CUBISM Project, The Tools
 @section CubeView
 @cindex CubeView
-@cindex Viewing Cubes
-@cindex Viewing Maps
+@cindex Viewing cubes
+@cindex Viewing maps
 
 
 The CubeView tool is a custom viewer, with general purpose as well as
@@ -1387,7 +1390,7 @@ block.
 
 @node CubeView File Menu, CubeView Options Menu, CubeView Menus, CubeView Menus
 @subsubsection File Menu
-@cindex File Menu, CubeView
+@cindex File menu, CubeView
 
 @table @code
 @item Save as PNG...
@@ -1412,7 +1415,7 @@ Close the viewer Window
 
 @node CubeView Options Menu, CubeView Tools Menu, CubeView File Menu, CubeView Menus
 @subsubsection Options Menu
-@cindex Options Menu, CubeView
+@cindex Options menu, CubeView
 
 @table @code
 @item Colormaps
@@ -1461,7 +1464,7 @@ zoom (up to the size of the monitor).
 
 @node CubeView Tools Menu,  , CubeView Options Menu, CubeView Menus
 @subsubsection Tools Menu
-@cindex Tools Menu, CubeView
+@cindex Tools menu, CubeView
 
 The tools menu provides an alternative means of selecting among the
 viewer tools in the tool palette at the top of the CubeView viewer
@@ -1470,7 +1473,7 @@ window.  @xref{CubeView Tools}.
 @node CubeView Tools, CubeView Colorbar, CubeView Menus, CubeView
 @subsection CubeView Tools
 @cindex Tools, CubeView
-@cindex Tool Palette, CubeView
+@cindex Tool palette, CubeView
 
 
 The viewer offers a number of individual tools for interacting with the
@@ -1638,7 +1641,7 @@ Compass Rose is disabled except with cubes and visualization images
 
 @node Zoom Tool, Histogram Tool, Tool Overview, CubeView Tools
 @subsubsection Zoom Tool
-@cindex Zooming Images
+@cindex Zooming images
 
 The zoom tool allow arbitrary zooming in on image regions.  By default,
 images are display at the maximum zoom which fits the entire image in
@@ -1658,8 +1661,8 @@ The zoom tool's key shortcut is @kbd{z}.
 
 @node Histogram Tool, Color Tool, Zoom Tool, CubeView Tools
 @subsubsection Histogram Tool
-@cindex Histogram Tool
-@cindex Image Scaling
+@cindex Histogram tool
+@cindex Image scaling
 
 The histogram tool is actually an image rescaling tool.  It allows you
 to identify a region of the image, and re-scale the image to emphasize
@@ -1695,8 +1698,8 @@ The color tool's key shortcut if @kbd{c}.
 
 @node Image Slicing Tool, Box Statistics Tool, Color Tool, CubeView Tools
 @subsubsection Image Slicing Tool
-@cindex Image Slicing Tool
-@cindex Slicer Tool
+@cindex Image slicing tool
+@cindex Slicer tool
 
 
 
@@ -1718,8 +1721,8 @@ The image slicing tool's key shortcut is @kbd{l}.
 
 @node Box Statistics Tool, Aperture Photometry Tool, Image Slicing Tool, CubeView Tools
 @subsubsection Box Statistics Tool
-@cindex Box Statistics Tool
-@cindex Statistics, Image
+@cindex Box statistics tool
+@cindex Statistics, image
 
 @float Figure,fig:cv_stats
 @center @image{images/cubeview_stats,4.332in,,CubeView Statistics Example}
@@ -1739,8 +1742,8 @@ The box statistics tool's key shortcut is @kbd{s}.
 
 @node Aperture Photometry Tool, Cube Extraction Tool, Box Statistics Tool, CubeView Tools
 @subsubsection Aperture Photometry Tool
-@cindex Photometry, Aperture
-@cindex Aperture Photometry Tool
+@cindex Photometry, aperture
+@cindex Aperture photometry tool
 
 @float Figure,fig:cv_phot
 @center @image{images/cubeview_phot,4.332in,,CubeView Photometry Example}
@@ -1776,8 +1779,8 @@ The cube extraction tool's key shortcut is @kbd{x}.
 
 @node Pixel Backtracking Tool, Bad Pixel Tool, Cube Extraction Tool, CubeView Tools
 @subsubsection Pixel Backtracking Tool
-@cindex Backtracking Tool
-@cindex Pixel Backtracking
+@cindex Backtracking tool
+@cindex Pixel backtracking
 
 @float Figure,fig:cv_backtrack
 @center @image{images/cubeview_backtrack,6in,,CubeView Backtrack Window}
@@ -1813,7 +1816,7 @@ The pixel backtracking tool's key shortcut is @kbd{t}.
 
 @node Bad Pixel Tool, AOR Visualization Tool, Pixel Backtracking Tool, CubeView Tools
 @subsubsection Bad Pixel Tool
-@cindex Bad Pixel Tool
+@cindex Bad pixel tool
 
 @float Figure,fig:cv_badpix
 @center @image{images/cubeview_badpix,4.332in,,CubeView Bad Pixel Display}
@@ -1889,7 +1892,7 @@ The bad pixel tool's key shortcut is @kbd{b}.
 @node AOR Visualization Tool, Pixel Table Tool, Bad Pixel Tool, CubeView Tools
 @subsubsection AOR Visualization Tool
 @cindex Visualizing AORs
-@cindex AOR Visualization
+@cindex AOR visualization
 
 It can be useful to look at a graphical representation of the AOR layout
 as observed on top of an image.  The Visualization tool can be activated
@@ -1919,14 +1922,14 @@ M51, with 13 records selected.}
 
 @node Pixel Table Tool, Order Mask Tool, AOR Visualization Tool, CubeView Tools
 @subsubsection Pixel Table Tool
-@cindex Pixel Table Tool
+@cindex Pixel table tool
 
 The pixel table tool can be activated at any time, and displays a group
 of pixel values around the cursor position.
 
 @node Order Mask Tool, Compass Rose Tool, Pixel Table Tool, CubeView Tools
 @subsubsection Order Mask Tool
-@cindex Order Mask Tool
+@cindex Order mask tool
 
 The order mask tool sets to zero all pixels outside the order, as
 defined by the @samp{WAVSAMP} aperture (@pxref{WAVSAMP}).  It is useful
@@ -1935,7 +1938,7 @@ are displayed.
 
 @node Compass Rose Tool,  , Order Mask Tool, CubeView Tools
 @subsubsection Compass Rose Tool
-@cindex Compass Rose Tool
+@cindex Compass rose tool
 
 The compass rose draws NE compass lines on images data with available
 astrometry (cubes, maps, and visualization images).
@@ -1953,7 +1956,7 @@ Tool}.
 
 @node CubeView Status Display Line, CubeView Image Info Block, CubeView Colorbar, CubeView
 @subsection Status Display Line
-@cindex Status Line, CubeView
+@cindex Status line, CubeView
 
 Below the display window, a status display line reports the pixel
 position and value (with uncertainty), and depending on the data being
@@ -2004,7 +2007,7 @@ aperture at once.
 @node CubeSpec,  , CubeView, The Tools
 @section CubeSpec
 @cindex CubeSpec
-@cindex Spectra, Viewing
+@cindex Spectra, viewing
 
 CubeSpec is the tool which permites viewing and manipulating extracted
 spectra, and create maps from spectral cubes.
@@ -2024,7 +2027,7 @@ spectra, and create maps from spectral cubes.
 
 @node Cube Assembly, Cube Analysis, The Techniques, The Techniques
 @section Cube Assembly
-@cindex Cube Assembly
+@cindex Cube assembly
 
 @menu
 * Input Files and Calibration::  Backgrounds:: Bad Pixels::
@@ -2076,7 +2079,7 @@ quality of the assembled cube, especially for faint sources.}
 
 @node In Situ Background, Archive Background, Backgrounds, Backgrounds
 @subsubsection In Situ Background
-@cindex Background, In Situ
+@cindex Background, in situ
 
 The primary and recommended technique for assembling a background frame
 is to use dedicated background observations you scheduled along with
@@ -2105,7 +2108,7 @@ found.
 
 @node Archive Background, Background Blend, In Situ Background, Backgrounds
 @subsubsection Archive Background
-@cindex Background, Archive
+@cindex Background, archive
 
 If you didn't obtain dedicated sky observations, and none of the records
 in your map are free from source emission, you can still recover 2D
@@ -2134,7 +2137,7 @@ requires waiting for the proprietary period to expire.
 
 @node Background Blend, 1D Sky Spectrum Background, Archive Background, Backgrounds
 @subsubsection Background Blend
-@cindex Background, Blended
+@cindex Background, blended
 
 A related technique to the archive background is the ``Background
 Blend'', useful if a set of observations from the archive which closely
@@ -2169,7 +2172,7 @@ source position and date, as available in Spot.
 
 @node 1D Sky Spectrum Background, No Background, Background Blend, Backgrounds
 @subsubsection 1D Sky Spectrum
-@cindex Sky, 1D Spectrum
+@cindex Sky, 1D spectrum
 
 If no 2D BCD-level data are available for subtraction, some of the same
 benefits can be obtained by specifying a 1D spectrum to subtract from
@@ -2194,7 +2197,7 @@ assembled cube, which may affect analysis of extracted spectra or maps.
 
 @node Background Selection Using Visualization,  , No Background, Backgrounds
 @subsubsection Background Selection Using Visualization
-@cindex Visualization, Background Selection
+@cindex Visualization, background selection
 
 It can be convenient to select suitable records for inclusion in the
 background frame by using the AOR visualization of an IRAC or MIPS (or
@@ -2225,17 +2228,30 @@ using @kbd{Background->Save Background Recs...}.
 
 @node Bad Pixels, Saving the Project, Backgrounds, Cube Assembly
 @subsection Bad Pixels
-@cindex Bad Pixels
+@cindex Bad pixels
 @cindex Rogue pixels
 
 
 
 @menu
-* Selecting/Defining Bad Pixels::  
+* Global and Record Level Bad Pixels::  
+* Automatic Bad Pixels::        
+* Tips for Selecting Bad Pixels::  
 @end menu
 
-@node Selecting/Defining Bad Pixels,  , Bad Pixels, Bad Pixels
-@subsubsection Selecting/Defining Bad Pixels
+@node Global and Record Level Bad Pixels, Automatic Bad Pixels, Bad Pixels, Bad Pixels
+@subsubsection Global and Record Level Bad Pixels
+
+The difference.
+
+@node Automatic Bad Pixels, Tips for Selecting Bad Pixels, Global and Record Level Bad Pixels, Bad Pixels
+@subsubsection Automatic Bad Pixels
+
+Weasel words, caveats, etc.  Best practices.  Redundancy is key.
+
+
+@node Tips for Selecting Bad Pixels,  , Automatic Bad Pixels, Bad Pixels
+@subsubsection Tips for Selecting Bad Pixels
 
 Bad pixels can be identified in CUBISM either 'manually' or in an
 automatic fashion.  The procedure for automatically identifying bad
@@ -2245,14 +2261,17 @@ pixels is described in Section XX.
 @item
  View the stack of relevant @samp{BCDs}.
 @item
- Show the wavsamp.
+ Show the @samp{WAVSAMP}.
 @item
- Click @samp{BGSub} (if available) to remove many bad pixels using the
- sky background data previously defined.
+ Click @samp{BGSub} (if available) to remove the appearance many bad
+ pixels using the record level sky background data previously defined
+ @pxref{Backgrounds}.
 @item
- Enlarge the stack viewer to the largest possible perspective.
+ Enlarge the stack viewer to the largest possible size @pxref{CubeView
+ Options Menu}.
 @item
- Show the current (cyan) bad pixel mask.
+ Show the user (cyan) bad pixel and pipeline fatal (red) masks only, by
+ right-clicking two times.
 @item
  Set the scaling stretch to show just the very brightest pixels.
 @item
@@ -2278,7 +2297,7 @@ point where the viewable pixels are no longer >4 sigma deviations.
 
 @node  Saving the Project,  , Bad Pixels, Cube Assembly
 @subsection Saving the Project
-@cindex Saving Projects
+@cindex Saving projects
 
 Saving the project to a @file{.cpj} project file records all of the
 information presented in a CUBISM Project window, including data
@@ -2346,7 +2365,7 @@ record data isn't necessary.
 
 @node  Cube Analysis, Cube Validation, Cube Assembly, The Techniques
 @section Cube Analysis
-@cindex Cube Analysis
+@cindex Cube analysis
 
 @subsection Extracting 1D Spectra
 
@@ -2462,7 +2481,7 @@ these maps are pseudo filter images, and are not continuum-subtracted.
 
 @node  Cube Validation, Cookbook, Cube Analysis, The Techniques
 @section Cube Validation
-@cindex Cube Validation
+@cindex Cube validation
 
 A description of backtracking and other means of validating and
 improving the cube, and checking on weak features, etc.
