@@ -329,6 +329,8 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
   ;; BCD=0 was passed
   if n_elements(mode) eq 0 AND n_elements(bcd) ne 0 then begin 
      if self.mode ge 2 then self.mode=0 ;go to full by default
+     ;; Or if stack mode no longer connected to a ViewSpec
+     if self.mode eq 1 && ~obj_valid(self.oView) then self.mode=0
   endif                         ; otherwise, just leave it the same
   
   if n_elements(mode) ne 0 then begin
@@ -348,13 +350,16 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
      if self.mode eq 2 then begin ;bcd mode
         self.oAper->On 
         self.oVis->Off,/RESET,/NO_REDRAW,/DISABLE
+        self->MsgSignup,self.oVis,/NONE
      endif else begin           ;visualize mode
         self.oAper->Off,/RESET,/NO_REDRAW
         self.oVis->On
+        self->MsgSignup,self.oVis,/CUBEREC_UPDATE
      endelse 
   endif else begin              ; A cube mode: full or stack
      if ~self->Enabled() then self->Enable ;need the extraction tool
-     self.oVis->Off
+     self.oVis->Off,/RESET,/NO_REDRAW,/DISABLE
+     self->MsgSignup,self.oVis,/NONE
      if obj_valid(self.oView) then $
         self.oView->MsgSignup,self,/CUBEVIEWSPEC_STACK,/CUBEVIEWSPEC_FULL, $
                               /CUBEVIEWSPEC_SAVE
@@ -665,7 +670,7 @@ function CubeRec::Init,oDraw,parent,CUBE=cube,APER_OBJECT=aper, $
   base=widget_base(self.wBase[0],/ROW,SPACE=1,/BASE_ALIGN_LEFT) 
   b1=widget_base(base,/ROW,SPACE=1) 
   lab=widget_label(b1,value='Wave:')
-  self.wLambda=widget_combobox(b1,/DYNAMIC_RESIZE,XSIZE=80)
+  self.wLambda=widget_combobox(b1,VALUE=['00.0000'])
   b2=widget_base(base,/COLUMN,SPACE=1,/BASE_ALIGN_CENTER,/FRAME)
   self.wBrowse=cw_bgroup(b2,['Prev','Next','Play'],/ROW, $
                          /NO_RELEASE,IDS=ids)
@@ -709,7 +714,7 @@ function CubeRec::Init,oDraw,parent,CUBE=cube,APER_OBJECT=aper, $
                        EVENT_PRO='cuberec_event', $
                        UVALUE={self:self,method:'Export',event:0})
      self.wExtractRegionBut=widget_button(menu, $
-                                          value='Extract Region From File...',$
+                                          value='Extract Region from File...',$
                                           EVENT_PRO='cuberec_event', $
                                           UVALUE={self:self, $
                                                   method:'ExtractFileRegion', $
