@@ -90,12 +90,14 @@ end
 ;=============================================================================
 pro IRS_Spectrum::GetProperty,REGION=region,WAVE_UNITS=wu, $
                               WAVELENGTH=wl, SPECTRUM_FLUX=flux, $
-                              SPECTRUM_UNCERTAINTY=unc,_REF_EXTRA=e
+                              SPECTRUM_UNCERTAINTY=unc,FLUX_UNITS=fu, $
+                              _REF_EXTRA=e
   if arg_present(wu) then wu=self.wave_units
   if arg_present(region) then region=self.region
   if arg_present(wl) && ptr_valid(self.wavelength) then wl=*self.wavelength
   if arg_present(flux) && ptr_valid(self.flux) then flux=*self.flux
   if arg_present(unc) && ptr_valid(self.unc) then unc=*self.unc
+  if arg_present(fu) then fu=self.flux_units
   self->IRS_File_IO::GetProperty,_EXTRA=e
 end
 
