@@ -111,7 +111,7 @@ pro IRS_Cube::InitHeader
      putast,*self.hdr,*self.astrometry,CD_TYPE=0
   
   ;; Wavelength coordinates and wavelength LUT binary table extension.
-  self->AddPar,'CD3_3', 1,' Index Separation in wavelength table'
+  self->AddPar,'PC3_3', 1,' Index Separation in wavelength table'
   self->AddPar,'CRPIX3',1,' Reference pixel'
   self->AddPar,'CRVAL3',1,' Table index for reference pixel'
   self->AddPar,'CTYPE3','WAVE-TAB',' Wavelength'
