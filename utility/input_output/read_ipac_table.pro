@@ -157,6 +157,7 @@ function read_ipac_table,file, hdr,UNITS=units
                  2: begin       ;units
                     units=tok
                  end 
+                 else: ;just skip other column header rows
               endcase 
            end 
            else: begin 
