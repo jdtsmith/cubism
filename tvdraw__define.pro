@@ -361,7 +361,7 @@ pro tvDraw::SetProperty, IMORIG=io,DISPSIZE=ds,OFFSET=off, $
   ;;  By default, don't send out PREDRAWs: original image may not change.
   pre=0                        
   if n_elements(off) ne 0 then $
-     if NOT array_equal(self.offset,off) then begin 
+     if ~array_equal(self.offset,off) then begin 
      draw=1
      self.offset=off
   endif 
@@ -665,7 +665,7 @@ end
 ;         quickly in one pass.
 ;=============================================================================
 pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
-  if NOT ptr_valid(self.imorig) then return ;gotta have something there.
+  if ~ptr_valid(self.imorig) then return ;gotta have something there.
   if n_elements(pre) eq 0 then pre=1
   db=keyword_set(db) 
   
