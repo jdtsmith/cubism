@@ -2247,9 +2247,117 @@ Finally, extract a 1d spectrum and look for spikes that aren't lines.
 @section Cube Analysis
 @cindex Cube Analysis
 
-A description of cube extraction, map making, map sets, line fitting,
-etc.
+@subsection Extracting 1D Spectra
 
+Extracting 1D spectra from the cube, and building 2D line, continuum, or
+feature maps are straightforward using the CUBISM interface.  After the
+cube has been built, and all bad pixels have been identified, make sure to
+save your cube project file (again).  To generate a 1D spectrum, you must
+first identify the spatial region over which the spectrum is to be
+averaged.  This can be done in one of two ways.  You can either read in a
+region file (actually the region is read from the headers of a saved ``tbl"
+spectrum file) from a previous analysis session (created, for example, from
+a different IRS module used to map the same target), or you can use the
+``Extract Spectra and Stack Cubes" tool to define a new region with the
+mouse.  We will discuss each of these in turn.
+
+In order to use a saved region file, simply go to the ``File" menu
+pulldown, and select ``Extract Region from File...".  This will then pop up
+a menu from which you can select your region file.  Once this is done, the
+spatial region will be displayed on your current cube in the CubeView
+window, and a spectrum will automatically appear in a new CubeSpec window.
+This spectrum is the average spectrum over the region in your current cube,
+defined by the save region file you have selected.  The name of this file
+appears at the top of the CubeSpec window.  The new spectrum can now be
+saved by using the ``File" menu pulldown in the CubeSpec window, and
+selecting ``Save Spectrum As...", and entering a filename (tbl file) at the
+prompt.  This is a common practice, for example, if you are examining a
+Short-Low second order (SL2) cube, and want to extract a spatial region
+defined on your Short-Low first order (SL1) cube so that the SL1 and SL2
+spectra cover the same spatial region on your science target.  This can
+also be used to extract Long-Low spectra using a region defined in the SL1
+or SL2 cubes, thus obtaining a complete spectrum over a singe,
+psuedo-aperture in the map.  Since Spitzer is diffraction-limited beyond
+about $6\mu$m, and the IRS modules have different pixel scales, users
+should be very careful here to avoid defining critically-samples regions at
+the shortest wavelengths, then using these to extract spectra from maps
+with significantly larger beam sizes.  This may result in long-wavelength
+spectra generated over areas smaller than the beam.  If you read in a
+region that is larger than your current cube, and you attempt to extract a
+spectrum over this region, CUBISM will produce a pop-up warning message.
+In this case, the problem will be obvious, as the extraction aperture will
+extend beyond the edges of your cube in the CubeView window.  You can still
+generate the spectrum and save it to disk, but you should probably select a
+smaller aperture if you are attempting to compare or stitch spectra across
+IRS modules.
+
+In order to extract a 1D spectrum from the cube over a new region, go to
+the Tools pulldown menu and choose ``Extract Spectra and Stack Cubes" (or
+simply click on the Extract Spectra icon in the menu bar of the CubeView
+window (the 7th button from the left).  Once this is active, a rectangular
+region will appear on the cube, which you can drag (by holding down the
+left mouse button inside the region) or expand (by holding down the left
+mouse button on the lower right corner of the region), and a spectrum will
+appear in the CubeSpec window.  If the CubeSpec window was already open,
+the spectrum will change to reflect your newly-defined region, and the area
+(in pixels) is displayed at the top of the CubeSpec window.  If the
+CubeSpec window was not open, it will pop up and display your new 1D
+spectrum.  When you move or resize the region, the spectrum (which is an
+average over that area) will change.  The 1D spectrum can be saved to a tbl
+file on disk at any time.  This is an excellent way to quickly see how the
+IRS spectrum of your source changes with position over the cube.  Any tbl
+file that you save in this step, can also be used to set the region for
+another cube which you make later (as described above).
+
+@subsection Creating 2D Maps
+
+Just the cube can be used to generate 1D spectra over any extraction
+region, so too can the 1D spectra be used to create 2D images (slices of
+the cube) over any specified wavelength interval.  Once a 1D spectrum is
+visible in the CubeSpec window, change the selection from ``Full Cube" to
+``Map".  Once ``Map" is selected, the button in the middle of the window
+will become active.  This button provides a single choice of ``continuum"
+or ``peak", allowing the user to define the continuum or peak regions in
+the spectrum for generation of the map.  If you wish to say, create a
+continuum-subtracted $11.3\mu$m PAH map from a SL1 cube, you can first use
+the mouse to define the continuum on either side of the PAH feature by
+selecting ``Continuum" and clicking (with the left button) two pairs of
+spectral regions on either side of the emission feature.  The continuum
+regions will turn red after selection.  You can have any number of
+continuum regions of any arbitrary size in wavelength.
+
+Once the continuum regions are defined, change the selection to ``Peak",
+and select the emission feature with the mouse in the same way.  If making
+an emission-line map, select at least three or more pixels around the peak
+of the line.  Once the peak region is selected, it will turn (a lighter
+shade of) red, and the image in the CubeView window will change.  This is
+now the continuum-subtracted map of your science target.  Cubism has taken
+the average of the two continuum points, and subtracted this value from the
+line emission at every point in the cube.  To save this map, simply go to
+the ``File" pulldown menu, and select ``Save Map as FITS".  The FITS file
+saved in this manner has all the required header keywords to be read into
+the common FITS readers (e.g. DS9), displayed, and aligned with any other
+FITS image of your science target.  Using the CubeSpec window, any number
+of spectral regions can be defined and used to make FITS images, which can
+then be saved in the CubeView window.
+
+Note that the CubeSpec window can also be used to measure simple line
+parameters before or after the line map is made.  By selecting the ``Fit"
+button, a polynomial fit, as defined by the ``Fit Order" button, will be
+performed between the continuum points, and the basic parameters (e.g. line
+equivalent width, line flux, average continuum flux density, etc.), will be
+displayed in the box in the upper right of the CubeSpec menu.  By clicking
+on the ``Reset Plot" button, all the continuum and peak selections will be
+erased, and new spectral regions, and their corresponding spectral maps,
+can be defined.
+
+Besides user-defined maps, Cubism has a number of pre-defined filter curves
+available under the ``Maps" pulldown menu in the CubeSpec window.  This will 
+allow you to generate spectral maps in, for example, any the IRAC-5.8, IRAC-8,
+MIPS-24, IRS Peakup, ISOCAM LW2 or LW3 filters.  Once selected, the spectral
+ranges will be highlighted on the 1D spectrum in the CubeSpec window, and the 
+image in the CubeView window will change to the corresponding 2D map.  Note, 
+these maps are pseudo filter images, and are not continuum-subtracted.
 
 @node  Cube Validation, Cookbook, Cube Analysis, The Techniques
 @section Cube Validation
