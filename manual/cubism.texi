@@ -143,6 +143,7 @@ General Interface Tips
 * List Selection::              
 * Scrolling::                   
 * Mouse Shortcuts::             
+* File Selection::              
 
 CUBISM Project
 
@@ -177,7 +178,7 @@ CubeView
 * CubeView Colorbar::           
 * CubeView Status Display Line::  
 * CubeView Image Info Block::   
-* CubeView WAVSamp Pane::       
+* CubeView WAVSAMP Pane::       
 
 Menus
 
@@ -225,6 +226,7 @@ CubeSpec Buttons
 The Techniques
 
 * Cube Assembly::               
+* WAVSAMP::                     
 * Cube Analysis::               
 * Cube Validation::             
 * Cookbook::                    
@@ -378,8 +380,8 @@ version; no need to install external libraries.
 @item
 No routine name conflicts should occur.
 @item 
-Can be used with the freely available @emph{IDL VM}, if you don't have
-access to an IDL license.
+Can be used (sans command line) with the freely available @emph{IDL VM},
+if you don't have access to an IDL license.
 @end itemize
 
 
@@ -476,16 +478,18 @@ prevent access to the command line.
 
 @node Setup, Upgrading, Binary Installation, Installation
 @section Setup
-@cindex Setting CUBISM up
+@cindex Setup, of CUBISM
 
 CUBISM needs very little setup.  As long as the binary or source file
-structure is left intact, CUBISM auto-discovers all the necessary
-calibration and other files it needs.  One basic setup issue relates to
-the color mode.  By default, IDL uses @emph{DECOMPOSED} color, in which
-the RBG value of pixels is directly specified, whereas CUBISM (and most
-astronomy software) relies on color table indices to specify color.  To
-switch modes, try adding the following to the file you specify with
-environment variable @code{IDL_STARTUP}:
+and directory structure is left intact, CUBISM auto-discovers all
+necessary calibration and other files it needs.  
+
+One basic setup issue relates to the color mode.  By default, IDL uses
+@emph{DECOMPOSED} color, in which the RBG value of pixels is directly
+specified, whereas CUBISM (and most astronomy software) relies on color
+table indices to specify color.  To switch modes, try adding the
+following to the IDL startup file specified with the environment
+variable @code{IDL_STARTUP}:
 
 @example
 device,DECOMPOSED=0,TRUE_COLOR=24,RETAIN=2
@@ -493,26 +497,29 @@ device,DECOMPOSED=0,TRUE_COLOR=24,RETAIN=2
 
 @noindent You may not need the @code{RETAIN=2} setting depending on your window
 manager (this forces IDL to keep track of the contents of windows when
-they need to be redrawn, and is typically required under Linux).
+they need to be redrawn, and is typically required under Linux).  The
+binary distribution of CUBISM performs this operation by default.
 
 Another potential issue relates to the @code{IDL_PATH}.  If you have a
 source distribution of CUBISM, you will need to ensure that the
-directories containing CUBISM are on your @code{IDL_PATH}.
-Occasionally, two different packages will each define the same routine
-in two files with the same names (a so-called @emph{name space
-conflict}).  If you encounter this problem, move the directory
-containing CUBISM higher on your @code{IDL_PATH}, or use the binary
-distribution, which doesn't suffer such name space conflicts.
+directories containing CUBISM as well as the @code{AstroLib}
+installation are on your @code{IDL_PATH}.  In principle it should not
+matter where on the path CUBISM is.  However, occasionally two different
+packages will each define the same routine in two files with the same
+names (a so-called @emph{name space conflict}).  If you encounter this
+problem, move the directory containing CUBISM higher on your
+@code{IDL_PATH}, or use the binary distribution, which doesn't suffer
+such name space conflicts.
 
 @node Upgrading,  , Setup, Installation
 @section Upgrading
 @cindex Upgrading
 
 Upgrading CUBISM is as simple as replacing the source or binary
-installation directories and restarting IDL.  You can always find out
-what version of CUBISM you are running with the menu @kbd{Info->About
-Cubism} in the project window.  New versions of CUBISM are available at
-@uref{@value{CUBISMHOMEPAGE}}.
+installation directories with the newer version and restarting IDL.  You
+can always find out what version of CUBISM you are running with the menu
+@kbd{Info->About Cubism} in the project window.  New versions of CUBISM
+are available at @uref{@value{CUBISMHOMEPAGE}}.
 
 @c
 @c Quick Start Guide   
@@ -666,6 +673,7 @@ shortcuts are available which can simplify interactive operations.
 * List Selection::              
 * Scrolling::                   
 * Mouse Shortcuts::             
+* File Selection::              
 @end menu
 
 @node List Selection, Scrolling, General Interface Tips, General Interface Tips
@@ -715,8 +723,8 @@ windows environment.  To do so, add the following to your
 
 @noindent and restart your X environment.
 
-@node Mouse Shortcuts,  , Scrolling, General Interface Tips
-@subsection Mouse Shortcuts
+@node Mouse Shortcuts, File Selection, Scrolling, General Interface Tips
+@subsection Mouse shortcuts
 
 Double-clicking on a list item often results in some action being
 performed on that item (e.g., view a record in the CUBISM Project
@@ -726,6 +734,28 @@ selected item.  In graphics windows (e.g. the CubeView window,
 context.  Typically the left-mouse button performs the default options.
 See the documentation for these tools for more information.
 
+@node File Selection,  , Mouse Shortcuts, General Interface Tips
+@subsection File Selection
+@cindex File selection
+
+CUBISM uses a specialized file selection tool throughout, which has some
+common features.  An example file selection dialog is shown in
+@ref{fig:file_sel}.  A list of wildcard filters is included relevant to
+the file being selected (for opening or saving), and new filters can be
+added.  Click on the @kbd{Filter} button for the current list.
+@kbd{Show All} shows all files, independent of the filter.  Directories
+are at left; double-click to navigate through them.  Arbitrary directory
+paths can be entered at the top.  Files in the current directory are
+listed at right; click to select or double-click to accept and return.
+To the left of the @strong{Directories} and @strong{Files} header words
+are two small icons, which, when clicked pop up a list of recent
+directory or file selections which can be selected.
+
+
+@float Figure,fig:file_sel
+@center @image{images/project_selection,3.772in,,File Selection}
+@caption{A file selection dialog.}
+@end float
 
 @node CUBISM Project, CubeView, General Interface Tips, The Tools
 @section CUBISM Project
@@ -1061,7 +1091,7 @@ available.
 Set the cube build order.
 
 @item Aperture(s)...
-Show the WAVSAMP apertures used for the various orders.
+Show the WAVSAMP apertures used for the various orders (@pxref{WAVSAMP}).
 
 @end table
 
@@ -1415,7 +1445,7 @@ available.
 * CubeView Colorbar::           
 * CubeView Status Display Line::  
 * CubeView Image Info Block::   
-* CubeView WAVSamp Pane::       
+* CubeView WAVSAMP Pane::       
 @end menu
 
 @node CubeView Title Bar, CubeView Menus, CubeView, CubeView
@@ -1537,8 +1567,8 @@ An example CubeView showing a stack average of 36 records is shown
 
 @float Figure,fig:cv_recs
 @center @image{images/cubeview_recs,4.332in,,CubeView Showing Stack}
-@caption{CubeView, showing a stack of 36 records, with histogram scaling
-box and WAVSamp display.}
+@caption{CubeView, showing a stack of 36 records, with an active
+histogram scaling box, and the order @samp{WAVSAMP} displayed.}
 @end float
 
 
@@ -2056,17 +2086,17 @@ brackets, like @samp{[2,4]}.  See the
 @uref{http://ssc.spitzer.caltech.edu/irs/dh/,IRS Data Handbook} for a
 reference of the @samp{BMASK} mask bits.
 
-@node CubeView Image Info Block, CubeView WAVSamp Pane, CubeView Status Display Line, CubeView
+@node CubeView Image Info Block, CubeView WAVSAMP Pane, CubeView Status Display Line, CubeView
 @subsection Image Info Block
 
 Information on the image being displayed is provided here, the same as
 is shown in the title bar (@pxref{CubeView Title Bar}).
 
-@node CubeView WAVSamp Pane,  , CubeView Image Info Block, CubeView
-@subsection WAVSamp Pane
+@node CubeView WAVSAMP Pane,  , CubeView Image Info Block, CubeView
+@subsection WAVSAMP Pane
 
 Below the image info block, when a BCD record is being displayed, is the
-@emph{WAVSamp Pane}, where the @samp{WAVSAMP} (@pxref{WAVSAMP}) can be
+@emph{WAVSAMP Pane}, where the @samp{WAVSAMP} (@pxref{WAVSAMP}) can be
 manipulated.  @kbd{Show} overlays the current @samp{WAVSAMP} for the
 current build order, @kbd{Edit} adds handles which can be used to adjust
 either side or end of the @samp{WAVSAMP}.  The normalized aperture
@@ -2093,9 +2123,10 @@ aperture at once.
 @cindex Spectra, Viewing
 
 CubeSpec is the tool which permits viewing and manipulating extracted
-spectra, and create maps from spectral cubes.
-The CubeSpec tool is a custom viewer, with general purpose as well as
-IRS-specific tools and configuration options.  It is used to view one dimensional spectra extracted from a cube via the cube viewer.  
+spectra, and create maps from spectral cubes.  The CubeSpec tool is a
+custom viewer, with general purpose as well as IRS-specific tools and
+configuration options.  It is used to view one dimensional spectra
+extracted from a cube via the cube viewer.
 
 @menu
 * CubeSpec Title Bar::          
@@ -2302,12 +2333,13 @@ This box states the wavelength followed by a colon (:) and the flux with the unc
 
 @menu
 * Cube Assembly::               
+* WAVSAMP::                     
 * Cube Analysis::               
 * Cube Validation::             
 * Cookbook::                    
 @end menu
 
-@node Cube Assembly, Cube Analysis, The Techniques, The Techniques
+@node Cube Assembly, WAVSAMP, The Techniques, The Techniques
 @section Cube Assembly
 @cindex Cube assembly
 
@@ -2473,9 +2505,10 @@ the fact, but operates on the entire cube at once.
 
 Using no background is a reasonable last resort option for brighter
 sources, though the number of bad pixels in the raw unsubtracted data is
-much higher, so more work will be required to identify them (see XXX).
-The physical background flux will also of course remain in the final
-assembled cube, which may affect analysis of extracted spectra or maps.
+much higher, so more work will be required to identify them (@pxref{Bad
+Pixels}).  The (astrophysical) foreground flux will also of course
+remain in the final assembled cube, which may affect analysis of
+extracted spectra or maps.
 
 @node Background Selection Using Visualization,  , No Background, Backgrounds
 @subsubsection Background Selection Using Visualization
@@ -2496,13 +2529,13 @@ AOR.  Using @kbd{Import AOR} will permit selecting more than one AOR at
 once.  Don't mix data taken more than a few days apart, to minimize the
 effects of day-to-day changes in the pixel response of the detectors.
 @item
-Visualize the AORs using, e.g., an 8 micron IRAC image (see XXX).  After
-using the histogram box to scale the image such that low-level diffuse
-emission is apparent, hit @kbd{v} to switch to visualize mode.  To
-define sky BCDs for, e.g., SL1, for example, set the cube build order to
-1 (@kbd{Cube->Set Cube Build Order}), and see which records land off
-your target.  Highlight these outriggers with the mouse by click and
-drag.
+Visualize the AORs using, e.g., an 8 micron IRAC image (@pxref{AOR
+Visualization Tool}).  After using the histogram box to scale the image
+such that low-level diffuse emission is apparent, switch to the
+visualizer tool.  To define background BCDs for, e.g., SL1, for example,
+set the cube build order to 1 (@kbd{Cube->Set Cube Build Order}), and
+see which records are free of source flux.  Highlight these outriggers
+with the mouse by click and drag.
 @item
 For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
@@ -2645,7 +2678,31 @@ to examine the cube itself (extract spectra, make maps), access to the
 record data isn't necessary.
 
 
-@node  Cube Analysis, Cube Validation, Cube Assembly, The Techniques
+@node WAVSAMP, Cube Analysis, Cube Assembly, The Techniques
+@section WAVSAMP
+@cindex WAVSAMP
+
+The @samp{WAVSAMP} is the set of @emph{pseudo-rectangles} which define
+the spectral order's location on the array, the (tilted) locus of
+constant wavelength, and the wavelength calibration (see, e.g.,
+@ref{fig:cv_recs}).  CUBISM uses a custom built version of the
+@samp{WAVSAMP}. which differs slightly from that used by the SSC.  The
+exact position and size of the @samp{WAVSAMP} changes with new SSC
+calibrations, and it typically includes a small amount (1-2 pixels) of
+spurious data at the extremities of the slit.  For spectral maps without
+any stepping along the slit (@emph{1xn} maps), leaving this @emph{crust}
+of spurious data will have little impact, since it can be ignored when
+extracting spectra and making maps.  For maps with along the slit
+redundancy however, it is important to exclude this data directly.  
+
+@xref{CubeView WAVSAMP Pane}, for more information on editing the
+@samp{WAVSAMP}.  Typically, the @samp{WAVSAMP} is edited, and the
+central handle is used to drag each side in by 2--5% (the reported
+@samp{WAVSAMP} coordinates are in normalized units, 0.0--1.0), to
+exclude the bulk of the spurious data at the slit ends.  Non-uniform
+edits are not recommended.
+
+@node  Cube Analysis, Cube Validation, WAVSAMP, The Techniques
 @section Cube Analysis
 @cindex Cube analysis
 
