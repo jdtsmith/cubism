@@ -116,7 +116,7 @@ pro CubeAutoBadPix::Prompt,maxvar,minfrac,wb,wu, $
                                                       self.record_only]), $
                            XSIZE=8,/EDITABLE,UNAME='maxvar')
   r=widget_base(b,/ROW)
-  l=widget_label(r,VALUE='MinBad-Fac:')
+  l=widget_label(r,VALUE='MinBad-Frac:')
   self.wMinFrac=widget_text(r,XSIZE=8,/EDITABLE,UNAME='minfrac',VALUE= $
                             string(FORMAT='(F0.2)', $
                                    self.minfrac[self.with_background, $
