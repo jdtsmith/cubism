@@ -163,8 +163,8 @@ pro CubeAutoBadPix::Defaults
                [10.0,5.0]]      ;record only version
   self.minfrac=[[0.5,0.1], $
                 [0.75,0.75]]
-  self.with_background=0b
-  self.with_unc=self.record_only?0b:1b
+  self.with_background=1b
+  self.with_unc=0b              ; self.record_only?0b:1b
   self.defaults_set=1b
 end
 
