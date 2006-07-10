@@ -230,9 +230,9 @@ Cube Assembly
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
+* WAVSAMP::                     
 * Building the Cube::           
 * Saving the Project::          
-* WAVSAMP::                     
 
 Backgrounds
 
@@ -2141,8 +2141,10 @@ extracted from a cube via the cube viewer.
 @subsection Title Bar
 
 The title bar of CubeSpec gives an indication of what is currently being
-displayed.  An example is @samp{CubeSpec: Extracted from ngc2403_extranuc00,[2,1]->[10,5]}.
-This information will change depending on which cube was extracted from.  The same
+displayed.  
+An example is @samp{CubeSpec: Extracted from ngc2403_extranuc00,[2,1]->[10,5]}.
+This information will change depending on which cube that you extracted from.  
+The same
 information is repeated as the title in the plot.  
 
 @node CubeSpec Menus, CubeSpec Buttons, CubeSpec Title Bar, CubeSpec
@@ -2222,29 +2224,23 @@ Overplots a shaded red area of the MIPS 24 micron system response curve.
 The viewer offers a number of individual tools for interacting with the
 viewed data, some of which are generic and always available, and others
 of which are specific to certain data types.  The tools are accessible
-via the palette.  
+via the button groups delineated by black lines.  
 
-Their are two categories of main CubeSpec tools, @emph{exclusive} tools,
+Their are two categories of main CubeSpec buttons, @emph{exclusive} tools,
 which require exclusive control of the mouse inputs, and
 @emph{non-exclusive} tools, any number of which can be active at any
 time.  Selecting an exclusive tool enters a mode of
-operation in which mouse inputs are interpreted by that tool alone.  
+operation in which mouse inputs are interpreted by that button alone.  
 
-CubeSpec tools can be toggled on or off by clicking the button.  The
-currently active tool(s) (if any) are indicated by depressed buttons in
-the tool palette, and with tick marks in the @kbd{Tools} menu.  If an
-exclusive tool is already active, toggling it on again (as opposed to
-simply selecting another tool) serves as a ``reset'', which restores it
-to its initial state, for instance removing any box area which has been
-defined.  Other tools which draw marks or annotations on top of the
-image keep those marks drawn even when they are not active.  An example
-is the bad pixel tool, which continues to display bad pixel marks even
-when it is not the active tool.  To remove these displays, @emph{reset}
-the tool as described.
 
-Tooltips identifying the tool, its key shortcut, and associated mouse
-operations (encoded as @samp{[left | middle | right]}) can be displayed
-by hovering the mouse over the tool button in the tool palette.
+CubeSpec buttons can be toggled on or off by clicking the button.  
+Unlike CubeView, only one button in a particular button group can be 
+active at any time.  
+Some currently active button(s) (if any) are indicated by depressed buttons in
+the palette.  
+Other tools, which draw lines or shaded regions on top of the
+spectrum, keep those marks drawn until they are used in another of the 
+button groups.
 
 
 @menu
@@ -2272,10 +2268,12 @@ This button makes the CubeView window show the map image produced from the Upper
 
 @table @code
 @item Renorm
-Renormalize the spectral window to show the maximum to minimum of the flux range.  
+Renormalize the spectral window to show the maximum to minimum of the 
+surface brightness range.  
 
 @item ValLine
-Pressing this button shows a large vertical line in the graph.  This shows the wavelength and flux of the spectra that you can also see in the Right Button Group (lower right).  
+Pressing this button shows a large vertical line in the graph.  
+This shows the wavelength and flux of the spectra that you can also see in the Right Button Group (lower right).  
 
 @item Errors
 Pressing this button turns the uncertainty bars on and off in the graph.  
@@ -2290,20 +2288,33 @@ This button tells the Fit button in the Right Button Group how to fit the contin
 
 @table @code
 @item Mouse: XZoom
-Pressing this button means that when you press the mouse button in two locations, the graph will zoom in on a smaller section of the wavelength range.  Clicking the mouse button in one location will return the graph to the full wavelength range.  
+Pressing this button means that when you click the left mouse button in two 
+locations, the graph will zoom in on a smaller section of the wavelength range.
+Double-clicking the left mouse button in one location will return the 
+graph to the full wavelength range.  
 
 @item Mouse: YZoom
-Pressing this button means that when you press the mouse button in two locations, the graph will zoom in on a smaller section of the surface brightness range.  Clicking the mouse button in one location will return the graph to the full surface brightness range.  
+Pressing this button means that when you click the left mouse button in two 
+locations, the graph will zoom in on a smaller section of the surface 
+brightness range.  
+Double-clicking the mouse button in one location will return the graph to the 
+full surface brightness range.  
 
 @item Mouse: Region:
-Pressing this button means that when you press the mouse button in two locations, the graph will highlight a certain portion of the spectrum.  
+Pressing this button means that when you click the mouse button in two 
+locations, the graph will highlight a certain portion of the spectrum.  
 This button is combined with the next button to produce spectral maps.
 
 @item Continuum/Peak
-This button is used in conjunction with the Region button stated above.  With Continuum chosen, you will select points to use for the continuum.  With Peak chosen, you will select points to use for the emission lines.  
+This button is used in conjunction with the Region button stated above.  
+With Continuum chosen, you will select points to use for the continuum.  
+With Peak chosen, you will select points to use for the emission lines.  
 
 @item Lambda-Weighted
-I have no clue what this button is for.
+Pressing this button will do the following when the Fit button is pressed.
+The continuum fit will weight the continuum regions by their wavelengths.  
+The weight is such that a higher weight is given to continuum regions closer
+to the emission lines.  
 
 @end table
 
@@ -2315,16 +2326,28 @@ I have no clue what this button is for.
 Pressing this button negates all zooms and region selections.  
 
 @item Remove Fit
-Pressing this button removes the fit generated with the next button explained.  
+Pressing this button removes the fit generated with the next button 
+explained.  
 
 @item Fit
-Several steps must be first performed before pressing this button.  First, the Region button (upper middle button group) must be pushed as well as the Map button (upper left button group).  With the Region button, you must select at least two continuum regions and at least one peak region.  Then, choose the fit order for the continuum (first order is a constant, etc.).  Now, you can press the Fit button.  Several results will be displayed in the Right display box.  
+Several steps must be first performed before pressing this button.  
+First, the Region button (upper middle button group) must be pushed as well 
+as the Map button (upper left button group).  
+With the Region button, you must select at least two continuum regions 
+and at least one peak region.  
+Then, choose the fit order for the continuum (first order is an average, etc.).
+Now, you can press the Fit button.  
+Several results will be displayed in the Right display box.  
 
 @item Right display box
-This box displays several values: average continuum, equivalent width of the line, maximum flux, maximum wavelength, median flux, median wavelength, and line strength.  These values will be disappear when you press the Remove Fit button.    
+This box displays several values: average continuum, equivalent width of the 
+line, maximum flux, maximum wavelength, median flux, median wavelength, 
+and line strength.  
+These values will disappear when you press the Remove Fit button.    
 
 @item Lower Right display box
-This box states the wavelength followed by a colon (:) and the flux with the uncertainty, separated by a plus-minus.  
+This box states the wavelength followed by a colon (:) 
+and the flux with the uncertainty, separated by a plus-minus.  
 
 @end table
 
@@ -2338,9 +2361,9 @@ This box states the wavelength followed by a colon (:) and the flux with the unc
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
+* WAVSAMP::                     
 * Building the Cube::           
 * Saving the Project::          
-* WAVSAMP::                     
 @end menu
 
 This section describes in detail the steps required to assemble a cube
@@ -2649,7 +2672,7 @@ For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
 @end enumerate
 
-@node Bad Pixels, Building the Cube, Backgrounds, Cube Assembly
+@node Bad Pixels, WAVSAMP, Backgrounds, Cube Assembly
 @section Bad Pixels
 @cindex Bad pixels
 @cindex Rogue pixels
@@ -2901,7 +2924,7 @@ Bad pixels can be loaded in from @file{.bpl} files as well, either
 replacing the current set, or appending to it.  @xref{CUBISM Project
 BadPix Menu}.
 
-@node WAVSAMP,  , Saving the Project, Cube Assembly
+@node WAVSAMP, Building the Cube, Bad Pixels, Cube Assembly
 @section WAVSAMP
 @cindex WAVSAMP
 
@@ -2925,7 +2948,7 @@ central handle is used to drag each side in by 2--5% (the reported
 exclude the bulk of the spurious data at the slit ends.  Non-uniform
 edits are not recommended.
 
-@node Building the Cube, Saving the Project, Bad Pixels, Cube Assembly
+@node Building the Cube, Saving the Project, WAVSAMP, Cube Assembly
 @section Building the Cube
 @cindex Cube, Building
 @cindex Building Cubes
@@ -2951,7 +2974,7 @@ which will need to be reconstructed in a slow cube build.  Changing
 backgrounds, bad pixels, etc. can be done without invalidating the
 accounts.
 
-@node  Saving the Project, WAVSAMP, Building the Cube, Cube Assembly
+@node  Saving the Project,  , Building the Cube, Cube Assembly
 @section Saving the Project
 @cindex Saving projects
 
