@@ -138,6 +138,7 @@ The Tools
 * CUBISM Project::              
 * CubeView::                    
 * CubeSpec::                    
+* CubeSpec Plot Window::        
 
 General Interface Tips
 
@@ -217,21 +218,15 @@ Menus
 * CubeSpec File Menu::          
 * CubeSpec Maps Menu::          
 
-CubeSpec Buttons
-
-* Upper Left Button Group::     
-* Lower Left Button Group::     
-* Upper Middle Button Group::   
-* Right Button Group::          
-
 Cube Assembly
 
-* Input Files::                 
+* Input Files::                 Calibration Sets:: Backgrounds:: Bad Pixels:: WAVSAMP::
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
+* Cube Build Settings::         
 * WAVSAMP::                     
-* Building the Cube::           
+* Building the Cube::           Saving the Project::
 * Saving the Project::          
 
 Backgrounds
@@ -628,6 +623,9 @@ a continuum-subtracted spectral map.  A full description of how to create and sa
 @c The Tools
 @c
 
+
+
+
 @node The Tools, Cube Assembly, Quick Start Guide, Top
 @chapter The Tools
 @cindex Cubism tools
@@ -637,8 +635,22 @@ building and analyzing spectral cubes: CUBISM Project, CubeView, and
 CubeSpec.  We will give here a description of the purpose and reference
 of the features of each of these three tools, after some general tips on
 using the interface, and background on the communication paths among the
-tools.
+tools. 
 
+@float Figure,fig:all_cubism
+@center @image{images/cubism_all,6in,,All CUBISM tools}
+@caption{The CUBISM tools being used together.}
+@end float
+@page
+
+An example of all the CUBISM tools being used together on a single
+project can be seen in @ref{fig:all_cubism}.  Seen in the window are,
+counter-clockwide from top-left: a CUBISM Project window, the cube build
+feedback plot, a CubeView tool visualizing the AOR and four selected
+records, a CubeView tool showing the average of 4 records, with bad
+pixels overlayed, the CubeSpec tool displaying an extracted spectrum and
+a 3 component line map, a CubeView window showing a line map image built
+from the LL order 1 cube, cube build parameters, and header info pane.
 
 @menu
 * Tool Inter-Communication::    
@@ -646,6 +658,7 @@ tools.
 * CUBISM Project::              
 * CubeView::                    
 * CubeSpec::                    
+* CubeSpec Plot Window::        
 @end menu
 
 @node Tool Inter-Communication, General Interface Tips, The Tools, The Tools
@@ -653,12 +666,12 @@ tools.
 
 The tools which comprise CUBISM constantly communicate with each other,
 so that updates in one are immediately reflected in the others.  For
-example, when selecting bad pixels (@pxref{Bad Pixel Tool}), the bad pixel
-list for the associated CUBISM Project is immediately updated, or if a
-new list is loaded from file, the viewer is updated.  Similar high level
-communication occurs between all of the sub-tools, so that typically you
-can regard a CUBISM project and all its associated windows and tools as
-in a single, consistent state.
+example, when selecting bad pixels (@pxref{Bad Pixel Tool}), the bad
+pixel list for the associated CUBISM Project is immediately updated, or
+if a new list is loaded from file, the viewer is updated.  Similar high
+level communication occurs between all of the sub-tools, so that
+typically you can regard a CUBISM project and all its associated windows
+and tools as in a single, consistent state.
 
 
 @node General Interface Tips, CUBISM Project, Tool Inter-Communication, The Tools
@@ -691,11 +704,6 @@ click the first, scroll to and @key{Shift}-click the second, scroll to
 and @key{Control}-click the third, and finally @key{Shift}-click the
 last.  The arrow keys scroll the selection up or down, and the @key{Page
 Up} and @key{Page Down} keys skip entire pages full of list items.
-
-@float Figure,fig:pop_sel
-@center @image{images/project_selection,6in,,Example List Selection}
-@caption{List with multiple regions selected.}
-@end float
 
 
 @node Scrolling, Mouse Shortcuts, List Selection, General Interface Tips
@@ -1564,14 +1572,16 @@ via the palette, through keyboard shortcuts, and via the @kbd{Tools}
 menu.  Other tools accessible below the displayed window will be
 discussed in the next section.
 
-An example CubeView showing a stack average of 36 records is shown
-@ref{fig:cv_recs}.
 
+@page
 @float Figure,fig:cv_recs
 @center @image{images/cubeview_recs,4.332in,,CubeView Showing Stack}
 @caption{CubeView, showing a stack of 36 records, with an active
 histogram scaling box, and the order @samp{WAVSAMP} displayed.}
 @end float
+
+An example CubeView showing a stack average of 36 records is shown
+@ref{fig:cv_recs}.
 
 
 @menu
@@ -1597,12 +1607,12 @@ histogram scaling box, and the order @samp{WAVSAMP} displayed.}
 @subsubsection Tool Interaction
 
 Their are two categories of main CubeView tools, @emph{exclusive} tools,
-which require exclusive control of the mouse inputs, and
+which require exclusive control of the mouse input, and
 @emph{non-exclusive} tools, any number of which can be active at any
 time.  These two types are separated in the tool palette, with exclusive
 tools grouped at left, and non-exclusive tools grouped at right
 (@pxref{fig:cv_recs}).  Selecting an exclusive tool enters a mode of
-operation in which mouse inputs are interpreted by that tool alone.  
+operation in which mouse inputs are interpreted by that tool alone.
 
 Cubeview tools can be toggled on or off by clicking the button,
 selecting the @kbd{Tools} menu item, or using the key shortcuts.  The
@@ -2120,16 +2130,23 @@ aperture at once.
 @samp{WAVSAMP}.  See @ref{fig:cv_recs} for an example displayed
 @samp{WAVSAMP}.
 
-@node CubeSpec,  , CubeView, The Tools
+@node CubeSpec, CubeSpec Plot Window, CubeView, The Tools
 @section CubeSpec
 @cindex CubeSpec
 @cindex Spectra, Viewing
 
 CubeSpec is the tool which permits viewing and manipulating extracted
 spectra, and create maps from spectral cubes.  The CubeSpec tool is a
-custom viewer, with general purpose as well as IRS-specific tools and
-configuration options.  It is used to view one dimensional spectra
-extracted from a cube via the cube viewer.
+custom viewer, used to view one dimensional spectra extracted from a
+cube (@pxref{Cube Extraction Tool}).  It is entered by extracting a
+spectrum from a cube, and is always associated with a CubeView window
+displaying a cube.
+
+@float Figure,fig:cubespec
+@center @image{images/cubespec,6in,,CubeSpec Window}
+@caption{CubeSpec window showing an extracted spectrum and 4 component map.}
+@end float
+
 
 @menu
 * CubeSpec Title Bar::          
@@ -2141,11 +2158,10 @@ extracted from a cube via the cube viewer.
 @subsection Title Bar
 
 The title bar of CubeSpec gives an indication of what is currently being
-displayed.  
-An example is @samp{CubeSpec: Extracted from ngc2403_extranuc00,[2,1]->[10,5]}.
-This information will change depending on which cube that you extracted from.  
-The same
-information is repeated as the title in the plot.  
+displayed.  An example is @samp{CubeSpec: Extracted from
+ngc2403_extranuc00,[2,1]->[10,5]}.  This information will change
+depending on the cube extracted and region extracted from.  The same
+information is repeated as the title in the plot.
 
 @node CubeSpec Menus, CubeSpec Buttons, CubeSpec Title Bar, CubeSpec
 @subsection Menus
@@ -2161,13 +2177,14 @@ information is repeated as the title in the plot.
 
 @table @code
 @item Save Spectrum as...
-Save the current spectra as a TBL (ASCII text) file.
+Save the current spectra as a @file{.tbl} file (ASCII text, IPAC table
+format).
 
 @item Export Spectrum to Command Line...
 Export the current spectra as an array variable on the IDL command line.
 
 @item Close
-Close the Spec Window
+Close the CubeSpec Window
 
 @end table
 
@@ -2177,19 +2194,21 @@ Close the Spec Window
 
 @table @code
 @item Save Current Map...
-Save the current map into a .map file for later use on other spectra.
+Save the current map into a @file{.map} file for later use on other
+spectra.
 
 @item Load Maps...
 Load a spectral map that has been previously saved.
 
 @item Reset to Default Maps
-Reset the spectral map to the I HAVE NO CLUE
+Re-load the default map sets saved in @file{cubism/map_sets}, removing
+others.
 
 @item Set Redshift...
-Set the Redshift of the object spectrum in km/s.   
+Set the Redshift of the object spectrum in @samp{km/s}.
 
 @item Clear Redshift
-Clears the redshift that you have entered and will save the spectrum with rest wavelength values ???
+Clears any entered redshift.
 
 @item IRAC 5.8 um
 Overplots a shaded red area of the IRAC 5.8 micron system response curve.  
@@ -2220,90 +2239,49 @@ Overplots a shaded red area of the MIPS 24 micron system response curve.
 @subsection CubeSpec Buttons
 @cindex Buttons, CubeSpec
 
-
-The viewer offers a number of individual tools for interacting with the
-viewed data, some of which are generic and always available, and others
-of which are specific to certain data types.  The tools are accessible
-via the button groups delineated by black lines.  
-
-Their are two categories of main CubeSpec buttons, @emph{exclusive} tools,
-which require exclusive control of the mouse inputs, and
-@emph{non-exclusive} tools, any number of which can be active at any
-time.  Selecting an exclusive tool enters a mode of
-operation in which mouse inputs are interpreted by that button alone.  
-
-
-CubeSpec buttons can be toggled on or off by clicking the button.  
-Unlike CubeView, only one button in a particular button group can be 
-active at any time.  
-Some currently active button(s) (if any) are indicated by depressed buttons in
-the palette.  
-Other tools, which draw lines or shaded regions on top of the
-spectrum, keep those marks drawn until they are used in another of the 
-button groups.
-
-
-@menu
-* Upper Left Button Group::     
-* Lower Left Button Group::     
-* Upper Middle Button Group::   
-* Right Button Group::          
-@end menu
-
-@node Upper Left Button Group, Lower Left Button Group, CubeSpec Buttons, CubeSpec Buttons
-@subsubsection Upper Left Button Group
+Most of CubeSpec's functionality is accessible in the form of buttons.
 
 @table @code
 @item Full Cube
-Default button setting.  This button makes the CubeView window show the full cube spectra at any wavelength.  
+Default setting.  In this mode, CubeView sends views of a single
+wavelength plane of the cube at a time to its associated CubeView
+viewer.  Key shortcut @key{u}.
 
 @item Map
-This button makes the CubeView window show the map image produced from the Upper Middle Button Group.  
-
-@end table
-
-
-@node Lower Left Button Group, Upper Middle Button Group, Upper Left Button Group, CubeSpec Buttons
-@subsubsection Lower Left Button Group
-
-@table @code
-@item Renorm
-Renormalize the spectral window to show the maximum to minimum of the 
-surface brightness range.  
+In this mode, pre-defined or custom defined maps (@pxref{Maps}) are sent
+to the viewer.  Key shortcuts @key{p} and @key{c} enable this mode (in
+peak/continuum mode).
 
 @item ValLine
-Pressing this button shows a large vertical line in the graph.  
-This shows the wavelength and flux of the spectra that you can also see in the Right Button Group (lower right).  
+Enable the display of the vertical line in the spectrum plot.
 
 @item Errors
-Pressing this button turns the uncertainty bars on and off in the graph.  
+Pressing this button turns the uncertainty bars on and off in the plot.
 
 @item Fit Order: 1, 2, 3, 4, or 5
-This button tells the Fit button in the Right Button Group how to fit the continuum ranges.  
+Set the polynomial order for the continuum fit (see @kbd{Fit} button).
 
-@end table
-
-@node Upper Middle Button Group, Right Button Group, Lower Left Button Group, CubeSpec Buttons
-@subsubsection Upper Middle Button Group
-
-@table @code
 @item Mouse: XZoom
-Pressing this button means that when you click the left mouse button in two 
-locations, the graph will zoom in on a smaller section of the wavelength range.
-Double-clicking the left mouse button in one location will return the 
-graph to the full wavelength range.  
+In this mouse mode, when you click the left mouse button in two
+locations, the plot will zoom in on that section of the wavelength
+range.  Double-clicking the left mouse button in one location, or
+right-clicking, will return to the full wavelength range.  Key shortcut
+@key{x}.
 
 @item Mouse: YZoom
-Pressing this button means that when you click the left mouse button in two 
-locations, the graph will zoom in on a smaller section of the surface 
-brightness range.  
-Double-clicking the mouse button in one location will return the graph to the 
-full surface brightness range.  
+In this mouse mode, when you click the left mouse button in two
+locations, the plot will zoom in on that section of the flux range.
+Double-clicking the left mouse button in one location, or
+right-clicking, will return to the full wavelength range.  Key shortcut
+@key{y}.
 
-@item Mouse: Region:
-Pressing this button means that when you click the mouse button in two 
-locations, the graph will highlight a certain portion of the spectrum.  
-This button is combined with the next button to produce spectral maps.
+@item Mouse: Region/Lambda:
+
+When @kbd{Full Cube} is depressed, this button is @kbd{Lambda}, a
+enables sending a single wavelength plane of the cube at a time to the
+viewer on click.  When in @kbd{Map} mode the button is @kbd{Region}, and
+enabling it means that clicking a start and finish wavelength range in
+the spectrum will define a peak or continuum region.
 
 @item Continuum/Peak
 This button is used in conjunction with the Region button stated above.  
@@ -2311,63 +2289,82 @@ With Continuum chosen, you will select points to use for the continuum.
 With Peak chosen, you will select points to use for the emission lines.  
 
 @item Lambda-Weighted
-Pressing this button will do the following when the Fit button is pressed.
-The continuum fit will weight the continuum regions by their wavelengths.  
-The weight is such that a higher weight is given to continuum regions closer
-to the emission lines.  
+If set, the continuum to subtract in maps with both peak and continuum
+region will be based on an average weighted by the distance away in
+wavelength from the peak to continuum point.  Normally, all continuum
+planes are averaged with equal weight.
 
-@end table
-
-@node Right Button Group,  , Upper Middle Button Group, CubeSpec Buttons
-@subsubsection Right Button Group
-
-@table @code
 @item Reset Plot
-Pressing this button negates all zooms and region selections.  
+Pressing this button removes all zooms and region selections.
 
 @item Remove Fit
-Pressing this button removes the fit generated with the next button 
-explained.  
+Pressing this button removes any fit generated.
 
 @item Fit
-Several steps must be first performed before pressing this button.  
-First, the Region button (upper middle button group) must be pushed as well 
-as the Map button (upper left button group).  
-With the Region button, you must select at least two continuum regions 
-and at least one peak region.  
-Then, choose the fit order for the continuum (first order is an average, etc.).
-Now, you can press the Fit button.  
-Several results will be displayed in the Right display box.  
+Perform a fit over the peak and continuum regions, which must be defined
+first.  The polynomial order of the fit is determined by @kbd{Fit
+Order}.  Resulting fit parameters will be displayed at right.
 
 @item Right display box
-This box displays several values: average continuum, equivalent width of the 
-line, maximum flux, maximum wavelength, median flux, median wavelength, 
-and line strength.  
-These values will disappear when you press the Remove Fit button.    
+This box displays several values from any fits performed: average
+continuum, equivalent width of the line, maximum flux, maximum
+wavelength, median flux, median wavelength, and line strength.  These
+values will disappear when you press the Remove Fit button.
 
 @item Lower Right display box
-This box states the wavelength followed by a colon (:) 
-and the flux with the uncertainty, separated by a plus-minus.  
+This box gives the wavelength and flux with the uncertainty of the
+current cursor position.
 
 @end table
 
+@node CubeSpec Plot Window,  , CubeSpec, The Tools
+@section CubeSpec Plot Window
+@cindex Spectrum, plotted
+
+The plot window of CubeSpec is where maps are defined, the view is
+modified, etc.  What operations are performed by the mouse is determined
+by which @samp{Mouse:} mode is selected in the button panes above:
+
+@table @code
+@item XZoom/YZoom
+Click twice to zoom in on the wavelength or flux scale.
+
+@item Region/Lambda
+@table @code
+@item Full Cube
+Clicking on a wavelength plane sends that plane to the viewer.  The
+plane can be moved using the arrow keys.
+
+@item Map
+A @kbd{Peak} or @kbd{Continuum} region is formed by clicking twice: once
+at the start and once at the end of the desired region.  Middle-clicking
+selects regions, @key{Space} to switch among the selected regions.  When
+a region is selected, left and right arrows move it, up and down
+increase or decrease its width. 
+@end table
+@end table
+
+When defining a region (for a map, or X/YZoom) the region can be
+canceled after the first click by right-clicking.  During region
+definition, a line is left at the location of the first click.
 
 @node Cube Assembly, Cube Analysis, The Tools, Top
 @chapter Cube Assembly
 @cindex Cube assembly
 
 @menu
-* Input Files::                 
+* Input Files::                 Calibration Sets:: Backgrounds:: Bad Pixels:: WAVSAMP::
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
+* Cube Build Settings::         
 * WAVSAMP::                     
-* Building the Cube::           
+* Building the Cube::           Saving the Project::
 * Saving the Project::          
 @end menu
 
-This section describes in detail the steps required to assemble a cube
-from mapping @samp{BCDs}.  A quick checklist of these steps is:
+This chapter describes in detail the steps required to assemble a cube
+from a set of mapping @samp{BCDs}.  A quick checklist of these steps is:
 
 @enumerate
 @item
@@ -2379,15 +2376,19 @@ Create a new cube project, and enter an appropriate name for the project
 @file{.cpj} file).
 
 @item
+Accept the default (latest) calibration set, or load a specific set.
+
+@item
 Load all data records from the AOR(s) which will be built into a single
 cube.
 
 @item
 Load any additional data records to be used for background subtraction.
-Disable them if they are not intended to appear in the cube.
+Disable them if they are not intended to appear in the cube
+(@pxref{Input Files}).
 
 @item
-Select and set the background records.  
+Select and set the background records (@pxref{Backgrounds}).
 
 @item
 Double-check the cube build settings under the @kbd{Cube} menu, in
@@ -2672,7 +2673,7 @@ For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
 @end enumerate
 
-@node Bad Pixels, WAVSAMP, Backgrounds, Cube Assembly
+@node Bad Pixels, Cube Build Settings, Backgrounds, Cube Assembly
 @section Bad Pixels
 @cindex Bad pixels
 @cindex Rogue pixels
@@ -2795,7 +2796,7 @@ and pixels within those records, contributing to a given cube pixel.
 This is a very powerful tool for validating features in a cube.  In
 particular, it is particularly useful for identifying global bad pixels,
 which impress stripes in planes of the output cube
-(@pxref{fig:cv_stripes}).  @xref{Pixel BackTracking Tool}, for more on
+(@pxref{fig:cv_stripes}).  @xref{Pixel Backtracking Tool}, for more on
 using this tool.
 
 A typical workflow for identifying bad pixels using the backtracking
@@ -2924,7 +2925,58 @@ Bad pixels can be loaded in from @file{.bpl} files as well, either
 replacing the current set, or appending to it.  @xref{CUBISM Project
 BadPix Menu}.
 
-@node WAVSAMP, Building the Cube, Bad Pixels, Cube Assembly
+@node Cube Build Settings, WAVSAMP, Bad Pixels, Cube Assembly
+@section Cube Build Settings
+@cindex Setting, cube building
+
+The cube build settings are accessed in the @kbd{Cube} menu of the
+project window.   Typically the default values (most options enabled)
+are fine, but for occasional uses you may prefer to disable some:
+
+@table @code
+@item FLUXCON
+Typically you would build the cube in units of @samp{MJy/sr} using this
+option.  It enables use of the extended source flux calibration files.
+Once reason you might prefer to build a cube @emph{without} fluxcon is
+to make a 1D background in @samp{e/s} units for loading as a background
+spectrum (@pxref{1D Sky Spectrum Background}).
+
+@item SLCF
+The slit-loss correction function is used to correct the native IRS
+pipeline calibration, tuned for point sources, to the case of perfectly
+extended sources.  While most sources are not entirely smooth and
+slit-filling, this option should be enabled in most cases, except
+perhaps for point sources.  Note that the CUBISM calibration of extended
+sources is made using the SLCF; point source spectrophotometry will be
+more accurate using SPICE, or another single-pointing extraction tool.
+
+@item Subtract Background
+Only available if a background is set, this is usually a good idea,
+unless you'd like to create a 1D background spectrum directly, or check
+the cube without background removal.  
+
+@item Trim Wavelengths
+Trimming the unreliable order ends is never a bad idea, unless you are
+specifically interested in the spectrum there.  Note that some
+additional trimming may be required; this is a conservative trim by
+default.
+
+@item Reconstructed Positions
+Unless you have cause to believe the reconstructed slit position is in
+error, use this option.  Disabling it uses the pre-programmed requested
+slit positions, which can be off by several arc seconds.
+
+@item Uncertainty Cube
+Only an option if all your records have uncertainties, this builds a
+full uncertainty cube in parallel.   
+
+@end table  
+
+@callout{Note that pipeline uncertainties are statistical ramp
+uncertainties only, valid only in the low S/N limit.  Above S/N~10--20,
+statistical uncertainties, not accounted for by CUBISM, dominate.}
+
+@node WAVSAMP, Building the Cube, Cube Build Settings, Cube Assembly
 @section WAVSAMP
 @cindex WAVSAMP
 
@@ -3043,23 +3095,41 @@ to examine the cube itself (extract spectra, make maps), access to the
 record data isn't necessary.
 
 
+@node Saving the Cube as FITS
+@section Saving the Cube as FITS
+@cindex FITS, saving cube as
+
+The cube can be saved as a 3D FITS file for further analysis, using
+@kbd{File->Write FITS Cube...}.  If an uncertainty cube exists, it will
+be saved alongside the main cube, with @file{_unc.fits} replacing
+@file{.fits}.  Both FITS files include headers from the first assembled
+@samp{BCD}, and an @samp{NAXIS=3} FITS cube in the primary data unit,
+with WCS header records recording the astrometric positions for the
+first two (celestial) dimensions, and the third (wavelength) dimension
+delineated by a lookup table, available in the first cell of the binary
+table in the single FITS extension.  This dimension coordinate
+description follows the lookup table spectral format of Greisen, E.W. et
+al., A&A 446, 2006.
+
 @node  Cube Analysis, Tips and Troubleshooting, Cube Assembly, Top
 @chapter Cube Analysis
 @cindex Cube analysis
 
+@node Extracting 1D Spectra
 @section Extracting 1D Spectra
+@cindex Spectra, extracting
 
 Extracting 1D spectra from the cube, and building 2D line, continuum, or
 feature maps are straightforward using the CUBISM interface.  After the
-cube has been built, and all bad pixels have been identified, make sure to
-save your cube project file (again).  To generate a 1D spectrum, you must
-first identify the spatial region over which the spectrum is to be
-averaged.  This can be done in one of two ways.  You can either read in a
-region file (actually the region is read from the headers of a saved ``tbl"
-spectrum file) from a previous analysis session (created, for example, from
-a different IRS module used to map the same target), or you can use the
-``Extract Spectra and Stack Cubes" tool to define a new region with the
-mouse.  We will discuss each of these in turn.
+cube has been built, and all bad pixels have been identified, make sure
+to save your cube project file (again).  To generate a 1D spectrum, you
+must first identify the spatial region over which the spectrum is to be
+averaged.  This can be done in one of two ways.  You can either read in
+a region file (actually the region is read from the headers of a saved
+``tbl" spectrum file) from a previous analysis session (created, for
+example, from a different IRS module used to map the same target), or
+you can use the ``Extract Spectra and Stack Cubes" tool to define a new
+region with the mouse.  We will discuss each of these in turn.
 
 In order to use a saved region file, simply go to the ``File" menu
 pulldown, and select ``Extract Region from File...".  This will then pop up
@@ -3092,39 +3162,43 @@ smaller aperture if you are attempting to compare or stitch spectra across
 IRS modules.
 
 In order to extract a 1D spectrum from the cube over a new region, go to
-the Tools pulldown menu and choose ``Extract Spectra and Stack Cubes" (or
-simply click on the Extract Spectra icon in the menu bar of the CubeView
-window (the 7th button from the left).  Once this is active, a rectangular
-region will appear on the cube, which you can drag (by holding down the
-left mouse button inside the region) or expand (by holding down the left
-mouse button on the lower right corner of the region), and a spectrum will
-appear in the CubeSpec window.  If the CubeSpec window was already open,
-the spectrum will change to reflect your newly-defined region, and the area
-(in pixels) is displayed at the top of the CubeSpec window.  If the
-CubeSpec window was not open, it will pop up and display your new 1D
-spectrum.  When you move or resize the region, the spectrum (which is an
-average over that area) will change.  The 1D spectrum can be saved to a tbl
-file on disk at any time.  This is an excellent way to quickly see how the
-IRS spectrum of your source changes with position over the cube.  Any tbl
-file that you save in this step, can also be used to set the region for
-another cube which you make later (as described above).
+the Tools pulldown menu and choose ``Extract Spectra and Stack Cubes"
+(or simply click on the Extract Spectra icon in the menu bar of the
+CubeView window (the 7th button from the left).  Once this is active, a
+rectangular region will appear on the cube, which you can drag (by
+holding down the left mouse button inside the region) or expand (by
+holding down the left mouse button on the lower right corner of the
+region), and a spectrum will appear in the CubeSpec window.  If the
+CubeSpec window was already open, the spectrum will change to reflect
+your newly-defined region, and the area (in pixels) is displayed at the
+top of the CubeSpec window.  If the CubeSpec window was not open, it
+will pop up and display your new 1D spectrum.  When you move or resize
+the region, the spectrum (which is an average over that area) will
+change.  The 1D spectrum can be saved to a tbl file on disk at any time.
+This is an excellent way to quickly see how the IRS spectrum of your
+source changes with position over the cube.  Any tbl file that you save
+in this step, can also be used to set the region for another cube which
+you make later (as described above).
 
+@node Creating 2D Maps
 @section Creating 2D Maps
+@cindex Maps, creating
 
-Just the cube can be used to generate 1D spectra over any extraction
+Just as the cube can be used to generate 1D spectra over any extraction
 region, so too can the 1D spectra be used to create 2D images (slices of
 the cube) over any specified wavelength interval.  Once a 1D spectrum is
-visible in the CubeSpec window, change the selection from ``Full Cube" to
-``Map".  Once ``Map" is selected, the button in the middle of the window
-will become active.  This button provides a single choice of ``continuum"
-or ``peak", allowing the user to define the continuum or peak regions in
-the spectrum for generation of the map.  If you wish to say, create a
-continuum-subtracted 11.3-micron PAH map from a SL1 cube, you can first use
-the mouse to define the continuum on either side of the PAH feature by
-selecting ``Continuum" and clicking (with the left button) two pairs of
-spectral regions on either side of the emission feature.  The continuum
-regions will turn red after selection.  You can have any number of
-continuum regions of any arbitrary size in wavelength.
+visible in the CubeSpec window, change the selection from ``Full Cube"
+to ``Map".  Once ``Map" is selected, the button in the middle of the
+window will become active.  This button provides a single choice of
+``continuum" or ``peak", allowing the user to define the continuum or
+peak regions in the spectrum for generation of the map.  If you wish to
+say, create a continuum-subtracted 11.3-micron PAH map from a SL1 cube,
+you can first use the mouse to define the continuum on either side of
+the PAH feature by selecting ``Continuum" and clicking (with the left
+button) two pairs of spectral regions on either side of the emission
+feature.  The continuum regions will turn red after selection.  You can
+have any number of continuum regions of any arbitrary size in
+wavelength.
 
 Once the continuum regions are defined, change the selection to ``Peak",
 and select the emission feature with the mouse in the same way.  If making
