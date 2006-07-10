@@ -116,7 +116,8 @@ reduction of spectral maps created with the
 * Installation::                
 * Quick Start Guide::           
 * The Tools::                   
-* The Techniques::              
+* Cube Assembly::               
+* Cube Analysis::               
 * Tips and Troubleshooting::    
 * Index::                       
 
@@ -223,20 +224,15 @@ CubeSpec Buttons
 * Upper Middle Button Group::   
 * Right Button Group::          
 
-The Techniques
-
-* Cube Assembly::               
-* WAVSAMP::                     
-* Cube Analysis::               
-* Cube Validation::             
-* Cookbook::                    
-
 Cube Assembly
 
-* Input Files and Calibration::  Backgrounds:: Bad Pixels::
+* Input Files::                 
+* Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
+* Building the Cube::           
 * Saving the Project::          
+* WAVSAMP::                     
 
 Backgrounds
 
@@ -250,11 +246,15 @@ Backgrounds
 Bad Pixels
 
 * Global and Record Level Bad Pixels::  
+* Manual Bad Pixel Selection::  
+* Backtracking to Discover Bad Pixels::  
 * Automatic Bad Pixels::        
-* Tips for Selecting Bad Pixels::  
+* Saving Bad Pixels::           
 
 Tips and Troubleshooting
 
+* Tips::                        
+* Troubleshooting::             
 * Debugging CUBISM::            
 
 @end detailmenu
@@ -320,10 +320,11 @@ This manual is organized as follows.  After discussing the installation
 and requirements of CUBISM in @ref{Installation}, we give a quick start
 guide to building a spectral cube from a mapping data set in @ref{Quick
 Start Guide}.  We then cover in detail the menu options and capabilities
-of the three main tools which comprise CUBISM.  Then we discuss in
-greater depth the steps required to build a cube in @ref{Cube Assembly},
-explain methods of analyzing the cube in @ref{Cube Analysis}, and cover
-validating and improving cubes in @ref{Cube Validation}.
+of the three main tools which comprise CUBISM (@pxref{The Tools}).  Then
+we discuss in greater depth the steps required to build a cube in
+@ref{Cube Assembly}, explain methods of analyzing the cube (@pxref{Cube
+Analysis}), finishing with common tips and troubleshooting (@pxref{Tips
+and Troubleshooting}).
 
 Note that this manual does not include information on planning IRS
 spectral mapping observations; see the
@@ -351,7 +352,7 @@ The advantages of a source installation are:
 @item
 Access to CUBISM's code for bug fixing or examining algorithms.
 @item
-Source level feedback when bugs occur (see XXX).
+Source level feedback when bugs occur (@pxref{Debugging CUBISM}).
 @item
 Should continue to function with all future versions of IDL.
 @end itemize
@@ -380,7 +381,7 @@ version; no need to install external libraries.
 @item
 No routine name conflicts should occur.
 @item 
-Can be used (sans command line) with the freely available @emph{IDL VM},
+Can be used (sans command line)  with the freely available @emph{IDL VM},
 if you don't have access to an IDL license.
 @end itemize
 
@@ -627,7 +628,7 @@ a continuum-subtracted spectral map.  A full description of how to create and sa
 @c The Tools
 @c
 
-@node The Tools, The Techniques, Quick Start Guide, Top
+@node The Tools, Cube Assembly, Quick Start Guide, Top
 @chapter The Tools
 @cindex Cubism tools
 
@@ -679,11 +680,6 @@ shortcuts are available which can simplify interactive operations.
 @node List Selection, Scrolling, General Interface Tips, General Interface Tips
 @subsection List Selection
 
-@float Figure,fig:pop_sel
-@center @image{images/project_selection,6in,,Example List Selection}
-@caption{List with multiple regions selected.}
-@end float
-
 In any list (e.g. the CUBISM Project window, @pxref{CUBISM Project}),
 individal list elements can be selected by clicking with the left mouse
 button.  A range of elements can be selected by click-dragging.
@@ -696,6 +692,10 @@ and @key{Control}-click the third, and finally @key{Shift}-click the
 last.  The arrow keys scroll the selection up or down, and the @key{Page
 Up} and @key{Page Down} keys skip entire pages full of list items.
 
+@float Figure,fig:pop_sel
+@center @image{images/project_selection,6in,,Example List Selection}
+@caption{List with multiple regions selected.}
+@end float
 
 
 @node Scrolling, Mouse Shortcuts, List Selection, General Interface Tips
@@ -729,38 +729,45 @@ windows environment.  To do so, add the following to your
 Double-clicking on a list item often results in some action being
 performed on that item (e.g., view a record in the CUBISM Project
 window).  The same effect results when @key{Return} is pressed with a
-selected item.  In graphics windows (e.g. the CubeView window,
-@pxref{CubeView}), mouse presses perform specific actions depending on
-context.  Typically the left-mouse button performs the default options.
-See the documentation for these tools for more information.
+selected item.  Using the arrow keys and @key{Return} is a quick way to
+go through a list viewing each item.  
+
+In graphics windows (e.g. the CubeView window, @pxref{CubeView}), mouse
+presses perform specific actions depending on context.  Typically the
+left-mouse button performs the default options.  See the documentation
+for these tools for more information.
 
 @node File Selection,  , Mouse Shortcuts, General Interface Tips
 @subsection File Selection
 @cindex File selection
 
-CUBISM uses a specialized file selection tool throughout, which has some
-common features.  An example file selection dialog is shown in
-@ref{fig:file_sel}.  A list of wildcard filters is included relevant to
-the file being selected (for opening or saving), and new filters can be
-added.  Click on the @kbd{Filter} button for the current list.
-@kbd{Show All} shows all files, independent of the filter.  Directories
-are at left; double-click to navigate through them.  Arbitrary directory
-paths can be entered at the top.  Files in the current directory are
-listed at right; click to select or double-click to accept and return.
-To the left of the @strong{Directories} and @strong{Files} header words
-are two small icons, which, when clicked pop up a list of recent
-directory or file selections which can be selected.
-
-
 @float Figure,fig:file_sel
-@center @image{images/project_selection,3.772in,,File Selection}
+@center @image{images/file_selection,3.772in,,File Selection}
 @caption{A file selection dialog.}
 @end float
+
+CUBISM uses a specialized file selection tool throughout, which has some
+common features.  An example dialog is shown in @ref{fig:file_sel}.  A
+list of wildcard filters is included relevant to the file being selected
+(for opening or saving), and new filters can be added.  Click on the
+@kbd{Filter} button for the current list.  @kbd{Show All} shows all
+files, independent of the filter.  Directories are at left; double-click
+to navigate through them.  Arbitrary directory paths can be entered at
+the top.  Files in the current directory are listed at right; click to
+select or double-click to accept and return.  To the left of the
+@strong{Directories} and @strong{Files} header words are two small
+icons, which, when clicked pop up a list of recent directory or file
+selections which can be selected.
 
 @node CUBISM Project, CubeView, General Interface Tips, The Tools
 @section CUBISM Project
 @cindex Project, CUBISM
 @cindex CUBISM project
+
+@float Figure,fig:pop_proj
+@center @image{images/populated_project,6in,,Populated Cubism Project}
+@caption{CUBISM Project Main Window, with selected and disabled records.}
+@end float
 
 The CUBISM Project is the central storehouse of all information relating
 to a single spectral cube.  This is where the raw spectral data are
@@ -792,10 +799,6 @@ Typically, a project is interacted with via the graphical interface,
 though it can be used directly from the command line as well.  Here is
 an example CUBISM Project window, populated with a mapping data set:
 
-@float Figure,fig:pop_proj
-@center @image{images/populated_project,6in,,Populated Cubism Project}
-@caption{CUBISM Project Main Window, with selected and disabled records.}
-@end float
 
 @menu
 * Project Title::               
@@ -820,7 +823,6 @@ convention usually they are kept similar or the same.
 @c
 @c CUBISM Project Menus
 @c
-
 
 @node CUBISM Project Menus, Data Records, Project Title, CUBISM Project
 @subsection Menus
@@ -1783,9 +1785,6 @@ The color tool's key shortcut if @kbd{c}.
 
 
 @float Figure,fig:cv_slice
-@center @image{images/cubeview_slice,5.617in,,CubeView Slice Window}
-@caption{A plot of a slice through an image.}
-@end float
 
 The image slicing tool allows slices to be taken through any image at
 arbitrary angles.  Just left-click and drag to define a slice, or
@@ -1797,6 +1796,11 @@ slice line, and click-dragging a new slice replaces the existing line.
 An example slice plot is shown in @ref{fig:cv_slice}.
 
 The image slicing tool's key shortcut is @kbd{l}.
+
+@center @image{images/cubeview_slice,5.617in,,CubeView Slice Window}
+@caption{A plot of a slice through an image.}
+@end float
+
 
 @node Box Statistics Tool, Aperture Photometry Tool, Image Slicing Tool, CubeView Tools
 @subsubsection Box Statistics Tool
@@ -1900,11 +1904,6 @@ The pixel backtracking tool's key shortcut is @kbd{t}.
 @subsubsection Bad Pixel Tool
 @cindex Bad pixel tool
 
-@float Figure,fig:cv_badpix
-@center @image{images/cubeview_badpix,4.332in,,CubeView Bad Pixel Display}
-@caption{A record stack with bad pixels displayed.}
-@end float
-
 The bad pixel tools marks individual bad pixels, either user-flagged, or
 pipeline-produced, and allows global and record-level user bad pixels to
 be added or removed (see @ref{Bad Pixels}, for more information on
@@ -1969,12 +1968,22 @@ Only user-set bad pixel marks.
 
 The bad pixel tool's key shortcut is @kbd{b}.
 
+@float Figure,fig:cv_badpix
+@center @image{images/cubeview_badpix,4.332in,,CubeView Bad Pixel Display}
+@caption{A record stack with bad pixels displayed.}
+@end float
 
 
 @node AOR Visualization Tool, Pixel Table Tool, Bad Pixel Tool, CubeView Tools
 @subsubsection AOR Visualization Tool
 @cindex Visualizing AORs
 @cindex AOR visualization
+
+@float Figure,fig:cv_viz
+@center @image{images/cubeview_visualize,4.332in,,CubeView Visualize}
+@caption{A visualization of the records on an IRAC 8 micron image of
+M51, with 13 records selected.}
+@end float
 
 It can be useful to look at a graphical representation of the AOR layout
 as observed on top of an image.  The Visualization tool can be activated
@@ -1995,12 +2004,6 @@ very useful from defining background records directly from an infrared
 image @pxref{Background Selection Using Visualization}.
 
 Disabled records are shown in gray.  
-
-@float Figure,fig:cv_viz
-@center @image{images/cubeview_visualize,4.332in,,CubeView Visualize}
-@caption{A visualization of the records on an IRAC 8 micron image of
-M51, with 13 records selected.}
-@end float
 
 @node Pixel Table Tool, Order Mask Tool, AOR Visualization Tool, CubeView Tools
 @subsubsection Pixel Table Tool
@@ -2326,42 +2329,146 @@ This box states the wavelength followed by a colon (:) and the flux with the unc
 @end table
 
 
-
-@node The Techniques, Tips and Troubleshooting, The Tools, Top
-@chapter The Techniques
-
-
-@menu
-* Cube Assembly::               
-* WAVSAMP::                     
-* Cube Analysis::               
-* Cube Validation::             
-* Cookbook::                    
-@end menu
-
-@node Cube Assembly, WAVSAMP, The Techniques, The Techniques
-@section Cube Assembly
+@node Cube Assembly, Cube Analysis, The Tools, Top
+@chapter Cube Assembly
 @cindex Cube assembly
 
 @menu
-* Input Files and Calibration::  Backgrounds:: Bad Pixels::
+* Input Files::                 
+* Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
+* Building the Cube::           
 * Saving the Project::          
+* WAVSAMP::                     
 @end menu
 
+This section describes in detail the steps required to assemble a cube
+from mapping @samp{BCDs}.  A quick checklist of these steps is:
 
-@node Input Files and Calibration, Backgrounds, Cube Assembly, Cube Assembly
-@subsection Input Files and Calibration
+@enumerate
+@item
+@xref{Quick Start Guide}, for more on starting and running CUBISM.
+
+@item
+Create a new cube project, and enter an appropriate name for the project
+(this can be changed later, and is not the same as the project's
+@file{.cpj} file).
+
+@item
+Load all data records from the AOR(s) which will be built into a single
+cube.
+
+@item
+Load any additional data records to be used for background subtraction.
+Disable them if they are not intended to appear in the cube.
+
+@item
+Select and set the background records.  
+
+@item
+Double-check the cube build settings under the @kbd{Cube} menu, in
+particular use @kbd{Set Cube Build Order...} to select the order for
+building the cube (note that high-resolution cubes are typically built
+using @emph{All} orders at once).
+
+@item
+Build the cube using @kbd{Cube->Build Cube}.
+
+@item
+Save the cube project to file.
+
+@item
+Manually or automatically generate bad pixels, and re-build the cube.
+Iterate as necessary.
+
+@item
+Enjoy your newly assembled cube: extract spectra, build maps, etc.
+@end enumerate
+
+@node Input Files, Calibration Sets, Cube Assembly, Cube Assembly
+@section Input Files
 @cindex @samp{BCD} files
 @cindex Calibration sets
 @cindex Files, input
 @cindex Input files
 
-File naming convention.
+CUBISM works from a set of input @samp{BCD} or other record level data
+to produce spectral cubes.  It reads positional information from the
+headers, loads pipeline mask files and uncertainty images, and uses all
+of this information together to map record-level pixels to the sky
+plane.  Details of the algorithm employed by CUBISM can be found in
+Smith et al., 2006 (in prep).
 
-@node Backgrounds, Bad Pixels, Input Files and Calibration, Cube Assembly
-@subsection Backgrounds
+CUBISM works best when applied directly to raw AOR directories
+downloaded from the Spitzer archives.  To import all data
+(spectra/masks/uncertaines) from all records in a given mapping AOR (or
+set of related AORs), simply hit the @kbd{Import AOR} button, select a
+directory which contains one or more AORs, and CUBISM searches all
+@samp{BCD} files contained in that directory or its subdirectories,
+assembling them into constituent AOR sets.  Select one or more of these
+AORs to load the associated data sets into the cube project.  An example
+can be seen in @ref{fig:bcd_choice}.
+
+@xref{Record Data Types}, for more information on non-@samp{BCD} data
+types which CUBISM can use (typically only for debugging problems with
+the pipeline processing).  Note that CUBISM projects can contain data
+from only one IRS module at a time, and that CUBISM does not check to
+see that the data sets you have selected are physically grouped,
+covering a moderate sized region on the sky.
+
+@float Figure,fig:bcd_choice
+@center @image{images/bcd_load_group_choice,3.036in,,BCD Group Choice}
+@caption{Importing AOR data, grouped by AORs found in the selected
+directory.}
+@end float
+
+Loading sets of non-mapping data, for the purpose of background
+subtraction (@pxref{Backgrounds}), can be accomplished conveniently
+using the @kbd{Record->Import Data by Module...}.  Simply point at a
+directory containing the data of interest, and select the appropriate
+data sets, grouped by object and IRS module.
+
+@node Calibration Sets, Backgrounds, Input Files, Cube Assembly
+@section Calibration Sets
+@cindex Calibration sets
+
+CUBISM needs a large number of different pieces of calibration data to
+perform its tasks, including flux calibration functions, order
+positioning and wavelength solutions, extended source flux correction
+functions, etc.  These calibration data are tied directly to those
+produced by the SSC for point sources, although they are extended and
+supplemented by additional information.  CUBISM uses the concepts of
+@emph{calibration sets}, unit bundles of calibration products which
+snapshot the latest calibration data, appropriate for the most recent
+pipeline processing.
+
+By default, CUBISM loads the most recent calibration set which is
+bundled with it.  Typically, you will not need to select a calibration
+set.  As long as you are using the most recent IRS pipeline processing
+version of your data, the latest set is appropriate.  The calibration
+set used with a given cube is saved in its project file, so that future
+use, even after new calibration sets are created, will continue to use
+that data.  You can see which calibration set you are using, and inspect
+all of the parameters and input calibration files it consists of, with
+@kbd{Info->Calibration Set Details...}.  New calibration sets
+(@file{.cal} files) can be loaded with @kbd{File->Load New Calibration
+Set...}.  All input calibration files (in incrementing versions) can be
+found in the @file{cubism/calib/data/ssc} directory in your CUBISM
+distribution.
+
+Note that the general presumption is that more current calibration data
+is always better when used with data processed wit the most up to date
+SSC IRS pipeline.  This is true in general, although there is now at
+least one time dependent calibration (the input bias voltage for the LH
+detectors was changed).  CUBISM automatically uses the appropriate flux
+calibration values depending on the date of observation.  
+
+New calibration sets can be created, but this is outside the scope of
+this document.  
+
+@node Backgrounds, Bad Pixels, Calibration Sets, Cube Assembly
+@section Backgrounds
 @cindex Background subtraction
 
 All IRS observations are affected at some level by the foreground or
@@ -2377,7 +2484,7 @@ the form of correlated patterns, bands, etc.).  2D level background
 subtraction is a recommended step for all cubes.
 
 Here we explore a variety of options for background subtraction, in
-decreasing order of preference.
+decreasing order of preference.  
 
 @callout{Subtracting a 2D background frame can greatly improve the
 quality of the assembled cube, especially for faint sources.}
@@ -2392,7 +2499,7 @@ quality of the assembled cube, especially for faint sources.}
 @end menu
 
 @node In Situ Background, Archive Background, Backgrounds, Backgrounds
-@subsubsection In Situ Background
+@subsection In Situ Background
 @cindex Background, in situ
 
 The primary and recommended technique for assembling a background frame
@@ -2403,25 +2510,27 @@ simply load the records (for example, with @kbd{Record->Import Data by
 Module->BCD}), disable them, and @kbd{Background->Set Background from
 Recs...}.  For backgrounds which appear among the mapping data set,
 simply select these records and choose @kbd{Background->Set Background
-from Recs...}.
+from Recs...}.  Using either the average or min/max trimmed average is
+fine.
 
-Finding full records which are uncontaminated by source emission, either
-within the spectral map itself, or as part of a dedicated background AOR
-grouped with the main observations, is the goal.  This is aided in maps
-using the low-resolution modules by the fact that each low-res slit (LL
-and SL) is comprised of two sub-slits which define the different
-spectral orders.  For small object, less than the size of one sub-slit,
-it is common to map first with one sub-slit, and then with the other
-(e.g. a SL1 map and, separately, a SL2 map).  In this case, the
-``outrigger'' data from the data collected when the source was placed in
-the other order can be used as a background set.  Even if the full slit
-was used to map a source, the fact that the two orders extend away from
-the map center to either side can allow useful background frames to be
-found.
+Finding records in which the @emph{full slit} is uncontaminated by
+source emission, either within the spectral map itself, or as part of a
+dedicated background AOR grouped with the main observations, is the
+goal.  This is aided in maps using the low-resolution modules by the
+fact that each low-res slit (LL and SL) is comprised of two sub-slits
+which define the different spectral orders.  For small object, less than
+the size of one sub-slit, it is common to map first with one sub-slit,
+and then with the other (e.g. a SL1 map and, separately, a SL2 map).  In
+this case, the ``outrigger'' data from the data collected when the
+source was placed in the other order can be used as a background set.
+Even if the full slit was used to map a source, the fact that the two
+orders extend away from the map center to either side can allow useful
+background frames to be found.  For a very helpful method for such
+selection, @xref{Background Selection Using Visualization}.
 
 
 @node Archive Background, Background Blend, In Situ Background, Backgrounds
-@subsubsection Archive Background
+@subsection Archive Background
 @cindex Background, archive
 
 If you didn't obtain dedicated sky observations, and none of the records
@@ -2450,7 +2559,7 @@ that the data must be available in the archive, which for many program
 requires waiting for the proprietary period to expire.
 
 @node Background Blend, 1D Sky Spectrum Background, Archive Background, Backgrounds
-@subsubsection Background Blend
+@subsection Background Blend
 @cindex Background, blended
 
 A related technique to the archive background is the ``Background
@@ -2483,9 +2592,8 @@ data set, formed in the same way (e.g. in from the PU field statistics).
 Another potentially useful fiducial is the predicted background at the
 source position and date, as available in Spot.
 
-
 @node 1D Sky Spectrum Background, No Background, Background Blend, Backgrounds
-@subsubsection 1D Sky Spectrum
+@subsection 1D Sky Spectrum
 @cindex Sky, 1D spectrum
 
 If no 2D BCD-level data are available for subtraction, some of the same
@@ -2501,7 +2609,7 @@ essentially equivalent to extracting spectra and differencing them after
 the fact, but operates on the entire cube at once.
 
 @node No Background, Background Selection Using Visualization, 1D Sky Spectrum Background, Backgrounds
-@subsubsection No Background
+@subsection No Background
 
 Using no background is a reasonable last resort option for brighter
 sources, though the number of bad pixels in the raw unsubtracted data is
@@ -2511,7 +2619,7 @@ remain in the final assembled cube, which may affect analysis of
 extracted spectra or maps.
 
 @node Background Selection Using Visualization,  , No Background, Backgrounds
-@subsubsection Background Selection Using Visualization
+@subsection Background Selection Using Visualization
 @cindex Visualization, background selection
 
 It can be convenient to select suitable records for inclusion in the
@@ -2541,77 +2649,310 @@ For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
 @end enumerate
 
-@node Bad Pixels, Saving the Project, Backgrounds, Cube Assembly
-@subsection Bad Pixels
+@node Bad Pixels, Building the Cube, Backgrounds, Cube Assembly
+@section Bad Pixels
 @cindex Bad pixels
 @cindex Rogue pixels
 
+Hot, ``rogue'' or bad pixels occur in IRS data with a broad range of
+intensities, and they vary in position and frequency on the array on
+scales of hours to months.  Over time, damage to the IRS arrays from
+solar particles has increased the number of these pixels, in particular
+on the two long wavelength arrays.  Such pixels dominates the noise
+properties of spectral cubes, maps and extracted spectra, and if left
+untreated, severely degrade the quality of assembled cubes.  Cleaning a
+cube of bad pixels is typically an iterative task: mark pixels, re-build
+the cube, inspect the cube for anomalous spectral or spatial features,
+mark additional pixels, etc.
 
+CUBISM contains a variety of tools for identifying and flagging such
+pixels, which are then ignored when assembling the cube.  Bad pixels can
+be identified either ``manually'' or automatically (or a combination of
+both).  As discussed in @ref{Backgrounds}, subtracting a background
+record built from data obtained nearby in time, with the same record
+exposure time, can mitigate many rogue pixels (which can be thought of
+as pixels which respond normally to light, but have a bright and
+variable underlying dark current component).  However, adjacent in time
+background subtraction is not always available, and even when it is, a
+number of problematic pixels often remain.
 
 @menu
 * Global and Record Level Bad Pixels::  
+* Manual Bad Pixel Selection::  
+* Backtracking to Discover Bad Pixels::  
 * Automatic Bad Pixels::        
-* Tips for Selecting Bad Pixels::  
+* Saving Bad Pixels::           
 @end menu
 
-@node Global and Record Level Bad Pixels, Automatic Bad Pixels, Bad Pixels, Bad Pixels
-@subsubsection Global and Record Level Bad Pixels
+@node Global and Record Level Bad Pixels, Manual Bad Pixel Selection, Bad Pixels, Bad Pixels
+@subsection Global and Record Level Bad Pixels
 
-The difference.
+There are two different types of user-settable bad pixel in CUBISM:
+@emph{Global} and @emph{Record Level}.  A global bad pixel is a pixel
+presumed bad in @emph{all} @samp{BCD} records.  Since global bad pixels
+remain bad throughout the duration (or a large portion) of the spectral
+map, they produce ``stripes'' at individual wavelength planes in the
+final cube as the pixel is rastered across the map; an example of this
+effect is seen in @ref{fig:cv_stripes}.  The number of stripes depends
+on how many steps are executed along the slit.  Occasionally, partial
+stripes will appear, indicating a bad pixel which persisted for only a
+portion of the map.
 
-@node Automatic Bad Pixels, Tips for Selecting Bad Pixels, Global and Record Level Bad Pixels, Bad Pixels
-@subsubsection Automatic Bad Pixels
+The second type of bad pixel is a @emph{record level} bad pixel, which
+affects only a single record.  These can be useful for treating
+intermittent bad pixels which affect only a single or small number of
+records; rather than discarding that pixel's data for the entire map,
+only the portion affected is removed.  This is particularly useful for
+@emph{BCD} frames with horizontal band artifacts (a group of rows with
+garbled data).  The number of record level bad pixels set for a given
+record can be seen in the secondary pane of information in the CUBISM
+Project window.  The total number of bad pixels marked, and their
+sources, is given in the project parameters (@kbd{Info->Project
+Parameters...}).
 
-Weasel words, caveats, etc.  Best practices.  Redundancy is key.
+@float Figure,fig:cv_stripes
+@center @image{images/cube_stripes,6in,,Cube with Bad Pixel Stripes}
+@caption{An example of a global bad pixel impressing ``stripes'' in the
+output cube.}
+@end float
+
+@node Manual Bad Pixel Selection, Backtracking to Discover Bad Pixels, Global and Record Level Bad Pixels, Bad Pixels
+@subsection Manual Bad Pixel Selection
+@cindex Bad pixels, manual selection
 
 
-@node Tips for Selecting Bad Pixels,  , Automatic Bad Pixels, Bad Pixels
-@subsubsection Tips for Selecting Bad Pixels
-
-Bad pixels can be identified in CUBISM either 'manually' or in an
-automatic fashion.  The procedure for automatically identifying bad
-pixels is described in Section XX.
+Bad pixels can be selected manually at several levels.  The most
+straightforward is at the @samp{BCD} level: simply examine a single or
+stack of records, and mark errant pixels.  @xref{Bad Pixel Tool}, for
+more on marking user or record level bad pixels.  A typical workflow for
+marking bad pixels at the @samp{BCD} level is:
 
 @enumerate
 @item
  View the stack of relevant @samp{BCDs}.
 @item
- Show the @samp{WAVSAMP}.
+ Show the @samp{WAVSAMP} (@pxref{CubeView WAVSAMP Pane}.
 @item
  Click @samp{BGSub} (if available) to remove the appearance many bad
- pixels using the record level sky background data previously defined
- @pxref{Backgrounds}.
+ pixels using the record level sky background data previously defined.
 @item
- Enlarge the stack viewer to the largest possible size @pxref{CubeView
- Options Menu}.
+ Enlarge the stack viewer window (@pxref{CubeView Options Menu}).
 @item
  Show the user (cyan) bad pixel and pipeline fatal (red) masks only, by
- right-clicking two times.
+ right-clicking two times (@pxref{Bad Pixel Tool}).
 @item
- Set the scaling stretch to show just the very brightest pixels.
+ Set the histogram scaling stretch to show only the very brightest
+ pixels.
 @item
- Mark ~ >4 sigma deviations, but ensure you are not marking line data!
+ Mark >4 sigma deviations, but ensure you are not marking line data!
 @item
  Reset the scaling to show the next brightest set of pixels.
 @item
- Mark ~ >4 sigma deviations.
+ Mark >4 sigma deviations.
 @item
- Iterate this process until you can clearly see emisison lines, to the
-point where the viewable pixels are no longer >4 sigma deviations.
+ Iterate this process until you can clearly see emisison lines or other
+ real features in the data, to the point where the viewable pixels are
+ no longer >4 sigma deviations.
 @item
- Save the bad pixel mask.
+ Save the bad pixel mask (@pxref{CUBISM Project BadPix Menu}).
 @item
- Build the cube with this mask.
-@item
- Inspect each wavelength plane for weird, out-of-place columns/rows.
-@item
- Use the backtrack tool to note any additional pixels to be masked.
-@item
- Finally, extract a 1d spectrum and look for spikes that aren't lines.
+ (Re)-build the cube with this mask.
 @end enumerate
 
-@node  Saving the Project,  , Bad Pixels, Cube Assembly
-@subsection Saving the Project
+@callout{When selecting bad pixels in cubes being built with a
+background, be sure to enable the @kbd{BGSub} button @emph{before}
+selection, since this can mitigate many bad pixels, which would
+otherwise get marked.}
+
+@node Backtracking to Discover Bad Pixels, Automatic Bad Pixels, Manual Bad Pixel Selection, Bad Pixels
+@subsection Backtracking to Discover Bad Pixels
+
+Backtracking is the term used for listing all the @samp{BCD} records,
+and pixels within those records, contributing to a given cube pixel.
+This is a very powerful tool for validating features in a cube.  In
+particular, it is particularly useful for identifying global bad pixels,
+which impress stripes in planes of the output cube
+(@pxref{fig:cv_stripes}).  @xref{Pixel BackTracking Tool}, for more on
+using this tool.
+
+A typical workflow for identifying bad pixels using the backtracking
+tool is:
+
+@enumerate
+@item
+ Inspect each wavelength plane of the cube for out-of-place
+ columns/rows.
+
+@item
+ Using the backtracking tool, select a cube pixel inside a problematic
+ feature (e.g. a stripe).
+
+@item
+ Note any outlier pixels in the backtracked data set, comparing to other
+ cube pixels along the feature to note consistently outlying record
+ pixels.
+
+@item
+ Right-click a given pixel to mark it as a global or record level bad
+ pixel.
+
+@item
+ Re-build the cube after one or more pixels are marked to see whether
+ the cube was improved.
+@end enumerate
+
+A related useful technique is to extract spectra in different parts of
+the cube, and look for non-physical spectral features (typically
+positive or negative spikes, one pixel wide, not corresponding to known
+lines).  Using CubeSpec's @kbd{Full Cube} mode, select the affected cube
+plane, and look for anomalous stripes or other features.  Use the
+backtracking tool to identify and mark bad pixels.
+
+
+@node Automatic Bad Pixels, Saving Bad Pixels, Backtracking to Discover Bad Pixels, Bad Pixels
+@subsection Automatic Bad Pixels
+@cindex Bad pixels, automatic selection
+
+CUBISM offers a powerful method to automatically discover and mark bad
+pixels in an assembled cube.  Selecting @kbd{BadPix->Auto-Gen Global Bad
+Pixels} or @kbd{BadPix->Auto-Gen Record Bad Pixels} will show a dialog
+in which the parameters for the automatic selection are set (see
+@ref{fig:autobadpix}).  The method by which bad pixels are automatically
+discovered is similar in concept to the backtracking method described in
+the previous section, except that @emph{all} cube pixels are considered
+simultaneously.
+
+@callout{The automatic bad pixel tool must be used with caution.  It can
+flag real data such as spectra lines or sharp spatial features
+(e.g. point sources).  Always check the resulting bad pixels it finds,
+and avoid very low sigma thresholds or fractions.}
+
+
+An example of the auto-badpix parameter dialog is seen in
+@ref{fig:autobadpix}.  The ``Sigma-Trim'' option sets the rough number
+of standard deviations a pixel must lie away from the median record
+pixel value contributing.  The ``MinBad-Fac'' lists the minimum fraction
+of occurence of a given @samp{BCD} pixel in which it must deviate to be
+considered bad.  For example, if @samp{sigma-trim} is 7, and
+@samp{minbad-frac} is .5, then a given @samp{BCD} pixel is considered
+bad if at least 50% of the time it appears in the cube, it is 7-sigma
+from the median pixel value.
+
+@float Figure,fig:autobadpix
+@center @image{images/autobadpix,2.031in,,Auto Bad Pixel dialog}
+@caption{The dialog for setting auto bad pixel parameters.}
+@end float
+
+The @kbd{BG} button determines whether the test for lying outside the
+sigma trim threshold is performed on the background subtracted data
+(comparable to using the @samp{Val-Back} column in the backtracking
+tool).  This is typically a good idea, since many pixels are not
+outliers when background-subtracted.  The @kbd{UNC} option controls how
+the fiducial spread of data values is determined.  If it is set, the
+pipeline-estimated uncertainties are used.  If not, a median absolute
+deviation is used as an estimate for the fiducial sigma value.  Since
+the pipeline uncertainties severely under-estimate the true spread of
+data above S/N ~10 or so, for bright sources, it is best not to set the
+@kbd{UNC} option.  It can be useful for faint sources, in particular
+when the redundancy is small.
+
+Record-level automatic bad pixels are similar to global bad pixels,
+except instead of demanding that a given @samp{BCD} pixel must deviate
+at least @samp{minbad-frac} of the time it appears in the cube, only
+@emph{that record's} pixel must satisfy this cut.  For example, if
+record 20, pixel @samp{(40,79)} appears 4 times in the cube,
+@samp{minbad-frac=.4} requires at least 2 of these appearances to be
+outliers to consider it a bad pixel.  Many more bad pixels will be
+generated by record-level auto-badpix, but each of them will have a much
+smaller impact on the final cube (since they disable that pixel for only
+a single record).  Often, global bad pixels are sufficient.  In certain
+cases, record-level pixels, automatically discovered, are very useful,
+for example for very short exposures (6s) in which cosmic rays are
+incompletely identified by the pipeline.  This results in small 3--4
+pixel stripes along rows, which can often be identified automatically
+with record-level auto bad pixels.
+
+@callout{Note that by default the bad pixel list is appended to with
+subsequent runs of auto-badpix.  Clear the bad pixel list first to avoid
+this.}
+
+Obviously, the amount of redundancy in a spectral map has a major impact
+on the degree to which outlying pixels can be automatically discovered.
+A @samp{1xn} map (no steps along the slit) offers a minimum amount of
+pixel redundancy, whereas a map stepped many times along the slit,
+placing the same source position at multiple positions along the slit,
+will offer much better redundancy.  With minimum redundancy, the number
+of record pixel samples mapping into a cube pixel is small, and the
+natural spread of those samples, which results from the edges of
+spectral lines or sharp spatial features falling into a single spectral
+cube, can overwhelm bad pixels.  Extreme caution must be exercised in
+this case to avoid marking legitimate pixels at these edges.
+
+
+@node Saving Bad Pixels,  , Automatic Bad Pixels, Bad Pixels
+@subsection Saving Bad Pixels
+@cindex Bad pixels, saving
+
+The list of global and record level bad pixels can be saved as text in
+@file{.bpl} files using @kbd{BadPix->Save Bad Pixels...}.  This is
+useful for sharing bad pixel lists among projects, and providing a
+backup of the marked pixels outside of the cube project (recommended).
+Bad pixels can be loaded in from @file{.bpl} files as well, either
+replacing the current set, or appending to it.  @xref{CUBISM Project
+BadPix Menu}.
+
+@node WAVSAMP,  , Saving the Project, Cube Assembly
+@section WAVSAMP
+@cindex WAVSAMP
+
+The @samp{WAVSAMP} is the set of @emph{pseudo-rectangles} which define
+the spectral order's location on the array, the (tilted) locus of
+constant wavelength, and the wavelength calibration (see, e.g.,
+@ref{fig:cv_recs}).  CUBISM uses a custom built version of the
+@samp{WAVSAMP}. which differs slightly from that used by the SSC.  The
+exact position and size of the @samp{WAVSAMP} changes with new SSC
+calibrations, and it typically includes a small amount (1-2 pixels) of
+spurious data at the extremities of the slit.  For spectral maps without
+any stepping along the slit (@emph{1xn} maps), leaving this @emph{crust}
+of spurious data will have little impact, since it can be ignored when
+extracting spectra and making maps.  For maps with along the slit
+redundancy however, it is important to exclude this data directly.  
+
+@xref{CubeView WAVSAMP Pane}, for more information on editing the
+@samp{WAVSAMP}.  Typically, the @samp{WAVSAMP} is edited, and the
+central handle is used to drag each side in by 2--5% (the reported
+@samp{WAVSAMP} coordinates are in normalized units, 0.0--1.0), to
+exclude the bulk of the spurious data at the slit ends.  Non-uniform
+edits are not recommended.
+
+@node Building the Cube, Saving the Project, Bad Pixels, Cube Assembly
+@section Building the Cube
+@cindex Cube, Building
+@cindex Building Cubes
+
+Once the data records are assembled, backgrounds are set, and obvious
+bad pixels are marked, a first-pass cube can be assembled.  Note that
+disabled records are not included in the cube build.  Frames which are
+completely garbled (a rare occurence) should be disabled, as should data
+records which are used only for setting the background.
+
+Select @kbd{Cube->Build Cube}, and watch the cube build progress plotted
+(records layed out and clipped against the sky grid, and then final cube
+pixels assembled from the record data).  Typically several iterations
+are performed, refining the background and bad pixel selection, before
+the cube is considered complete.
+
+Once the cube has been built once, subsequent builds will proceed much
+more quickly, since the ``account'' information, which includes all the
+clipped pixel mapping from @samp{BCD} to the sky grid, is saved.
+Changing the @samp{WAVSAMP}, build order, or manually resetting the
+accounts with @kbd{Cube->Reset Accounts} will invalidate the accounts,
+which will need to be reconstructed in a slow cube build.  Changing
+backgrounds, bad pixels, etc. can be done without invalidating the
+accounts.
+
+@node  Saving the Project, WAVSAMP, Building the Cube, Cube Assembly
+@section Saving the Project
 @cindex Saving projects
 
 Saving the project to a @file{.cpj} project file records all of the
@@ -2648,22 +2989,23 @@ it will be recalled from disk when needed.  Unfortunately, this makes
 cube project files non-portable (leading to an error like ``Couldn't
 restore data from file''), unless the absolute path to the @samp{BCD}
 files is fixed on all systems where the cube is loaded.  While you can
-easily replace the root directory from the file names to fix this (see
-XXXX), another method is to use this option to specify that all path
-names will be recorded relative to the path of the @file{.cpj} file
-itself.  Then, as long as the relative file layout of the project file
-and data files remains the same, all record data should load with no
-problem.
+easily replace the root directory from the file names to fix this
+(@pxref{Troubleshooting}), another method is to use this option to
+specify that all path names will be recorded relative to the path of the
+@file{.cpj} file itself.  Then, as long as the relative file layout of
+the project file and data files remains the same, all record data should
+load with no problem.
 
 @item
 @kbd{Save Accounts with Project}: The clipping accounts consist of all
 the information which maps @samp{BCD} pixels to the sky grid.  When the
 accounts are valid, (you don't see @emph{needs rebuilding} in the
 @kbd{Info->Project Parameters...} page), the cube can be rebuilt
-quickly, and pixel backtracking works without a re-build (see XXX).
-Saving this account information to disk gives these benefits to cube
-projects loaded from disk as well, but comes with a steep cost in terms
-of disk space: approximately 400--700kB per record.
+quickly, and pixel backtracking works without a re-build (@pxref{Pixel
+Backtracking Tool}).  Saving this account information to disk gives
+these benefits to cube projects loaded from disk as well, but comes with
+a steep cost in terms of disk space: approximately 400--700kB per
+record.
 
 @end enumerate
 
@@ -2678,35 +3020,11 @@ to examine the cube itself (extract spectra, make maps), access to the
 record data isn't necessary.
 
 
-@node WAVSAMP, Cube Analysis, Cube Assembly, The Techniques
-@section WAVSAMP
-@cindex WAVSAMP
-
-The @samp{WAVSAMP} is the set of @emph{pseudo-rectangles} which define
-the spectral order's location on the array, the (tilted) locus of
-constant wavelength, and the wavelength calibration (see, e.g.,
-@ref{fig:cv_recs}).  CUBISM uses a custom built version of the
-@samp{WAVSAMP}. which differs slightly from that used by the SSC.  The
-exact position and size of the @samp{WAVSAMP} changes with new SSC
-calibrations, and it typically includes a small amount (1-2 pixels) of
-spurious data at the extremities of the slit.  For spectral maps without
-any stepping along the slit (@emph{1xn} maps), leaving this @emph{crust}
-of spurious data will have little impact, since it can be ignored when
-extracting spectra and making maps.  For maps with along the slit
-redundancy however, it is important to exclude this data directly.  
-
-@xref{CubeView WAVSAMP Pane}, for more information on editing the
-@samp{WAVSAMP}.  Typically, the @samp{WAVSAMP} is edited, and the
-central handle is used to drag each side in by 2--5% (the reported
-@samp{WAVSAMP} coordinates are in normalized units, 0.0--1.0), to
-exclude the bulk of the spurious data at the slit ends.  Non-uniform
-edits are not recommended.
-
-@node  Cube Analysis, Cube Validation, WAVSAMP, The Techniques
-@section Cube Analysis
+@node  Cube Analysis, Tips and Troubleshooting, Cube Assembly, Top
+@chapter Cube Analysis
 @cindex Cube analysis
 
-@subsection Extracting 1D Spectra
+@section Extracting 1D Spectra
 
 Extracting 1D spectra from the cube, and building 2D line, continuum, or
 feature maps are straightforward using the CUBISM interface.  After the
@@ -2768,7 +3086,7 @@ IRS spectrum of your source changes with position over the cube.  Any tbl
 file that you save in this step, can also be used to set the region for
 another cube which you make later (as described above).
 
-@subsection Creating 2D Maps
+@section Creating 2D Maps
 
 Just the cube can be used to generate 1D spectra over any extraction
 region, so too can the 1D spectra be used to create 2D images (slices of
@@ -2810,195 +3128,22 @@ on the ``Reset Plot" button, all the continuum and peak selections will be
 erased, and new spectral regions, and their corresponding spectral maps,
 can be defined.
 
-Besides user-defined maps, Cubism has a number of pre-defined filter curves
-available under the ``Maps" pulldown menu in the CubeSpec window.  This will 
-allow you to generate spectral maps in, for example, any the IRAC-5.8, IRAC-8,
-MIPS-24, IRS Peakup, ISOCAM LW2 or LW3 filters.  Once selected, the spectral
-ranges will be highlighted on the 1D spectrum in the CubeSpec window, and the 
-image in the CubeView window will change to the corresponding 2D map.  Note, 
-these maps are pseudo filter images, and are not continuum-subtracted.
-
-@node  Cube Validation, Cookbook, Cube Analysis, The Techniques
-@section Cube Validation
-@cindex Cube validation
-
-A description of backtracking and other means of validating and
-improving the cube, and checking on weak features, etc.
-
-@node Cookbook,  , Cube Validation, The Techniques
-@section Cookbook
-@cindex Cookbook
-
-NOTE: This info will likely be re-organized and scattered around the
-previous sections.
-
-@center The 10 Steps To Build A Spectral Cube 
-@enumerate
-@item
-Admit that you have a cube.  Prepare yourself.  We tend to chose a 20+
-year old whisky, preferably Speyside.
-@item
-We assume that you have already followed the Quick Start Guide and
-started CUBISM with the following command.
-@example
-IDL> cubism
-@end example
-@item 
-If this is your first start of CUBISM, you will have a menu window
-asking you to @kbd{Load Cube Project...}.  In that case, you can open an
-old cube project (ending in .cpj) or press the bottom button @kbd{Create
-New Cube Project}.  For a new project, you must first name the project.
-A @kbd{New Project Name} window pops up and this is where you type its
-name.  Click @kbd{OK} when you are done.
-@item
-Click on the @kbd{Record} menu tab.  Highlight then click the
-@kbd{Load Record Uncertainties}.  After this, the @kbd{Record}
-menu closes.  Open it again and you will see a square next to
-@kbd{Load Record Uncertainties}.
-@item
-With the @kbd{Record} menu tab still open, click on @kbd{Import
-Data by Module}.  This brings up another window.  You want to click
-@kbd{BCD...}.  This brings up yet another window entitled
-@kbd{Select BCD AOR Directory}.  You just need to highlight the top
-directory where the data are.  Since you can only load one type of data
-in one project, you can highlight the r###### directory that you get
-when unzipping data from the SSC.  If you do not know which r######
-directory has which data, highlight the next directory down on the
-directory tree (with / being the base of the directory tree).  Click
-@kbd{OK} and CUBISM will bring up another window entitled
-@kbd{Load Group}. Click on the square next to the data that you want.
-The window tells you what object, module (SL, LL, SH, LH), and how many
-files for each module.  Click @kbd{OK} when you are ready.
-
-@item
-Click on the @kbd{Cube} menu tab.  There are several points under this
-menu that need to be checked (producing a square like that for @kbd{Load
-Record Uncertainties} in Step 4).  Check the following: @kbd{Build Cube
-with FLUXCON}, @kbd{Build in MJy/sr}, @kbd{Build Cube with SLCF},
-@kbd{Trim Wavelengths}, and @kbd{Build Cube Uncertainties} (you will not
-be able to highlight this unless you clicked on @kbd{Load Record
-Uncertainties} earlier).  There is also @kbd{Subtract Background} that
-needs to be checked if you are getting rid of the background.  That is
-your preference.  This text will not be clickable until you have set the
-background records.
-
-@item
-Now, time to set the background records.  You will have to add the
-background spectra using the @kbd{Record} menu tab and clicking
-@kbd{Import Data by Module} and then @kbd{BCD} (just like before).
-In the main cube project window, highlight the file names that are for
-the background.  Once the file names are highlighted, click on the
-@kbd{Background} menu tab.  Under this menu, click on @kbd{Set
-Background from Rec(s)...}.  A window will appear with either one
-option, if you only have 2 background files, or two options.  The two
-options to choose are @kbd{Average} (for both 2 or greater number of
-files) and @kbd{Average + Min/Max Trim} (for only greater than 2
-background files).  Now, under the @kbd{Cube} menu tab, you can now
-highlight and then click @kbd{Subtract Background}.
-
-@item
-It is time to build your cube.  Go into the @kbd{Cube} menu tab and
-click on @kbd{Build Cube}.  A new window producing multicolored
-rectangles will appear.  Then, the white grid will become bold when each
-``pixel'' is generated.  Congratulations!  You have a cube.
-
-@item
-Now, you can start deleting bad pixels or have the program do it for
-you.  It all depends on how much time that you want to spend on the
-cube.  I will not tell you how to delete bad pixels.  That is saved for
-another section.  For those wishing to have CUBISM do it, click on the
-@kbd{Bad Pixel} menu tab and then click on @kbd{Auto-Gen Global
-Bad Pixels...}.  You can also click on @kbd{Auto-Gen Record Bad
-Pixels...}, but this option is not discussed here.  After hitting the
-Global button, a new window pops up.  First, unclick the @kbd{UNC}
-button.  Second, if you have subtracted a background, click the
-@kbd{BG} button to account for the background use.  The default sigma
-and fraction that come up are very good.  Click @kbd{OK}.  We cannot
-give you default numbers of bad pixels that will be produced by the
-program.  It depends on when your observations were taken, if you used
-background subtraction, and the parameters for the Auto-Gen.
-
-@item
-Finally, rebuild your cube.  The Auto-Gen Bad Pixel program will always
-leave a few bad pixels.  So, you will have to subtract a few.  If the
-program doesn't leave a few, then you have probably deleted some of your
-science.  @strong{BE FOREWARNED!}  However, you can now view the cube,
-extract spectra, and save them as .tbl files.  Enjoy your new life with
-a spectral cube!
-@end enumerate
-
-@center GOTCHA!!! --- Things That Will Waste Your Time When You Do Them
-Here, we present a list of things to remember, especially if you just
-resave your first project (using @kbd{Save As...} under the
-@kbd{File} menu tab).
-@enumerate
-@item
-If you just resave a project, like SL1 and then use it for SL2, then remember to 
-change the @kbd{Set Cube Build Order...} under the @kbd{Cube} menu tab.  
-@item
-If you just resave a project, like SH and then use it for LH, then
-remember to erase all your previous bad pixels.  These bad pixel numbers
-are saved in each project.  Use @kbd{Clear All Bad Pixels} under the
-@kbd{BadPix} menu tab.
-@item
-If you resave a project, you will NOT have to change the background
-files, for SL1 to SL2.  However, you WILL have to clear the background
-records if you switch from SH to LH.  Use @kbd{Remove Background}
-under the @kbd{Background} menu tab.
-@item
-SAVE OFTEN!!!  You can also save your bad pixel and background records
-in separate files from your project (.cpj) file.  These are typically
-.bpl (for bad pixels) and .bgl (for backgrounds).  You can then load
-these files into a new project file and save yourself time, if you are
-breaking a large Project into several smaller project files.
-@sp 1
-OR what could happen is that you get drunk and type 'rm -f *.cpj' in the
-directory where you are working.  All that work lost, but before you
-throw yourself from the building, just load up the science files again
-and then load up the .bpl and .bgl files.  NOTE: The background science
-files have to be loaded prior to loading the .bgl file.
-@item 
-When SSC moves onto S14, S15, etc., they change the last number in the
-science fits files.  Thus, your project files will not be portable
-@sp 1
-NNNNNNNNNNNNNNNOOOOOOOOOOOOOOOOOOOOO!!!!!!!!!!!!!!!!!
-@sp 1 
-But wait!  Go to the @kbd{Edit} menu tab and click on @kbd{Select
-All}.  Then, under the @kbd{Edit} menu tab, there is the great button
-called @kbd{Replace File Subtring}.  This brings up, essentially, the
-Find and Replace window from Windows.  Just type in _1_ in the Find
-line.  Then, type _2_ in the Replace line.  Click @kbd{OK}.  Thus,
-all your old work is saved.
-@item
-If you get an error message about missing a calibration file and so
-using something older, don't panic.  It's fine but you probably need an
-update of your CUBISM, or you need to wait for the SSC to come up with a
-newer calibration file.
-@item
-If CUBISM ever freezes, close everything and restart.  Before running CUBISM again,
-click on @kbd{Debug Cubism} under the @kbd{Info} menu
-tab.  Then, run through the steps that generated the error in the first place.  
-Send the error messages in your IDL
-window to the SSC Help Desk.  The debug information will help the Science User Support
-team assess the problem.
-@item
-If you want to View your cube and visualize your AORs, then you want to
-use the (new viewer) commands of the same name (e.g., View Cube (new
-viewer)...).  These (new viewer) commands are found under the
-@kbd{Record} menu tab and @kbd{Cube} menu tab.  Hitting these
-buttons will save you the frustration of seeing what you want disappear.
-This is not so bad for viewing a cube but it will save you a few moments
-when you are visualizing an AOR.
-@item
-If you can think of any more, you are smarter than us.  
-@end enumerate
+Besides user-defined maps, Cubism has a number of pre-defined filter
+curves available under the @kbd{Maps} menu in the CubeSpec window.  This
+will allow you to generate spectral maps in, for example, any the
+IRAC-5.8, IRAC-8, MIPS-24, IRS Peakup, ISOCAM LW2 or LW3 filters.  Once
+selected, the spectral ranges will be highlighted on the 1D spectrum in
+the CubeSpec window, and the image in the CubeView window will change to
+the corresponding 2D map.  Note, these maps are pseudo filter images,
+and are not continuum-subtracted, and may lie partially outside the
+range of the spectra.
 
 
 @c
 @c Troubleshooting
 @c
 
-@node Tips and Troubleshooting, Index, The Techniques, Top
+@node Tips and Troubleshooting, Index, Cube Analysis, Top
 @chapter Tips and Troubleshooting
 @cindex Troubleshooting
 
@@ -3007,10 +3152,108 @@ standard issues which are commonly encountered, and provide tips on
 debugging CUBISM and providing useful feedback to the SSC.
 
 @menu
+* Tips::                        
+* Troubleshooting::             
 * Debugging CUBISM::            
 @end menu
 
-@node Debugging CUBISM,  , Tips and Troubleshooting, Tips and Troubleshooting
+@node Tips, Troubleshooting, Tips and Troubleshooting, Tips and Troubleshooting
+@section Tips
+@cindex Tips
+
+The most common and useful tips.
+
+@enumerate
+@item
+@strong{Save Often.}  You can always revert to the file on disk, or save
+multiple versions.
+
+@item
+@strong{Save bad pixels and background records.}  You can save your bad
+pixel and background records in separate files from your project
+@file{.cpj} file.  These are @file{.bpl} (for bad pixels) and
+@file{.bgl} (for backgrounds).  You can then load these files into a new
+project file and save yourself time, if you are breaking a large Project
+into several smaller project files, and they are a useful backup in the
+case of loss or damage to the @file{.cpj} file.
+
+@item
+@strong{Use auto-badpix with care.}  This can be a big time saver, but
+can mark valid data bad if used improperly, especially on maps without
+much cube-level redundancy.
+@end enumerate
+
+@node Troubleshooting, Debugging CUBISM, Tips, Tips and Troubleshooting
+@section Troubleshooting
+@cindex Troubleshooting
+
+Commonly encountered problems and their solutions:
+
+@enumerate
+@item
+@strong{I get the message ``Couldn't restore data from file...''}.  By
+default, CUBISM does not save the data itself, only a link to the files
+in a project.  If you've since moved or modified those files, or are
+loading the project on another system where they are in a different
+location, you can @kbd{Edit->Select All}, then @kbd{Edit->Replace File
+Substring...}  to correct the base pathname.  Another option is to store
+the data in the project, or save relative pathnames.  @xref{Saving the
+Project}.
+
+@strong{I'm attempting to upgrade a project from pipeline version S14 to
+S15, but the project data won't load}.  The SSC increments a version
+number for all processed files when the pipeline processing changes.
+You can use the same technique as in the last tip to, e.g. Find
+@samp{_4_} and replace with @samp{_5_} (or whatever the relevant version
+numbers happen to be).
+
+@item
+@strong{CUBISM freezes.}  There a number of reasons why CUBISM could
+freeze, but commonly it only appears to be frozen, due to a dialog which
+is awaiting your attention, and must be dismissed before the rest of the
+program is responsive.  If this is not the problem, @xref{Debugging
+CUBISM}.
+
+@item
+@strong{My CubeView window gets overwritten when I visualize or display
+cubes or records.}  You can have as many CubeView windows as you want
+associated with a cube.  By default, however, CUBISM recycles CubeView
+windows, to avoid too much clutter on your display.  If you want a new
+window, for instance to visualize an AOR while examining data records,
+use the @kbd{(new viewer)...} version of the view commands.
+
+@item
+@strong{My cube seems to be built in the wrong order.}  Did you double
+check the cube build order (@kbd{Cube->Set Cube Build Order...}).
+Remember that saving the cube with a different name does not change the
+cube build order.
+
+@item
+@strong{I have 4 different projects open, and I can't keep track of what
+is what.}  Look in the title and status bars of each tool for relevant
+information.  Consider adopting a different color table for all CubeView
+tools displaying a given project's data.
+
+@item
+@strong{I get a message about missing calibration files.}
+
+You are probably using another cube built with a newer version of
+CUBISM, and need to update your version.  See @kbd{Info->About Cubism}
+to check the local CUBISM version, as well as the version which was used
+to build the loaded cube project.
+
+@item
+@strong{I removed all data records, loaded more, and built a new cube,
+but something isn't right.}  Remember that a cube project includes
+information on bad pixels, background records, etc.  Check
+@kbd{Info->Project Parameters...} to see what you've set.  Clear bad
+pixels and background records if necessary, or (easiest) just start from
+a clean, new cube project.
+
+@end enumerate
+
+
+@node Debugging CUBISM,  , Troubleshooting, Tips and Troubleshooting
 @section Debugging CUBISM
 @cindex Debugging CUBISM
 
