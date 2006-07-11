@@ -384,8 +384,8 @@ problems.
 Subject to routine name conflicts (e.g. two routines named
 @file{routine.pro} on the path), so you must carefully set your
 @code{IDL_PATH} to be sure CUBISM's files are found first.  This should
-not be a common problem, but earlier distributions of SMART did have
-some conflicting file names.
+not be a common problem, but earlier distributions of the staring-mode
+extraction package SMART did have some conflicting file names.
 @end itemize
 
 @noindent The advantages of installing and running a binary version of CUBISM:
@@ -497,9 +497,9 @@ prevent access to the command line.
 @section Setup
 @cindex Setup, of CUBISM
 
-CUBISM needs very little setup.  As long as the binary or source file
-and directory structure is left intact, CUBISM auto-discovers all
-necessary calibration and other files it needs.  
+CUBISM needs very little setup.  As long as the binary or source
+directory structure is left intact, CUBISM auto-discovers all necessary
+calibration and other files it needs.
 
 One basic setup issue relates to the color mode.  By default, IDL uses
 @emph{DECOMPOSED} color, in which the RBG value of pixels is directly
@@ -1810,7 +1810,7 @@ you find yourself using this tool often to bring out detail in different
 regions of an image, try out the histogram tool instead and see if you
 prefer it.
 
-The color tool's key shortcut if @kbd{c}.
+The color tool's key shortcut is @kbd{c}.
 
 @node Image Slicing Tool, Box Statistics Tool, Color Tool, CubeView Tools
 @subsubsection Image Slicing Tool
@@ -1845,13 +1845,13 @@ The image slicing tool's key shortcut is @kbd{l}.
 @caption{Example CubeView statistics computed in the yellow box.}
 @end float
 
-The statistics tools extends the CubeView window, adding a panel of
+The statistics tool extends the CubeView window, adding a panel of
 statistics information at the bottom, including mininum/maximum,
 average, median, standard deviations, and 3-sigma trimmed average and
 standard deviation.  Simply create or modify a box region (@pxref{Box
-Regions}) to view the statistics within that box.  The box region for the
-statistics tool is yellow.  An example of the tool's output is show in
-@ref{fig:cv_stats}.
+Regions}) to view the statistics within that box.  The box region for
+the statistics tool is yellow.  An example of the tool's output is show
+in @ref{fig:cv_stats}.
 
 The box statistics tool's key shortcut is @kbd{s}.
 
@@ -2565,25 +2565,25 @@ your mapping AOR, or to use data obtained as part of your mapping
 observations which went off the source.  For dedicated sky observations,
 simply load the records (for example, with @kbd{Record->Import Data by
 Module->BCD}), disable them, and @kbd{Background->Set Background from
-Recs...}.  For backgrounds which appear among the mapping data set,
-simply select these records and choose @kbd{Background->Set Background
-from Recs...}.  Using either the average or min/max trimmed average is
-fine.
+Recs...}.  For backgrounds which appear among the mapping data set
+(e.g. as was done in @ref{Quick Start Guide}), simply select these
+records and choose @kbd{Background->Set Background from Recs...}.  Using
+either the average or min/max trimmed average is fine.
 
 Finding records in which the @emph{full slit} is uncontaminated by
 source emission, either within the spectral map itself, or as part of a
 dedicated background AOR grouped with the main observations, is the
 goal.  This is aided in maps using the low-resolution modules by the
 fact that each low-res slit (LL and SL) is comprised of two sub-slits
-which define the different spectral orders.  For small object, less than
-the size of one sub-slit, it is common to map first with one sub-slit,
-and then with the other (e.g. a SL1 map and, separately, a SL2 map).  In
-this case, the ``outrigger'' data from the data collected when the
-source was placed in the other order can be used as a background set.
-Even if the full slit was used to map a source, the fact that the two
-orders extend away from the map center to either side can allow useful
-background frames to be found.  For a very helpful method for such
-selection, @xref{Background Selection Using Visualization}.
+which define the different spectral orders.  For small objects, less
+than the size of one sub-slit, it is common to map first with one
+sub-slit, and then with the other (e.g. a SL1 map and, separately, a SL2
+map).  In this case, the ``outrigger'' data from the data collected when
+the source was placed in the other order can be used as a background
+set.  Even if the full slit was used to map a source, the fact that the
+two orders extend away from the map center to either side can allow
+useful background frames to be found.  For a very helpful method for
+such selection, @xref{Background Selection Using Visualization}.
 
 
 @node Archive Background, Background Blend, In Situ Background, Backgrounds
@@ -2699,10 +2699,10 @@ effects of day-to-day changes in the pixel response of the detectors.
 Visualize the AORs using, e.g., an 8 micron IRAC image (@pxref{AOR
 Visualization Tool}).  After using the histogram box to scale the image
 such that low-level diffuse emission is apparent, switch to the
-visualizer tool.  To define background BCDs for, e.g., SL1, for example,
-set the cube build order to 1 (@kbd{Cube->Set Cube Build Order}), and
-see which records are free of source flux.  Highlight these outriggers
-with the mouse by click and drag.
+visualizer tool.  To define background BCDs for, e.g., SL1, set the cube
+build order to 1 (@kbd{Cube->Set Cube Build Order}), and see which
+records are free of source flux.  Highlight these outriggers with the
+mouse by click and drag.
 @item
 For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
@@ -2731,7 +2731,7 @@ both).  As discussed in @ref{Backgrounds}, subtracting a background
 record built from data obtained nearby in time, with the same record
 exposure time, can mitigate many rogue pixels (which can be thought of
 as pixels which respond normally to light, but have a bright and
-variable underlying dark current component).  However, adjacent in time
+variable underlying dark current component).  However, adjacent-in-time
 background subtraction is not always available, and even when it is, a
 number of problematic pixels often remain.
 
@@ -2792,7 +2792,7 @@ marking bad pixels at the @samp{BCD} level is:
 @item
  Show the @samp{WAVSAMP} (@pxref{CubeView WAVSAMP Pane}.
 @item
- Click @samp{BGSub} (if available) to remove the appearance many bad
+ Click @samp{BGSub} (if available) to remove the appearance of many bad
  pixels using the record level sky background data previously defined.
 @item
  Enlarge the stack viewer window (@pxref{CubeView Options Menu}).
@@ -2829,10 +2829,9 @@ otherwise get marked.}
 Backtracking is the term used for listing all the @samp{BCD} records,
 and pixels within those records, contributing to a given cube pixel.
 This is a very powerful tool for validating features in a cube.  In
-particular, it is particularly useful for identifying global bad pixels,
-which impress stripes in planes of the output cube
-(@pxref{fig:cv_stripes}).  @xref{Pixel Backtracking Tool}, for more on
-using this tool.
+particular, it is useful for identifying global bad pixels, which
+impress stripes in planes of the output cube (@pxref{fig:cv_stripes}).
+@xref{Pixel Backtracking Tool}, for more on using this tool.
 
 A typical workflow for identifying bad pixels using the backtracking
 tool is:
@@ -2847,9 +2846,9 @@ tool is:
  feature (e.g. a stripe).
 
 @item
- Note any outlier pixels in the backtracked data set, comparing to other
- cube pixels along the feature to note consistently outlying record
- pixels.
+ Note any pixels in the backtracked data set, comparing to other cube
+ pixels along the feature to note record pixels which are consistently
+ outliers.
 
 @item
  Right-click a given pixel to mark it as a global or record level bad
@@ -2936,7 +2935,7 @@ subsequent runs of auto-badpix.  Clear the bad pixel list first to avoid
 this.}
 
 Obviously, the amount of redundancy in a spectral map has a major impact
-on the degree to which outlying pixels can be automatically discovered.
+on the degree to which outlier pixels can be automatically discovered.
 A @samp{1xn} map (no steps along the slit) offers a minimum amount of
 pixel redundancy, whereas a map stepped many times along the slit,
 placing the same source position at multiple positions along the slit,
@@ -3446,12 +3445,12 @@ debugging CUBISM and providing useful feedback to the SSC.
 @section Tips
 @cindex Tips
 
-The most common and useful tips.
+The most common and useful tips:
 
 @enumerate
 @item
 @strong{Save Often.}  You can always revert to the file on disk, or save
-multiple versions.
+multiple versions of a project under different names.
 
 @item
 @strong{Save bad pixels and background records.}  You can save your bad
@@ -3482,6 +3481,11 @@ tool, @key{Space} to freeze the scaling range, etc.), in CubeSpec
 regions, etc.), and in the CUBISM Project (e.g. arrow keys to change the
 record selection, @key{Return} to view it).  @xref{The Tools}, for more
 information.
+
+@item
+@strong{Use multiple viewers.}  This allows you to simultaneously
+scrutinize @samp{BCD} records, the built cube, and an AOR visualization
+image.
 @end enumerate
 
 @node Troubleshooting, Debugging CUBISM, Tips, Tips and Troubleshooting
@@ -3513,8 +3517,8 @@ numbers happen to be).
 @strong{CUBISM freezes.}  There a number of reasons why CUBISM could
 freeze, but commonly it only appears to be frozen, due to a dialog which
 is awaiting your attention, and must be dismissed before the rest of the
-program is responsive.  If this is not the problem, @xref{Debugging
-CUBISM}.
+program is responsive.  @xref{Debugging CUBISM}, if this is not the
+problem.
 
 @item
 @strong{My CubeView window gets overwritten when I visualize or display
@@ -3552,6 +3556,12 @@ information on bad pixels, background records, etc.  Check
 pixels and background records if necessary, or (easiest) just start from
 a clean, new cube project.
 
+@item
+@strong{My source emission disappears when I use outrigger sky data and
+then click @kbd{BGSub} in the stack or cube viewer.}  Make sure that you
+are subtracting the correct data order.  You might have inadvertently
+selected first order for your sky when you actually meant second order,
+for example.
 @end enumerate
 
 
