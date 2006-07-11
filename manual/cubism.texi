@@ -212,6 +212,7 @@ CubeSpec
 * CubeSpec Title Bar::          
 * CubeSpec Menus::              
 * CubeSpec Buttons::            
+* CubeSpec Display Panes::      
 
 Menus
 
@@ -228,6 +229,7 @@ Cube Assembly
 * WAVSAMP::                     
 * Building the Cube::           Saving the Project::
 * Saving the Project::          
+* Saving the Cube as FITS::     
 
 Backgrounds
 
@@ -245,6 +247,25 @@ Bad Pixels
 * Backtracking to Discover Bad Pixels::  
 * Automatic Bad Pixels::        
 * Saving Bad Pixels::           
+
+Cube Analysis
+
+* Extracting 1D Spectra::       
+* Creating 2D Maps::            
+* Complex Maps and Extractions::  
+
+Extracting 1D Spectra
+
+* Direct Extraction::           
+* Matched Extraction::          
+
+Creating 2D Maps
+
+* User-defined Maps::           
+* Pre-defined Maps::            
+* Map Sets::                    
+* Redshift and Maps::           
+* Line Fits::                   
 
 Tips and Troubleshooting
 
@@ -548,17 +569,18 @@ cube, extract a spectrum, and build a spectral map, leaving all of the
 (important) details aside for now.  These details are covered later in 
 this manual.
 
-An important note before we begin concerns the scope of a CUBISM project.
-Each CUBISM project pertains to a single IRS slit, e.g.  Long-Low order 1
-(LL1), Short-Low order 2 (SL2) or Short-High (SH).  Each of the low-res
-slits are a single spectral order, but the high-res slits have 10 orders,
-each.  Just as a reminder, there are four IRS modules (SL, LL, SH, and LH),
-with each low-res module containing two slits and each high-res module
-containing one slit.  For data sets with mapping observations in all four
-low-resolution orders (SL1, SL2, LL1 and LL2), four individual cubes will
-be built, and analzyed as a set.  A full low-res and high-res IRS map will
-therefore produce six spectral cubes (the four for low-res and two
-additional for SH and LH) and there will be six CUBISM project (*cpj) files.
+An important note before we begin concerns the scope of a CUBISM
+project.  Each CUBISM project pertains to a single IRS slit, e.g.
+Long-Low order 1 (LL1), Short-Low order 2 (SL2) or Short-High (SH).
+Each of the low-res slits are a single spectral order, but the high-res
+slits have 10 orders, each.  Just as a reminder, there are four IRS
+modules (SL, LL, SH, and LH), with each low-res module containing two
+slits and each high-res module containing one slit.  For data sets with
+mapping observations in all four low-resolution orders (SL1, SL2, LL1
+and LL2), four individual cubes will be built, and analzyed as a set.  A
+full low-res and high-res IRS map will therefore produce six spectral
+cubes (the four for low-res and two additional for SH and LH) and there
+will be six CUBISM project (@file{.cpj}) files.
 
 Below we take the user through the process of building a cube with a
 pre-packaged example that uses data from the SINGS Short-Low order 1 (SL1)
@@ -573,19 +595,20 @@ IDL> cubism
 @end example
 
 @noindent and create a new cube project, giving it a useful name when
-prompted.  As you build each cube and save your work, you will be prompted
-for the names of the individual *.cpj files corresponding to each set of
-IRS data (slit).  Assuming you have unpacked the BCD's and the ancillary
-files included in the pre-packaged dataset, and placed them in a directory
-below the current working directory, it is now time to read in the data and
-build the NGC 3049 SL1 cube.  First, select @kbd{Import Data from Mapping
-AOR -> BCD} under the @kbd{Record} pulldown menu.  CUBISM will search for
-all IRS data files at or beneath that directory, and group all discovered
-data files by object and mapping AOR, allowing you to select among them.
-When prompted, choose the set of data you are interested in (more than one
-is allowed, but they must be from the same instrument module).  All the
-relevant files will then be loaded into the project.  If you are warned
-that no calibration set has been loaded, and that the latest is being used,
+prompted.  As you build each cube and save your work, you will be
+prompted for the names of the individual @file{.cpj} files corresponding
+to each set of IRS data (slit).  Assuming you have unpacked the BCD's
+and the ancillary files included in the pre-packaged dataset, and placed
+them in a directory below the current working directory, it is now time
+to read in the data and build the NGC 3049 SL1 cube.  First, select
+@kbd{Import Data from Mapping AOR -> BCD} under the @kbd{Record}
+pulldown menu.  CUBISM will search for all IRS data files at or beneath
+that directory, and group all discovered data files by object and
+mapping AOR, allowing you to select among them.  When prompted, choose
+the set of data you are interested in (more than one is allowed, but
+they must be from the same instrument module).  All the relevant files
+will then be loaded into the project.  If you are warned that no
+calibration set has been loaded, and that the latest is being used,
 simply acknowledge the warning.
 
 First, specify the background BCDs and the bad pixels using the two
@@ -767,6 +790,7 @@ select or double-click to accept and return.  To the left of the
 icons, which, when clicked pop up a list of recent directory or file
 selections which can be selected.
 
+@page
 @node CUBISM Project, CubeView, General Interface Tips, The Tools
 @section CUBISM Project
 @cindex Project, CUBISM
@@ -1430,7 +1454,7 @@ Close the current project, prompting to save any unsaved changes.
 @end table
 
 
-
+@page
 @node CubeView, CubeSpec, CUBISM Project, The Tools
 @section CubeView
 @cindex CubeView
@@ -1779,10 +1803,11 @@ The histogram tool's key shortcut is @kbd{h}.
 The histogram tool provides a much more direct means to bring out detail
 in a given image area, but the color tool enables the
 SAOImage/DS9-esque, click and drag method of adjusting the color map
-directly.  Simply left-click and drag.  Moving down narrows the map, up
-widens, left shifts it to lower color values, and right shifts it to
-higher.  Right-clicking resets the color map.  If you find yourself
-using this tool often, try out the histogram tool instead and see if you
+directly.  Simply left-click, hold, and drag around the window.  Moving
+down narrows the map, up widens, left shifts it to lower color values,
+and right shifts it to higher.  Right-clicking resets the color map.  If
+you find yourself using this tool often to bring out detail in different
+regions of an image, try out the histogram tool instead and see if you
 prefer it.
 
 The color tool's key shortcut if @kbd{c}.
@@ -1792,9 +1817,6 @@ The color tool's key shortcut if @kbd{c}.
 @cindex Image slicing tool
 @cindex Slicer tool
 
-
-
-@float Figure,fig:cv_slice
 
 The image slicing tool allows slices to be taken through any image at
 arbitrary angles.  Just left-click and drag to define a slice, or
@@ -1807,6 +1829,7 @@ An example slice plot is shown in @ref{fig:cv_slice}.
 
 The image slicing tool's key shortcut is @kbd{l}.
 
+@float Figure,fig:cv_slice
 @center @image{images/cubeview_slice,5.617in,,CubeView Slice Window}
 @caption{A plot of a slice through an image.}
 @end float
@@ -2130,6 +2153,7 @@ aperture at once.
 @samp{WAVSAMP}.  See @ref{fig:cv_recs} for an example displayed
 @samp{WAVSAMP}.
 
+@page
 @node CubeSpec, CubeSpec Plot Window, CubeView, The Tools
 @section CubeSpec
 @cindex CubeSpec
@@ -2152,6 +2176,7 @@ displaying a cube.
 * CubeSpec Title Bar::          
 * CubeSpec Menus::              
 * CubeSpec Buttons::            
+* CubeSpec Display Panes::      
 @end menu
 
 @node CubeSpec Title Bar, CubeSpec Menus, CubeSpec, CubeSpec
@@ -2234,9 +2259,8 @@ Overplots a shaded red area of the MIPS 24 micron system response curve.
 @end table
 
 
-
-@node CubeSpec Buttons,  , CubeSpec Menus, CubeSpec
-@subsection CubeSpec Buttons
+@node CubeSpec Buttons, CubeSpec Display Panes, CubeSpec Menus, CubeSpec
+@subsection Buttons
 @cindex Buttons, CubeSpec
 
 Most of CubeSpec's functionality is accessible in the form of buttons.
@@ -2245,12 +2269,12 @@ Most of CubeSpec's functionality is accessible in the form of buttons.
 @item Full Cube
 Default setting.  In this mode, CubeView sends views of a single
 wavelength plane of the cube at a time to its associated CubeView
-viewer.  Key shortcut @key{u}.
+viewer.  Key shortcut @kbd{u}.
 
 @item Map
-In this mode, pre-defined or custom defined maps (@pxref{Maps}) are sent
-to the viewer.  Key shortcuts @key{p} and @key{c} enable this mode (in
-peak/continuum mode).
+In this mode, pre-defined or custom defined maps (@pxref{Creating 2D
+Maps}) are sent to the viewer.  Key shortcuts @kbd{p} and @kbd{c} enable
+this mode (for peak or continuum definition, respectively).
 
 @item ValLine
 Enable the display of the vertical line in the spectrum plot.
@@ -2266,14 +2290,14 @@ In this mouse mode, when you click the left mouse button in two
 locations, the plot will zoom in on that section of the wavelength
 range.  Double-clicking the left mouse button in one location, or
 right-clicking, will return to the full wavelength range.  Key shortcut
-@key{x}.
+@kbd{x}.
 
 @item Mouse: YZoom
 In this mouse mode, when you click the left mouse button in two
 locations, the plot will zoom in on that section of the flux range.
 Double-clicking the left mouse button in one location, or
 right-clicking, will return to the full wavelength range.  Key shortcut
-@key{y}.
+@kbd{y}.
 
 @item Mouse: Region/Lambda:
 
@@ -2304,7 +2328,15 @@ Pressing this button removes any fit generated.
 Perform a fit over the peak and continuum regions, which must be defined
 first.  The polynomial order of the fit is determined by @kbd{Fit
 Order}.  Resulting fit parameters will be displayed at right.
+@end table
 
+@node CubeSpec Display Panes,  , CubeSpec Buttons, CubeSpec
+@subsection Display Panes
+
+Two display panes provide information on any line fit and the cursor
+position: 
+
+@table @code
 @item Right display box
 This box displays several values from any fits performed: average
 continuum, equivalent width of the line, maximum flux, maximum
@@ -2361,6 +2393,7 @@ definition, a line is left at the location of the first click.
 * WAVSAMP::                     
 * Building the Cube::           Saving the Project::
 * Saving the Project::          
+* Saving the Cube as FITS::     
 @end menu
 
 This chapter describes in detail the steps required to assemble a cube
@@ -2636,11 +2669,13 @@ the fact, but operates on the entire cube at once.
 @subsection No Background
 
 Using no background is a reasonable last resort option for brighter
-sources, though the number of bad pixels in the raw unsubtracted data is
-much higher, so more work will be required to identify them (@pxref{Bad
-Pixels}).  The (astrophysical) foreground flux will also of course
-remain in the final assembled cube, which may affect analysis of
-extracted spectra or maps.
+sources, though the number of bad pixels in the raw unsubtracted data
+will be much higher, so more work will be required to identify them
+(@pxref{Bad Pixels}).  The (astrophysical) foreground flux will also of
+course remain in the final assembled cube, which may affect analysis of
+extracted spectra or maps, and the degree to which matched extractions
+from cubes built in different IRS modules or orders will stitch with
+each other.
 
 @node Background Selection Using Visualization,  , No Background, Backgrounds
 @subsection Background Selection Using Visualization
@@ -3026,7 +3061,7 @@ which will need to be reconstructed in a slow cube build.  Changing
 backgrounds, bad pixels, etc. can be done without invalidating the
 accounts.
 
-@node  Saving the Project,  , Building the Cube, Cube Assembly
+@node  Saving the Project, Saving the Cube as FITS, Building the Cube, Cube Assembly
 @section Saving the Project
 @cindex Saving projects
 
@@ -3095,7 +3130,7 @@ to examine the cube itself (extract spectra, make maps), access to the
 record data isn't necessary.
 
 
-@node Saving the Cube as FITS
+@node Saving the Cube as FITS,  , Saving the Project, Cube Assembly
 @section Saving the Cube as FITS
 @cindex FITS, saving cube as
 
@@ -3115,125 +3150,278 @@ al., A&A 446, 2006.
 @chapter Cube Analysis
 @cindex Cube analysis
 
-@node Extracting 1D Spectra
+Once a given cube is fully built and validated, it can be used to
+generate 1D line extractions and build arbitrary 2D spectral maps, both
+of which are straightforward using the CUBISM interface.
+
+@menu
+* Extracting 1D Spectra::       
+* Creating 2D Maps::            
+* Complex Maps and Extractions::  
+@end menu
+
+@node Extracting 1D Spectra, Creating 2D Maps, Cube Analysis, Cube Analysis
 @section Extracting 1D Spectra
 @cindex Spectra, extracting
 
-Extracting 1D spectra from the cube, and building 2D line, continuum, or
-feature maps are straightforward using the CUBISM interface.  After the
-cube has been built, and all bad pixels have been identified, make sure
-to save your cube project file (again).  To generate a 1D spectrum, you
-must first identify the spatial region over which the spectrum is to be
-averaged.  This can be done in one of two ways.  You can either read in
-a region file (actually the region is read from the headers of a saved
-``tbl" spectrum file) from a previous analysis session (created, for
-example, from a different IRS module used to map the same target), or
-you can use the ``Extract Spectra and Stack Cubes" tool to define a new
-region with the mouse.  We will discuss each of these in turn.
+To generate a 1D spectrum, you must first identify the spatial region
+over which the spectral cube is to be averaged.  This can be done in one
+of two ways: directly defining a rectangular aperture on the cube, or
+from a matched extraction region read in from an existing @file{.tbl}
+spectrum file.
 
-In order to use a saved region file, simply go to the ``File" menu
-pulldown, and select ``Extract Region from File...".  This will then pop up
-a menu from which you can select your region file.  Once this is done, the
-spatial region will be displayed on your current cube in the CubeView
-window, and a spectrum will automatically appear in a new CubeSpec window.
-This spectrum is the average spectrum over the region in your current cube,
-defined by the save region file you have selected.  The name of this file
-appears at the top of the CubeSpec window.  The new spectrum can now be
-saved by using the ``File" menu pulldown in the CubeSpec window, and
-selecting ``Save Spectrum As...", and entering a filename (tbl file) at the
-prompt.  This is a common practice, for example, if you are examining a
-Short-Low second order (SL2) cube, and want to extract a spatial region
-defined on your Short-Low first order (SL1) cube so that the SL1 and SL2
-spectra cover the same spatial region on your science target.  This can
-also be used to extract Long-Low spectra using a region defined in the SL1
-or SL2 cubes, thus obtaining a complete spectrum over a singe,
-psuedo-aperture in the map.  Since Spitzer is diffraction-limited beyond
-about 6-microns, and the IRS modules have different pixel scales, users
-should be very careful here to avoid defining critically-samples regions at
-the shortest wavelengths, then using these to extract spectra from maps
-with significantly larger beam sizes.  This may result in long-wavelength
-spectra generated over areas smaller than the beam.  If you read in a
-region that is larger than your current cube, and you attempt to extract a
-spectrum over this region, CUBISM will produce a pop-up warning message.
-In this case, the problem will be obvious, as the extraction aperture will
-extend beyond the edges of your cube in the CubeView window.  You can still
-generate the spectrum and save it to disk, but you should probably select a
-smaller aperture if you are attempting to compare or stitch spectra across
-IRS modules.
+@menu
+* Direct Extraction::           
+* Matched Extraction::          
+@end menu
 
-In order to extract a 1D spectrum from the cube over a new region, go to
-the Tools pulldown menu and choose ``Extract Spectra and Stack Cubes"
-(or simply click on the Extract Spectra icon in the menu bar of the
-CubeView window (the 7th button from the left).  Once this is active, a
-rectangular region will appear on the cube, which you can drag (by
-holding down the left mouse button inside the region) or expand (by
-holding down the left mouse button on the lower right corner of the
-region), and a spectrum will appear in the CubeSpec window.  If the
-CubeSpec window was already open, the spectrum will change to reflect
-your newly-defined region, and the area (in pixels) is displayed at the
-top of the CubeSpec window.  If the CubeSpec window was not open, it
-will pop up and display your new 1D spectrum.  When you move or resize
-the region, the spectrum (which is an average over that area) will
-change.  The 1D spectrum can be saved to a tbl file on disk at any time.
-This is an excellent way to quickly see how the IRS spectrum of your
-source changes with position over the cube.  Any tbl file that you save
-in this step, can also be used to set the region for another cube which
-you make later (as described above).
+@node Direct Extraction, Matched Extraction, Extracting 1D Spectra, Extracting 1D Spectra
+@subsection Direct Extraction
 
-@node Creating 2D Maps
+@xref{Cube Extraction Tool}, for more information on defining a
+rectangular extraction aperture on a cube.  Briefly, choose the
+extraction tool (hit @kbd{x} in the CubeView window displaying the
+cube), drag from top-left to bottom right to define a region, and a
+CubeSpec window opens showing the flux intensity spectrum averaged that
+region, in the units specified in the cube build settings (@pxref{Cube
+Build Settings}).  If the CubeSpec window was already open, the spectrum
+will change to reflect the newly-defined region, and the area of
+extraction (in cube pixels) is displayed at the top of the CubeSpec
+window.
+
+When you move or resize the region, the spectrum (which is an average
+over that area) will automatically update.  This is an excellent way to
+quickly see how the IRS spectrum of your source changes with position
+over the cube, or extraction size.  Remember that the arrow keys allow
+the selection box to be moved one pixel at a time in CubeView.
+
+Any extracted spectra can be saved using @kbd{File->Save Spectrum As...}
+(@pxref{CubeSpec File Menu}).  The save format is an ASCII file with
+encoded headers, column delimiters, and units, in the IPAC table format
+(the utility routine @code{read_ipac_table} supplied with CUBISM can
+read this format).  Any @file{.tbl} file saved in this way can also be
+used to define the region of extraction for another cube --- see below.
+
+@callout{Avoid using extraction apertures smaller than roughly
+@samp{2x2} pixels, since over small regions, pixel aliasing driven by
+the undersampled IRS PSF can lead to anomalous continuum ``sawtooth''
+patterns near high spatial frequency portions of the cube.}
+
+
+@node Matched Extraction,  , Direct Extraction, Extracting 1D Spectra
+@subsection Matched Extraction
+@cindex Spectra, fully stitched
+
+Matched extraction is the extraction of spectra from a cube in an
+aperture defined elsewhere.  All spectra saved by CUBISM include header
+information giving the celestial coordinates of the rectangular region
+of extraction.  This aperture can be reused to recover spectra from
+different cubes built in the same region.  It is most commonly used to
+generate single, fully stitched spectra by matching the physical
+extraction region between different cubes in different IRS modules or
+orders: e.g. matching SL1 and SL2, or SL1 with LL1, SH with LH, etc.,
+though it can also be convenient to recall existing extraction regions
+from the same cube.
+
+@callout{When defining an aperture intended to be matched across
+multiple IRS modules, ensure it is large enough to avoid the pixel
+aliasing mentioned above in all modules being extracted.}
+
+In the CubeView window displaying your cube, use @kbd{File->Extract
+Region from File...} to load a saved region file.  Once this is done,
+the spatial region will be displayed on your current cube in the
+CubeView window, and a spectrum will automatically appear in a new
+CubeSpec window.  Regions loaded from file in this manner are not
+directly editable.  Note that since cubes are built with position angle
+parallel to the IRS slit at the time of observation (which rotates
+throughout the year), in general extraction apertures recovered from
+other slits, or spectral maps executed at different times, will not
+align with the rows or columns of the cube.  Rotated apertures are
+clipped against the cube to generate the partial-pixel weighted average
+over the region.  
+
+The name of the file from which the aperture was loaded appears at the
+top of the CubeSpec window.  The new spectrum can now be saved in the
+same manner as described above, and its header will contain the file
+from which its extraction region was drawn.
+
+Matched extraction can be used to extract Long-Low spectra using a
+region defined in the SL1 or SL2 cubes, thus obtaining a complete
+spectrum over a single, psuedo-aperture in the map.  Since Spitzer is
+diffraction-limited beyond about 6 microns, and the IRS modules have
+different pixel scales, users should be very careful to avoid defining
+critically-sampled regions at the shortest wavelengths, then using these
+to extract spectra from maps with significantly larger beam sizes.  This
+may result in long-wavelength spectra generated over areas smaller than
+the beam.  Also be aware that diffraction smooths the angular source
+distribution to greater degrees at longer wavelength, so that a single
+extraction aperture can probe slightly different regions depending on
+wavelength.  This effect is particularly pronounced with sharp spatial
+structures: e.g. an extraction formed inside a small ring of emission at
+the shortest wavelengths will likely be contaminated by ring emission at
+longer wavelengths.
+
+If you read in a region that is larger than your current cube, and
+attempt to extract a spectrum over this region, CUBISM will produce a
+warning message.  In this case, the problem will be obvious, as the
+extraction aperture will extend beyond the edges of your cube in the
+CubeView window.  You can still generate the spectrum and save it to
+disk, but you should probably select a smaller aperture if you are
+attempting to compare or stitch spectra across IRS modules.  Similarly,
+regions entirely outside the cube will generate an error.
+
+@callout{When comparing spectra extracted from the same physical region,
+offsets can occur.  To minimize this, ensure the background was
+subtracted in the same manner for all cubes being compared, and that the
+extraction region was not too small.}
+
+Slight astrometric errors in the final cube astrometry (limited by the
+spacecraft pointing system's precision) will compound offsets between
+matched spectra in very small regions near steep spatial gradients in
+the source.
+
+@node Creating 2D Maps, Complex Maps and Extractions, Extracting 1D Spectra, Cube Analysis
 @section Creating 2D Maps
 @cindex Maps, creating
 
 Just as the cube can be used to generate 1D spectra over any extraction
 region, so too can the 1D spectra be used to create 2D images (slices of
-the cube) over any specified wavelength interval.  Once a 1D spectrum is
-visible in the CubeSpec window, change the selection from ``Full Cube"
-to ``Map".  Once ``Map" is selected, the button in the middle of the
-window will become active.  This button provides a single choice of
-``continuum" or ``peak", allowing the user to define the continuum or
-peak regions in the spectrum for generation of the map.  If you wish to
-say, create a continuum-subtracted 11.3-micron PAH map from a SL1 cube,
-you can first use the mouse to define the continuum on either side of
-the PAH feature by selecting ``Continuum" and clicking (with the left
-button) two pairs of spectral regions on either side of the emission
-feature.  The continuum regions will turn red after selection.  You can
-have any number of continuum regions of any arbitrary size in
-wavelength.
+the cube) over any specified wavelength interval.  @xref{CubeSpec} for
+more detail on defining regions on the displayed spectrum.
 
-Once the continuum regions are defined, change the selection to ``Peak",
-and select the emission feature with the mouse in the same way.  If making
-an emission-line map, select at least three or more pixels around the peak
-of the line.  Once the peak region is selected, it will turn (a lighter
-shade of) red, and the image in the CubeView window will change.  This is
-now the continuum-subtracted map of your science target.  Cubism has taken
-the average of the two continuum points, and subtracted this value from the
-line emission at every point in the cube.  To save this map, simply go to
-the ``File" pulldown menu, and select ``Save Map as FITS".  The FITS file
-saved in this manner has all the required header keywords to be read into
-the common FITS readers (e.g. DS9), displayed, and aligned with any other
-FITS image of your science target.  Using the CubeSpec window, any number
-of spectral regions can be defined and used to make FITS images, which can
-then be saved in the CubeView window.
+@menu
+* User-defined Maps::           
+* Pre-defined Maps::            
+* Map Sets::                    
+* Redshift and Maps::           
+* Line Fits::                   
+@end menu
 
-Note that the CubeSpec window can also be used to measure simple line
-parameters before or after the line map is made.  By selecting the ``Fit"
-button, a polynomial fit, as defined by the ``Fit Order" button, will be
-performed between the continuum points, and the basic parameters (e.g. line
-equivalent width, line flux, average continuum flux density, etc.), will be
-displayed in the box in the upper right of the CubeSpec menu.  By clicking
-on the ``Reset Plot" button, all the continuum and peak selections will be
-erased, and new spectral regions, and their corresponding spectral maps,
-can be defined.
+@node User-defined Maps, Pre-defined Maps, Creating 2D Maps, Creating 2D Maps
+@subsection User-defined Maps
+@cindex Maps, user-defined
 
-Besides user-defined maps, Cubism has a number of pre-defined filter
+Once a 1D spectrum is visible in the CubeSpec window, change the
+selection from @kbd{Full Cube} to @kbd{Map}, and select either
+@kbd{Peak} or @kbd{Continuum} (the convenient key shortcuts @kbd{p} and
+@kbd{c} set both of these at once and permit quickly switching between
+peak and continuum region definition).  A spectral map consists of any
+number of peak and continuum regions.  The continuum regions are
+averaged (either directly, or weighted by the wavelength offset, if
+@kbd{Lambda-Weighted} is selected), and then subtracted from the average
+of planes over the peak regions.  Continuum regions are optional.
+
+For example, if you wish to create a continuum-subtracted 11.3 micron
+PAH map from a SL1 cube, you can first use the mouse to define the
+continuum on either side of the PAH feature. Once the continuum regions
+are defined, change the selection mode to @kbd{Peak}, and select the
+emission feature with the mouse in the same way.  For emission line
+maps, select at least three or more pixels around the peak of the line.
+Once the peak region is selected, it will show up in (a lighter shade
+of) red, and the image in the CubeView window will change to reflect the
+newly defined map.  This is now the continuum-subtracted map of your
+science target.  The CubeView window will indicate the type of map being
+shown, the range of peak wavelength coverage.
+
+@callout{Though they are called @kbd{Peak} and @kbd{Continuum}, the two
+region types can be used to make arbitrary differential maps averaged
+over different wavelength intervals.}
+
+Once regions are defined, they can be selected by middle-clicking,
+@key{Space} cycles selection among them, moved with middle-click-drag,
+or with the left/right arrow keys.  Up/down arrow increase or decrease
+the width of the region.  Regions which come in contact with eachother
+are merged.  When regions are re-sized or moved, the accompanying map is
+automatically updated.  Defining a small peak region (several pixels),
+and then moving it across the spectrum is a good way to get a quick feel
+for how the cube is changing with wavelength.
+
+To save any map generated in this way, use @kbd{File->Save Map as FITS}
+in the CubeView window where it is displayed.  The FITS file saved in
+this manner has all the required header keywords to be read into the
+common FITS readers (e.g. DS9), displayed, and aligned with any other
+FITS image of your science target.  Using the CubeSpec window, any
+number of spectral regions can be defined and used to make images, which
+can then be saved to FITS from the CubeView window.  The FITS headers
+will include the wavelength peak and continuum regions used to generate
+the map.
+
+@node Pre-defined Maps, Map Sets, User-defined Maps, Creating 2D Maps
+@subsection Pre-defined Maps
+@cindex Maps, pre-defined
+
+Besides user-defined maps, CUBISM offers a number of pre-defined filter
 curves available under the @kbd{Maps} menu in the CubeSpec window.  This
 will allow you to generate spectral maps in, for example, any the
 IRAC-5.8, IRAC-8, MIPS-24, IRS Peakup, ISOCAM LW2 or LW3 filters.  Once
 selected, the spectral ranges will be highlighted on the 1D spectrum in
 the CubeSpec window, and the image in the CubeView window will change to
-the corresponding 2D map.  Note, these maps are pseudo filter images,
+the corresponding 2D map.  Note, these maps are pseudo-filter images,
 and are not continuum-subtracted, and may lie partially outside the
-range of the spectra.
+wavelength range of the spectra.  Unlike maps based on wavelength
+regions, maps based on filter curves cannot be directly edited in
+CubeSpec.  A selected map will appear at far right in the title of the
+plotted spectrum.
+
+@node Map Sets, Redshift and Maps, Pre-defined Maps, Creating 2D Maps
+@subsection Map Sets
+@cindex Map sets, saving
+
+User-defined map sets can be saved for later use using the CubeSpec
+@kbd{Maps} menu.  A given set of peak and continuum regions can be saved
+as a @file{.map} file using @kbd{Maps->Save Current Map...}, and later
+recovered.  Once saved or restored, it will appear below the default
+pre-defined maps at the bottom of the @kbd{Maps} menu.  For example, a
+map defined in LL1 on the [SiII] line with adjacent continuum could be
+saved as @file{siII.map}, and later re-used to create similar [SiII]
+image from another LL1 cube.  To make a map saved in this way one of the
+default maps, move it to the @file{cubism/map_sets} directory.
+
+@node Redshift and Maps, Line Fits, Map Sets, Creating 2D Maps
+@subsection Redshift and Maps
+@cindex Redshift, map creation
+
+Sources at non-negligible redshift can have saved maps automatically
+shifted into the observed frame by specifying their redshift @samp{cz}
+in @samp{km/s} with @kbd{Maps->Set Redshift...}.  The currently set
+redshift will be displayed at right in the plot title window, and will
+be used to shift any saved map set to the rest frame.  For example, in
+the [SiII] map example above, specifying a redshift will shift the saved
+map to track the line in sources at higher redshift.
+
+Note that pre-defined map sets based on filter curves are not shifted in
+this way (since they are meant to define psuedo-images simulating direct
+observation).
+
+
+@node Line Fits,  , Redshift and Maps, Creating 2D Maps
+@subsection Line Fits
+@cindex Line fits
+
+The CubeSpec window can also be used to measure simple line parameters
+before or after the line map is made.  By selecting the @kbd{Fit}
+button, a polynomial fit, as defined by the @kbd{Fit Order}, will be
+performed between the continuum points, and the basic parameters
+(e.g. line equivalent width, line flux, average continuum flux density,
+etc.), will be displayed in the box in the upper right of the CubeSpec
+menu.  By clicking on the @kbd{Reset Plot} button, all the continuum and
+peak selections will be erased, and new spectral regions, and their
+corresponding spectral maps, can be defined.  Such fits are for
+informational purposes only, and do not affect the map displayed.
+
+
+@node Complex Maps and Extractions,  , Creating 2D Maps, Cube Analysis
+@section Complex Maps and Extractions
+
+CUBISM offers only a simple set of rectangular extraction apertures with
+matched extraction, and map creation based on averages or
+wavelength-offset-weighted averages among planes of the cube.  For
+higher order extraction and map creation, e.g. to extract over
+non-rectangular areas, or create maps by fitting multiple components to
+at each position in a maps, it is convenient to export the full cube to
+the IDL command line or as a separate FITS file.  @xref{Saving the Cube
+as FITS}, for more information.
+
 
 
 @c
@@ -3278,6 +3466,22 @@ case of loss or damage to the @file{.cpj} file.
 @strong{Use auto-badpix with care.}  This can be a big time saver, but
 can mark valid data bad if used improperly, especially on maps without
 much cube-level redundancy.
+
+
+@item
+@strong{Check spurious spectral features using backtracking.}
+Unexpected positive or negative spikes in an extracted spectrum often
+indicate remaining bad pixels.  Use backtracking to track them down ---
+@xref{Backtracking to Discover Bad Pixels}.
+
+@item
+@strong{Use keyboard shortcuts to speed up the interface.}  Keyboard
+shortcuts are available CubeView (e.g. @kbd{z} to switch to the zoom
+tool, @key{Space} to freeze the scaling range, etc.), in CubeSpec
+(e.g. @kbd{p} to enter peak region define mode, arrows to move or resize
+regions, etc.), and in the CUBISM Project (e.g. arrow keys to change the
+record selection, @key{Return} to view it).  @xref{The Tools}, for more
+information.
 @end enumerate
 
 @node Troubleshooting, Debugging CUBISM, Tips, Tips and Troubleshooting
@@ -3297,6 +3501,7 @@ Substring...}  to correct the base pathname.  Another option is to store
 the data in the project, or save relative pathnames.  @xref{Saving the
 Project}.
 
+@item
 @strong{I'm attempting to upgrade a project from pipeline version S14 to
 S15, but the project data won't load}.  The SSC increments a version
 number for all processed files when the pipeline processing changes.
