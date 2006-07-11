@@ -221,13 +221,13 @@ Menus
 
 Cube Assembly
 
-* Input Files::                 Calibration Sets:: Backgrounds:: Bad Pixels:: WAVSAMP::
+* Input Files::                 
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
 * Cube Build Settings::         
 * WAVSAMP::                     
-* Building the Cube::           Saving the Project::
+* Building the Cube::           
 * Saving the Project::          
 * Saving the Cube as FITS::     
 
@@ -432,8 +432,8 @@ The requirements for installing and running CUBISM from source are:
 A Linux/Solaris/Unix or MacOSX platform.  CUBISM may run under Windows,
 but has not been tested there.
 @item
-A licensed copy of IDL at version @value{IDLVERSIONREQUIRED} or later.
-Download @uref{http://rsinc.com/idl/,from RSI}.
+A licensed copy of IDL, version @value{IDLVERSIONREQUIRED} or later.
+Download @uref{http://ittvis.com/idl/,from RSI (now ITTVIS)}.
 @item
 The @code{AstroLib} library, available from
 @uref{http://idlastro.gsfc.nasa.gov/, NASA Goddard}.  Be sure to include
@@ -479,7 +479,7 @@ but has not been tested there.
 A copy of IDL at version @value{IDLVERSIONREQUIRED} or later.  This can
 either be a fully licensed copy, or the @emph{IDL VM}, the freely
 available virtual machine.  Download either
-@uref{http://rsinc.com/idl/,from RSI}.
+@uref{http://ittvis.com/idl/,from ITTVIS}.
 @item
 A compiler for C source, typically @code{gcc}, or whatever the IDL
 routine @code{MAKE_DLL} looks for.
@@ -809,10 +809,10 @@ preferences are set, the cube is assembled, and outputs are saved.
 @callout{A single CUBISM project contains information for only one
 spectral cube, corresponding to a single IRS module and order.}
 
-@noindent This includes sub-slits for single IRS modules, e.g. SL1 and SL2 would
-be two separate cubes.  There is a separate project window for each open
-cube. For information on how to extract spectra from matched areas in
-multiple overlapping cubes, see XXX.
+@noindent This includes sub-slits for single IRS modules, e.g. SL1 
+and SL2 would be two separate cubes.  There is a separate project window
+for each open cube. For information on how to extract spectra from
+matched areas in multiple overlapping cubes, @ref{Matched Extraction}.
 
 CUBISM projects, with all their associated meta-data, can be saved to
 and recovered from disk, with the default file extension @file{.cpj}
@@ -1786,10 +1786,10 @@ to the region of interest.  The scaling mode can be linear, square root,
 logarithmic, or histogram equalizing, with 1% or 5% trimming available,
 in the @kbd{Options->Scale Image} menu.  By default, the entire image is
 scaled.  This tool also draws a histogram of the resulting image colors
-on the colorbar (see XXX), and gives the scaling range.  The scale
-clipping limits can be frozen with @key{Space}, or set directly using
-@kbd{Options->Set Scale Range}.  It can be convenient to ``reset'' the
-histogram tool to remove it's box area and define a new one, in
+on the colorbar (@pxref{Color Tool}), and gives the scaling range.  The
+scale clipping limits can be frozen with @key{Space}, or set directly
+using @kbd{Options->Set Scale Range}.  It can be convenient to ``reset''
+the histogram tool to remove it's box area and define a new one, in
 particular if you are zoomed in on a different region of the image.  To
 quickly reset and turn it back on, hit the key shortcut twice. The box
 region for the statistics tool is red, and can be seen in
@@ -1927,8 +1927,8 @@ window.  Left-clicking freezes on an individual cube pixel, marking it
 with a green @samp{x}, while right-clicking restores the free motion.
 In the BackTracking window, right-clicking on any individual list item
 allows the associated BCD pixel to be set as a global or record-level
-bad pixel (see XXX).  You can continue to navigate through the cube
-while backtracking is active (see XXX).
+bad pixel (@pxref{Global and Record Level Bad Pixels}).  You can
+continue to navigate through the cube while backtracking is active.
 
 The pixel backtracking tool's key shortcut is @kbd{t}.
 
@@ -2385,13 +2385,13 @@ definition, a line is left at the location of the first click.
 @cindex Cube assembly
 
 @menu
-* Input Files::                 Calibration Sets:: Backgrounds:: Bad Pixels:: WAVSAMP::
+* Input Files::                 
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
 * Cube Build Settings::         
 * WAVSAMP::                     
-* Building the Cube::           Saving the Project::
+* Building the Cube::           
 * Saving the Project::          
 * Saving the Cube as FITS::     
 @end menu
@@ -2566,7 +2566,7 @@ observations which went off the source.  For dedicated sky observations,
 simply load the records (for example, with @kbd{Record->Import Data by
 Module->BCD}), disable them, and @kbd{Background->Set Background from
 Recs...}.  For backgrounds which appear among the mapping data set
-(e.g. as was done in @ref{Quick Start Guide}), simply select these
+(e.g. as was done in the @ref{Quick Start Guide}), simply select these
 records and choose @kbd{Background->Set Background from Recs...}.  Using
 either the average or min/max trimmed average is fine.
 
@@ -3471,7 +3471,7 @@ much cube-level redundancy.
 @strong{Check spurious spectral features using backtracking.}
 Unexpected positive or negative spikes in an extracted spectrum often
 indicate remaining bad pixels.  Use backtracking to track them down ---
-@xref{Backtracking to Discover Bad Pixels}.
+see @ref{Backtracking to Discover Bad Pixels}.
 
 @item
 @strong{Use keyboard shortcuts to speed up the interface.}  Keyboard
@@ -3562,6 +3562,15 @@ then click @kbd{BGSub} in the stack or cube viewer.}  Make sure that you
 are subtracting the correct data order.  You might have inadvertently
 selected first order for your sky when you actually meant second order,
 for example.
+
+@item
+@strong{I get a message 'Failed compiling DLM clipper...'.}  CUBISM
+makes heavy use of polygon clipping, so to speed this up, a small piece
+of code in C is automatically compiled.  If your system is not
+configured with a C compiler (typically @code{gcc}), this can fail.  A
+fallback IDL version will take over, but it is much slower.  See the
+documentation for IDL's @code{MAKE_DLL} to learn more about compiler
+configuration on your system.
 @end enumerate
 
 
@@ -3583,7 +3592,7 @@ code path which led to the error.  This code path might be enough to
 give you a hint as to the nature of the problem, but is also useful for
 the upstream maintainers for debugging purposes.  
 
-Report problems to @url{mailto:help@@spitzer.caltech.edu,the SSC Help Desk},
+Report problems to the SSC, @email{help@@spitzer.caltech.edu},
 including, at minimum:
 
 @enumerate
