@@ -131,6 +131,13 @@ Installation
 * Setup::                       
 * Upgrading::                   
 
+Quick Start Guide
+
+* Example Data Set::            
+* Building Your First Cube::    
+* Visualizing the AORs::        
+* Navigating the Cube::         
+
 The Tools
 
 * Tool Inter-Communication::    
@@ -334,13 +341,13 @@ analysis of these outputs (e.g. multiple Gaussian fitting, etc.).
 
 This manual is organized as follows.  After discussing the installation
 and requirements of CUBISM in @ref{Installation}, we give a quick start
-guide to building a spectral cube from a mapping data set in @ref{Quick
-Start Guide}.  We then cover in detail the menu options and capabilities
-of the three main tools which comprise CUBISM (@pxref{The Tools}).  Then
-we discuss in greater depth the steps required to build a cube in
-@ref{Cube Assembly}, explain methods of analyzing the cube (@pxref{Cube
-Analysis}), finishing with common tips and troubleshooting (@pxref{Tips
-and Troubleshooting}).
+guide to building a spectral cube from an example mapping data set in
+@ref{Quick Start Guide}.  We then cover in detail the menu options and
+capabilities of the three main tools which comprise CUBISM (@pxref{The
+Tools}).  Then we discuss in greater depth the steps required to build a
+cube in @ref{Cube Assembly}, explain methods of analyzing the cube
+(@pxref{Cube Analysis}), finishing with common tips and troubleshooting
+(@pxref{Tips and Troubleshooting}).
 
 Note that this manual does not include information on planning IRS
 spectral mapping observations; see the
@@ -552,21 +559,20 @@ of mapping data sets is in principle a simple process: the correct
 @samp{BCDs} are collected together in a project, the cube build
 parameters are adjusted, and the cube is built.  Further refinement of
 the cube includes identifying bad pixels to exclude from the cube build,
-selecting and creating the appropriate background frames, configuring the
-calibration details and cube build options, etc.  Although simple, this
-process can take a good deal of time.  Users should expect to spend 
-between one-half and one hour per IRS slit, building and cleaning 
-(flagging and removing bad pixels) their cubes.  Therefore, building
-the cubes for a complete low-res and/or high-res spectral map of a single
-target can take several hours.
+selecting and creating the appropriate background frames, configuring
+the calibration details and cube build options, etc.  Although
+straightforward, this process can take a good deal of time.  Users
+should expect to spend between one-half and one hour per IRS slit,
+building and cleaning their cubes (flagging and removing bad pixels,
+etc.).
 
-With the assembled cube, you can perform a variety of post-cube
-analyses, including extracting 1D spectra in specific regions and building
-2D spectral maps.  There are many details which can affect the cube
+With the assembled cube, you can perform a variety of types of analysis,
+including extracting 1D spectra in specific regions and building 2D
+spectral maps.  There are many details which can affect the cube
 assembly process, and impact the quality of the final assembled product.
 Here we will quickly go through the basic steps required to build a
 cube, extract a spectrum, and build a spectral map, leaving all of the
-(important) details aside for now.  These details are covered later in 
+(important) details aside for now.  These details are covered later in
 this manual.
 
 An important note before we begin concerns the scope of a CUBISM
@@ -582,11 +588,58 @@ full low-res and high-res IRS map will therefore produce six spectral
 cubes (the four for low-res and two additional for SH and LH) and there
 will be six CUBISM project (@file{.cpj}) files.
 
-Below we take the user through the process of building a cube with a
-pre-packaged example that uses data from the SINGS Short-Low order 1 (SL1)
-observations of NGC 3049.  We describe the major steps to setting up the
-project, including adding data, selecting backgrounds, flagging bad pixels,
-and building the cube.
+@menu
+* Example Data Set::            
+* Building Your First Cube::    
+* Visualizing the AORs::        
+* Navigating the Cube::         
+@end menu
+
+@node Example Data Set, Building Your First Cube, Quick Start Guide, Quick Start Guide
+@section Example Data Set
+
+We have assembled a small example data set, using data from the SINGS
+IRS Short-Low order 1 (SL1) spectral mapping observations of nearby
+galaxy NGC 3049.  The example data set should be available where you
+obtained this manual.  Unpack it, and follow along.  The set includes
+the following:
+
+@table @file
+
+@item data/
+A directory containing all of the data files.
+
+@item ngc3048_irac_8um.fits
+
+A 8 micron IRAC image of the galaxy.
+
+@item ngc3049_sl1.bgl
+
+The background record list.
+
+@item ngc3049_sl1.bpl
+
+The bad pixel list.
+
+@item ngc3049_SL1.cpj
+
+The pre-built cube project.
+
+@item ngc3049_SL1_cube.fits
+
+The pre-built cube as a 3D FITS image.
+
+@item ngc3049_SL1_cube_unc.fits
+
+The pre-built cube uncertainties as a 3D FITS image.
+@end table
+
+
+@node Building Your First Cube, Visualizing the AORs, Example Data Set, Quick Start Guide
+@section Building Your First Cube
+
+Here we take you through the process of assembling a cube with the
+pre-packaged data set.
 
 To get going, type:
 
@@ -594,53 +647,83 @@ To get going, type:
 IDL> cubism
 @end example
 
-@noindent and create a new cube project, giving it a useful name when
-prompted.  As you build each cube and save your work, you will be
-prompted for the names of the individual @file{.cpj} files corresponding
-to each set of IRS data (slit).  Assuming you have unpacked the BCD's
-and the ancillary files included in the pre-packaged dataset, and placed
-them in a directory below the current working directory, it is now time
-to read in the data and build the NGC 3049 SL1 cube.  First, select
-@kbd{Import Data from Mapping AOR -> BCD} under the @kbd{Record}
-pulldown menu.  CUBISM will search for all IRS data files at or beneath
-that directory, and group all discovered data files by object and
-mapping AOR, allowing you to select among them.  When prompted, choose
-the set of data you are interested in (more than one is allowed, but
-they must be from the same instrument module).  All the relevant files
-will then be loaded into the project.  If you are warned that no
-calibration set has been loaded, and that the latest is being used,
-simply acknowledge the warning.
+@noindent You can either @kbd{Create New Cube Project} to build it
+from scratch, or skip directly to the ``answer key'', choosing the
+pre-built cube project file @file{ngc3049_SL1.cpj} bundled in the
+example, moving ahead to the next section.
 
-First, specify the background BCDs and the bad pixels using the two
-ancillary files, NGC3049_SL1.bgl and NGC3049_SL1.bpl, respectively, that
-have come with the dataset.  To specify the background files, select
-@kbd{Load Background Rec(s)} from the @kbd{Background} pulldown menu, and
-choose the NGC3049_SL1.bgl file.  To specify the bad pixels, select
-@kbd{Load Bad Pixels} from the @kbd{BadPix} pulldown menu, and choose the
-NGC3049_SL1.bpl file.  Choose @kbd{Edit->Select All} and then
-@kbd{Record->View Record Stack...} to popup a viewer displaying a stack of
-all the records.  Make sure to click the @kbd{BGSub} button in the CubeView
-window before stretching the data and looking for the object trace in the
-2D IRS data.  A square-root stretch, with a histogram scaling box that excludes
-the peakup windows, is also recommended for viewing relatively faint SL
-spectra.
+Once you have chosen to create a new cube project, give it a useful name
+when prompted, like @samp{NGC3049 SL1}.  You'll be presented with a
+blank CUBISM Project window.  Read in the full example data set by
+clicking on the @kbd{Import AOR} button at the bottom left.  Select the
+@file{data} directory.  CUBISM will search for all IRS data files at or
+beneath that directory, and group all discovered data files by object
+and mapping AOR, allowing you to select among them.  In this case, only
+two AORs are found, one for SL1, and one for SL2.  Select them both to
+load data from both mapped orders, and all the relevant files will then
+be loaded into the project.  When you are warned that no calibration set
+has been loaded, and that the latest is being used, simply acknowledge
+the warning.
 
-Back in the main CubeProject window, choose @kbd{Cube->Build Cube}, and
-watch the build progress.  When the cube is complete, hit the @kbd{View
-Cube} button to display the cube in the same viewer window.  In this
-window, click on the @kbd{Extract} button (a cube with a line through it),
-or select @kbd{Tools->Extract Spectra and Stack Cubes}.  Click and drag a
-rectangular extraction region, from upper left to lower right, on the cube,
-and the CubeSpec window will appear showing you the extracted spectrum. 
-In the CubeSpec window, click @kbd{Map} and then choose @samp{Region: Peak}.
-Click and release once at a low and high wavelength point to define a peak
-region.  This will then be highlighted in red on the spectrum, and the image
-in the CubeView window will change showing a map of NGC 3049 averaged over
-the wavelength region you have selected.  You have just created your first
-spectral map with CUBISM.  By choosing @samp{Region: Continuum}, and setting
-the continuum regions on either side of your peak region, you can also create
-a continuum-subtracted spectral map.  A full description of how to create and save
-1D spectra and 2D maps is given below (Section 5.2).
+Normally, you would now choose background records among the record set
+(@pxref{Backgrounds}), and select bad pixels (@pxref{Bad Pixels}).  In
+this case, we have pre-built the background record list and bad pixel
+list for you.  Specify the background @file{BCD} records to be used by
+choosing @file{Background->Load Background Recs...}, and loading
+@file{ngc3049_sl1.bgl}, choosing @kbd{Average + Min/Max Trim} when
+prompted.  Simiarly, load the prepared bad pixels using
+@kbd{BadPix->Load Bad Pixels...}, choosing @file{ngc3049_sl1.bpl}.
+
+Choose @kbd{Edit->Select All} and then @kbd{Record->View Record
+Stack...} to popup a viewer displaying an average stack of all the
+records.  In the viewer, choose @kbd{Tools->Scale Image with Histogram},
+and draw a scaling box on the dark part of the image at left by clicking
+and dragging from top-left to bottom right.  You should see two spectral
+orders appear with an obvious spectrum in the center.  Move the scaling
+box around by click and drag to highlight different features.
+
+Back in the main CUBISM Project window, choose @kbd{Cube->Build Cube},
+and watch the build progress.  You should see the cube build feedback in
+a window which opens.  Click the @kbd{Save} button and save the project
+to disk as a @file{.cpj} file. Congratulations, you have completed your
+first spectral cube.
+
+@node Visualizing the AORs, Navigating the Cube, Building Your First Cube, Quick Start Guide
+@section Visualizing the AORs
+
+Before you move on to examine the cube, visualize the spectral mapping
+AOR by choosing @kbd{Record->Visualize AORs...}.  Select the
+@file{ngc3048_irac_8um.fits} file, and the viewer should fill with an
+image and some yellow outlines of the AOR regions.  Drag or create a
+histogram scaling box to bring the galaxy into view.  Click on the zoom
+tool (leftmost), and draw a box around these record outlines to zoom in
+and examine the records overlaid on the 8 micron image.
+
+@node Navigating the Cube,  , Visualizing the AORs, Quick Start Guide
+@section Navigating the Cube
+
+Now that the cube is built, hit the @kbd{View Cube} button to display
+the cube in the same viewer window.  In this window, click on the
+@kbd{Extract} button (a cube with a line through it), or select
+@kbd{Tools->Extract Spectra and Stack Cubes}.  Click and drag a
+rectangular extraction region, from upper left to lower right, on the
+cube, and the CubeSpec window will appear showing you the extracted
+spectrum.  Center the purple box on the galaxy seen in the right hand
+side of the cube.  
+
+In the CubeSpec window, click @kbd{Map} and then choose @samp{Region:
+Peak}.  Click and release at 11 micron and then 11.8 micron to define a
+peak region highlighting the 11.3 micron PAH feature.  This will then be
+highlighted in red on the spectrum, and the image in the CubeView window
+will change showing a map of NGC 3049 averaged over the wavelength
+region you have selected.  
+
+Congratulations, you have just created your first spectral map with
+CUBISM.  By choosing @samp{Region: Continuum}, and setting continuum
+regions on either side of your peak region, you could now create a
+continuum-subtracted spectral map.  Read on to learn more about the
+detailed steps for cube assembly and analysis.
+
 
 @c
 @c The Tools
@@ -3032,7 +3115,8 @@ redundancy however, it is important to exclude this data directly.
 central handle is used to drag each side in by 2--5% (the reported
 @samp{WAVSAMP} coordinates are in normalized units, 0.0--1.0), to
 exclude the bulk of the spurious data at the slit ends.  Non-uniform
-edits are not recommended.
+edits (different normalized range at each end of the order) are not
+recommended.
 
 @node Building the Cube, Saving the Project, WAVSAMP, Cube Assembly
 @section Building the Cube
