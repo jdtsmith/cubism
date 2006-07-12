@@ -2791,6 +2791,15 @@ For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
 @end enumerate
 
+@node Saving the Background List
+@subsection Saving the Background List
+
+The background list can be saved to a text @file{.bpl} file using
+@kbd{Background->Save Background Rec(s)}.  While not strictly necessary,
+this is a useful record of the background records for future reference
+in other cubes.  The format is list of unique record IDs (@samp{DCEID})
+which do not change with updated pipeline processing.
+
 @node Bad Pixels, Cube Build Settings, Backgrounds, Cube Assembly
 @section Bad Pixels
 @cindex Bad pixels
@@ -2873,7 +2882,7 @@ marking bad pixels at the @samp{BCD} level is:
 @item
  View the stack of relevant @samp{BCDs}.
 @item
- Show the @samp{WAVSAMP} (@pxref{CubeView WAVSAMP Pane}.
+ Show the @samp{WAVSAMP} (@pxref{CubeView WAVSAMP Pane}).
 @item
  Click @samp{BGSub} (if available) to remove the appearance of many bad
  pixels using the record level sky background data previously defined.
@@ -3039,7 +3048,13 @@ The list of global and record level bad pixels can be saved as text in
 useful for sharing bad pixel lists among projects, and providing a
 backup of the marked pixels outside of the cube project (recommended).
 Bad pixels can be loaded in from @file{.bpl} files as well, either
-replacing the current set, or appending to it.  @xref{CUBISM Project
+replacing the current set, or appending to it.  The format of the bad
+pixel file is a list of 1D pixel indices (@samp{128*y+x}), prepended (in
+the case of record level bad pixels) by a line with two entries: the
+unique record id (@samp{DCEID}) and the number of bad pixels associated
+with that record.  The global bad pixel list follows.
+
+@xref{CUBISM Project
 BadPix Menu}.
 
 @node Cube Build Settings, WAVSAMP, Bad Pixels, Cube Assembly
