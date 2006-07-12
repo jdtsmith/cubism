@@ -6,7 +6,7 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.1
+@set EDITION 1.1a
 @set VERSION 0.99
 @set IDLVERSIONREQUIRED 6.1
 @set DATE July, 2006
@@ -246,6 +246,7 @@ Backgrounds
 * 1D Sky Spectrum Background::  
 * No Background::               
 * Background Selection Using Visualization::  
+* Saving the Background List::  
 
 Bad Pixels
 
@@ -2636,6 +2637,7 @@ quality of the assembled cube, especially for faint sources.}
 * 1D Sky Spectrum Background::  
 * No Background::               
 * Background Selection Using Visualization::  
+* Saving the Background List::  
 @end menu
 
 @node In Situ Background, Archive Background, Backgrounds, Backgrounds
@@ -2759,7 +2761,7 @@ extracted spectra or maps, and the degree to which matched extractions
 from cubes built in different IRS modules or orders will stitch with
 each other.
 
-@node Background Selection Using Visualization,  , No Background, Backgrounds
+@node Background Selection Using Visualization, Saving the Background List, No Background, Backgrounds
 @subsection Background Selection Using Visualization
 @cindex Visualization, background selection
 
@@ -2790,7 +2792,7 @@ For reference, save the resulting record set into a @file{.bgl} file
 using @kbd{Background->Save Background Recs...}.
 @end enumerate
 
-@node Saving the Background List
+@node Saving the Background List,  , Background Selection Using Visualization, Backgrounds
 @subsection Saving the Background List
 
 The background list can be saved to a text @file{.bpl} file using
