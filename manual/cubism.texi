@@ -1544,15 +1544,14 @@ Close the current project, prompting to save any unsaved changes.
 @cindex Viewing maps
 
 
-The CubeView tool is a custom viewer with general purpose tools, as
-well as IRS-specific tools, and configuration options.  It is used to
-view BCD records, a stack of records, special frames like the
-background frame, or full spectral cubes --- as individual planes or
-maps created from the cube --- and AOR visualization images.  You can
-have as many instances of the viewer as you want, and each can be
-configured differently.  By default, individual CUBISM projects
-attempt to target their own set of viewer windows, only creating a new
-window if none is presently available.
+CubeView is a custom viewer with both general purpose and IRS-specific
+tools and configuration options.  It is used to view BCD records, a
+stack of records, special frames like the background frame, or full
+spectral cubes --- as individual planes or maps created from the cube
+--- and AOR visualization images.  You can have as many instances of the
+viewer as you want, and each can be configured differently.  By default,
+individual CUBISM projects attempt to target their own set of viewer
+windows, only creating a new window if none is presently available.
 
 @menu
 * CubeView Title Bar::          
