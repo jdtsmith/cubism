@@ -332,8 +332,8 @@ images.
 spectral cubes.
 @end multitable
 
-@noindent CUBISM is not a general purpose spectral analysis tool.  What
-analysis tools it offers are oriented directly towards the task of
+@noindent CUBISM is not a general purpose spectral analysis tool.  The 
+tools it offers are oriented directly towards the task of
 creating, validating, and analyzing spectral cubes.  Since individual
 spectra, spectral maps, and full spectral cubes can be output from a
 single cube project, other tools can easily be used for higher order
@@ -346,7 +346,7 @@ guide to building a spectral cube from an example mapping data set in
 capabilities of the three main tools which comprise CUBISM (@pxref{The
 Tools}).  Then we discuss in greater depth the steps required to build a
 cube in @ref{Cube Assembly}, explain methods of analyzing the cube
-(@pxref{Cube Analysis}), finishing with common tips and troubleshooting
+(@pxref{Cube Analysis}), and finish with common tips and troubleshooting
 (@pxref{Tips and Troubleshooting}).
 
 Note that this manual does not include information on planning IRS
@@ -390,9 +390,10 @@ problems.
 @item
 Subject to routine name conflicts (e.g. two routines named
 @file{routine.pro} on the path), so you must carefully set your
-@code{IDL_PATH} to be sure CUBISM's files are found first.  This should
-not be a common problem, but earlier distributions of the staring-mode
-extraction package SMART did have some conflicting file names.
+@code{IDL_PATH} to be sure CUBISM's files are found first.  This
+should not be a common problem, but users of earlier distributions of
+the staring-mode extraction package SMART experienced conflicting file
+names.
 @end itemize
 
 @noindent The advantages of installing and running a binary version of CUBISM:
@@ -436,8 +437,9 @@ The requirements for installing and running CUBISM from source are:
 
 @enumerate
 @item
-A Linux/Solaris/Unix or MacOSX platform.  CUBISM may run under Windows,
-but has not been tested there.
+A Linux/Solaris/Unix or MacOSX platform.  CUBISM may run under the
+Windows operating system, but has not been tested on a Windows
+platform.
 @item
 A licensed copy of IDL, version @value{IDLVERSIONREQUIRED} or later.
 Download @uref{http://ittvis.com/idl/,from RSI (now ITTVIS)}.
@@ -480,8 +482,9 @@ The requirements for CUBISM running as a binary:
 
 @enumerate
 @item
-A Linux/Solaris/Unix or MacOSX platform.  CUBISM may run under Windows,
-but has not been tested there.
+A Linux/Solaris/Unix or MacOSX platform.  CUBISM may run under the
+Windows operating system, but has not been tested on a Windows
+platform.
 @item
 A copy of IDL at version @value{IDLVERSIONREQUIRED} or later.  This can
 either be a fully licensed copy, or the @emph{IDL VM}, the freely
@@ -505,8 +508,8 @@ prevent access to the command line.
 @cindex Setup, of CUBISM
 
 CUBISM needs very little setup.  As long as the binary or source
-directory structure is left intact, CUBISM auto-discovers all necessary
-calibration and other files it needs.
+directory structure is left intact, CUBISM automatically discovers all
+the necessary calibration and other files needed.
 
 One basic setup issue relates to the color mode.  By default, IDL uses
 @emph{DECOMPOSED} color, in which the RBG value of pixels is directly
@@ -539,7 +542,7 @@ such name space conflicts.
 @section Upgrading
 @cindex Upgrading
 
-Upgrading CUBISM is as simple as replacing the source or binary
+Upgrading CUBISM is simple and requires replacing the source or binary
 installation directories with the newer version and restarting IDL.  You
 can always find out what version of CUBISM you are running with the menu
 @kbd{Info->About Cubism} in the project window.  New versions of CUBISM
@@ -724,13 +727,9 @@ regions on either side of your peak region, you could now create a
 continuum-subtracted spectral map.  Read on to learn more about the
 detailed steps for cube assembly and analysis.
 
-
 @c
 @c The Tools
 @c
-
-
-
 
 @node The Tools, Cube Assembly, Quick Start Guide, Top
 @chapter The Tools
@@ -751,12 +750,12 @@ tools.
 
 An example of all the CUBISM tools being used together on a single
 project can be seen in @ref{fig:all_cubism}.  Seen in the window are,
-counter-clockwide from top-left: a CUBISM Project window, the cube build
+counter-clockwise from top-left: a CUBISM Project window, the cube build
 feedback plot, a CubeView tool visualizing the AOR and four selected
 records, a CubeView tool showing the average of 4 records, with bad
 pixels overlayed, the CubeSpec tool displaying an extracted spectrum and
 a 3 component line map, a CubeView window showing a line map image built
-from the LL order 1 cube, cube build parameters, and header info pane.
+from the LL order 1 cube, cube build parameters, and header information pane.
 
 @menu
 * Tool Inter-Communication::    
@@ -777,7 +776,7 @@ pixel list for the associated CUBISM Project is immediately updated, or
 if a new list is loaded from file, the viewer is updated.  Similar high
 level communication occurs between all of the sub-tools, so that
 typically you can regard a CUBISM project and all its associated windows
-and tools as in a single, consistent state.
+and tools as a single, consistent state.
 
 
 @node General Interface Tips, CUBISM Project, Tool Inter-Communication, The Tools
@@ -895,7 +894,7 @@ spectral cube, corresponding to a single IRS module and order.}
 @noindent This includes sub-slits for single IRS modules, e.g. SL1 
 and SL2 would be two separate cubes.  There is a separate project window
 for each open cube. For information on how to extract spectra from
-matched areas in multiple overlapping cubes, @ref{Matched Extraction}.
+matched areas in multiple overlapping cubes, see @ref{Matched Extraction}.
 
 CUBISM projects, with all their associated meta-data, can be saved to
 and recovered from disk, with the default file extension @file{.cpj}
@@ -932,7 +931,7 @@ surrounded by @samp{*}, if there are unsaved changes, as well as the
 file name the project is saved to in @samp{<>} (angle brackets), or
 @samp{<(unsaved)>} is the project is not yet saved.  Note that the file
 name of a saved project, and the project name are distinct, though by
-convention usually they are kept similar or the same.
+convention they are usually kept the same.
 
 
 @c
@@ -1002,7 +1001,7 @@ Write out the assembled cube (if any) as a FITS cube, along with an
 associated uncertainty cube (if built).
 
 @item Rename Project...
-Rename the project (which doesn't affect the file to which the project
+Rename the project (which does not affect the file to which the project
 is saved).
 
 @item Export to Command Line...
@@ -1545,15 +1544,15 @@ Close the current project, prompting to save any unsaved changes.
 @cindex Viewing maps
 
 
-The CubeView tool is a custom viewer, with general purpose as well as
-IRS-specific tools and configuration options.  It is used to view BCD
-records, stacks of records, or special frames like the background frame,
-full spectral cubes --- as individual planes or maps created from the
-cube --- and AOR visualization images.  You can have as many instances
-of the viewer as you want, and each can be configured differently.  By
-default, individual CUBISM projects attempt to target their own set of
-viewer windows, only creating a new window if none is presently
-available.
+The CubeView tool is a custom viewer with general purpose tools, as
+well as IRS-specific tools, and configuration options.  It is used to
+view BCD records, a stack of records, special frames like the
+background frame, or full spectral cubes --- as individual planes or
+maps created from the cube --- and AOR visualization images.  You can
+have as many instances of the viewer as you want, and each can be
+configured differently.  By default, individual CUBISM projects
+attempt to target their own set of viewer windows, only creating a new
+window if none is presently available.
 
 @menu
 * CubeView Title Bar::          
@@ -1673,7 +1672,7 @@ window.  @xref{CubeView Tools}.
 
 
 The viewer offers a number of individual tools for interacting with the
-viewed data, some of which are generic and always available, and others
+data, some of which are generic and always available, and others
 of which are specific to certain data types.  The tools are accessible
 via the palette, through keyboard shortcuts, and via the @kbd{Tools}
 menu.  Other tools accessible below the displayed window will be
@@ -1831,7 +1830,7 @@ The non-exclusive tools are:
 
 Among the tools, Cube Extraction can only be used when viewing a cube,
 pixel backtracking can only be used when viewing a single cube plane,
-bad pixels and order masking are enabled only when viewing BCD data,
+and bad pixels and order masking are enabled only when viewing BCD data,
 Visualization is only possible with a visualization image, and the
 Compass Rose is disabled except with cubes and visualization images
 (i.e. images with WCS information).
@@ -1883,13 +1882,14 @@ The histogram tool's key shortcut is @kbd{h}.
 @node Color Tool, Image Slicing Tool, Histogram Tool, CubeView Tools
 @subsubsection Color Tool
 
-The histogram tool provides a much more direct means to bring out detail
-in a given image area, but the color tool enables the
-SAOImage/DS9-esque, click and drag method of adjusting the color map
-directly.  Simply left-click, hold, and drag around the window.  Moving
-down narrows the map, up widens, left shifts it to lower color values,
-and right shifts it to higher.  Right-clicking resets the color map.  If
-you find yourself using this tool often to bring out detail in different
+The histogram tool provides a much more direct means to bring out
+detail in a given image area, but the color tool allows one to use
+palettes similar to those found in SAOImage/DS9.  One can use the
+click and drag method for adjusting the color map directly.  Simply
+left-click, hold, and drag around the window.  Moving down narrows the
+map, up widens, left shifts it to lower color values, and right shifts
+it to higher.  Right-clicking resets the color map.  If you find
+yourself using this tool often to bring out detail in different
 regions of an image, try out the histogram tool instead and see if you
 prefer it.
 
@@ -2597,12 +2597,13 @@ Set...}.  All input calibration files (in incrementing versions) can be
 found in the @file{cubism/calib/data/ssc} directory in your CUBISM
 distribution.
 
-Note that the general presumption is that more current calibration data
-is always better when used with data processed wit the most up to date
-SSC IRS pipeline.  This is true in general, although there is now at
-least one time dependent calibration (the input bias voltage for the LH
-detectors was changed).  CUBISM automatically uses the appropriate flux
-calibration values depending on the date of observation.  
+Note that the general presumption is that more current calibration
+data is always better when used with data processed wit the most up to
+date SSC IRS pipeline.  This is true in general, although there is
+currently one time dependent calibration (the input bias voltage for
+the LH detectors was changed).  CUBISM automatically uses the
+appropriate flux calibration values depending on the date of
+observation.
 
 New calibration sets can be created, but this is outside the scope of
 this document.  
@@ -2667,7 +2668,6 @@ set.  Even if the full slit was used to map a source, the fact that the
 two orders extend away from the map center to either side can allow
 useful background frames to be found.  For a very helpful method for
 such selection, @xref{Background Selection Using Visualization}.
-
 
 @node Archive Background, Background Blend, In Situ Background, Backgrounds
 @subsection Archive Background
