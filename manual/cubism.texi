@@ -1407,10 +1407,10 @@ This page includes:
 @multitable @columnfractions .15 .85
 
 @item @samp{RA}
-@tab RA targetted by the slit field of view position (J2000).
+@tab RA targeted by the slit field of view position (J2000).
 
 @item @samp{DEC}
-@tab DEC targetted by the slit field of view position (J2000).
+@tab DEC targeted by the slit field of view position (J2000).
 
 @item @samp{DATA}
 @tab Whether the data for this record are loaded, rather than just a
@@ -3078,7 +3078,7 @@ The slit-loss correction function is used to correct the native IRS
 pipeline calibration, tuned for point sources, to the case of perfectly
 extended sources.  While most sources are not entirely smooth and
 slit-filling, this option should be enabled in most cases, except
-perhaps for point sources.  Note that the CUBISM calibration of extended
+for point sources.  Note that the CUBISM calibration of extended
 sources is made using the SLCF; point source spectrophotometry will be
 more accurate using SPICE, or another single-pointing extraction tool.
 
