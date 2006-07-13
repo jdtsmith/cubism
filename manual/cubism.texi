@@ -2101,13 +2101,15 @@ The bad pixel tool's key shortcut is @kbd{b}.
 M51, with 13 records selected.}
 @end float
 
-It can be useful to look at a graphical representation of the AOR layout
-as observed on top of an image.  The Visualization tool can be activated
-from the CUBISM Project window by choosing @kbd{Record->Visualize
-AORs...} @pxref{CUBISM Project Record Menu}.  This will prompt for an
-image to use for visualization (if none is set).  Select a FITS image
-with valid astrometry (DSS, 2MASS, Spitzer IRAC/MIPS, etc.), and the
-records will be shown, as in @ref{fig:cv_viz}.
+It can be useful to view a graphical representation of the AOR layout
+overlaid of an image of your target.  The AOR Visualization tool can be
+activated from the CUBISM Project window by choosing
+@kbd{Record->Visualize AORs...}  @pxref{CUBISM Project Record Menu}.
+This will prompt for an image to use for visualization (if none is set).
+Select a FITS image with valid astrometry (DSS, 2MASS, Spitzer
+IRAC/MIPS, etc.), and the records will be shown, as in @ref{fig:cv_viz}.
+Any selected records in the cube project will be shown in white.
+Disabled records are gray.
 
 When this tool is active, records can be selected directly in the image
 itself.  Click on a record to activate it, at which point it is drawn in
@@ -2119,7 +2121,6 @@ overlays to deselect all records.  Direct selection on the image can be
 very useful from defining background records directly from an infrared
 image @pxref{Background Selection Using Visualization}.
 
-Disabled records are shown in gray.  
 
 @node Pixel Table Tool, Order Mask Tool, AOR Visualization Tool, CubeView Tools
 @subsubsection Pixel Table Tool
@@ -2597,13 +2598,12 @@ Set...}.  All input calibration files (in incrementing versions) can be
 found in the @file{cubism/calib/data/ssc} directory in your CUBISM
 distribution.
 
-Note that the general presumption is that more current calibration
-data is always better when used with data processed wit the most up to
-date SSC IRS pipeline.  This is true in general, although there is
-currently one time dependent calibration (the input bias voltage for
-the LH detectors was changed).  CUBISM automatically uses the
-appropriate flux calibration values depending on the date of
-observation.
+Note that the general presumption is that more current calibration data
+is always better when used with data processed with the most up to date
+SSC IRS pipeline.  This is true in general, although there is currently
+one time dependent calibration (the input bias voltage for the LH
+detectors was changed).  CUBISM automatically uses the appropriate flux
+calibration values depending on the date of observation.
 
 New calibration sets can be created, but this is outside the scope of
 this document.  
@@ -2839,7 +2839,7 @@ number of problematic pixels often remain.
 @node Global and Record Level Bad Pixels, Manual Bad Pixel Selection, Bad Pixels, Bad Pixels
 @subsection Global and Record Level Bad Pixels
 
-There are two different types of user-settable bad pixel in CUBISM:
+There are two different types of user-settable bad pixels in CUBISM:
 @emph{Global} and @emph{Record Level}.  A global bad pixel is a pixel
 presumed bad in @emph{all} @samp{BCD} records.  Since global bad pixels
 remain bad throughout the duration (or a large portion) of the spectral
@@ -3586,6 +3586,15 @@ information.
 @strong{Use multiple viewers.}  This allows you to simultaneously
 scrutinize @samp{BCD} records, the built cube, and an AOR visualization
 image.
+
+@item
+@strong{Use the AOR visualizer to examine in-situ backgrounds.}  This
+lets you quickly check for source contamination (ideally using 8 or 24
+micron Spitzer image).  Since the selected records are indicated in
+white in the AOR visualization, and viewing the background selects the
+background records, it's easy to get a quick view of where the
+background is being drawn from.  @xref{AOR Visualization Tool}, for
+more.
 @end enumerate
 
 @node Troubleshooting, Debugging CUBISM, Tips, Tips and Troubleshooting
