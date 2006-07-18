@@ -71,7 +71,7 @@ end
 function IRS_Region::RegionPhotometry,image,clip_astr
   pix=self->ClipRegion(image,clip_astr,AREAS=areas)
   if pix[0] eq -1 then return,!VALUES.F_NAN
-  return,total(image[pix]*areas)/total(areas)
+  return,total(image[pix]*areas,/NAN)/total(areas,/NAN)
 end
 
 ;=============================================================================
