@@ -139,8 +139,7 @@ end
 ;=============================================================================
 pro WSMask::Blank,im_ptr
   if ~ptr_valid(self.mask) then self->MaskGen
-  mn=mean(*im_ptr,/NAN)
-  (*im_ptr)[where(*self.mask)]=mn
+  (*im_ptr)[where(*self.mask)]=!VALUES.F_NAN
 end
 
 ;=============================================================================
