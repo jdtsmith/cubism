@@ -1089,6 +1089,11 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
      endif
   endif
   
+  if keyword_set(nodata) then begin 
+     detVIZ=self.visualize_image & self.visualize_image=ptr_new()
+     detVIZH=self.visualize_header & self.visualize_header=ptr_new()
+  endif 
+  
   oldchange=self.Changed        ;we want the file written to have changed=0!
   self.Changed=0b               ;but save the old preference incase we fail
   
@@ -1122,6 +1127,11 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
         self.ACCOUNTS_VALID=av
         (*self.DR).ACCOUNT=detACCOUNT
      endif
+  endif 
+  
+  if keyword_set(nodata) then begin 
+     self.visualize_image=detVIZ
+     self.visualize_header=detVIZH
   endif 
   
   if serr then self->Error,['Error Saving to File: ',file]
@@ -1744,7 +1754,7 @@ pro CubeProj::Revert
   endelse 
   
   self->Status,status+'done'
-  self->Send,/UPDATE
+  self->Send,/UPDATE,/NEW_CUBE
   self->UpdateAll
 end
 
