@@ -87,15 +87,28 @@ pro tvSlice::Message,msg
            pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
            if pt[0] eq -1 then return
            if array_equal(self.ept,pt) then return
-           self->EraseLine
-           if self.constrain then begin 
-              if abs(pt[1]-self.opt[1]) gt abs(pt[0]-self.opt[0]) then $
-                 pt[0]=self.opt[0] $ ; up-down 
-              else pt[1]=self.opt[1] ;left-right
-           endif 
-           self.ept=pt
+           if self.widen then begin 
+              width=self->Width(pt)
+              if self.width eq width then return
+              self->EraseLine              
+              self.width=width
+           endif else begin 
+              self->EraseLine
+              if self.constrain || (msg.modifiers AND 2b) ne 0b then begin 
+                 delx=abs(pt[0]-self.opt[0])
+                 dely=abs(pt[1]-self.opt[1])
+                 del=round(0.5*(delx+dely))>1
+                 if abs(delx-dely)/del lt .5 then begin 
+                    pt[0]=self.opt[0]+del*(pt[0] gt self.opt[0]?1:-1)
+                    pt[1]=self.opt[1]+del*(pt[1] gt self.opt[1]?1:-1)
+                 endif else if dely gt delx then $
+                    pt[0]=self.opt[0] $ ; up-down 
+                 else pt[1]=self.opt[1] ;left-right
+              endif 
+              self.ept=pt
+           endelse 
            self->DrawLine
-           self.oDraw->SendRedraw
+           self->PlotSlice
         endif
      end 
      
@@ -104,12 +117,24 @@ pro tvSlice::Message,msg
            0: $                 ;button press
               begin  
               if self.opt[0] ne -1 then self->EraseLine 
-              self.constrain=(msg.press AND 4b) ne 0 ;only up-down left right
+              self.constrain=(msg.press AND 4b) ne 0
+              self.width=0.0
               pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
               if pt[0] eq -1 then return
-              self.opt=pt       ;the original point
-              self.oDraw->MsgSignup,self,/DRAW_MOTION ;ask for motion events
+              
               self.buttondown=1b
+              
+              if ((msg.press AND 2b) ne 0 || msg.modifiers AND 1b) && $
+                 self.ept[0] ne -1 then begin 
+                 self.widen=1b
+                 width=self->Width(pt)
+                 if self.width ne width then begin 
+                    self->EraseLine
+                    self.width=width
+                    self->DrawLine
+                 endif 
+              endif else self.opt=pt                  ;the original point
+              self.oDraw->MsgSignup,self,/DRAW_MOTION ;ask for motion events
               self.oDraw->SendRedraw
            end
            
@@ -119,8 +144,10 @@ pro tvSlice::Message,msg
               self.buttondown=0b
               ;; we need no more motion events
               self.oDraw->MsgSignup,self,DRAW_MOTION=0 
-              if self.constrain then begin 
+              if self.constrain || (msg.modifiers AND 2b) ne 0b then begin 
                  self.constrain=0b ;reset for next round
+              endif else if self.widen then begin 
+                 self.widen=0b
               endif else begin 
                  pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
                  if pt[0] ne -1 then self.ept=pt ;otherwise just use last one 
@@ -134,42 +161,61 @@ pro tvSlice::Message,msg
      end 
      
      'TVDRAW_POSTDRAW':  begin 
-        if NOT ptr_valid(self.plotvec) then return
+        if ~ptr_valid(self.plotvec) then return
         self->PlotSlice         ;we'll draw it when the redraw arrives.
         widget_control, self.wBase,TLB_SET_TITLE=self.oDraw->Title()+' - Slice'
         break
      end
      
-     'TVDRAW_REDRAW': if ptr_valid(self.plotvec) AND self.buttondown eq 0b $
-        then self->DrawLine
+     'TVDRAW_REDRAW': begin 
+        if ptr_valid(self.plotvec) AND self.buttondown eq 0b then $
+           self->DrawLine
+     end 
+     
+     'TVDRAW_SNAPSHOT': begin 
+        if ptr_valid(self.plotvec) AND self.buttondown eq 0b then $
+           self->DrawLine
+     end 
      else:
   endcase
 end
 
 ;=============================================================================
-;	On:  Get all our messages.
+;	On:
 ;=============================================================================
 pro tvSlice::On
-  if self->On() then begin      ;if turned on *again* .. means off
-     self->Off                  
+  if self->On() then begin      ;if turned on *again*, reset
+     self->Reset                  
      return
   endif
   self->tvPlug::On
-  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/DRAW_MOTION,/TVDRAW_REDRAW, $
-     /TVDRAW_POSTDRAW
+  self.oDraw->MsgSignup,self,/DRAW_BUTTON,/TVDRAW_REDRAW,/TVDRAW_POSTDRAW, $
+                        TVDRAW_SNAPSHOT=0
+  self.oDraw->ReDraw,/SNAPSHOT
 end
 
 ;=============================================================================
-;       Off: (But if we have a box drawn, keep processing).
+;       Off: 
 ;=============================================================================
 pro tvSlice::Off
   self->tvPlug::Off
+  self.oDraw->MsgSignup,self,/NONE,/TVDRAW_POSTDRAW,/TVDRAW_SNAPSHOT
+  if self.oDraw->IsDrawn() then self.oDraw->ReDraw,/SNAPSHOT
+end
+
+;=============================================================================
+;       Reset: 
+;=============================================================================
+pro tvSlice::Reset
   if self.opt[0] ne -1 then self->EraseLine
   self.plotpt=[-1,-1]           ;no longer plotting it
-  if widget_info(self.wBase,/VALID) then  $
-     widget_control, self.wBase,/DESTROY
+  self.opt=[-1,-1]
+  self.ept=[-1,-1]
+  ptr_free,self.plotvec
+  if widget_info(self.wBase,/VALID) then widget_control, self.wBase,/DESTROY
+  self->tvPlug::Off
   self.oDraw->MsgSignup,self,/NONE
-  self.oDraw->SendRedraw
+  self.oDraw->ReDraw,/SNAPSHOT
 end
 
 
@@ -185,7 +231,7 @@ function tvSlice::Description
 end
 
 function tvSlice::MouseHelp
-  return,['Slice','','XYConstrained']
+  return,['Slice','SetWidth','XYConstrained']
 end
 ;;************************End OverRiding methods*******************************
 
@@ -194,8 +240,13 @@ pro tvslice_plot_event,ev
   self->PlotEvent,ev
 end
 
+pro tvslice_plot_kill,id
+  widget_control, id,GET_UVALUE=self
+  self->Reset
+end
+
 ;=============================================================================
-;       PlotEvent -  Update indicator and overlay point
+;  PlotEvent -  Update indicator and overlay point
 ;=============================================================================
 pro tvSlice::PlotEvent,ev
   type=tag_names(ev,/STRUCTURE_NAME)
@@ -213,25 +264,37 @@ pro tvSlice::PlotEvent,ev
   self.oDraw->GetProperty,IMORIG=io
   self->ResetScale
   c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
-  c[0]=round((0>c[0])<(n_elements(*self.plotvec)-1))
-  if self.plotpt[0] eq c[0] || c[0] ge n_elements(*self.plotvec) then return
-  c[1]=(*io)[(*self.plotvec)[c[0]]] ;the data value there
+  n=(size(*self.plotvec,/DIMENSIONS))[1]
+  c[0]=round((0>c[0])<(n-1))
+  if self.plotpt[0] eq c[0] || c[0] ge n then return
+  c[1]=(*self.plotvec)[1,c[0]] ;the data value there
   if self.plotpt[0] ne -1 then self->EraseIndicator ;Erase old one
   self.plotpt=c
   self->ShowIndicator           ;Draw the symbols
 end
 
 ;=============================================================================
-;       ShowIndicator -  Show the overlay indicator
+;  ShowIndicator -  Show the overlay indicator
 ;=============================================================================
 pro tvSlice::ShowIndicator, IMONLY=il
   self.oDraw->GetProperty,DRAWWIN=win,SIZE=sz
   wset,win
   self.oDraw->SendRedraw ;some of it got erased probably
-  indx=(*self.plotvec)[self.plotpt[0]]
+  indx=long((*self.plotvec)[0,self.plotpt[0]])
   x=indx mod sz[0] & y=indx/sz[0]
+     
   self.ImCoords=self.oDraw->Convert([x,y],/DEVICE)
   plots,self.ImCoords,/DEVICE,PSYM=1,SYMSIZE=1.5,THICK=1.5,COLOR=self.color
+  
+  if self.width ne 0.0 then begin 
+     self->FlankingPoints,x,y,fx,fy
+     nf=n_elements(fx) 
+     c=lindgen(2,nf)
+     for i=0,nf-1 do $
+        c[0,i]=self.oDraw->Convert([fx[i],fy[i]],/DEVICE)
+     plots,c,PSYM=3,COLOR=self.color,/DEVICE
+  endif
+  
   if n_elements(il) eq 0 then begin 
      wset,self.plotwin
      self->ResetScale
@@ -241,7 +304,7 @@ pro tvSlice::ShowIndicator, IMONLY=il
 end
 
 ;=============================================================================
-;       tvSlice::EraseIndicator -  Erase the plot point indicators
+;  EraseIndicator -  Erase the plot point indicators
 ;=============================================================================
 pro tvSlice::EraseIndicator
   ;; Erase indicator + vertical line on the plot window
@@ -254,11 +317,43 @@ pro tvSlice::EraseIndicator
   device,copy=[low,dist,low,self.plotpixwin]
   
   ;; Erase indicator on the image window
-  self.oDraw->GetProperty,WINSIZE=winsize
-  low=self.ImCoords-6>0
-  dist=[13,13]<(winsize-low)>1
+  self.oDraw->GetProperty,WINSIZE=winsize,ZOOM=zm
+  low=self.ImCoords-6-self.width*zm>0
+  dist=[13,13]+(2*zm*self.width)<(winsize-low)>1
   self.oDraw->Erase,low,dist
 end
+
+;=============================================================================
+;  Width -  Determine width perpendicular to slice line of given point
+;=============================================================================
+function tvSlice::Width,pt
+  width=abs(float(self.ept[0]-self.opt[0])*(self.opt[1]-pt[1])- $
+            float(self.opt[0]-pt[0])*(self.ept[1]-self.opt[1]))/ $
+             sqrt(total(float(self.ept-self.opt)^2))
+  if width lt 0.5 then width=0.0
+  return,width
+end
+
+;=============================================================================
+;  FlankingPoints - Find the flanking points within width of the given
+;                   line point(s).
+;=============================================================================
+pro tvSlice::FlankingPoints,x,y,fx,fy
+  del=float(self.ept-self.opt)
+  d=sqrt(total(del^2))
+  ang=atan(abs(del[1]),abs(del[0]))*!RADEG
+  if ang gt 45. then ang=90.-ang
+  cos_term=cos(ang/!RADEG)
+  nw=(2*ceil(self.width*cos_term)+1)>2
+  n=n_elements(x) 
+  off=float(lindgen(nw)-nw/2)/((nw-1)/2)*self.width
+  offx=off*(-del[1]/d)
+  offy=off*( del[0]/d)
+  all=make_array(n,nw,VALUE=!VALUES.F_NAN)
+  fx=round(rebin([x],n,nw)+rebin(transpose(offx),n,nw))
+  fy=round(rebin([y],n,nw)+rebin(transpose(offy),n,nw))
+end
+
 
 pro tvSlice::ResetScale
   !X.S=self.scale[0:1] & !Y.S=self.scale[2:3]
@@ -287,7 +382,8 @@ pro tvSlice::PlotWin
   self.plotwin=win
   wset,save
   XManager,'tvSlice_Plot',self.wBase,/NO_BLOCK, $
-           EVENT_HANDLER='tvslice_plot_event',GROUP_LEADER=tlb
+           EVENT_HANDLER='tvslice_plot_event',GROUP_LEADER=tlb, $
+           CLEANUP='tvslice_plot_kill'
 end
 
 
@@ -299,11 +395,13 @@ pro tvSlice::PlotSlice
   if widget_info(self.wBase,/VALID) eq 0 then self->PlotWin
   wset,self.plotwin
   self.oDraw->GetProperty,IMORIG=io,SIZE=sz,DRAWWIN=dwin
-  d=float(self.ept-self.opt)
-  n=floor(sqrt(d[0]^2+d[1]^2))
+  del=float(self.ept-self.opt)
+  d=sqrt(total(del^2))
+  n=floor(d)
+  if n lt 2 then return
+  x=round(findgen(n)/(n-1)*del[0]+self.opt[0])
+  y=round(findgen(n)/(n-1)*del[1]+self.opt[1])
 
-  x=round(findgen(n)/(n-1)*d[0]+self.opt[0])
-  y=round(findgen(n)/(n-1)*d[1]+self.opt[1])
   wh=where(x ge 0 and x lt sz[0],cnt)
   if cnt eq 0 then begin
      wset,dwin
@@ -317,12 +415,26 @@ pro tvSlice::PlotSlice
   endif 
   x=x[wh] & y=y[wh]
   n=n_elements(x) 
-  if ptr_valid(self.plotvec) then *self.plotvec=x+y*sz[0] else  $
-     self.plotvec=ptr_new(x+y*sz[0])
+    
   ttl=string(FORMAT='("[",I4,",",I4,"] to [",I4,",",I4,"]")', $
              x[0],y[0],x[n-1],y[n-1])
-  plot,indgen(n),(*io)[*self.plotvec],xtitle="Slice Index",ytitle='Value',$
-       TITLE=ttl,xstyle=16,XMINOR=n lt 10?-1:0
+  
+  
+  inds=x+y*sz[0]
+  ;; At each position, span width
+  if self.width ne 0.0 then begin 
+     self->FlankingPoints,x,y,allx,ally
+     all=(*io)[allx,ally]
+     vec=total(all,2,/NAN)/total(finite(all),2)
+     ttl+=string(FORMAT='("  width: ",F0.1)',self.width)
+  endif else vec=(*io)[inds]
+  
+  if ptr_valid(self.plotvec) then $
+     *self.plotvec=transpose([[inds],[vec]]) else  $
+        self.plotvec=ptr_new(transpose([[inds],[vec]]))
+
+  plot,indgen(n),vec,xtitle="Slice Index",ytitle='Value',$
+       TITLE=ttl,xstyle=17,XMINOR=n lt 10?-1:0,POSITION=[.07,.08,.99,.95]
   self.scale=[!X.S,!Y.S] & self.range=!Y.CRANGE
   wset,self.plotpixwin
   device,copy=[0,0,512,384,0,0,self.plotwin] ;save it for redrawing
@@ -338,6 +450,17 @@ pro tvSlice::DrawLine
   en=self.oDraw->Convert(self.ept,/DEVICE)
   plots,[bg[0],en[0]],[bg[1],en[1]],COLOR=self.color,$
         THICK=1.5,/DEVICE
+  
+  if self.width ne 0.0 then begin 
+     del=self.opt-self.ept
+     off=self.width*[-del[1],del[0]]/sqrt(total(float(del)^2))
+     for s=-1,1,2 do begin 
+        bg=self.oDraw->Convert(self.opt+s*off,/DEVICE)
+        en=self.oDraw->Convert(self.ept+s*off,/DEVICE)
+        plots,[bg[0],en[0]],[bg[1],en[1]],COLOR=self.color,$
+              THICK=1.5,/DEVICE,LINESTYLE=2
+     endfor 
+  endif 
 end
 
 ;=============================================================================
@@ -346,9 +469,20 @@ end
 pro tvSlice::EraseLine
   bg=self.oDraw->Convert(self.opt,/DEVICE)
   en=self.oDraw->Convert(self.ept,/DEVICE)
-  self.oDraw->GetProperty,WINSIZE=winsize
   high=bg>en+1
   low=(en<bg-1)>0
+  if self.width ne 0.0 then begin 
+     del=self.opt-self.ept
+     off=self.width*[-del[1],del[0]]/sqrt(total(float(del)^2))
+     for s=-1,1,2 do begin 
+        bg=self.oDraw->Convert(self.opt+s*off,/DEVICE)
+        en=self.oDraw->Convert(self.ept+s*off,/DEVICE)
+        high>=bg>en+1
+        low<=(en<bg-1)>0
+     endfor
+  endif
+     
+  self.oDraw->GetProperty,WINSIZE=winsize
   dist=(high-low+1) < (winsize-low) > 1
   self.oDraw->Erase,low,dist
 end
@@ -368,6 +502,7 @@ function tvSlice::Init,oDraw,COLOR=color
   self.opt=[-1,-1]
   self.ept=[-1,-1]
   self.plotpt=[-1,-1]
+  self.width=-1.
   
   if (self->tvPlug::Init(oDraw) ne 1) then return,0 ;chain up
   
@@ -399,5 +534,7 @@ pro tvSlice__define
           ept:[0,0], $          ;end point of line (pixel coordinates)
           scale:dblarr(4),$     ;the x,y data->device scaling parameters
           range:fltarr(2), $    ;the saved y range after plot
-          constrain:0b}         ;with right button, constrain to up-down/l-r
+          width:0.0, $          ;width (in pixels) of the slice
+          constrain:0b,$        ;with right button, constrain to up-down/l-r
+          widen:0b}             ;with middle button, widen area of averaging
 end
