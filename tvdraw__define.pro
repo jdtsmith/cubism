@@ -162,7 +162,8 @@
 ;       overall image about to be drawn (e.g., computing statistics)
 ;       should subscribe to TVDRAW_POSTDRAW messages, which are sent
 ;       after every image is drawn, be it a new image, a change in
-;       zoom, etc.  Plugins should only *read* the image passed.
+;       zoom, etc.  Plugins should only *read* the image passed.  If
+;       it's a new image, it will be indicated.
 ;
 ;    TVDRAW_REDRAW: Plug-ins which draw atop the image (e.g., a box or
 ;       line or other symbol set) or otherwise need to be alerted when
@@ -609,10 +610,16 @@ pro tvDraw::Snapshot
   wset,self.drawwin
 end
 
+;=============================================================================
+;  QueueRedraws - Begin queuing redraw requests
+;=============================================================================
 pro tvDraw::QueueRedraws
   self.redraw_queue=1b
 end
 
+;=============================================================================
+;  FlushRedraws - Flush pending redraws
+;=============================================================================
 pro tvDraw::FlushRedraws
   rq=self.redraw_queue
   self.redraw_queue=0b
@@ -625,7 +632,7 @@ end
 
 ;=============================================================================
 ;  ReDraw - Quickly redraw the already computed draw image, to the
-;           double, buffer area if no_show is requested.
+;           double buffer area if no_show is requested
 ;=============================================================================
 pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era,NO_SHOW=no_show
   snap=keyword_set(snap) 
@@ -889,9 +896,9 @@ pro tvDraw__define
       dispsize:[0,0]}           ;current [xsize,ysize] of displayed portion
                                 ;    of array
   ;; Messages (other than widget events) we send.
-  msg={TVDRAW_PREDRAW,im:ptr_new()} ; sent before draw, for modification
+  msg={TVDRAW_PREDRAW,im:ptr_new()}  ; sent before draw, for modification
   msg={TVDRAW_POSTDRAW,im:ptr_new()} ; sent after draw, for interpretation
-  msg={TVDRAW_REDRAW,im:ptr_new()} ; sent when screen gets clobbered
+  msg={TVDRAW_REDRAW,im:ptr_new()}   ; sent when screen gets clobbered
   msg={TVDRAW_SNAPSHOT,im:ptr_new()} ; when we fill the erase pixwin
-  msg={TVDRAW_RESIZE,x:0,y:0}   ;the draw window has been resized
+  msg={TVDRAW_RESIZE,x:0,y:0}        ; the draw window has been resized
 end
