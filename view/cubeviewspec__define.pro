@@ -189,7 +189,7 @@ pro CubeViewSpec::Event,ev
                  'F': self->Fit
                  'V': begin     ;value line
                     widget_control, self.wToggles, GET_VALUE=tog
-                    tog[1]=1-tog[1]
+                    tog[0]=1-tog[0]
                     widget_control, self.wToggles, SET_VALUE=tog
                     self->Plot
                  end
@@ -387,7 +387,7 @@ pro CubeViewSpec::Event,ev
      
      self.wToggles: begin 
         widget_control, ev.id,GET_VALUE=tog
-        self.show_error=tog[2]
+        self.show_error=tog[1]
         self->Plot
      end 
      
@@ -972,7 +972,7 @@ end
 ;=============================================================================
 function CubeViewSpec::ShowingValueLine
   widget_control, self.wToggles, GET_VALUE=tog
-  return,tog[1] ne 0 
+  return,tog[0] ne 0 
 end
 
 ;=============================================================================
@@ -1258,7 +1258,7 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,PARENT_GROUP=grp
   col1row2base=widget_base(col1base,/ROW,/ALIGN_LEFT, $
                            /BASE_ALIGN_CENTER,SPACE=1,/FRAME) 
   
-  buttons=['Renorm','ValLine','Errors']
+  buttons=['ValLine','Errors']
   
   self.wToggles=cw_bgroup(col1row2base,buttons,/NONEXCLUSIVE,/ROW,$
                           SET_VALUE=replicate(1,n_elements(buttons)))
