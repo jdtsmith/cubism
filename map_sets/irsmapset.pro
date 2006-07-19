@@ -145,20 +145,10 @@ pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
   
   redQ=n_elements(redshift) ne 0 && redshift ne 0.0
   
-  if ptr_valid(map.weights) then begin 
+  if ptr_valid(map.weights) then begin ;; Weight maps first
      weights=*map.weights
-     if n_elements(wc) ne 0 and keyword_set(nwc) eq 0 then begin 
-        wlam=weights[0,*]
-        if redQ then wlam*=1.+redshift/299792.458
-        
-        minlam=min(wlam,MAX=maxlam)
-                
-        weights=interpol(weights[1,*],wlam,wc)>0.
-        wh=where(wc gt maxlam OR wc lt minlam,NCOMPLEMENT=good,cnt)
-        if good eq 0 then $
-           self->Error,map.name+': No overlap with current wavelengths.'
-        if cnt gt 0 then weights[wh]=0.0 ;no extrapolation, just zero
-     endif
+     if n_elements(wc) ne 0 && keyword_set(nwc) eq 0 && redQ then $
+        weights[0,*]*=1.+redshift/299792.458
   endif 
   
   if ptr_valid(map.foreranges) then begin 
