@@ -174,6 +174,7 @@ pro xf_addrecent, state,addfile,adddir
   addfile=strtrim(addfile,2)
   
   if addfile[0] ne '' then begin
+     addfile=file_expand_path(addfile)
      widget_control, state.recfiles_id, get_value=flist
      ;;--- ensure no multiple copies of the same item
      wh=where(flist ne '',cnt)
