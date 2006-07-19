@@ -70,6 +70,10 @@ pro compile_cubism
   skip_files=['cubism_dir','cubism_version','compile_cubism', $
               'do_compile_cubism',ps+'scraps'+ps,'CVS'+ps]
   resolve_routine,'XManager',/COMPILE_FULL_FILE
+  
+  extra_funs=['svdfunct']
+  resolve_routine,extra_funs,/IS_FUNCTION
+
   skip=0
   for i=0,n_elements(files)-1 do begin 
      for j=0,n_elements(skip_files)-1 do begin 
@@ -89,5 +93,9 @@ pro compile_cubism
      resolve_routine,routine,/EITHER,/NO_RECOMPILE,/COMPILE_FULL_FILE
   endfor 
   resolve_all,/CONTINUE_ON_ERROR
-  save,/ROUTINES,FILENAME=filepath(ROOT=bindir,'cubism_vm.sav')
+  
+  savefile=filepath(ROOT=bindir,'cubism_vm.sav')
+  save,/ROUTINES,FILENAME=savefile
+  sz=(file_info(savefile)).size
+  print,'Saved cubism_vm.sav: '+file_size_string(sz)
 end
