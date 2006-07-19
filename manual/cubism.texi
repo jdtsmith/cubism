@@ -6,7 +6,7 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.1a
+@set EDITION 1.1b
 @set VERSION 0.99
 @set IDLVERSIONREQUIRED 6.1
 @set DATE July, 2006
@@ -101,11 +101,15 @@ license to the document, as described in section 6 of the license.
 
 @node Top, Introduction, (dir), (dir)
 
+@strong{Edition @value{EDITION}, for CUBISM version @value{VERSION},
+@value{DATE}}
+
 CUBISM, the CUbe Builder for IRS Spectral Mapping, is a package written
 in the Interactive Data Language (IDL), which supports the analysis and
 reduction of spectral maps created with the
 @uref{http://ssc.spitzer.caltech.edu/irs/,IRS Spectrograph} aboard the
 @uref{http://ssc.spitzer.caltech.edu/,Spitzer Space Telescope}.
+
 
 @end ifnottex
 
@@ -1730,8 +1734,9 @@ to its initial state, for instance removing any box area which has been
 defined.  Other tools which draw marks or annotations on top of the
 image keep those marks drawn even when they are not active.  An example
 is the bad pixel tool, which continues to display bad pixel marks even
-when it is not the active tool.  To remove these displays, @emph{reset}
-the tool as described.
+when it is not the active tool (i.e. when mouse clicks don't affect the
+bad pixel mask).  To remove these displays, @emph{reset} the tool as
+described.
 
 Tooltips identifying the tool, its key shortcut, and associated mouse
 operations (encoded as @samp{[left | middle | right]}) can be displayed
@@ -1844,15 +1849,16 @@ The zoom tool allow arbitrary zooming in on image regions.  By default,
 images are display at the maximum zoom which fits the entire image in
 the display window.  To zoom in, drag a rectangular region around the
 area of interest, or simply left-click to double the zoom level and
-center on the clicked region.  To zoom out, right-click.  All zoom
-levels are saved onto a ``zoom stack'', which is navigated backwards one
-step at a time.  To zoom all the way out, right double-click.
+center on the clicked point.  To zoom out, right-click.  All zoom levels
+are saved onto a ``zoom stack'', which is navigated backwards one step
+at a time.  To zoom all the way out, right double-click.
 
 When an image is zoomed in, middle-click dragging (or
-@key{Control}-click dragging) pans the image.  If the display canvas is
-resized (either using the @kbd{Set Size} menu item, see @ref{CubeView
-Options Menu}, or by re-sizing the entire CubeView window), the image is
-re-zoomed.
+@key{Control}-click dragging) pans the image.  Middle-double-clicking,
+or @key{Control} double-clicking recenters the image on the point
+clicked.  If the display canvas is resized (either using the @kbd{Set
+Size} menu item, see @ref{CubeView Options Menu}, or by re-sizing the
+entire CubeView window), the image is re-zoomed.
 
 The zoom tool's key shortcut is @kbd{z}.
 
@@ -1862,20 +1868,20 @@ The zoom tool's key shortcut is @kbd{z}.
 @cindex Image scaling
 
 The histogram tool is actually an image rescaling tool.  It allows you
-to identify a region of the image, and re-scale the image to emphasize
-it.  Simply create a box area, or move and resize an existing box area,
-to the region of interest.  The scaling mode can be linear, square root,
-logarithmic, or histogram equalizing, with 1% or 5% trimming available,
-in the @kbd{Options->Scale Image} menu.  By default, the entire image is
-scaled.  This tool also draws a histogram of the resulting image colors
-on the colorbar (@pxref{Color Tool}), and gives the scaling range.  The
-scale clipping limits can be frozen with @key{Space}, or set directly
-using @kbd{Options->Set Scale Range}.  It can be convenient to ``reset''
-the histogram tool to remove it's box area and define a new one, in
-particular if you are zoomed in on a different region of the image.  To
-quickly reset and turn it back on, hit the key shortcut twice. The box
-region for the statistics tool is red, and can be seen in
-@ref{fig:cv_recs}.
+to identify a region of the image, and rescale the image values to
+emphasize it.  Simply create a box area, or move and resize an existing
+box area, to the region of interest.  The scaling mode can be linear,
+square root, logarithmic, or histogram equalizing, with 1% or 5%
+trimming available, in the @kbd{Options->Scale Image} menu.  By default,
+the entire image is scaled.  This tool also draws a histogram of the
+resulting image colors on the colorbar (@pxref{Color Tool}), and gives
+the scaling range.  The scale clipping limits can be frozen with
+@key{Space}, or specified directly using @kbd{Options->Set Scale Range}.
+It can be convenient to ``reset'' the histogram tool to remove it's box
+area and define a new one, in particular if you are zoomed in on a
+different region of the image.  To quickly reset and turn it back on,
+hit the key shortcut twice. The box region for the statistics tool is
+red, and can be seen in @ref{fig:cv_recs}.
 
 The histogram tool's key shortcut is @kbd{h}.  
 
@@ -1900,15 +1906,23 @@ The color tool's key shortcut is @kbd{c}.
 @cindex Image slicing tool
 @cindex Slicer tool
 
-
 The image slicing tool allows slices to be taken through any image at
-arbitrary angles.  Just left-click and drag to define a slice, or
-right-click and drag to define horizontal or vertical slices.  A plot
-window with the pixel values along the slice vector is displayed, and
-mousing over it highlights simultaneously the value and pixel position
-within the image.  Turning the tool off or selecting another removes the
-slice line, and click-dragging a new slice replaces the existing line.
-An example slice plot is shown in @ref{fig:cv_slice}.
+arbitrary angles, either a single pixel wide, or averaged over a given
+width.  Just left-click and drag to define a slice at any angle, or hold
+down @key{Control} or right click and drag to constrain the slice to be
+horizontal, vertical, or diagonal.  A plot window with the pixel values
+along the slice vector is displayed as the slice is made, and mousing
+over it simultaneously highlights the value and the corresponding pixel
+position(s) within the image.  @key{Shift}-left-click, or middle-click
+(and drag) to define an averaging width perpendicular to the slice line
+(indicated by dashed lines).  Only full pixels are averaged, and the
+selection heuristic is simple.
+
+While other tools are active, the slice plot window will remain active
+and continue to indicate the position.  Creating a new slice replaces
+the existing line.  To remove the slice line, reset the tool by turning
+it on twice, or destroy the plotting window.  An example slice plot is
+shown in @ref{fig:cv_slice}.
 
 The image slicing tool's key shortcut is @kbd{l}.
 
@@ -1929,15 +1943,14 @@ The image slicing tool's key shortcut is @kbd{l}.
 @end float
 
 The statistics tool extends the CubeView window, adding a panel of
-statistics information at the bottom, including mininum/maximum,
+statistics information at the bottom, including mininum, maximum,
 average, median, standard deviations, and 3-sigma trimmed average and
 standard deviation.  Simply create or modify a box region (@pxref{Box
 Regions}) to view the statistics within that box.  The box region for
-the statistics tool is yellow.  An example of the tool's output is show
+the statistics tool is yellow.  An example of the tool's output is shown
 in @ref{fig:cv_stats}.
 
 The box statistics tool's key shortcut is @kbd{s}.
-
 
 @node Aperture Photometry Tool, Cube Extraction Tool, Box Statistics Tool, CubeView Tools
 @subsubsection Aperture Photometry Tool
@@ -3060,7 +3073,7 @@ BadPix Menu}.
 
 @node Cube Build Settings, WAVSAMP, Bad Pixels, Cube Assembly
 @section Cube Build Settings
-@cindex Setting, cube building
+@cindex Settings, cube building
 
 The cube build settings are accessed in the @kbd{Cube} menu of the
 project window.   Typically the default values (most options enabled)
@@ -3179,18 +3192,21 @@ Not all of the data is saved with the project by default.  There are
 three options related to saving the project file, accessible in the
 @kbd{File->Save Setup} menu:
 
+@cindex Saving, with data
 @enumerate
 @item
 @kbd{Save Data with Project}: This saves a copy of all the loaded data
 (including @samp{BCD}, associated masks, and uncertainties) into the
-project.  This adds approximately 192kB per record to the size of the
-project file, and is only necessary when you intend to distribute the
-file independent of the data directories.  This can be useful for
-sharing @file{.cpj} files colleagues without access to the Spitzer
+project file.  This adds approximately 192kB per record to the size of
+the file, and is only necessary when you intend to distribute the file
+independent of the data directories.  This can be useful for sharing
+@file{.cpj} files with colleagues without access to the Spitzer
 archives, but can result in large files when many tens or hundreds of
 records are involved, and is redundant when the data files themselves
 are available.
 
+@cindex Relative file names
+@cindex File names, relative
 @item
 @kbd{Relative File Names}: By default, the absolute path to the data
 files is stored in the project, and, if the data itself is not stored,
@@ -3200,11 +3216,12 @@ restore data from file''), unless the absolute path to the @samp{BCD}
 files is fixed on all systems where the cube is loaded.  While you can
 easily replace the root directory from the file names to fix this
 (@pxref{Troubleshooting}), another method is to use this option to
-specify that all path names will be recorded relative to the path of the
-@file{.cpj} file itself.  Then, as long as the relative file layout of
-the project file and data files remains the same, all record data should
-load with no problem.
+specify that all path names will be saved @emph{relative to the path of
+the @file{.cpj}} file itself.  Then, as long as the relative file layout
+of the project file and data files remains the same, all record data
+should load without problem.
 
+@cindex Saving, with accounts
 @item
 @kbd{Save Accounts with Project}: The clipping accounts consist of all
 the information which maps @samp{BCD} pixels to the sky grid.  When the
@@ -3218,16 +3235,24 @@ record.
 
 @end enumerate
 
-For distributing @file{.cpj} files, it's easiest to save without data or
-accounts (the default), since this produces the smallest files by far,
-but this requires everyone to have access to the data, in the same path
-(for absolute file names), or with the same relative path layout (for
-relative file names) as on the build host.  A reasonable approach is to
-use relative file names, and bundle the @file{.cpj} together with the
-data directories in a distribution package.  For users who simply wish
-to examine the cube itself (extract spectra, make maps), access to the
-record data isn't necessary.
+For distributing CUBISM projects as @file{.cpj} files, it's easiest to
+save the project without data or accounts (the default), since this
+produces the smallest files by far.  However, this requires everyone to
+have access to the data, in the same path (for absolute file names), or
+with the same relative path layout (for relative file names) as on the
+build host.
 
+One approach for sharing the data and cube project together is to save
+the data in the project itself.  This creates a larger project file, but
+is fully self-contained.  Another reasonable approach is to use relative
+file names, and bundle the @file{.cpj} together with the data
+directories and visualization image (if any) in a single directory for
+distribution.  The advantage of the latter is it allows the @file{.cpj}
+file to be updated independent of the data themselves.
+
+For users who simply wish to examine the cube itself (extract spectra,
+make maps), access to the record data isn't necessary --- any
+@file{.cpj} with an assembled cube will do.
 
 @node Saving the Cube as FITS,  , Saving the Project, Cube Assembly
 @section Saving the Cube as FITS
@@ -3304,7 +3329,7 @@ used to define the region of extraction for another cube --- see below.
 @callout{Avoid using extraction apertures smaller than roughly
 @samp{2x2} pixels, since over small regions, pixel aliasing driven by
 the undersampled IRS PSF can lead to anomalous continuum ``sawtooth''
-patterns near high spatial frequency portions of the cube.}
+patterns near high spatial frequency regions within the cube.}
 
 
 @node Matched Extraction,  , Direct Extraction, Extracting 1D Spectra
@@ -3687,19 +3712,19 @@ configuration on your system.
 @section Debugging CUBISM
 @cindex Debugging CUBISM
 
-By default, CUBISM traps and reports all errors which occur.  The
-resulting error message may or may not allow you to determine the cause
-of the error.  To debug CUBISM yourself, or to provide useful
+By default, CUBISM traps and reports all errors which occur in a dialog.
+The resulting error message may or may not allow you to determine the
+root of the problem.  To debug CUBISM yourself, or to provide useful
 information to the SSC helpdesk to allow them to investigate the
 problem, enable debugging with @kbd{Info->Debug Cubism} in the CUBISM
 Project window.  This requires access to the IDL command line, which
 will not be available for versions of CUBISM running under the IDLVM
 (@pxref{Binary Installation}).  After enabling debugging, repeat the
 action which generated the error.  Instead of trapping the error with a
-prompt, IDL will halt, with a full traceback message showing the exact
-code path which led to the error.  This code path might be enough to
-give you a hint as to the nature of the problem, but is also useful for
-the upstream maintainers for debugging purposes.  
+dialog prompt, IDL will halt, with a full traceback message showing the
+exact code path which led to the error in the IDL shell.  This code path
+might be enough to give you a hint as to the nature of the problem, but
+is also useful for the upstream maintainers for debugging purposes.
 
 Report problems to the SSC, @email{help@@spitzer.caltech.edu},
 including, at minimum:
