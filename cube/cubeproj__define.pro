@@ -1060,9 +1060,9 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   
   nr=self->N_Records()
   
+  if relfile then root=file_dirname(file_expand_path(file))
   if ptr_valid(self.DR) then begin 
      ;; Canonicalize the filenames
-     if relfile then root=file_dirname(file_expand_path(file))
      if self.savefile then cd,file_dirname(self.savefile)
      for i=0,nr-1 do begin 
         (*self.DR)[i].file=file_expand_path((*self.DR)[i].file)
@@ -1093,6 +1093,9 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
      detVIZ=self.visualize_image & self.visualize_image=ptr_new()
      detVIZH=self.visualize_header & self.visualize_header=ptr_new()
   endif 
+  
+  if relfile && self.visualize_file then $
+     self.visualize_file=make_filename_relative(self.visualize_file,root)
   
   oldchange=self.Changed        ;we want the file written to have changed=0!
   self.Changed=0b               ;but save the old preference incase we fail
@@ -2187,6 +2190,9 @@ end
 ;  LoadVisualize - Ensure a visualization image is loaded
 ;=============================================================================
 pro CubeProj::LoadVisualize,SELECT=sel
+  ;; Go to the cube directory first, for relative file-names
+  if self.savefile then cd,file_dirname(self.savefile)
+  
   if ~keyword_set(sel) then begin 
      if ptr_valid(self.visualize_image) && ptr_valid(self.visualize_header) $
      then return
