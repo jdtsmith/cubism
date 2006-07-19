@@ -124,6 +124,7 @@ pro tvSlice::Message,msg
               
               self.buttondown=1b
               
+              ;; With shift or middle click, widen
               if ((msg.press AND 2b) ne 0 || msg.modifiers AND 1b) && $
                  self.ept[0] ne -1 then begin 
                  self.widen=1b
@@ -144,15 +145,13 @@ pro tvSlice::Message,msg
               self.buttondown=0b
               ;; we need no more motion events
               self.oDraw->MsgSignup,self,DRAW_MOTION=0 
-              if self.constrain || (msg.modifiers AND 2b) ne 0b then begin 
-                 self.constrain=0b ;reset for next round
-              endif else if self.widen then begin 
-                 self.widen=0b
-              endif else begin 
+              if ~self.constrain && ~self.widen && $
+                 (msg.modifiers AND 3b) eq 0b then begin 
                  pt=self.oDraw->Convert([msg.X,msg.Y],/SHOWING)
                  if pt[0] ne -1 then self.ept=pt ;otherwise just use last one 
-              endelse             
-              if total(self.opt eq self.ept) eq 2. then return
+              endif   
+              self.constrain=0b & self.widen=0b
+              if array_equal(self.opt,self.ept) then return
               self.oDraw->SendRedraw ;probably overwrote stuff
               self->PlotSlice
            end
@@ -425,7 +424,8 @@ pro tvSlice::PlotSlice
   if self.width ne 0.0 then begin 
      self->FlankingPoints,x,y,allx,ally
      all=(*io)[allx,ally]
-     vec=total(all,2,/NAN)/total(finite(all),2)
+     
+     vec=total(all,2,/NAN)/(total(finite(all),2)>1.)
      ttl+=string(FORMAT='("  width: ",F0.1)',self.width)
   endif else vec=(*io)[inds]
   
