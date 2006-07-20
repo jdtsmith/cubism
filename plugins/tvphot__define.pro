@@ -71,7 +71,7 @@
 
 ;;**************************OverRiding methods********************************
 ;=============================================================================
-;	Message. Only snapshot, and box messages.
+;  Message. Only snapshot, and box messages.
 ;=============================================================================
 pro tvPhot::Message, msg
   self->tvPlug::Message,msg,TYPE=type
@@ -84,7 +84,7 @@ pro tvPhot::Message, msg
 end 
 
 ;=============================================================================
-;	On:  Get all our messages.
+;  On:  Get all our messages.
 ;=============================================================================
 pro tvPhot::On
   if self->On() then begin      ;if turned on *again* .. means turn *off*!
@@ -100,7 +100,7 @@ pro tvPhot::On
 end
 
 ;=============================================================================
-;       Off - Our box will stay around for us
+;  Off - Our box will stay around for us
 ;=============================================================================
 pro tvPhot::Off
   if widget_info(self.wBase,/VALID_ID) then self->wDestroy
@@ -122,6 +122,9 @@ function tvPhot::Description
 end
 ;;************************End OverRiding methods*******************************
 
+;=============================================================================
+;  GetProperty
+;=============================================================================
 pro tvPhot::GetProperty, Phot=phot, Rad=rad, SkyWidth=sw, SKY=sky
   if arg_present(phot) then phot=self.Phot
   if arg_present(rad) then rad=self.Rad
@@ -129,6 +132,9 @@ pro tvPhot::GetProperty, Phot=phot, Rad=rad, SkyWidth=sw, SKY=sky
   if arg_present(sky) then sky=self.Sky
 end
 
+;=============================================================================
+;  Draw - Draw the circles and centroid
+;=============================================================================
 pro tvPhot::Draw
   if self.Box->IsDrawn() AND self.cntrd[0] ne -1. then begin 
      ;; draw a small circle on the centroid center.
@@ -154,6 +160,9 @@ pro tvPhot::Draw
   endif 
 end
 
+;=============================================================================
+;  Centroid - Compute normal and DAO-phot style centroid
+;=============================================================================
 function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
   if n_elements(fwhm) eq 0 then fwhm=5
   if n_elements(tr) eq 0 then tr=.2 else tr=0.>tr<1.
@@ -167,82 +176,88 @@ function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
   s=size(im,/DIMENSIONS)
   
   ;; regular centroid
-  tm=total(im,2,/NAN) & ttm2=total(tm) 
-  tm=total(im,1,/NAN) & ttm1=total(tm)
+  tm2=total(im,2,/NAN) & ttm2=total(tm2) 
+  tm1=total(im,1,/NAN) & ttm1=total(tm1)
   if ttm2 eq 0.0 || ttm1 eq 0.0 then begin 
      err=1b
      return,[-1.,-1.]
   endif 
   
-  x=total(tm*(findgen(s[0])+.5),/NAN)/ttm2
-  y=total(tm*(findgen(s[1])+.5),/NAN)/ttm1
-  
-  ;; daophot-style spatial derivative centroid
-  x2=round(x) & y2=round(y)     ;central pixel for centroid box (derivatives)
-  
-  nhalf =  fix(0.637*fwhm) > 2  ;
-  nbox = 2*nhalf+1              ;Width of box to be used to compute centroid
-  
-  l=(x2-nhalf) & r=(x2+nhalf)
-  b=(y2-nhalf) & t=(y2+nhalf)
-  if l lt 1. or r gt s[0]-2. or b lt 1. or t gt s[1]-2. then begin
-     if keyword_set(silent) eq 0b then  $
-        message,/INFO,'The standard centroid falls too far from the center.'
-     err=1b
-     return,[-1.,-1.]
-  endif 
-  
-  cbox=im[l:r,b:t]
-  pos= findgen(nbox-1) + 0.5 - nhalf ;we truncate the last column/row
-  
-  ;; Weighting factor W unity in center, 0.5 at end, and linear in between 
-  w=1.-0.5*(abs(pos)-0.5)/(nhalf-1.) 
-  sumc=total(w)
-  
-  ;; compute x centroid
-  d=shift(cbox,-1,0)-cbox       ;derivative in x direction
-  d=d[0:nbox-2,*]               ;don't take the last edge
-  d=total(d,2)
-  sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
-  dx=sumxsq*sumd/(sumc*sumxd)
-  if ( abs(dx) GT nhalf ) then begin ;Reject if centroid outside box
-     err=2b
-     if not keyword_set(silent) then $
-        message,/INF,'Derivative X centroid out of range, using standard only.'
-  endif else begin
-     x2=x2+.5-dx & x=tr*x+(1.-tr)*x2
-  endelse 
-  
-  ;; compute y centroid
-  d=shift(cbox,0,-1)-cbox       ;derivative in x direction
-  d=d[*,0:nbox-2]               ;don't take the last edge
-  d=total(d,1)
-  sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
-  
-  dy=sumxsq*sumd/(sumc*sumxd)
-  if ( abs(dy) GT nhalf ) then begin ;Reject if centroid outside box
-     err=2b
-     if not keyword_set(silent) then $
-        message,/INF,'Derivative Y centroid out of range, using standard only.'
-  endif else begin
-     y2=y2+.5-dy & y=tr*y+(1.-tr)*y2
-  endelse 
+  x=total(tm2*(findgen(s[0])+.5),/NAN)/ttm2
+  y=total(tm1*(findgen(s[1])+.5),/NAN)/ttm1
   
   if ~finite(x) || ~finite(y) then begin 
      err=1b
      return,[-1.,-1.]
   endif 
+
+  ;; daophot-style spatial derivative centroid
+  x2=round(x) & y2=round(y)     ;central pixel for centroid box (derivatives)
   
-  if x lt 0. or x ge (r-1.) or y lt 0. or y ge (t-1.) then begin 
-     if not keyword_set(silent) then $
-        message,/INF,'Centroid lies outside of sub-array.'
-     err=1b
-     return,[-1.,-1.]
-  endif 
+  nhalf = fix(0.637*fwhm) > 2  ;
+  nbox  = 2*nhalf+1              ;Width of box to be used to compute centroid
+  
+  l=(x2-nhalf) & r=(x2+nhalf)
+  b=(y2-nhalf) & t=(y2+nhalf)
+  
+  if l lt 1 or r gt s[0]-2 or b lt 1 or t gt s[1]-2 then begin
+     err=2b                     ;fall back on regular centroid
+     if keyword_set(silent) eq 0b then  $
+        message,/INFO,'The centroid falls too far from the ' + $
+                'center, using standard.'
+  endif else begin 
+     cbox=im[l:r,b:t]
+     pos= findgen(nbox-1) + 0.5 - nhalf ;we truncate the last column/row
+  
+     ;; Weighting factor W unity in center, 0.5 at end, and linear in between 
+     w=1.-0.5*(abs(pos)-0.5)/(nhalf-1.) 
+     sumc=total(w)
+  
+     ;; compute x centroid
+     d=shift(cbox,-1,0)-cbox    ;derivative in x direction
+     d=d[0:nbox-2,*]            ;don't take the last edge
+     d=total(d,2)
+     sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
+     dx=sumxsq*sumd/(sumc*sumxd)
+     if ( abs(dx) GT nhalf ) then begin ;Reject if centroid outside box
+        err=2b
+        if not keyword_set(silent) then $
+           message,/INF,'Derivative X centroid out of range, ' + $
+                   'using standard only.'
+     endif else begin
+        x2=x2+.5-dx & x=tr*x+(1.-tr)*x2
+     endelse 
+  
+     ;; compute y centroid
+     d=shift(cbox,0,-1)-cbox    ;derivative in x direction
+     d=d[*,0:nbox-2]            ;don't take the last edge
+     d=total(d,1)
+     sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
+     
+     dy=sumxsq*sumd/(sumc*sumxd)
+     if ( abs(dy) GT nhalf ) then begin ;Reject if centroid outside box
+        err=2b
+        if not keyword_set(silent) then $
+           message,/INF,'Derivative Y centroid out of range, ' + $
+                   'using standard only.'
+     endif else begin
+        y2=y2+.5-dy & y=tr*y+(1.-tr)*y2
+     endelse 
+     
+     if x lt 0. or x ge (r-1.) or y lt 0. or y ge (t-1.) then begin 
+        if not keyword_set(silent) then $
+           message,/INF,'Centroid lies outside of sub-array.'
+        err=1b
+        return,[-1.,-1.]
+     endif 
+  endelse 
   
   return,[x,y]
 end
 
+;=============================================================================
+;  ApPhot - Approximate circular aperture photometry
+;=============================================================================
 pro tvPhot::ApPhot, image, cntrd,SILENT=silent,ERROR=err
   srad=self.Rad+self.SkyWidth
   rad=self.Rad  
@@ -274,6 +289,9 @@ pro tvPhot::ApPhot, image, cntrd,SILENT=silent,ERROR=err
   self.Phot=total(image[incircle]*fractn)-self.Sky*total(fractn)
 end
 
+;=============================================================================
+;  Phot - Compute and display photometry
+;=============================================================================
 pro tvPhot::Phot
   if NOT self.Box->IsDrawn() then return
   self.Box->Getlrtb,l,r,t,b
@@ -325,6 +343,9 @@ pro tvphot_event, ev
   self->Event,ev
 end
 
+;=============================================================================
+;  Event
+;=============================================================================
 pro tvPhot::Event,ev
   new=0
   case ev.id of
@@ -384,14 +405,14 @@ pro tvPhot::Event,ev
 end
 
 ;=============================================================================
-;	wDestroy: Destroy the widgets for photometry
+;  wDestroy - Destroy the widgets for photometry
 ;=============================================================================
 pro tvPhot::wDestroy
   widget_control, self.wBase,/DESTROY
 end
 
 ;=============================================================================
-;	wShow: Show the widgets for photometry
+;  wShow - Show the widget panel for photometry
 ;=============================================================================
 pro tvPhot::wShow
   widget_control, self.parent,UPDATE=0
@@ -433,7 +454,7 @@ function tvPhot::Init,oDraw,parent,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
 end
 
 ;=============================================================================
-;	tvPhot__define -  Prototype the tvPhot class.
+;  tvPhot__define -  Prototype the tvPhot class.
 ;=============================================================================
 pro tvPhot__define
   struct={tvPhot, $ 
