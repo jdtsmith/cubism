@@ -442,7 +442,7 @@ end
 function tvPhot::Init,oDraw,parent,RADIUS=rad,SKY_WIDTH=sw,_EXTRA=e
   if (self->tvPlug::Init(oDraw,_EXTRA=e) ne 1) then return,0 ;chain up
   self.parent=parent
-  if n_elements(rad) eq 0 then self.rad=12.0 else self.rad=rad
+  if n_elements(rad) eq 0 then self.rad=6.0 else self.rad=rad
   if n_elements(sw) ne 0 then self.SkyWidth=sw else self.SkyWidth=2.5
   self.cntrd=[-1.,-1.]          ;no centroid yet!
   self.do_cntrd=1               ;default to doing it
