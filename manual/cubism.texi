@@ -1965,14 +1965,20 @@ found in the box area.}
 
 The aperture photometry tool performs simple circular aperture
 photometry with a sky annulus.  It extends the CubeView window to report
-the photometry results.  A box is drawn (blue, for this tool), and the
-centroid of the source in the box is computed, and used to center two
-circular apertures, source and sky.  If the @kbd{Centroid} option at
-bottom is de-selected, the center of the box is used as the center of
-the circular apertures instead.  The total flux inside the inner
-circular aperture, minus the scaled sky flux (reported as the average
-within the sky annulus) is given. An example of the tool's output is
-show in @ref{fig:cv_phot}.
+the photometry results at the bottom.  A box is drawn (blue, for this
+tool), and the centroid of the source in the box is computed, and used
+to center two circular apertures, source and sky.  If the @kbd{Centroid}
+option at bottom is de-selected, the center of the box is used as the
+center of the circular apertures instead.  There are actually two
+centroids computed: a standard ``center of mass'' style centroid, and a
+refined DAOPhot-style ``vanishing derivatives'' centroid.  If the latter
+is invalid, because it falls too far outside the box, the former is
+used, and the centroid is marked with an @samp{x} in addition to a
+circle.  Enlarging the search box may help with accurate centroiding.
+
+The total flux inside the inner circular aperture, minus the scaled sky
+flux (reported as the average within the sky annulus) is given. An
+example of the tool's output is show in @ref{fig:cv_phot}.
 
 The aperture photometry tool's key shortcut is @kbd{p}.
 
@@ -2413,7 +2419,8 @@ With Peak chosen, you will select points to use for the emission lines.
 If set, the continuum to subtract in maps with both peak and continuum
 region will be based on an average weighted by the distance away in
 wavelength from the peak to continuum point.  Normally, all continuum
-planes are averaged with equal weight.
+planes are averaged with equal weight.  Only available when both peak
+and continuum regions are defined.
 
 @item Reset Plot
 Pressing this button removes all zooms and region selections.
@@ -2660,13 +2667,8 @@ quality of the assembled cube, especially for faint sources.}
 The primary and recommended technique for assembling a background frame
 is to use dedicated background observations you scheduled along with
 your mapping AOR, or to use data obtained as part of your mapping
-observations which went off the source.  For dedicated sky observations,
-simply load the records (for example, with @kbd{Record->Import Data by
-Module->BCD}), disable them, and @kbd{Background->Set Background from
-Recs...}.  For backgrounds which appear among the mapping data set
-(e.g. as was done in the @ref{Quick Start Guide}), simply select these
-records and choose @kbd{Background->Set Background from Recs...}.  Using
-either the average or min/max trimmed average is fine.
+observations which went far enough off the source to remove all source
+flux from the slit.  
 
 Finding records in which the @emph{full slit} is uncontaminated by
 source emission, either within the spectral map itself, or as part of a
@@ -2676,12 +2678,23 @@ fact that each low-res slit (LL and SL) is comprised of two sub-slits
 which define the different spectral orders.  For small objects, less
 than the size of one sub-slit, it is common to map first with one
 sub-slit, and then with the other (e.g. a SL1 map and, separately, a SL2
-map).  In this case, the ``outrigger'' data from the data collected when
-the source was placed in the other order can be used as a background
-set.  Even if the full slit was used to map a source, the fact that the
-two orders extend away from the map center to either side can allow
-useful background frames to be found.  For a very helpful method for
-such selection, @xref{Background Selection Using Visualization}.
+map).  In this case, the ``outrigger'' data from those records collected
+when the source was placed in the other order can be used as a
+background set.  Even if the full slit was used to map a source, the
+fact that the two orders extend away from the map center to either side
+often allow useful background frames to be found at the extremities of
+the map.  For a very helpful method for making such selections,
+@xref{Background Selection Using Visualization}.
+
+For dedicated offset sky observations, simply load the records (for
+example, with @kbd{Record->Import Data by Module->BCD}), disable them,
+and @kbd{Background->Set Background from Recs...}.  For backgrounds
+which appear among the mapping data set (e.g. as was done in the
+@ref{Quick Start Guide}), simply select these records and choose
+@kbd{Background->Set Background from Recs...}.  Using either the average
+or min/max trimmed average is fine.  These records can be built into the
+cube directly (though by definition they should not contain much source
+flux), or disabled to save time and space.
 
 @node Archive Background, Background Blend, In Situ Background, Backgrounds
 @subsection Archive Background
@@ -2839,7 +2852,8 @@ exposure time, can mitigate many rogue pixels (which can be thought of
 as pixels which respond normally to light, but have a bright and
 variable underlying dark current component).  However, adjacent-in-time
 background subtraction is not always available, and even when it is, a
-number of problematic pixels often remain.
+number of problematic pixels often remain.  CUBISM has multiple
+facilities for discovering and flagging out these bad pixels.
 
 @menu
 * Global and Record Level Bad Pixels::  
@@ -2889,8 +2903,9 @@ output cube.}
 Bad pixels can be selected manually at several levels.  The most
 straightforward is at the @samp{BCD} level: simply examine a single or
 stack of records, and mark errant pixels.  @xref{Bad Pixel Tool}, for
-more on marking user or record level bad pixels.  A typical workflow for
-marking bad pixels at the @samp{BCD} level is:
+more on marking user or record level bad pixels, and on the identifying
+symbols used to mark pixels.  A typical workflow for marking bad pixels
+at the @samp{BCD} level is:
 
 @enumerate
 @item
@@ -2903,8 +2918,9 @@ marking bad pixels at the @samp{BCD} level is:
 @item
  Enlarge the stack viewer window (@pxref{CubeView Options Menu}).
 @item
- Show the user (cyan) bad pixel and pipeline fatal (red) masks only, by
- right-clicking two times (@pxref{Bad Pixel Tool}).
+ Show the user (cyan/green @samp{x}) bad pixel and pipeline fatal (red
+ @samp{x}) masks only, by right-clicking two times (@pxref{Bad Pixel
+ Tool}).
 @item
  Set the histogram scaling stretch to show only the very brightest
  pixels.
@@ -2923,6 +2939,12 @@ marking bad pixels at the @samp{BCD} level is:
 @item
  (Re)-build the cube with this mask.
 @end enumerate
+
+Note that most @samp{BCD} records contain a rim of pixels flagged with
+@samp{[7]}, which appear as red diamonds surrounding each order.  These
+are ``flat-field questionable'' pixels, but experience shows that many
+of these pixels are useful.  They can be trimmed away by narrowing the
+WAVSAMP (@pxref{WAVSAMP}), but aren't considered fatal by default.
 
 @callout{When selecting bad pixels in cubes being built with a
 background, be sure to enable the @kbd{BGSub} button @emph{before}
@@ -3137,7 +3159,7 @@ spurious data at the extremities of the slit.  For spectral maps without
 any stepping along the slit (@emph{1xn} maps), leaving this @emph{crust}
 of spurious data will have little impact, since it can be ignored when
 extracting spectra and making maps.  For maps with along the slit
-redundancy however, it is important to exclude this data directly.  
+redundancy however, it is important to exclude this data directly.
 
 @xref{CubeView WAVSAMP Pane}, for more information on editing the
 @samp{WAVSAMP}.  Typically, the @samp{WAVSAMP} is edited, and the
@@ -3145,7 +3167,10 @@ central handle is used to drag each side in by 2--5% (the reported
 @samp{WAVSAMP} coordinates are in normalized units, 0.0--1.0), to
 exclude the bulk of the spurious data at the slit ends.  Non-uniform
 edits (different normalized range at each end of the order) are not
-recommended.
+recommended.  Note that most @samp{BCD} records contain a rim of pixels
+flagged with @samp{[7]} in their @samp{BMASK}, which indicates the flat
+field is questionable there.  These are not fatal bad pixels, and should
+not be excluded simply because they are flagged.
 
 @node Building the Cube, Saving the Project, WAVSAMP, Cube Assembly
 @section Building the Cube
