@@ -550,7 +550,7 @@ such name space conflicts.
 Upgrading CUBISM is simple and requires replacing the source or binary
 installation directories with the newer version and restarting IDL.  You
 can always find out what version of CUBISM you are running with the menu
-@kbd{Info->About Cubism} in the project window.  New versions of CUBISM
+@kbd{Help->About Cubism} in the project window.  New versions of CUBISM
 are available at @uref{@value{CUBISMHOMEPAGE}}.
 
 @c
@@ -1331,9 +1331,20 @@ Show the details of the currently loaded calibration set.
 Enable CUBISM debugging, so that errors will halt at the command line
 with full traceback information.
 
-@item About Cubism
+@end table
+
+@node CUBISM Project Help Menu,  , CUBISM Project BadPix Menu, CUBISM Project Menus
+@subsubsection Help Menu
+@cindex Help menu, CUBISM project
+
+@table @code
+
+@item About Cubism...
 Show the current CUBISM version, and the version which was used to
-assemble the loaded project (if different).
+assemble the loaded cube project (if different).
+
+@item Cubism Manual...
+Load the PDF CUBISM manual.
 
 @end table
 
@@ -3713,7 +3724,7 @@ table for all CubeView tools displaying a given project's data.
 @strong{I get a message about missing calibration files.}
 
 You are probably using another cube built with a version of CUBISM newer
-than yours, and need to update your version.  See @kbd{Info->About
+than yours, and need to update your version.  See @kbd{Help->About
 Cubism} to check the local CUBISM version, as well as the version which
 was used to build the loaded cube project.
 
@@ -3743,6 +3754,18 @@ this can fail, generating this message.  An equivalent fallback
 IDL-native version of the clipping algorithm will take over, but it is
 much slower.  See the documentation for IDL's @code{MAKE_DLL} to learn
 more about compiler configuration on your system.
+
+@item
+@strong{Selecting @kbd{Help->Cubism Manual} doesn't do anything.} On
+Unix systems, IDL opens PDF files using its distributed script
+@file{online_help_pdf}.  By default, this script uses @file{acroread} to
+load the specified file.  If you don't have Acrobat reader installed,
+you can specify another PDF reader by setting the environment variable
+@code{IDL_ONLINE_HELP_PDF_CMD}, e.g. (for @file{.cshrc}):
+
+@example
+setenv IDL_ONLINE_HELP_PDF_CMD xpdf
+@end example
 @end enumerate
 
 
