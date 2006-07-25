@@ -6,8 +6,8 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.1b
-@set VERSION 0.99
+@set EDITION 1.1c
+@set VERSION 1.0
 @set IDLVERSIONREQUIRED 6.1
 @set DATE July, 2006
 @set AUTHOR J.D. Smith
@@ -2484,6 +2484,10 @@ When defining a region (for a map, or X/YZoom) the region can be
 canceled after the first click by right-clicking.  During region
 definition, a line is left at the location of the first click.
 
+@c
+@c Cube Assembly
+@c
+
 @node Cube Assembly, Cube Analysis, The Tools, Top
 @chapter Cube Assembly
 @cindex Cube assembly
@@ -3295,6 +3299,11 @@ table in the single FITS extension.  This dimension coordinate
 description follows the lookup table spectral format of Greisen, E.W. et
 al., A&A 446, 2006.
 
+
+@c
+@c Cube Analysis
+@c
+
 @node  Cube Analysis, Tips and Troubleshooting, Cube Assembly, Top
 @chapter Cube Analysis
 @cindex Cube analysis
@@ -3572,7 +3581,6 @@ the IDL command line or as a separate FITS file.  @xref{Saving the Cube
 as FITS}, for more information.
 
 
-
 @c
 @c Troubleshooting
 @c
@@ -3656,21 +3664,22 @@ Commonly encountered problems and their solutions:
 @enumerate
 @item
 @strong{I get the message ``Couldn't restore data from file...''}.  By
-default, CUBISM does not save the data itself, only a link to the files
-in a project.  If you've since moved or modified those files, or are
-loading the project on another system where they are in a different
-location, you can @kbd{Edit->Select All}, then @kbd{Edit->Replace File
+default, CUBISM does not save the BCD and associated data itself in the
+@file{.cpj} project file, instead recording a file reference to the
+files.  If you've since moved or modified the BCD files, or are loading
+the project on another system where they are in a different location,
+you can @kbd{Edit->Select All}, then @kbd{Edit->Replace File
 Substring...}  to correct the base pathname.  Another option is to store
-the data in the project, or save relative pathnames.  @xref{Saving the
-Project}.
+the data inside of the project, or save it with @emph{relative}
+pathnames.  @xref{Saving the Project}.
 
 @item
 @strong{I'm attempting to upgrade a project from pipeline version S14 to
 S15, but the project data won't load}.  The SSC increments a version
-number for all processed files when the pipeline processing changes.
-You can use the same technique as in the last tip to, e.g. Find
-@samp{_4_} and replace with @samp{_5_} (or whatever the relevant version
-numbers happen to be).
+number in the filename for all processed files every time the pipeline
+processing changes.  You can use the same technique as in the last tip
+to, e.g. Find @samp{_4_} and replace with @samp{_5_} (or whatever the
+relevant version numbers happen to be).
 
 @item
 @strong{CUBISM freezes.}  There a number of reasons why CUBISM could
@@ -3684,52 +3693,56 @@ problem.
 cubes or records.}  You can have as many CubeView windows as you want
 associated with a cube.  By default, however, CUBISM recycles CubeView
 windows, to avoid too much clutter on your display.  If you want a new
-window, for instance to visualize an AOR while examining data records,
-use the @kbd{(new viewer)...} version of the view commands.
+window, for instance to visualize an AOR or cube, while examining data
+records, use the @kbd{(new viewer)...} version of the view commands.
+@xref{CUBISM Project Menus}.
 
 @item
-@strong{My cube seems to be built in the wrong order.}  Did you double
-check the cube build order (@kbd{Cube->Set Cube Build Order...}).
+@strong{My cube seems to be built in the wrong spectral order.}  Did you
+double check the cube build order (@kbd{Cube->Set Cube Build Order...}).
 Remember that saving the cube with a different name does not change the
 cube build order.
 
 @item
 @strong{I have 4 different projects open, and I can't keep track of what
-is what.}  Look in the title and status bars of each tool for relevant
-information.  Consider adopting a different color table for all CubeView
-tools displaying a given project's data.
+is what.}  Look in the title and status bars of each tool for
+information on the source cube.  Consider adopting a different color
+table for all CubeView tools displaying a given project's data.
 
 @item
 @strong{I get a message about missing calibration files.}
 
-You are probably using another cube built with a newer version of
-CUBISM, and need to update your version.  See @kbd{Info->About Cubism}
-to check the local CUBISM version, as well as the version which was used
-to build the loaded cube project.
+You are probably using another cube built with a version of CUBISM newer
+than yours, and need to update your version.  See @kbd{Info->About
+Cubism} to check the local CUBISM version, as well as the version which
+was used to build the loaded cube project.
 
 @item
 @strong{I removed all data records, loaded more, and built a new cube,
-but something isn't right.}  Remember that a cube project includes
+but something isn't right.}  Remember that a cube project includes saved
 information on bad pixels, background records, etc.  Check
-@kbd{Info->Project Parameters...} to see what you've set.  Clear bad
-pixels and background records if necessary, or (easiest) just start from
-a clean, new cube project.
+@kbd{Info->Project Parameters...} to get a top level view of the
+settings.  Set the cube build order, and clear bad pixels and background
+records if necessary, or (easiest) just start from a clean, new cube
+project.
 
 @item
 @strong{My source emission disappears when I use outrigger sky data and
-then click @kbd{BGSub} in the stack or cube viewer.}  Make sure that you
-are subtracting the correct data order.  You might have inadvertently
+then click @kbd{BGSub} in the viewed stack.}  Make sure that you are
+subtracting the correct data order.  You might have inadvertently
 selected first order for your sky when you actually meant second order,
-for example.
+for example, causing target self-subtraction.
 
 @item
 @strong{I get a message 'Failed compiling DLM clipper...'.}  CUBISM
-makes heavy use of polygon clipping, so to speed this up, a small piece
-of code in C is automatically compiled.  If your system is not
-configured with a C compiler (typically @code{gcc}), this can fail.  A
-fallback IDL version will take over, but it is much slower.  See the
-documentation for IDL's @code{MAKE_DLL} to learn more about compiler
-configuration on your system.
+makes heavy use of polygon clipping to map all those BCD pixels onto the
+sky grid, so to speed up this crucial operation, a small piece of
+clipping code in written in C, and automatically compiled as needed.  If
+your system is not configured with a C compiler (typically @code{gcc}),
+this can fail, generating this message.  An equivalent fallback
+IDL-native version of the clipping algorithm will take over, but it is
+much slower.  See the documentation for IDL's @code{MAKE_DLL} to learn
+more about compiler configuration on your system.
 @end enumerate
 
 
@@ -3746,7 +3759,7 @@ Project window.  This requires access to the IDL command line, which
 will not be available for versions of CUBISM running under the IDLVM
 (@pxref{Binary Installation}).  After enabling debugging, repeat the
 action which generated the error.  Instead of trapping the error with a
-dialog prompt, IDL will halt, with a full traceback message showing the
+dialog prompt, IDL will halt, with a full backtrace message showing the
 exact code path which led to the error in the IDL shell.  This code path
 might be enough to give you a hint as to the nature of the problem, but
 is also useful for the upstream maintainers for debugging purposes.
@@ -3756,35 +3769,14 @@ including, at minimum:
 
 @enumerate
 @item A brief statement of the problem.
-@item A detailed description of the steps which can lead to the problem.
-@item Example inputs which trigger the problem, if applicable.
+@item A detailed description of the steps which can lead to the problem,
+isolated to the smallest necessary number.
+@item Example inputs which trigger the problem, if applicable (e.g. a
+FITS file which gives trouble).
 @item The full traceback message reported after you have enabled
 Debugging.
 @end enumerate
 
-
-
-@c
-@c Appendices
-@c
-
-@c @node CubeProject Reference, CubeView Reference, The Techniques, Top
-@c @appendix CubeProject Reference
-@c @cindex CubeProject
-
-@c A detailed listing of all CubeProject menus etc.
-
-@c @node CubeView Reference, CubeSpec Reference, CubeProject Reference, Top
-@c @appendix CubeView Reference
-@c @cindex CubeView
-
-@c A detailed listing of all CubeView tools, menus etc.
-
-@c @node CubeSpec Reference, Index, CubeView Reference, Top
-@c @appendix CubeSpec Reference
-@c @cindex CubeSpec
-
-@c A detailed listing of all CubeSpec, menus etc.
 
 @node Index,  , Tips and Troubleshooting, Top
 @unnumbered Index
