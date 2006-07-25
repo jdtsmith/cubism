@@ -448,8 +448,13 @@ pro CubeProj::ShowEvent, ev
      
      'about': begin 
         @cubism_version
-        if self.version ne '' AND cubism_version ne self.version then $
-           thiscube=' (Curr. Cube: '+self.version+')' else thiscube=''
+        if self.version ne '' AND cubism_version ne self.version then begin 
+           thiscube='(Curr. Cube: '+self.version+')'
+           spaces=39-strlen(thiscube)
+           if spaces gt 0 then $
+              thiscube=strjoin(replicate(' ',spaces/2))+thiscube+ $
+                       strjoin(replicate(' ',spaces-spaces/2))
+        end else thiscube=''
         title='CUBISM '+cubism_version
         tlen=strlen(title) & left=(39-tlen)/2
         title=strjoin(replicate(' ',left>0)) + title
@@ -459,10 +464,18 @@ pro CubeProj::ShowEvent, ev
                     thiscube,                                 $
                     '                                       ', $
                     '      JD Smith and the SINGS Team      ', $
-                    '               2002-2006               ', $
+                    '           (c) 2002-2006               ', $
                     ' http://ssc.spitzer.caltech.edu/cubism ', $
                     '***************************************']
      end
+     
+     'manual': begin 
+        @cubism_dir
+        manual=filepath(ROOT=cubism_dir,SUBDIR='manual','cubism.pdf')
+        if ~file_test(manual,/READ) then $
+           self->Error,'Cannot locate Cubism manual.'
+        online_help,BOOK=manual,/FULL_PATH
+     end 
      
      'debug': begin 
         self->SetProperty,DEBUG=1b-self.debug
@@ -776,7 +789,11 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   widget_control, b1,SET_BUTTON=self.debug
   if lmgr(/VM,/RUNTIME) then widget_control, b1,SENSITIVE=0
   
-  b1=widget_button(info,VALUE='About Cubism',UVALUE='about',/SEPARATOR)
+  
+  ;;*** Help menu
+  help=widget_button(mbar,VALUE='Help',/MENU,/HELP)
+  b1=widget_button(help,VALUE='About Cubism...',UVALUE='about')
+  b1=widget_button(help,VALUE='Cubism Manual...',UVALUE='manual')
   
   b=widget_base(base,/COLUMN,/BASE_ALIGN_LEFT,SPACE=1,YPAD=0,XPAD=0)
   headbase=widget_base(b,/ROW,XPAD=0,YPAD=0,/FRAME,SPACE=1)
