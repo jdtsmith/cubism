@@ -175,6 +175,7 @@ Menus
 * CUBISM Project Background Menu::  
 * CUBISM Project BadPix Menu::  
 * CUBISM Project Info Menu::    
+* CUBISM Project Help Menu::    
 
 Data Records
 
@@ -960,6 +961,7 @@ here in order of their appearance.
 * CUBISM Project Background Menu::  
 * CUBISM Project BadPix Menu::  
 * CUBISM Project Info Menu::    
+* CUBISM Project Help Menu::    
 @end menu
 
 @node CUBISM Project File Menu, CUBISM Project Edit Menu, CUBISM Project Menus, CUBISM Project Menus
@@ -1312,7 +1314,7 @@ records, prompting for detection parameters.
 @end table
 
 
-@node CUBISM Project Info Menu,  , CUBISM Project BadPix Menu, CUBISM Project Menus
+@node CUBISM Project Info Menu, CUBISM Project Help Menu, CUBISM Project BadPix Menu, CUBISM Project Menus
 @subsubsection Info Menu
 @cindex Info menu, CUBISM project
 
@@ -1333,7 +1335,7 @@ with full traceback information.
 
 @end table
 
-@node CUBISM Project Help Menu,  , CUBISM Project BadPix Menu, CUBISM Project Menus
+@node CUBISM Project Help Menu,  , CUBISM Project Info Menu, CUBISM Project Menus
 @subsubsection Help Menu
 @cindex Help menu, CUBISM project
 
