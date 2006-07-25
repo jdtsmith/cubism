@@ -1246,9 +1246,11 @@ end
 
 ;=============================================================================
 ;  ReplaceFilenameSubstring - Replace common substring in selected
-;                             filenames
+;                             filenames.  The search text can be a
+;                             regexp, and replacement text can be a
+;                             pattern wildcard, matched to real files.
 ;=============================================================================
-pro CubeProj::ReplaceFilenameSubstring,from,to,recs,_EXTRA=e
+pro CubeProj::ReplaceFilenameSubstring,from,to,recs,VERIFY_FILE=vf,_EXTRA=e
   self->RecOrSelect,recs,_EXTRA=e
   if recs[0] eq -1 then return
   do_it=1
@@ -1276,9 +1278,16 @@ pro CubeProj::ReplaceFilenameSubstring,from,to,recs,_EXTRA=e
      file=(*self.DR)[recs[i]].FILE
      pos=stregex(file,from,length=len)
      if pos eq -1 then self->Error,['No match for '+from+' in: ',file]
-     (*self.DR)[recs[i]].FILE= $
-        strmid(file,0,pos)+to+strmid(file,pos+len)
+     file=strmid(file,0,pos)+to+strmid(file,pos+len)
+     if keyword_set(vf) then begin ;; Find the real file 
+        file=file_search(file,COUNT=cnt)
+        if cnt eq 0 then self->Error,'No matching file found'
+        file=file[0]
+     endif 
+     (*self.DR)[recs[i]].FILE=file
   endfor
+  self.changed=1b
+  self->UpdateTitle & self->UpdateButtons
 end
 
 
@@ -2323,6 +2332,9 @@ pro CubeProj::SwitchRecordDataType,r,FLATAP=f2ap,BCD=bcd,DROOPRES=dr,_EXTRA=e
   
   new_files=irs_associated_file(recs.file,FLATAP=new_type eq 3, $
                                 DROOPRES=new_type eq 1)
+  if ~array_equal(new_files ne '',1b) then $
+     self->Error,'Alternate data files not found.'
+  
   (*self.DR)[r].FILE=new_files
   (*self.DR)[r].TYPE=new_type[0]
   
@@ -2948,11 +2960,12 @@ pro CubeProj::GetProperty, $
    TLB_OFFSET=tboff, TLB_SIZE=tbsize,BCD_SIZE=bcdsz, VERSION=version, $
    ASTROMETRY=astr,POSITION=pos, POSITION_ANGLE=pa, SAVE_DATA=sd, $
    SAVE_ACCOUNT=sa, CUBE_DATE=cdate, $
-   ;; Record based options
+   ;; Record based property options
    ALL_RECORDS=all_recs,RECORDS=recs, RECORD_SET=rec_set, DATE_OBS=dobs, $
-   BAD_PIXEL_LIST=bpl, FILENAMES=fn, DCEID=dceid, DISABLED=dis,_REF_EXTRA=e
+   BAD_PIXEL_LIST=bpl, FILENAMES=fn, DCEID=dceid, DISABLED=dis, $
+   _REF_EXTRA=e
    
-  if n_elements(e) ne 0 then begin 
+  if n_elements(e) ne 0 then begin ;; chain up the inheritance chain
      self->ObjMsg::GetProperty,_EXTRA=e
      self->ObjReport::GetProperty,_EXTRA=e
   endif 
