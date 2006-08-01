@@ -104,6 +104,7 @@ pro CubeRec::Message, msg
   free=0b
   case type of
      'BOX': begin 
+        if self.region->On() then self.region->Reset
         self->Extract
         return
      end 
@@ -219,7 +220,7 @@ pro CubeRec::On
      return
   end
   self->tvPlug::On
-  self.Box->On
+  self.Box->On & self.Region->On
 end
 
 ;=============================================================================
@@ -583,7 +584,7 @@ pro CubeRec::ExtractFileRegion,FILE=rff,_EXTRA=e
   if n_elements(spec_unc) ne 0 then spec_unc=ptr_new(spec_unc,/NO_COPY) else $
      spec_unc=ptr_new()
   info=string(FORMAT='(%"Region from %s")',file_basename(self.region_file))
-  self.Box->Reset & self.Box->Off
+  self.Box->Reset & self.Box->On ;clear any box, but leave active
   self.region->SetProperty,REGION=op
   if ~self.region->On() then self.region->On
   self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,spec,spec_unc}
