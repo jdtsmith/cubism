@@ -315,7 +315,12 @@ pro CubeBackTrack::UpdateList
      return
   endif 
   self->EnsureCube
-  list=self.cube->BackTrackPix(self.point,self.plane,/FOLLOW)
+     
+  list=self.cube->BackTrackPix(self.point,self.plane,/FOLLOW,ERROR=err)
+  if keyword_set(err) then begin 
+     self->Off
+     return
+  endif 
   oldid=''
   pm=string(177b)
   if size(list,/N_DIMENSIONS) eq 0 then str='' else begin 
