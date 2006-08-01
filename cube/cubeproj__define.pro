@@ -4383,12 +4383,15 @@ end
 ;                 other BMASK/PMASK bad pixel.  Flags contain the mask
 ;                 flags along with "BP(1)" for bad pixel.
 ;=============================================================================
-function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow,COUNT=cnt
+function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow,COUNT=cnt, ERROR=err
   nrec=self->N_Records()
   if nrec eq 0 then return,-1
   if ~(self.ACCOUNTS_VALID AND 1b) OR $
-     array_equal(ptr_valid((*self.DR).ACCOUNT),0b) then $
-        self->Error,"Must rebuild cube to backtrack"
+     array_equal(ptr_valid((*self.DR).ACCOUNT),0b) then begin 
+     self->Error,"Must rebuild cube to backtrack",RETURN_ONLY=arg_present(err)
+     err=1
+     return,-1
+  endif 
   
   ;; At least one reverse account required
   if array_equal(ptr_valid((*self.DR).REV_ACCOUNT),0b) then self->BuildRevAcct
