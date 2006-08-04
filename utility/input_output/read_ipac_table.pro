@@ -51,6 +51,8 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2006-08-04 (J.D. Smith): Improved header reading speed for long
+;                             headers.
 ;    2005-03-25 (J.D. Smith): Brought into compliance with "new" IRSA
 ;                             IPAC TABLE Format standard.
 ;    2005-02-25 (J.D. Smith): Pre-allocate return for speedup.
@@ -91,7 +93,8 @@ function read_ipac_table,file, hdr,UNITS=units
   line_cnt=0
   nlines=file_lines(file)
   at_data=(chead=0)
-  while NOT eof(un) do begin 
+  hcnt=0L
+  while ~eof(un) do begin 
      readf,un,line
      if ~strtrim(line,2) then continue ; Skip blank lines
      if at_data eq 0 then begin 
@@ -100,7 +103,12 @@ function read_ipac_table,file, hdr,UNITS=units
         case firstchar of
            '\': begin 
               if ~arg_present(hdr) then break
-              if n_elements(hdr) eq 0 then hdr=[line] else hdr=[hdr,line]
+              if n_elements(hdr) le hcnt then begin 
+                 if n_elements(hdr) eq 0 then hdr=[''] else begin 
+                    hdr=[hdr,strarr(n_elements(hdr))]
+                 endelse 
+              endif 
+              hdr[hcnt++]=line
            end
            '|': begin
               line=strtrim(line) ;no trailing blanks, please
@@ -173,6 +181,8 @@ function read_ipac_table,file, hdr,UNITS=units
      reads,line,data_elem,FORMAT='('+strjoin(format,",")+')'
      ret[line_cnt++]=data_elem
   endwhile
+  
+  if hcnt gt 0 then hdr=hdr[0:hcnt-1]
   
   if line_cnt lt nlines then begin 
      ret=ret[0:line_cnt-1]
