@@ -69,7 +69,7 @@
 function ipac_table_xpar,hdr,name,COUNT=cnt
   if n_params() lt 2 then message,'Usage: IPAC_TABLE_SXPAR, header, name'
   cnt=0
-  for i=0,n_elements(hdr)-1 do begin 
+  for i=0L,n_elements(hdr)-1 do begin 
      val=stregex(hdr[i],'^\\'+strtrim(name,2)+' *= *("([^"]+)"|'+"'([^'])+'"+ $
                  '|([-0-9.]+))',/SUBEXPR,/EXTRACT)
      if val[0] then begin 
