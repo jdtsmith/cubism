@@ -206,15 +206,18 @@ end
 ;       Reset: 
 ;=============================================================================
 pro tvSlice::Reset
-  if self.opt[0] ne -1 then self->EraseLine
+  showing=self.oDraw->IsDrawn()
+  if self.opt[0] ne -1 && showing then self->EraseLine
   self.plotpt=[-1,-1]           ;no longer plotting it
   self.opt=[-1,-1]
   self.ept=[-1,-1]
   ptr_free,self.plotvec
   if widget_info(self.wBase,/VALID) then widget_control, self.wBase,/DESTROY
   self->tvPlug::Off
-  self.oDraw->MsgSignup,self,/NONE
-  self.oDraw->ReDraw,/SNAPSHOT
+  if showing then begin 
+     self.oDraw->MsgSignup,self,/NONE
+     self.oDraw->ReDraw,/SNAPSHOT
+  endif 
 end
 
 
@@ -434,7 +437,7 @@ pro tvSlice::PlotSlice
         self.plotvec=ptr_new(transpose([[inds],[vec]]))
 
   plot,indgen(n),vec,xtitle="Slice Index",ytitle='Value',$
-       TITLE=ttl,xstyle=17,XMINOR=n lt 10?-1:0,POSITION=[.07,.08,.99,.95]
+       TITLE=ttl,/XSTYLE,XMINOR=n lt 10?-1:0,XMARGIN=[8,2],YMARGIN=[3,2]
   self.scale=[!X.S,!Y.S] & self.range=!Y.CRANGE
   wset,self.plotpixwin
   device,copy=[0,0,512,384,0,0,self.plotwin] ;save it for redrawing
