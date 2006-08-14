@@ -129,6 +129,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   bottom=floor(min(py,max=maxy))>0L
   top=floor(maxy)<(sy-1L)
   nx=right-left+1L & ny=top-bottom+1L
+  if nx lt 1 || ny lt 1 then return,-1L
   npol=long(n_elements(px)) & npix=long(nx*ny)
   if npix le 0L then return,-1L
   ret=lonarr(npix,/NOZERO)
