@@ -102,6 +102,7 @@ end
 
 pro tvFixedRegion::Reset
   self.oDraw->MsgSignup,self,/NONE
+  ptr_free,self.region
   if self.drawn then begin 
      self.drawn=0b
      self.oDraw->ReDraw,/SNAPSHOT
