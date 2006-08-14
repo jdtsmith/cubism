@@ -192,6 +192,21 @@ pro IRS_Region::SetRegion,reg,RESET=reset,ASTROMETRY=astr
 end
 
 ;=============================================================================
+;  WriteDS9Region -- Write region as a DS9 region file
+;=============================================================================
+pro IRS_Region::WriteDS9Region,file
+  openw,un,/get_lun,file
+  printf,un,'# Region file format: DS9 version 3.0'
+  printf,un,'# CUBISM-derived spectral aperture region file'
+  if self.source then printf,un,'# Source: '+self.source
+  printf,un,'global color=green select=1 edit=0 move=0 delete=1 include=1 ' + $
+         'fixed=0 source fk5;'
+  reg=self->Region()
+  printf,un,'polygon('+strjoin(string(FORMAT='(F0.7)',reg),",")+')'
+  free_lun,un
+end
+
+;=============================================================================
 ;  WriteRegion -- Write Region info to header (IPAC table) or append
 ;                 to file as REGION extension (FITS).
 ;=============================================================================
@@ -268,6 +283,15 @@ end
 pro IRS_Region::Cleanup
   heap_free,self.region
   heap_free,self.astr
+end
+
+
+;=============================================================================
+;  Init
+;=============================================================================
+function IRS_Region::Init,source
+  if n_elements(source) ne 0 then self.source=source
+  return,1
 end
 
 ;=============================================================================
