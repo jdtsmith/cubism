@@ -220,7 +220,7 @@ pro IRS_Spectrum::Read,file,DISCARD_EXTRA=de
   endif else begin 
      st=read_ipac_table(file,hdr,UNITS=units)
      
-     if ~obj_valid(self.region) then self.region=obj_new('IRS_Region')
+     if ~obj_valid(self.region) then self.region=obj_new('IRS_Region',file)
      self.region->ParseRegion,hdr,file,/IPAC_TABLE
      
      ptr_free,self.hdr
