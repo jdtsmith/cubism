@@ -142,11 +142,16 @@ pro CubeProj::ShowEvent, ev
   endif 
   event_type=tag_names(ev,/STRUCTURE_NAME)
   if event_type eq 'WIDGET_BASE' then begin ;size
-     widget_control, (*self.wInfo).SList, $
-                     SCR_YSIZE=ev.Y+(*self.wInfo).list_size_diff
+     new=ev.Y+(*self.wInfo).list_size_diff
+     widget_control, (*self.wInfo).SList,  SCR_YSIZE=new
+     geom=widget_info(ev.top,/GEOM)
+     if geom.xsize ne geom.scr_xsize then begin 
+        widget_control, ev.top,XSIZE=0 ;takes two changes to 'take'
+        widget_control, ev.top,SCR_XSIZE=(*self.wInfo).xsize
+     endif 
      ;; Workaround v6.1 resize offset bug:
      widget_control, ev.top, TLB_GET_OFFSET = offset
-     widget_control, ev.top, TLB_SET_XOFFSET = offset[0], $
+     widget_control, ev.top,TLB_SET_XOFFSET = offset[0], $
                      TLB_SET_YOFFSET = offset[1]
      return
   endif else if event_type eq 'WIDGET_TIMER' then begin 
@@ -450,23 +455,23 @@ pro CubeProj::ShowEvent, ev
         @cubism_version
         if self.version ne '' AND cubism_version ne self.version then begin 
            thiscube='(Curr. Cube: '+self.version+')'
-           spaces=39-strlen(thiscube)
+           spaces=35-strlen(thiscube)
            if spaces gt 0 then $
               thiscube=strjoin(replicate(' ',spaces/2))+thiscube+ $
                        strjoin(replicate(' ',spaces-spaces/2))
         end else thiscube=''
         title='CUBISM '+cubism_version
-        tlen=strlen(title) & left=(39-tlen)/2
+        tlen=strlen(title) & left=(35-tlen)/2
         title=strjoin(replicate(' ',left>0)) + title
         self->Info,TITLE='About Cubism', $
-                   ['***************************************', $
+                   ['***********************************', $
                     title,                                    $
                     thiscube,                                 $
-                    '                                       ', $
-                    '      JD Smith and the SINGS Team      ', $
-                    '           (c) 2002-2006               ', $
-                    ' http://ssc.spitzer.caltech.edu/cubism ', $
-                    '***************************************']
+                    '                                   ', $
+                    '    JD Smith and the SINGS Team    ', $
+                    '         (c) 2002-2006             ', $
+                    '   http://sings.stsci.edu/cubism   ', $
+                    '***********************************']
      end
      
      'manual': begin 
@@ -828,9 +833,9 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   (*self.wInfo).Status=widget_label(b,/ALIGN_LEFT,/SUNKEN_FRAME)
   
-  bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup', $
+  bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup',$
                 ['Enable','Disable','Header', $
-                 'View Record','View Cube','Import AOR','Save','Close'],$
+                 'View Record','View Cube','Import AOR',' Save ',' Close '],$
                 BUTTON_UVALUE= $
                 ['enablerecord','disablerecord','headers', $
                  'viewrecord','viewcube','addgroup','save','exit'])
@@ -847,9 +852,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   widget_control, (*self.wInfo).Status, $
                   XSIZE=geom.XSIZE-2*geom.MARGIN-2*geom.XPAD-2
   geom=widget_info((*self.wInfo).SList,/GEOMETRY)
+  bgeom=widget_info(base,/GEOMETRY)
   (*self.wInfo).list_row=(geom.SCR_YSIZE-7)/geom.YSIZE
-  (*self.wInfo).list_size_diff=geom.SCR_YSIZE- $
-                               (widget_info(base,/GEOMETRY)).SCR_YSIZE
+  (*self.wInfo).list_size_diff=geom.SCR_YSIZE-bgeom.SCR_YSIZE
+  (*self.wInfo).xsize=bgeom.SCR_XSIZE
   
   @cubism_version
   status=string(164b)+' CUBISM version '+cubism_version+ $
@@ -932,7 +938,8 @@ pro CubeProj::SnapshotParameters
   
   ;; find locations where old and new share the same pointer
   for i=0,n_tags(as_built)-1 do begin 
-     ;; XXX Assumes only pointer structure members contain heap data
+     ;; XXX Assumes only pointer structure members contain heap data, but
+     ;; deeper structures/objects/etc. could cause trouble here.
      if size(as_built.(i),/TYPE) ne 10 then continue
      ;; Free existing as_built if it doesn't share global pointer
      if ptr_valid(as_built.(i)) && as_built.(i) ne self.as_built.(i) then $
@@ -994,6 +1001,11 @@ pro CubeProj::Initialize
                   'CUBEPROJ_UPDATE', 'CUBEPROJ_SELECT', $ $
                   'CUBEPROJ_BADPIX_UPDATE', $
                   'CUBEPROJ_RECORD_UPDATE','CUBEPROJ_CALIB_UPDATE']
+  
+  ;; Check IDL version
+  if !VERSION.RELEASE lt '6.1' then $
+     self->Error,'CUBISM requires IDL version 6.1 or greater.'
+  
   ;; Show will change this
   if ~self->IsWidget() then self->SetProperty,FEEDBACK=0  
   
@@ -1174,39 +1186,16 @@ pro CubeProj::RestoreData,sel,RESTORE_CNT=cnt,BCD=bcd,UNCERTAINTY=unc, $
                           BMASK=bm,_EXTRA=e
   self->RecOrSelect,sel,_EXTRA=e
   
-  restore_bcd=0 & restore_unc=0 & restore_bmask=0
-  case 1 of
-     keyword_set(bcd): begin 
-        restore_bcd=1
-        wh=where(~ptr_valid((*self.DR)[sel].BCD),cnt)
-     end 
-     
-     keyword_set(unc): begin 
-        if self.load_unc then $
-           wh=where(~ptr_valid((*self.DR)[sel].UNC),cnt) $
-        else self->Error,"Must enable Uncertainty Loading to restore UNC."
-        restore_unc=1
-     end 
-     
-     keyword_set(bmask): begin
-        restore_bmask=1
-        wh=where(~ptr_valid((*self.DR)[sel].BMASK),cnt)
-     end 
-     
-     ;; Default cases:
-     ~self.load_unc: begin 
-        wh=where(~ptr_valid((*self.DR)[sel].BCD) OR $
-                 ~ptr_valid((*self.DR)[sel].BMASK),cnt)
-        restore_bcd=1 & restore_bmask=1
-     end 
-     
-     else: begin 
-        wh=where(~ptr_valid((*self.DR)[sel].BCD) OR $
-                 ~ptr_valid((*self.DR)[sel].UNC) OR $
-                 ~ptr_valid((*self.DR)[sel].BMASK),cnt)
-        restore_bcd=1 & restore_bmask=1 & restore_unc=1
-     end 
-  endcase
+  restore_bcd=n_elements(bm) gt 0?keyword_set(bm):1b
+  restore_unc=keyword_set(unc)  || self.load_unc
+  restore_bmask=keyword_set(bm) || self.load_masks
+  
+  flags=replicate(0b,n_elements(sel)) 
+  if restore_bcd   then flags OR= ~ptr_valid((*self.DR)[sel].BCD)
+  if restore_unc   then flags OR= ~ptr_valid((*self.DR)[sel].UNC)
+  if restore_bmask then flags OR= ~ptr_valid((*self.DR)[sel].BMASK)
+  
+  wh=where(flags,cnt)
   
   if cnt gt 0 then begin 
      status=string(FORMAT='("Restoring ",I0," records...")',cnt)
@@ -1811,7 +1800,8 @@ end
 pro CubeProj::UpdateTitle
   if NOT self->IsWidget() then return
   pn=self->ProjectName()
-  if self.Changed then pn='*'+pn+'*'
+  if self.Changed then $
+     pn=string('253'OB)+pn+string('273'OB)
   widget_control, (*self.wInfo).Base,  $
                   TLB_SET_TITLE='CUBISM Project: '+ pn + $
                   "  <"+(self.SaveFile?file_basename(self.SaveFile): $
@@ -1913,7 +1903,7 @@ function CubeProj::List
       if which_list eq 0 then begin ;the standard list
          type=(*self.DR)[i].type>0
          tchar=([" ","d","c","f"])[type]
-         s=string(FORMAT='(" ",A-20,T23,F6.2,T30,A,T49,A,T68,A8,T78,' + $
+         s=string(FORMAT='(" ",A-20,T23,F6.2,T30,A,T49,A,T68,A8,T77,' + $
                   'I3,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
                   (*self.DR)[i].TIME, $
@@ -2548,7 +2538,8 @@ end
 ;=============================================================================
 pro CubeProj::ReadBackgroundFromFile,file
   if ptr_valid(self.BACKGROUND) then $
-     self->Error,'Cannot set background spectrum and record-based background.'
+     self->Warning,['A record-based background is already set;', $
+                    'both backgrounds will be used on cube rebuild.']
   
   if size(file,/TYPE) ne 7 then begin 
      xf,file,/RECENT,FILTERLIST=['*.{tbl,fits}','*.*','*'],$
@@ -2562,9 +2553,7 @@ pro CubeProj::ReadBackgroundFromFile,file
   oSP->GetProperty,WAVE_UNITS=wu,FLUX_UNITS=fu,WAVELENGTH=wav,SPECTRUM_FLUX=sp
   obj_destroy,oSP
   
-  if ~stregex(fu,'e/s/(pix|px)',/BOOLEAN) then $
-     self->Error,'1D Background Spectrum must be un-fluxed (e/s/pix)'
-  
+  self.BG_SP_TYPE=~stregex(fu,'e/s',/BOOLEAN) ; unfluxed (0b) or fluxed (1b)
   ptr_free,self.BG_SP
   self.BG_SP=ptr_new(transpose([[wav],[sp]]))
   self.BG_SP_FILE=file
@@ -2672,6 +2661,13 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
   str=['IRS Spectral Cube: '+self->ProjectName()+ $
        ((~keyword_set(as_built) && ((self.ACCOUNTS_VALID AND 6b) ne 6b))? $
      " (needs rebuilding)":"")]
+  
+  str=[str,string(FORMAT='("Cube Size: ",I0.3,"x",I0.3,"x",I0.3,", ' + $
+                  'Center: ",A," ",A)', $
+                  this.cube_size, $
+                  radecstring(self.POSITION[0],/RA), $
+                  radecstring(self.POSITION[1]))]
+  
   if keyword_set(as_built) then begin 
      str=[str,'Cube Created: '+ $
           (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))]
@@ -2699,12 +2695,17 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
      str=[str,('Background: '+ $
                desc + ', '+jul2date(this.BACK_DATE))+ $
           (this.use_bg?"":" (disabled)")]
-  endif else if this.BG_SP_FILE then begin 
-     str=[str,'Background: 1D from file'+(this.use_bg?"":" (disabled)")+' --',$
+  endif 
+  if this.BG_SP_FILE then begin 
+     str=[str,'Background: 1D from file'+ $
+          ' ('+(this.BG_SP_TYPE?"raw":"fluxed")+ $
+               (this.use_bg?")":",disabled)")+ $
+          ' --',$
           '   '+this.BG_SP_FILE]
-  endif else begin 
+  endif 
+  
+  if this.BACK_DATE eq 0.0d && this.BG_SP_FILE eq '' then $
      str=[str,'Background: none']
-  endelse 
   
   str=[str,'FLUXCON: '+(this.FLUXCON?"Yes":"No")]
   str=[str,'   SLCF: '+(this.SLCF?"Yes":"No")]
@@ -3582,10 +3583,9 @@ end
 ;                 corresponding cube pixel.
 ;=============================================================================
 pro CubeProj::BuildAccount,_EXTRA=e
-  self->Normalize
   self->MergeSetup
   self.CUBE_SIZE[2]=n_elements(*self.WAVELENGTH) 
-  
+
   ords=self->BuildOrders()
   nap=n_elements(*self.APERTURE) 
   RADEG = 180.0d/!DPI           ; preserve double
@@ -3634,7 +3634,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
   ;; need to shift existing accounts by one or more pixels ... only
   ;; relevant with POSITION-based (not GRID-based) cube layout.
   ;; E.g. making a cube with overlapping maps taken at different
-  ;; epochs.
+  ;; epochs.  A better option is to leave the cube size the same.
   
   ;; if self.ACCOUNTS_VALID eq 2b then begin 
   ;;    new=where(NOT ptr_valid((*self.DR).ACCOUNT)) ;newly added BCD's
@@ -3649,18 +3649,20 @@ pro CubeProj::BuildAccount,_EXTRA=e
   astr=self->CubeAstrometryRecord()
   exp_off=-1
   for iwh=0L,good_cnt-1 do begin 
-     i=wh[iwh]
+     i=wh[iwh]                  ;enabled record index
      feedback_only=0            ;might just be showing the feedback
-     if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
-     color=!D.TABLE_SIZE-20+((*self.DR)[i].EXP-exp_off) mod 4
      
      ;; if the accounts are fully valid and an account exists for this
      ;; DR, assume it's valid.
-     if self.ACCOUNTS_VALID AND 1b AND ptr_valid((*self.DR)[i].ACCOUNT) $
-        then begin 
+     if (self.ACCOUNTS_VALID AND 3b) eq 3b && $
+        ptr_valid((*self.DR)[i].ACCOUNT) then begin 
         if self.feedback then feedback_only=1 else continue 
      endif else ptr_free,(*self.DR)[i].ACCOUNT
      
+     ;; Color for Feedback PR
+     if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
+     color=!D.TABLE_SIZE-20+((*self.DR)[i].EXP-exp_off) mod 4
+
      ;; Compute the pixel offset of the canonical PR's center for this
      ;; BCD N.B. The slit is laid out differently in Spectral Maps and
      ;; BCD's (ughh) so ROW<-->COLUMN.  A non-full aperture will
@@ -3804,7 +3806,8 @@ end
 ;=============================================================================
 pro CubeProj::BuildRevAcct
   accs_changed=0b
-  if ~(self.ACCOUNTS_VALID AND 1b) then ptr_free,(*self.DR).REV_ACCOUNT
+  if (self.ACCOUNTS_VALID AND 3b) ne 3b then $
+     ptr_free,(*self.DR).REV_ACCOUNT
   need=where(~ptr_valid((*self.DR).REV_ACCOUNT) AND ~(*self.DR).DISABLED, $
              need_cnt)
   if need_cnt eq 0 then return
@@ -3861,8 +3864,16 @@ pro CubeProj::BuildCube
   if enabled_cnt eq 0 then $
      self->Error,'Must enable some records to build cube.'
   
-  if (self.ACCOUNTS_VALID AND 3b) ne 3b OR $
-     ~array_equal(ptr_valid((*self.DR)[enabled].ACCOUNT),1b) OR $
+  self->Normalize
+  if (self.ACCOUNTS_VALID AND 3b) eq 1b then begin
+     ;; accts valid, but size changed
+     self->Warning,'Cube layout changed, rebuild accounts?',/CANCEL, $
+                   RESULT=res
+     if res eq 'Cancel' then return
+  endif 
+  
+  if (self.ACCOUNTS_VALID AND 3b) ne 3b || $
+     ~array_equal(ptr_valid((*self.DR)[enabled].ACCOUNT),1b) || $
      self.feedback then self->BuildAccount else self->BuildRevAcct
   
   status=string(FORMAT='("Building ",I0,"x",I0,"x",I0," cube...")', $
@@ -3973,18 +3984,17 @@ pro CubeProj::BuildCube
   if use_unc then self.CUBE_UNC=ptr_new(sqrt(cube_unc)/areas)
   
   ;; Subtract off 1D BG spectrum (converting to correct units if necessary)
-  if self.use_bg && ptr_valid(self.BG_SP) && $
-     ~ptr_valid(self.BACKGROUND) then begin 
-     ;; Assume they are in correct non-fluxed units (e/s/pix)
+  if self.use_bg && ptr_valid(self.BG_SP) then begin 
+     ;; Assume they are in correct units 
      if array_equal((*self.BG_SP)[0,*],*self.wavelength) then begin 
         bg=(*self.BG_SP)[1,*]
-     endif else begin 
+     endif else begin ;; interpolate
         bg=interpol((*self.BG_SP)[1,*],(*self.BG_SP)[0,*], $
                     *self.wavelength,/LSQUADRATIC)
      endelse 
      ;; First flux the spectrum if necessary
-     if self.fluxcon then self->Flux,*self.wavelength,bg,SLCF=self.slcf, $
-                                     PIXEL_OMEGA=self.pix_omega
+     if self.fluxcon && self.BG_SP_TYPE eq 0b then $
+        self->Flux,*self.wavelength,bg,SLCF=self.slcf,PIXEL_OMEGA=self.pix_omega
      bg=rebin(reform(bg,1,1,n_elements(*self.wavelength),/OVERWRITE), $
               size(*self.CUBE,/DIMENSIONS),/SAMPLE)
      *self.CUBE-=bg
@@ -4023,7 +4033,7 @@ end
 pro CubeProj::Normalize
   self->LoadCalib
   
-  if NOT ptr_valid(self.DR) then $
+  if ~ptr_valid(self.DR) then $
      self->Error,'No data records'
   
   ;; For low-res use the target order as the order, if they're all the same.
@@ -4282,8 +4292,10 @@ pro CubeProj::LayoutBCDs
   self.PA=mean(pa)              ;match our PA to the most numerous
   ;; Approximate cube center (pos average), for now (not critical)
   pos=self.reconstructed_pos?recs.REC_POS:recs.RQST_POS
+  old_pos=self.POSITION
   self.POSITION=size(pos,/N_DIMENSIONS) eq 2?total(pos,2)/goodcnt:pos
   cubeastr=self->CubeAstrometryRecord(/ZERO_OFFSET)
+  self.POSITION=old_pos
   
   ;; Compute the region bounds
   bounds=self->BCDBounds(good)
@@ -4309,17 +4321,25 @@ pro CubeProj::LayoutBCDs
   
   ;; Establish the dimensions of the cube in the sky coordinate system
   exact_size=[x_max-x_min,y_max-y_min]
-
-  new_size=ceil(exact_size-.001) ;no hangers-on
-  if ~array_equal(self.CUBE_SIZE[0:1],new_size) then begin 
-     self.CUBE_SIZE[0:1]=new_size
-     self.ACCOUNTS_VALID AND= NOT 2b
-  endif
+  new_size=ceil(exact_size-.001) ; no hangers-on
+  self.CUBE_SIZE[0:1]=new_size
+  ;;print,self.CUBE_SIZE,self.AS_BUILT.CUBE_SIZE
+  if (self.ACCOUNTS_VALID AND 3b) eq 3b && $ ;see if size changed
+     ~array_equal(self.AS_BUILT.CUBE_SIZE,0L) && $
+     ~array_equal(self.CUBE_SIZE[0:1],self.AS_BUILT.CUBE_SIZE[0:1]) then $
+        self.ACCOUNTS_VALID AND= NOT 2b
 
   ;; Find the cube center in the sky coordinate system
   xy2ad,x_min+float(new_size[0])/2.-.5,y_min+float(new_size[1])/2.-.5, $
         cubeastr,a,d
+  
   self.POSITION=[a,d]
+  ;;print,FORMAT='(G)',abs(self.POSITION-self.AS_BUILT.POSITION)
+  if (self.ACCOUNTS_VALID AND 3b) eq 3b && $ ;see if center changed
+     ~array_equal(self.AS_BUILT.POSITION,0.0D) && $
+     ~array_equal(abs(self.POSITION-self.AS_BUILT.POSITION) lt 1D-6,1b) then $
+        self.ACCOUNTS_VALID AND= NOT 2b
+     
     
 ;  skyc=3600.D*(skyc-rebin(total(skyc,2)/(n_elements(skyc)/2), $
 ;                          size(skyc,/DIMENSIONS)))
@@ -5981,20 +6001,23 @@ end
 ;=============================================================================
 pro CubeProj__define
   ;; Basic parameters which go into building a cube: they can be
-  ;; changed without rebuilding a cube.  Useful for saving snapshots.
-  ;; Careful when freeing pointers!
+  ;; changed without rebuilding a cube.  Useful for saving "as-built"
+  ;; snapshots.  Careful when freeing shared pointers!
   cp={CUBE_PARAMETERS, $
       MODULE:'', $              ;The name of the module, one of
                                 ;   SL,LL,SH,LH (IRS),MSED (MIPS)
       ORDER:0, $                ;The sub-slit order for which to build
                                 ; the cube (or 0 to build and splice all
                                 ; orders in the module)
+      POSITION:[0.0D,0.0D], $   ;optimized position of the cube center
+      CUBE_SIZE: [0L,0L,0L],$   ;the size of the cube, (n,m,l)
       APERTURE:ptr_new(), $     ;The aperture of the clip, or one
                                 ; for each order
       BACK_DATE: 0.0D, $        ;date background created
       BACK_RECS: ptr_new(),$    ;list of expids used for the background,
                                 ;or pair of structures containing A/B info
       BG_SP_FILE:'', $          ;file used for 1D BG subtraction
+      BG_SP_TYPE: 0b, $         ;0b: raw electrons, 1b: fluxed
       GLOBAL_BAD_PIXEL_LIST: ptr_new(),$ ;a user list of bad pixels to exclude
       GLOBAL_BP_FILES: ptr_new(), $ ;files which contribed to the BPs
       GLOBAL_BP_TYPE: 0b, $         ;by hand: 1b, auto bps: 2b
@@ -6039,14 +6062,12 @@ pro CubeProj__define
                                 ;  1:accts, 2:size, 4: bg
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      CUBE_UNC:  ptr_new(),$     ;a pointer to the nxmxl uncertainty cube
-     CUBE_SIZE: [0L,0L,0L],$    ;the size of the cube, (n,m,l)
      CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
      WAVELENGTH: ptr_new(), $   ;the cube's wavelength list
      AS_BUILT: {CUBE_PARAMETERS}, $ ;the as-built cube parameters
      BACKGROUND: ptr_new(),$    ;the background image (if any) to subtract
      BACKGROUND_UNC:ptr_new(),$ ;the uncertainty in the background
      BG_SP: ptr_new(), $        ;2xn background spectrum for 1D subtractions
-     POSITION:[0.0D,0.0D], $    ;optimized position of the cube center
      PA:0.0D, $                 ;optimized position angle of the cube
      VISUALIZE_FILE:'',$        ;file for visualization image
      VISUALIZE_IMAGE:ptr_new(),$ ;image for AOR visulization
@@ -6126,6 +6147,7 @@ pro CubeProj__define
          list_row:0.0, $        ;the height of list rows in pixels
          which_list:0, $        ;which list we're using
          list_size_diff:0, $    ;the difference in ysize between list and base
+         xsize: 0, $            ;the screen xsize of the show widget
          lines:0, $             ;number of list lines last set
          view_ids:lonarr(5), $  ;record view button ids
          nsel_sav: 0, $          ;save number of selected records
