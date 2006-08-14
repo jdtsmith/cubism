@@ -206,7 +206,7 @@ end
 ;  Error - Signal an error, returning all the way to the command line
 ;          or to the widget loop catch, if using a widget.
 ;=============================================================================
-pro ObjReport::Error,msg,RETURN_ONLY=ro,_EXTRA=e
+pro ObjReport::Error,msg,RETURN_ONLY=ro,_REF_EXTRA=e
   on_error,2
   if self->IsWidget() then begin 
      self->orPopupReport,msg,/Error,PARENT=parent,_EXTRA=e
@@ -220,7 +220,7 @@ end
 ;=============================================================================
 ;  Warning - Post a warning but otherwise continue
 ;=============================================================================
-pro ObjReport::Warning,msg,PARENT=parent,_EXTRA=e
+pro ObjReport::Warning,msg,PARENT=parent,_REF_EXTRA=e
   if self->IsWidget() then $
      self->orPopupReport,msg,/WARNING,PARENT=parent,_EXTRA=e $
   else self->orCommandLineReport,msg,/WARNING,_EXTRA=e
@@ -229,7 +229,7 @@ end
 ;=============================================================================
 ;  Info - Post some info but otherwise continue
 ;=============================================================================
-pro ObjReport::Info,msg,PARENT=parent,_EXTRA=e
+pro ObjReport::Info,msg,PARENT=parent,_REF_EXTRA=e
   if self->IsWidget() then $
      self->orPopupReport,msg,/INFO,PARENT=parent,_EXTRA=e $
   else self->orCommandLineReport,msg,/INFO,_EXTRA=e
@@ -252,7 +252,8 @@ end
 ;                  associated msg
 ;=============================================================================
 pro ObjReport::orPopupReport,msg,INFO=info,WARNING=warning,ERROR=error, $
-                             PARENT=parent,TITLE=title,SCROLL=scroll,_EXTRA=e
+                             PARENT=parent,TITLE=title,SCROLL=scroll,$
+                             RESULT=result,_EXTRA=e
   title_type=keyword_set(error)?"error":keyword_set(warning)?"warning": $
              keyword_set(info)?"info":"error"
   if strlen(self.or_title_base) eq 0 then $
@@ -266,10 +267,10 @@ pro ObjReport::orPopupReport,msg,INFO=info,WARNING=warning,ERROR=error, $
                   HEIGHT=n_elements(msg)<10, _EXTRA=e
   endif else begin 
      if keyword_set(info) or keyword_set(error) then $
-        void=dialog_message(msg,DIALOG_PARENT=parent, $
+        result=dialog_message(msg,DIALOG_PARENT=parent, $
                             INFORMATION=keyword_set(info) , $
                             ERROR=keyword_set(error),TITLE=title,_EXTRA=e) $
-     else void=dialog_message(msg,DIALOG_PARENT=parent,TITLE=title,_EXTRA=e)
+     else result=dialog_message(msg,DIALOG_PARENT=parent,TITLE=title,_EXTRA=e)
   endelse 
 end
 
