@@ -4866,8 +4866,8 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      if ~obj_valid(oReg) then return,-1
   endif
   
-  if n_elements(oReg) ne 0 && n_elements(low) eq 0 then begin 
-     ;; Celestial coords: convert ra,dec to x,y
+  if obj_valid(oReg) then begin ;we've got a region object
+     ;; Celestial coord region: convert ra,dec to x,y
      r=oReg->Region()           ;first region
      self->ConvertCoords,r[0,*],r[1,*],x,y,/TO_X_Y 
      if arg_present(op) then op=[x,y]
@@ -4929,7 +4929,8 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
                                                 [sp],[sp_unc]]) $
      else self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
   endif 
-  if n_elements(oSP) ne 0 then obj_destroy,oSP
+  if n_elements(oSP) ne 0 then $
+     obj_destroy,oSP,NO_REGION_DESTROY=arg_present(oReg)
   if keyword_set(pkg) then begin 
      if n_elements(sp_unc) ne 0 then $
         rec={WAVELENGTH:0.0,FLUX:0.0,UNCERTAINTY:0.0} else $
