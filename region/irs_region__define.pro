@@ -194,15 +194,21 @@ end
 ;=============================================================================
 ;  WriteDS9Region -- Write region as a DS9 region file
 ;=============================================================================
-pro IRS_Region::WriteDS9Region,file
+pro IRS_Region::WriteDS9Region,file,_EXTRA=e
+  if size(file,/TYPE) ne 7 then begin 
+     xf,file,/RECENT,FILTERLIST=['*.reg','*.*','*'],/SAVEFILE, $
+        TITLE='Save as DS9 Region File...',/MODAL,SELECT=0,/NO_SHOW_ALL, $
+        _EXTRA=e
+     if size(file,/TYPE) ne 7 then return                
+  endif 
   openw,un,/get_lun,file
   printf,un,'# Region file format: DS9 version 3.0'
   printf,un,'# CUBISM-derived spectral aperture region file'
   if self.source then printf,un,'# Source: '+self.source
   printf,un,'global color=green select=1 edit=0 move=0 delete=1 include=1 ' + $
-         'fixed=0 source fk5;'
+         'fixed=0 source'
   reg=self->Region()
-  printf,un,'polygon('+strjoin(string(FORMAT='(F0.7)',reg),",")+')'
+  printf,un,' fk5; polygon('+strjoin(string(FORMAT='(F0.7)',reg),",")+')'
   free_lun,un
 end
 
