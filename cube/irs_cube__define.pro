@@ -6,7 +6,7 @@
 ; CONTACT:
 ;
 ;    UPDATED VERSIONS of CUBISM and more information can be found at:
-;       http://ssc.spitzer.caltech.edu/cubism
+;       http://sings.stsci.edu/cubism
 ;
 ; DESCRIPTION:
 ;    
