@@ -105,6 +105,7 @@ pro CubeRec::Message, msg
   case type of
      'BOX': begin 
         if self.region->On() then self.region->Reset
+        if ~widget_info(self.wSaveDS9But,/SENSITIVE) then self->SetButtons
         self->Extract
         return
      end 
@@ -221,6 +222,7 @@ pro CubeRec::On
   end
   self->tvPlug::On
   self.Box->On & self.Region->On
+  self->SetButtons
 end
 
 ;=============================================================================
@@ -230,6 +232,7 @@ pro CubeRec::Off,_EXTRA=e
   self->tvPlug::Off,_EXTRA=e
   self.Box->Off
   self.Region->Off
+  self->SetButtons
 end
 
 ;=============================================================================
@@ -367,13 +370,7 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
      self.oAper->Off,/RESET,/NO_REDRAW 
   endelse 
   
-  ;; The menu buttons
-  if widget_info(self.wMapSaveBut,/VALID_ID) then begin 
-     widget_control, self.wMapSaveBut,SENSITIVE=self.mode eq 1
-  endif 
-  if widget_info(self.wExtractRegionBut,/VALID_ID) then begin 
-     widget_control, self.wExtractRegionBut,SENSITIVE=self.mode lt 2
-  endif 
+  self->SetButtons
   
   ;;Switch the base showing
   others=where(indgen(4) ne self.mode)
@@ -382,6 +379,20 @@ pro CubeRec::SwitchMode,FULL=full,STACK=stack,BCD=bcd,VISUALIZE=viz
   widget_control, self.wBase[self.mode],/MAP,/SENSITIVE
 end
 
+
+;=============================================================================
+;  SetButtons - Set button sensitivity
+;=============================================================================
+pro CubeRec::SetButtons
+  ;; The menu buttons
+  if widget_info(self.wMapSaveBut,/VALID_ID) then begin 
+     widget_control, self.wMapSaveBut,SENSITIVE=self.mode eq 1
+     widget_control, self.wExtractRegionBut,SENSITIVE=self.mode lt 2
+     widget_control, self.wSaveDS9But,SENSITIVE=self.mode lt 2 && $
+        ((obj_valid(self.box) && self.Box->IsDrawn()) || $
+         (obj_valid(self.region) && self.region_file && self.region->On()))
+  endif 
+end
 
 ;=============================================================================
 ;  UpdateData - Update the image and its uncertainty
@@ -547,7 +558,6 @@ pro CubeRec::SaveMapEvent,ev
   self->BuildStack,/UNCERTAINTY,/SAVE
 end
 
-
 ;=============================================================================
 ;  SetupViewSpec -  Get a spectrum viewer if necessary
 ;=============================================================================
@@ -587,10 +597,21 @@ pro CubeRec::ExtractFileRegion,FILE=rff,_EXTRA=e
   self.Box->Reset & self.Box->On ;clear any box, but leave active
   self.region->SetProperty,REGION=op
   if ~self.region->On() then self.region->On
+  self->SetButtons
   self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,spec,spec_unc}
   ptr_free,spec,spec_unc
 end
 
+
+;=============================================================================
+;  SaveDS9Region -  Save region as a DS9 .reg file
+;=============================================================================
+pro CubeRec::SaveDS9Region
+  self.Box->Getlrtb,l,r,t,b
+  void=self.cube->Extract(FROM_FILE=self.region_file,[l,b],[r,t],REGION=reg)
+  reg->WriteDS9Region,PARENT_GROUP=self.cube->TopBase()
+  obj_destroy,reg
+end
 
 ;=============================================================================
 ;  Extract -  Extract a spectrum from box
@@ -720,6 +741,14 @@ function CubeRec::Init,oDraw,parent,CUBE=cube,APER_OBJECT=aper, $
                                           UVALUE={self:self, $
                                                   method:'ExtractFileRegion', $
                                                   event:0},/SEPARATOR)
+     self.wSaveDS9But=widget_button(menu, $
+                                    value='Save DS9 Region...', $
+                                    EVENT_PRO='cuberec_event', $
+                                    UVALUE={self:self, $
+                                            method:'SaveDS9Region', $
+                                            event:0}, $
+                                    SENSITIVE=self.mode le 1 AND $
+                                    self.box->IsDrawn())
   endif
   self.stack_msg=ptr_new(/ALLOCATE_HEAP)
   return,1
@@ -770,7 +799,8 @@ pro CubeRec__define
       wStackInfo:0L, $          ;The stack information
       wFull:0L,$                ;The "Switch to Full mode" button
       wMapSaveBut:0L, $         ;The Save Map as FITS button
-      wExtractRegionBut:0L}     ;Extract Region from File button
+      wExtractRegionBut:0L,$    ;Extract Region from File button
+      wSaveDS9But:0L}
   
   ;; The messages we send
   
