@@ -251,10 +251,10 @@ end
 ;=============================================================================
 ;  Cleanup
 ;=============================================================================
-pro IRS_Spectrum::Cleanup
+pro IRS_Spectrum::Cleanup,NO_REGION_DESTROY=nrd
   ptr_free,self.wavelength,self.flux,self.unc
   heap_free,self.extra_data
-  if obj_valid(self.region) then obj_destroy,self.region
+  if obj_valid(self.region) && ~keyword_set(nrd) then obj_destroy,self.region
   self->IRS_File_IO::Cleanup
 end
 
