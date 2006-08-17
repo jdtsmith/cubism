@@ -3794,6 +3794,19 @@ the @kbd{(new viewer)...} version of the view commands.  @xref{CUBISM
 Project Menus}.
 
 @item
+@strong{My cube seems to have skipped some rows, or seems to be missing data.}  
+
+There are two possible reasons for this.  One is that you disabled
+some of your records when making the cube (See @xref{Record Enabled State}). The other is that your initial map was not
+properly sampled.  We have seen at least one example of a map that was
+done using full slit spacings which was not contiguous.  The most
+likely reason for this is the pointing uncertainty in making the
+observations.  If you do full slit spacings, it is possible that small
+gaps may result in your final map.  To avoid this, please see the
+@uref{http://ssc.spitzer.caltech.edu/irs/documents/specmap_bop/, IRS
+Spectral Map HOWTO} for information on observation planning.
+
+@item
 @strong{My cube seems to be built in the wrong spectral order.}  
 
 Did you double check the cube build order (@kbd{Cube->Set Cube Build
