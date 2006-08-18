@@ -151,7 +151,8 @@ function read_ipac_table,file, hdr,UNITS=units
                                 format=[aform] else format=[format,aform]
                           end
                           1: begin 
-                             print,'warning, unkown type '+tok[i]
+                             message,'warning, unknown type '+tok[i], $
+                                     /INFORMATIONAL
                              break
                           end 
                        endcase 
