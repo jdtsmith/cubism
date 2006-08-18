@@ -1612,9 +1612,13 @@ Extract a spectrum from the current cube from the extraction region
 encoded in the header of an existing extracted spectrum (@file{.tbl}
 file).
 
+@item Save DS9 Region...
+Save the current extraction region (whether specified directly, or
+loaded from another file) as a DS9 @file{.reg} region file, which can be
+loaded in DS9 to visualize the extraction area.
+
 @item Close
 Close the viewer Window
-
 @end table
 
 @node CubeView Options Menu, CubeView Tools Menu, CubeView File Menu, CubeView Menus
