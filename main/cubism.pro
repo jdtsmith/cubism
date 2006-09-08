@@ -80,6 +80,6 @@ pro cubism,pname,_EXTRA=e
         endif 
      endif 
      project->SetProperty,/SPAWNED 
-     project->Show,/FORCE,SET_NEW_PROJECTNAME=~got_name
+     project->Show,/FORCE,SET_NEW_PROJECTNAME=~got_name,_EXTRA=e
   endif else obj_destroy,project
 end
