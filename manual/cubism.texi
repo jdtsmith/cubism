@@ -2032,6 +2032,7 @@ output is shown in @ref{fig:cv_stats}.
 
 The box statistics tool's key shortcut is @kbd{s}.
 
+@page
 @node Aperture Photometry Tool, Cube Extraction Tool, Box Statistics Tool, CubeView Tools
 @subsubsection Aperture Photometry Tool
 @cindex Photometry, aperture
