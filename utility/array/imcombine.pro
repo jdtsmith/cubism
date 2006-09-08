@@ -92,7 +92,10 @@ function imcombine,array,AVERAGE=avg,MEDIAN=med,REJECT_MINMAX=rmm, $
         return,median(array,DIMENSION=3) ;median sans min/max is the same
      endif 
   end else begin 
-     if n_elements(dims) eq 2 || dims[2] eq 1 then return,array
+     if n_elements(dims) eq 2 || dims[2] eq 1 then begin 
+        if n_elements(unc) ne 0 then comb_unc=unc
+        return,array
+     endif 
      if n_elements(unc) ne 0 then comb_unc=sqrt(total(unc^2,3))/dims[2]
      if keyword_set(avg) then return,total(array,3)/dims[2] else $
         return,median(array,DIMENSION=3)
