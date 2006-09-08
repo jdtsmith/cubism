@@ -510,6 +510,7 @@ pro CubeProj::Exit
      if ans eq 'Cancel' then canceled=1 $
      else if ans eq 'Yes' then self->Save,CANCELED=canceled
      if keyword_set(canceled) then begin 
+        self->KillShow
         if NOT widget_info((*self.wInfo).SList,/VALID_ID) then self->Show
         return
      endif 
@@ -859,7 +860,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   @cubism_version
   status=string(164b)+' CUBISM version '+cubism_version+ $
-         ' by JDS and the SINGS team'
+         ' by JD Smith and the SINGS team'
   self->Status,status
   
   name='CubeProj_Show:'+self.ProjectName+file_basename(self.savefile)
@@ -869,9 +870,9 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
      self->SetProjectName,TITLE='New Project Name'
   self->UpdateAll
   (*self.wInfo).showing=1
-  XManager,name, base,/NO_BLOCK,EVENT_HANDLER='CubeProj_show_event', $
-           CLEANUP='CubeProj_show_kill'
   widget_control, base,TIMER=45.
+  XManager,name, base,/NO_BLOCK,EVENT_HANDLER='CubeProj_show_event', $
+           CLEANUP='CubeProj_show_kill',_EXTRA=e
 end
 
 ;=============================================================================
