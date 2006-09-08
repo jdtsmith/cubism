@@ -51,6 +51,7 @@
 pro cubism_vm,pname
   @cubism_dir                   ; to freeze the relative cubism directory
   common cubism_vm_command_line_args, used_args
+  command_line=~lmgr(/VM) && ~lmgr(/RUNTIME)
   if n_elements(used_args) eq 0 then begin 
      catch,err
      if err eq 0b then begin 
@@ -65,5 +66,13 @@ pro cubism_vm,pname
      catch,/cancel
   endif
   device,DECOMPOSED=0,RETAIN=2,TRUE=24
-  cubism,pname
+  if ~command_line then begin 
+     XManager,CATCH=0
+     catch,err
+     if err ne 0b then begin 
+        XManager                ;just silently restart event processing
+        return
+     endif 
+  endif 
+  cubism,pname,NO_BLOCK=command_line
 end
