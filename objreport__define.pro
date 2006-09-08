@@ -212,7 +212,7 @@ pro ObjReport::Error,msg,RETURN_ONLY=ro,_REF_EXTRA=e
      self->orPopupReport,msg,/Error,PARENT=parent,_EXTRA=e
      if self->IsBlocking() then begin
         ;; Send a message to be caught by the established OBJREPORT catch
-        message,'OBJREPORT-ERROR',/NOPRINT
+        message,'OBJREPORT-ERROR',/NOPRINT,LEVEL=-1
      endif else if keyword_set(ro) then return else retall 
   endif else self->orCommandLineReport,msg,/ERROR
 end
@@ -298,10 +298,10 @@ pro ObjReport::orCommandLineReport,msg,INFO=info,WARNING=warning, $
      msg=newmsg
   endif 
   printmsg=title+': '+msg
-  if keyword_set(warning) then message,printmsg,/CONTINUE,/NONAME $
-  else if keyword_set(error) then message,printmsg,/NONAME $
+  if keyword_set(warning) then message,printmsg,/CONTINUE,/NONAME,LEVEL=-2 $
+  else if keyword_set(error) then message,printmsg,/NONAME,LEVEL=-2 $
   else if keyword_set(info) || keyword_set(status) then $
-     message,printmsg,/INFORMATIONAL,/NONAME 
+     message,printmsg,/INFORMATIONAL,/NONAME,LEVEL=-2
   return
 end
 
