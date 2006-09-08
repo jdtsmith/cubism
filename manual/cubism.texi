@@ -121,7 +121,13 @@ Installation
 * Source Installation::         
 * Binary Installation::         
 * Setup::                       
+* Running::                     
 * Upgrading::                   
+
+Running
+
+* Running the Source Distribution::  
+* Running the Binary Distribution::  
 
 Quick Start Guide
 
@@ -423,6 +429,7 @@ between IDL versions within a few versions is quite good).
 * Source Installation::         
 * Binary Installation::         
 * Setup::                       
+* Running::                     
 * Upgrading::                   
 @end menu
 
@@ -458,7 +465,7 @@ To install CUBISM from source:
 
 @enumerate
 @item
-Unpack the @file{cubism_vX.XX.tgz} file (where @file{X.XX} is the
+Unpack the @file{cubism_vX.XX_src.tgz} file (where @file{X.XX} is the
 version number) in a directory on the IDL path (e.g. @file{~/idl}).
 @item
 Ensure the @file{irs_cubism} directory which is unpacked is on the
@@ -498,9 +505,13 @@ only the graphical interface to CUBISM is accessible.  With this setup,
 no analysis can be performed at the command line, though all files,
 including spectra, maps, and cubes can be output as normal.  Running the
 binary distribution of CUBISM in a licensed version of IDL does not
-prevent access to the command line.
+prevent access to the command line.  
 
-@node Setup, Upgrading, Binary Installation, Installation
+To install the binary version of CUBISM, simply unpack the
+@file{cubism_vX.XX_bin.tgz} file (where @file{X.XX} is the version
+number) in a directory on the IDL path (or anywhere else).
+
+@node Setup, Running, Binary Installation, Installation
 @section Setup
 @cindex Setup, of CUBISM
 
@@ -535,7 +546,63 @@ problem, move the directory containing CUBISM higher on your
 @code{IDL_PATH}, or use the binary distribution, which doesn't suffer
 such name space conflicts.
 
-@node Upgrading,  , Setup, Installation
+@node Running, Upgrading, Setup, Installation
+@section Running
+@cindex Running CUBISM
+
+How CUBISM is run depends on how it was installed.  
+
+@menu
+* Running the Source Distribution::  
+* Running the Binary Distribution::  
+@end menu
+
+@node Running the Source Distribution, Running the Binary Distribution, Running, Running
+@subsection Running the Source Distribution
+@cindex Running, source distribution
+
+For source distributions, after installation on your IDL path, simply
+type:
+
+@example
+IDL> cubism
+@end example
+
+@noindent and you are prompted to select an existing saved cube project, or
+create a new one.
+
+@node Running the Binary Distribution,  , Running the Source Distribution, Running
+@subsection Running the Binary Distribution
+@cindex Running, binary distribution
+
+Running the pre-compiled binary version of CUBISM can be accomplished by
+putting the @file{cubism_vm.sav} file in your IDL path and using:
+
+@example
+IDL> cubism_vm
+@end example
+
+Another option allows you to run this binary file from anywhere, not
+necessarily on your IDL path:
+
+@example
+IDL> restore,'/path/to/cubism/bin/cubism_vm.sav'
+IDL> cubism
+@end example
+
+You can also run the compiled file in the free IDL VM, which does not
+require an IDL license:
+
+@example
+% idl -vm=/path/to/cubism_vm.sav
+@end example
+
+MacOSX users can accomplish the same thing by optionally use the
+precompiled wrapper @file{Cubism.app} application: simply double-click
+(or double-click a @file{.cpj} CUBISM project file).  Note that even
+under OSX, CUBISM runs as an X11 application.
+
+@node Upgrading,  , Running, Installation
 @section Upgrading
 @cindex Upgrading
 
@@ -641,7 +708,7 @@ The pre-built cube uncertainties as a 3D FITS image.
 Here we take you through the process of assembling a cube with the
 pre-packaged data set.
 
-To get going, type:
+To get going, start Cubism (@pxref{Running}):
 
 @example
 IDL> cubism
@@ -732,7 +799,7 @@ detailed steps for cube assembly and analysis.
 @chapter The Tools
 @cindex Cubism tools
 
-Cubism consists of three main components, which are used together for
+CUBISM consists of three main components, which are used together for
 building and analyzing spectral cubes: CUBISM Project, CubeView, and
 CubeSpec.  We will give here a description of the purpose and reference
 of the features of each of these three tools, after some general tips on
@@ -1338,7 +1405,6 @@ assemble the loaded cube project (if different).
 
 @item Cubism Manual...
 Load the PDF CUBISM manual.
-
 @end table
 
 
@@ -1618,7 +1684,7 @@ loaded from another file) as a DS9 @file{.reg} region file, which can be
 loaded in DS9 to visualize the extraction area.
 
 @item Close
-Close the viewer Window
+Close the viewer window.
 @end table
 
 @node CubeView Options Menu, CubeView Tools Menu, CubeView File Menu, CubeView Menus
