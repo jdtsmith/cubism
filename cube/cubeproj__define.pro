@@ -181,7 +181,8 @@ pro CubeProj::ShowEvent, ev
         endelse 
         return 
      endelse 
-  endif else widget_control, ev.id, get_uvalue=action
+  endif else if event_type eq 'WIDGET_KILL_REQUEST' then action='Exit' $
+  else widget_control, ev.id, get_uvalue=action
   if action eq 'bargroup' then action=ev.value
   
   widget_control, /HOURGLASS
@@ -491,11 +492,6 @@ pro CubeProj::ShowEvent, ev
   endcase     
 end
 
-pro CubeProj_Show_kill,id
-  widget_control, id, get_uvalue=self
-  if obj_valid(self) then self->Exit
-end
-
 ;=============================================================================
 ;  Exit - Get out of here, possibly committing hara kiri on the way.
 ;=============================================================================
@@ -507,13 +503,18 @@ pro CubeProj::Exit
                          self.SaveFile?"to file "+self.SaveFile:"",status], $
                         /QUESTION,TITLE="Save "+self->ProjectName()+"?", $
                         DIALOG_PARENT=self->TopBase(),/CANCEL,/DEFAULT_CANCEL)
-     if ans eq 'Cancel' then canceled=1 $
-     else if ans eq 'Yes' then self->Save,CANCELED=canceled
+     case ans of
+        'Cancel': canceled=1
+        'Yes': self->Save,CANCELED=canceled
+        else:
+     endcase
      if keyword_set(canceled) then begin 
-        self->KillShow
-        if NOT widget_info((*self.wInfo).SList,/VALID_ID) then self->Show
+        if ~widget_info((*self.wInfo).SList,/VALID_ID) then begin
+           self->KillShow
+           self->Show
+        endif 
         return
-     endif 
+     endif else self->KillShow
   endif 
   if self.Spawned then obj_destroy,self else self->KillShow
 end
@@ -532,7 +533,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   self.feedback=1               ;default to showing cube build feedback
   
   base=widget_base(/COLUMN,/BASE_ALIGN_RIGHT,APP_MBAR=mbar,SPACE=1, $
-                   /TLB_SIZE_EVENTS,_EXTRA=e)
+                   /TLB_SIZE_EVENTS,/TLB_KILL_REQUEST_EVENTS,_EXTRA=e)
   (*self.wInfo).Base=base
   self->UpdateTitle
   
@@ -871,8 +872,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   self->UpdateAll
   (*self.wInfo).showing=1
   widget_control, base,TIMER=45.
-  XManager,name, base,/NO_BLOCK,EVENT_HANDLER='CubeProj_show_event', $
-           CLEANUP='CubeProj_show_kill',_EXTRA=e
+  XManager,name, base,/NO_BLOCK,EVENT_HANDLER='CubeProj_show_event',_EXTRA=e
 end
 
 ;=============================================================================
