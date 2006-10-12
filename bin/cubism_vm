@@ -1,0 +1,26 @@
+#!/bin/sh
+# Run the binary cubism IDL save file
+
+top=$(dirname "$0")
+cubism_vm=$top/cubism_vm.sav
+[ -f $cubism_vm ] || { echo "Cannot find Cubism save file"; exit 1; }
+
+#echo RUNNING WITH $IDL_DIR
+if [ -z "$IDL_DIR" ]; then
+    if [ -d /usr/local/rsi/idl ]; then
+	export IDL_DIR=/usr/local/rsi/idl
+    elif [ -d /Applications/rsi/idl ]; then
+	export IDL_DIR=/Applications/rsi/idl
+    else 
+	echo "IDL_DIR not set and idl cannot be located, please correct."
+	exit 1
+    fi
+fi
+
+IDL=$IDL_DIR/bin/idl
+
+if [ $# -ge 1 ]; then 
+    $IDL -vm=$cubism_vm -arg "$1"
+else
+    $IDL -vm=$cubism_vm
+fi
