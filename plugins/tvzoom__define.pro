@@ -139,15 +139,9 @@ pro tvZoom::Message, msg
                  ;; Control-click == middle-click
                  if msg.press eq 1b && (msg.modifiers AND 2b) ne 0b then $
                     press=2b else press=msg.press
-                 ;; Double middle click: pan re-center
-                 if press eq 2b && msg.clicks eq 2 then begin 
-                    self->ZoomIt,msg.X,msg.Y,/TRANSLATE
-                    self.buttondwn=0b
-                    return
-                 endif 
                  self.buttondwn=press
-                 ;; Offset Pan
-                 if press eq 2b then begin ;middle click drag
+                 ;; (Potential) Dragging-Offset Pan
+                 if press eq 2b then begin 
                     self.oDraw->GetProperty,offset=offset
                     self.save=offset
                  endif 
@@ -158,7 +152,10 @@ pro tvZoom::Message, msg
               if msg.release eq 4b then return ;nothing to do
               self.oDraw->MsgSignup,self,DRAW_MOTION=0 ;turn off motion 
               if self.buttondwn eq 1b then $
-                 self->ZoomIt,msg.X,msg.Y ;zoom in on it
+                 self->ZoomIt,msg.X,msg.Y $ ;zoom in on it
+              else if self.buttondwn eq 2b && $
+                 array_equal([msg.X,msg.Y],self.orig) then $
+                    self->ZoomIt,msg.X,msg.Y,/TRANSLATE ;; re-center it
               self.buttondwn=0b ;no button down anymore
            end
         endcase
