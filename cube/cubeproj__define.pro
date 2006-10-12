@@ -964,7 +964,7 @@ pro CubeProj::Open,pname,PROJECT=proj,_EXTRA=e
   proj=self->Load(pname)
   if NOT obj_valid(proj) then return
   proj->SetProperty,/SPAWNED,CHANGED=0b
-  proj->Show
+  proj->Show,_EXTRA=e
 end
 
 ;=============================================================================
