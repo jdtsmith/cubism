@@ -68,7 +68,7 @@ end
 ;  RegionPhotometry -- Compute area averaged photometry of an image
 ;                      over our region
 ;=============================================================================
-function IRS_Region::RegionPhotometry,image,clip_astr
+function IRS_Region::RegionPhotometry,image,clip_astr,AREAS=areas
   pix=self->ClipRegion(image,clip_astr,AREAS=areas)
   if pix[0] eq -1 then return,!VALUES.F_NAN
   return,total(image[pix]*areas,/NAN)/total(areas,/NAN)
