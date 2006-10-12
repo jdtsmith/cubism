@@ -1,4 +1,4 @@
 #!/bin/sh
 
 top=$(dirname $0)
-$top/cubism/bin/cubism_vm $2
+exec $top/cubism/bin/cubism_vm $2
