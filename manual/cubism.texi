@@ -6,10 +6,10 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.2
-@set VERSION 1.01
+@set EDITION 1.21
+@set VERSION 1.02
 @set IDLVERSIONREQUIRED 6.1
-@set DATE August, 2006
+@set DATE October, 2006
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jdsmith@@as.arizona.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -1921,21 +1921,21 @@ images (i.e. images with WCS information).
 @subsubsection Zoom Tool
 @cindex Zooming images
 
-The zoom tool allow arbitrary zooming in on image regions.  By
-default, images are displayed at the maximum zoom which fits the
-entire image in the display window.  To zoom in, drag a rectangular
-region around the area of interest, or simply left-click to double the
-zoom level and center on the clicked point.  To zoom out, right-click.
-All zoom levels are saved onto a ``zoom stack'', which is navigated
+The zoom tool allow arbitrary zooming in on image regions.  By default,
+images are displayed at the maximum integer zoom which fits the entire
+image in the display window.  To zoom in, drag a rectangular region
+around the area of interest, or simply left-click to double the zoom
+level and center on the clicked point.  To zoom out, right-click.  All
+zoom levels are saved onto a ``zoom stack'', which is navigated
 backwards one step at a time.  To zoom all the way out, right
 double-click.
 
 When an image is zoomed in, middle-click dragging (or
-@key{Control}-click dragging) pans the image.  Middle-double-clicking,
-or @key{Control} double-clicking re-centers the image on the point
-clicked.  If the display canvas is resized (either using the @kbd{Set
-Size} menu item, see @ref{CubeView Options Menu}, or by re-sizing the
-entire CubeView window), the image is re-zoomed.
+@key{Control}-click dragging) pans the image smoothly.  Middle-clicking,
+or @key{Control}-clicking without moving re-centers the image on the
+point clicked.  If the display canvas is resized (either using the
+@kbd{Set Size} menu item, see @ref{CubeView Options Menu}, or by
+re-sizing the entire CubeView window), the image is re-zoomed.
 
 The zoom tool's key shortcut is @kbd{z}.
 
