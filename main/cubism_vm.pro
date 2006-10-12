@@ -48,6 +48,17 @@
 ;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
+
+;; Convert form feeds back to spaces, since idl -arg can't handle spaces
+pro cubism_vm_reencode_spaces,arg
+  b=byte(arg)
+  wh=where(b eq 12b,fcnt)       ;form feeds
+  if fcnt gt 0 then begin 
+     b[wh]=32b
+     arg=string(b)
+  endif 
+end
+
 pro cubism_vm,pname
   @cubism_dir                   ; to freeze the relative cubism directory
   common cubism_vm_command_line_args, used_args
@@ -59,8 +70,15 @@ pro cubism_vm,pname
         ;; only process the args once, in case called interactively
         used_args=1b 
         if cnt gt 0 then begin 
-           if file_test(args[0],/READ) && $
-           strpos(args[0],'.cpj') eq strlen(args[0])-4 then pname=args[0]
+           wdir=args[0] ;; first arg, initial working directory
+           cubism_vm_reencode_spaces,wdir
+           if file_test(wdir,/DIRECTORY) then cd,wdir
+           if cnt gt 1 then begin 
+              file=args[1]
+              cubism_vm_reencode_spaces,file
+              if file_test(file,/READ) && $
+                 strpos(file,'.cpj') eq strlen(file)-4 then pname=file
+           endif 
         endif 
      endif
      catch,/cancel
@@ -69,7 +87,7 @@ pro cubism_vm,pname
   if ~command_line then begin 
      XManager,CATCH=0
      catch,err
-     if err ne 0b then begin 
+     if err ne 0 then begin 
         XManager                ;just silently restart event processing
         return
      endif 
