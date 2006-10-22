@@ -21,7 +21,7 @@
 ;    
 ; EXAMPLE:
 ;
-;    idl -vm=/path/to/cubism_vm.sav -arg=/path/to/cube.cpj
+;    idl -vm=/path/to/cubism_vm.sav -arg /starting/path -arg=/path/to/cube.cpj
 ;-
 ;    $Id$
 ;##############################################################################
@@ -65,7 +65,7 @@ pro cubism_vm,pname
   command_line=~lmgr(/VM) && ~lmgr(/RUNTIME)
   if n_elements(used_args) eq 0 then begin 
      catch,err
-     if err eq 0b then begin 
+     if err eq 0 then begin 
         args=call_function('command_line_args',COUNT=cnt)
         ;; only process the args once, in case called interactively
         used_args=1b 
@@ -91,6 +91,7 @@ pro cubism_vm,pname
         XManager                ;just silently restart event processing
         return
      endif 
+     catch,/cancel
   endif 
   cubism,pname,NO_BLOCK=command_line
 end
