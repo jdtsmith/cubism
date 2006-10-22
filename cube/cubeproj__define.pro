@@ -135,9 +135,11 @@ end
 pro CubeProj::ShowEvent, ev
   if ~self.debug then begin     ;; trap errors unless debugging
      catch, err
-     if err ne 0 then begin 
+     if err ne 0 then begin
+        if strpos(!ERROR_STATE.MSG,'OBJREPORT-ERROR') eq -1 then $ 
+           self->Error,!ERROR_STATE.MSG ;; if just a trap, skip it
         catch,/CANCEL
-        self->Error,!ERROR_STATE.MSG
+        return
      endif 
   endif 
   event_type=tag_names(ev,/STRUCTURE_NAME)
@@ -879,10 +881,8 @@ end
 ;  KillShow - Kill the widget GUI if it's alive
 ;=============================================================================
 pro CubeProj::KillShow
-  if self->isWidget() && widget_info((*self.wInfo).SList,/VALID_ID) $
-  then begin 
+  if self->isWidget() && widget_info((*self.wInfo).SList,/VALID_ID) then $
      widget_control, (*self.wInfo).Base,KILL_NOTIFY='',/DESTROY
-  endif 
   if ptr_valid(self.wInfo) then (*self.wInfo).showing=-1
 end
 
@@ -953,7 +953,7 @@ end
 ;=============================================================================
 ;  Open - Open a Project and show it
 ;=============================================================================
-pro CubeProj::Open,pname,PROJECT=proj,_EXTRA=e
+pro CubeProj::Open,pname,PROJECT=proj,SUCCESS=success,_EXTRA=e
   if size(pname,/TYPE) ne 7 then begin 
      xf,pname,/RECENT,FILTERLIST=['*.cpj','*.*','*'],$
         TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0, $
@@ -962,7 +962,8 @@ pro CubeProj::Open,pname,PROJECT=proj,_EXTRA=e
   widget_control, /HOURGLASS
   if size(pname,/TYPE) ne 7 then return ;cancelled
   proj=self->Load(pname)
-  if NOT obj_valid(proj) then return
+  success=obj_valid(proj)
+  if ~success then return
   proj->SetProperty,/SPAWNED,CHANGED=0b
   proj->Show,_EXTRA=e
 end
