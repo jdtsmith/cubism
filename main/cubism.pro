@@ -64,11 +64,11 @@ pro cubism,pname,_EXTRA=e
   pname_passed=n_elements(pname) ne 0
   ;; Open a new project, unless a valid name was passed
   if ~pname_passed || file_test(pname,/READ) then $
-     project->Open,pname,PROJECT=opened_project, $
+     project->Open,pname,SUCCESS=success,PROJECT=opened_project, $
                    CANCEL_TEXT='Create New Cube Project', $
                    _EXTRA=e
   
-  if ~obj_valid(opened_project) then begin
+  if ~keyword_set(success) then begin ;; didn't open any project
      ;; Use the pre-existing project, possibly with a passed name
      got_name=pname_passed && size(pname,/TYPE) eq 7
      if got_name then begin 
