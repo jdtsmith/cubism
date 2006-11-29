@@ -174,13 +174,17 @@ pro CubeRec::Message, msg
         self->SwitchMode,/VISUALIZE
      end
      
-     'CUBEPROJ_UPDATE': begin 
-        if msg.new_cube && self.mode ge 2 then return
-        self.cube=msg.cube
-        self.cube->GetProperty,WAVELENGTH=wl,ASTROMETRY=astr,CUBE_SIZE=cs, $
-                               /POINTER
+     'CUBEPROJ_UPDATE': begin ;; a new cube
+        if msg.new_cube then begin 
+           self.cube=msg.cube
+           self.cube->GetProperty,WAVELENGTH=wl,ASTROMETRY=astr,CUBE_SIZE=cs, $
+                                  /POINTER
+           if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
+        endif 
         
-        if n_elements(wl) ne 0 && ptr_valid(wl) then self.wavelength=wl
+        if self.mode ge 2 then return ;; nothing to update, just cache the cube
+        
+        ;; Avoid stacks which run off the end.
         if self.mode eq 1 && n_elements(*self.stack_msg) gt 0 then begin 
            if ptr_valid((*self.stack_msg).foreground) then begin 
               fg=*(*self.stack_msg).foreground
@@ -188,7 +192,14 @@ pro CubeRec::Message, msg
                  self->SwitchMode,/FULL
            endif 
         endif 
+        
+        ;; Re-extraction with updated cube
+        if (self.Box->IsDrawn() || self.region_file && self->On()) then begin 
+           method=self.region_file?"ExtractFileRegion":"Extract"
+           call_method,method,self,FILE=self.region_file
+        endif
      end 
+     
      'CUBEPROJ_BADPIX_UPDATE': badpix_update=1b
      'CUBEPROJ_CALIB_UPDATE': cal_update=1b
      'CUBEPROJ_RECORD_UPDATE': begin 
