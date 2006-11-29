@@ -27,10 +27,6 @@
 ;
 ;    A GUI interface to CubeProj is available.
 ;
-; RESTRICTIONS:
-;
-;    Any restrictions?
-;
 ; METHODS:
 ;
 ;    Init: 
@@ -203,8 +199,7 @@ pro CubeProj::ShowEvent, ev
         if self.BACK_RECS eq self.AS_BUILT.BACK_RECS then $
            self.BACK_RECS=ptr_new() else heap_free,self.BACK_RECS 
         self.BACK_DATE=0.0D
-        self.ACCOUNTS_VALID AND=NOT 4b ;bg's no longer valid
-        self.Changed=1b
+        self->SetDirty,/SAVE,/BACKGROUND
         self->UpdateButtons & self->UpdateTitle
      end 
      'setbackgroundfromrecsa': self->SetBackgroundFromRecs,BLEND=0
@@ -215,7 +210,7 @@ pro CubeProj::ShowEvent, ev
      'remove-bg-sp': begin 
         ptr_free,self.BG_SP
         self.BG_SP_FILE=''
-        self.Changed=1b
+        self->SetDirty
         self->UpdateButtons & self->UpdateTitle
      end 
      'loadcalib': self->LoadCalib,/SELECT
@@ -498,7 +493,7 @@ end
 ;  Exit - Get out of here, possibly committing hara kiri on the way.
 ;=============================================================================
 pro CubeProj::Exit
-  if self.Changed then begin 
+  if self->Dirty() then begin 
      status=self.Spawned?"(changes will be lost)": $
             "(project available on command line)"
      ans=dialog_message(["Save changes to project "+self->ProjectName()+"?", $
@@ -528,9 +523,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   if ~keyword_set(force) then if self->Showing() then return
 
   ;; make the info structure if we need it.
-  if ~ptr_valid(self.wInfo) then begin
-     self.wInfo=ptr_new({CubeProj_wInfo})
-  endif 
+  if ~ptr_valid(self.wInfo) then self.wInfo=ptr_new({CubeProj_wInfo})
   
   self.feedback=1               ;default to showing cube build feedback
   
@@ -596,7 +589,6 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).MUST_PROJ[4]=widget_button(edit,VALUE='Deselect Disabled', $
                                            UVALUE='deselect-disabled')
   
-  
   wMustSel=widget_button(edit,VALUE='Replace File Substring...', $
                          UVALUE='replacefilenamesubstring',/SEPARATOR)
   
@@ -618,8 +610,6 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   b1=widget_button(rec,VALUE='Load Record Uncertainties',UVALUE='load_unc', $
                    /CHECKED_MENU)
   widget_control, b1,SET_BUTTON=self.load_unc
-  
-  
   
   wMustSel=[wMustSel, $
             widget_button(rec,VALUE='Switch Record Data Type...', $
@@ -668,8 +658,10 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   ;;*** Cube menu  
   cube=widget_button(mbar,VALUE='Cube',/MENU)
-  (*self.wInfo).MUST_PROJ[5]= $
-     widget_button(cube,VALUE='Build Cube',UVALUE='buildcube') 
+  (*self.wInfo).build_ids[0]= $
+     ((*self.wInfo).MUST_PROJ[5]= $
+      widget_button(cube,VALUE='Build Cube',UVALUE='buildcube'))
+
   wMustAcct= [wMustAcct, $
               widget_button(cube,VALUE='Reset Accounts',UVALUE='resetaccounts')]
   ;;-------------
@@ -838,17 +830,18 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).Status=widget_label(b,/ALIGN_LEFT,/SUNKEN_FRAME)
   
   bar=cw_bgroup(base,IDS=ids,/ROW,UVALUE='bargroup',$
-                ['Enable','Disable','Header', $
-                 'View Record','View Cube','Import AOR',' Save ',' Close '],$
+                ['Build Cube','Enable','Disable', $
+                 'View Record','View Cube', 'Import AOR',' Save ',' Close '],$
                 BUTTON_UVALUE= $
-                ['enablerecord','disablerecord','headers', $
-                 'viewrecord','viewcube','addgroup','save','exit'])
+                ['buildcube','enablerecord','disablerecord', $
+                 'viewrecord','viewcube', 'addgroup',  'save',  'exit'])
   ;; list of buttons that require a selection to be meaningful
-  (*self.wInfo).MUST_SELECT=[wMustSel,ids[0:3]]
+  (*self.wInfo).MUST_SELECT=[wMustSel,ids[1:3]]
+  (*self.wInfo).build_ids[1] = ((*self.wInfo).MUST_PROJ[6]=ids[0])
   (*self.wInfo).view_ids[2]=ids[3]
   
   ;; a cube must exist
-  (*self.wInfo).MUST_CUBE=[wMustCube,ids[4]]
+  (*self.wInfo).MUST_CUBE=[wMustCube,ids[3]]
   
   widget_control, base,set_uvalue=self,/REALIZE
   
@@ -883,7 +876,16 @@ end
 pro CubeProj::KillShow
   if self->isWidget() && widget_info((*self.wInfo).SList,/VALID_ID) then $
      widget_control, (*self.wInfo).Base,KILL_NOTIFY='',/DESTROY
-  if ptr_valid(self.wInfo) then (*self.wInfo).showing=-1
+  if ptr_valid(self.wInfo) then begin
+     device,WINDOW_STATE=win_valid
+     if (*self.wInfo).feedback_window gt 0 && $
+        win_valid[(*self.wInfo).feedback_window] then $
+           wdelete,(*self.wInfo).feedback_window
+     if (*self.wInfo).feedback_pixmap gt 0 && $
+        win_valid[(*self.wInfo).feedback_pixmap] then $
+           wdelete,(*self.wInfo).feedback_pixmap
+     (*self.wInfo).showing=-1
+  endif
 end
 
 ;=============================================================================
@@ -981,17 +983,8 @@ function CubeProj::Load,file,ERROR=err
      return,-1
   endif
   if self->IsWidget() then widget_control,/HOURGLASS
-  obj=restore_object(file,obj_class(self), $
-                     OTHER_CLASSES=['irs_aperture','irs_file_io', $
-                                    'irs_spectrum','irs_map','irs_cube', $
-                                    'cubeautobadpix'])
-  if obj_valid(obj) then begin 
-     if ~obj_isa(obj,obj_class(self)) then $
-        self->Error,'Invalid Cube Project'
-     obj->SetProperty,CHANGED=0b,SAVE_FILE=file_expand_path(file)
-     obj->Initialize
-  endif      
-  return,obj
+  cube=cubeproj_load(file)
+  return,cube
 end
 
 ;=============================================================================
@@ -1012,7 +1005,7 @@ pro CubeProj::Initialize
   if ~self->IsWidget() then self->SetProperty,FEEDBACK=0  
   
   ;; Look for old-style saved Reverse Accounts: rebuild if necessary.
-  if ptr_valid(self.DR) && self.ACCOUNTS_VALID then begin 
+  if ptr_valid(self.DR) && ~self->Dirty(/ACCOUNTS) then begin 
      wh=where(ptr_valid((*self.DR).REV_ACCOUNT),cnt)
      if cnt gt 0 && array_equal((*self.DR)[wh].REV_WIDTH,0L) then begin 
         self->BuildRevAcct
@@ -1103,7 +1096,11 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
      
      stub=ptrarr(nr)
      detRevAccts=(*self.DR).REV_ACCOUNT ;never save reverse accounts
+     detRevBcdAccts=(*self.DR).REV_BCD_ACCOUNT ;never save reverse accounts
+     detRevDual=(*self.DR).REV_DUAL
      (*self.DR).REV_ACCOUNT=stub
+     (*self.DR).REV_BCD_ACCOUNT=stub
+     (*self.DR).REV_DUAL=stub
      if keyword_set(nodata) then begin 
         detBCD=(*self.DR).BCD
         (*self.DR).BCD=stub
@@ -1152,6 +1149,8 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   
   if ptr_valid(self.DR) then begin 
      (*self.DR).REV_ACCOUNT=detRevAccts
+     (*self.DR).REV_BCD_ACCOUNT=detRevBcdAccts
+     (*self.DR).REV_DUAL=detRevDual
      if keyword_set(nodata) then begin 
         (*self.DR).BCD=detBCD
         (*self.DR).UNC=detUNC
@@ -1294,7 +1293,7 @@ pro CubeProj::ReplaceFilenameSubstring,from,to,recs,VERIFY_FILE=vf,_EXTRA=e
      endif 
      (*self.DR)[recs[i]].FILE=file
   endfor
-  self.changed=1b
+  self->SetDirty
   self->UpdateTitle & self->UpdateButtons
 end
 
@@ -1328,7 +1327,10 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
   set=1                         ;primary status is setting
   pix=reform(pix,/OVERWRITE)
   if keyword_set(auto) then bit=2b else bit=1b
-  if ptr_valid(list) then begin 
+  
+  self->SetDirtyPix,pix,RECORD=rec ;; these pixels are now dirty
+  
+  if ptr_valid(list) then begin ;; already have a list
      keep=make_array(n_elements(*list),VALUE=1b)
      
      if do_set then begin 
@@ -1363,8 +1365,8 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
      status_changed=1b
      self.GLOBAL_BP_TYPE OR=bit & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
   endelse 
-  if ~self.Changed then begin 
-     self.Changed=1b
+  if ~self->Dirty() then begin 
+     self->SetDirty
      self->UpdateTitle
   endif 
   if status_changed then self->UpdateButtons
@@ -1378,8 +1380,8 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
   catch, err
   if err ne 0 then begin 
      if n_elements(un) ne 0 then free_lun,un
-     self->Error,['Error loading bad pixel list from '+file,!ERROR_STATE.MSG],$
-                 /RETURN_ONLY
+     self->Error,['Error loading bad pixel list from '+file, $
+                  !ERROR_STATE.MSG], /RETURN_ONLY
      file=-1
   endif
   if size(file,/TYPE) ne 7 then begin 
@@ -1425,7 +1427,6 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
      free_lun,un
   endelse 
   
-  
   ;; Global bad pixels, and file list
   if n_elements(bp) gt 0 then begin 
      if keyword_set(append) && $
@@ -1441,6 +1442,7 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
      then self.GLOBAL_BP_FILES=ptr_new(*self.AS_BUILT.GLOBAL_BP_FILES)
      if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST $
      then ptr_free,self.GLOBAL_BAD_PIXEL_LIST
+     self->SetDirtyPix,bp
      self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bp,/NO_COPY)
   endif 
   
@@ -1460,6 +1462,7 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
            wh=where(bprecs.DCEID eq (*self.DR)[recs[i]].DCEID,cnt)
            if cnt eq 0 then continue
            badpix=*bprecs[wh[0]].PIX
+           self->SetDirtyPix,RECORD=recs[i],badpix
            if keyword_set(append) then begin
               list=(*self.DR)[recs[i]].BAD_PIXEL_LIST
               if ptr_valid(list) then begin 
@@ -1475,7 +1478,7 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
      endelse 
   endif 
         
-  ;; Update BP file record
+  ;; Update BP file record, a history of how the BP's have arrived
   if keyword_set(append) then begin 
      ;; Append to list of files
      if ptr_valid(self.GLOBAL_BP_FILES) then $
@@ -1489,11 +1492,10 @@ pro CubeProj::LoadBadPixels,file,APPEND=append,ERROR=err
   endelse 
   
   self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
-  self.Changed=1b
+  self->SetDirty
   self->UpdateButtons & self->UpdateTitle
-  self->Send,/UPDATE
+  self->Send,/BADPIX_UPDATE
 end
-
 
 ;=============================================================================
 ;  SaveBadPixels - Save bad pixels to file
@@ -1538,10 +1540,17 @@ pro CubeProj::ClearBadPixels, recs, CLEAR_RECORDS=clear_recs, $
                               NO_UPDATE=nu,_EXTRA=e
   if keyword_set(clear_recs) then self->RecOrSelect,recs,_EXTRA=e
   
-  ;; And the record based
-  if ptr_valid(self.DR) && n_elements(recs) gt 0 then begin 
+  ;; Clear the record based bad pixels
+  if n_elements(recs) gt 0 then begin
+     if ~ptr_valid(self.DR) then return
+     for i=0,n_elements(recs)-1 do $
+        if ptr_valid((*self.DR)[recs[i]].BAD_PIXEL_LIST) then $
+           self->SetDirtyPix,*(*self.DR)[recs[i]].BAD_PIXEL_LIST,RECORD=recs[i]
      ptr_free,(*self.DR)[recs].BAD_PIXEL_LIST
   endif else begin 
+     if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then $
+        self->SetDirtyPix,*self.GLOBAL_BAD_PIXEL_LIST ;; all now dirty
+     
      ;; Clear out the bad pixels
      if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST $
      then ptr_free,self.GLOBAL_BAD_PIXEL_LIST else $
@@ -1555,11 +1564,47 @@ pro CubeProj::ClearBadPixels, recs, CLEAR_RECORDS=clear_recs, $
      self.GLOBAL_BP_TYPE=0b
      self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
   endelse 
-  self.Changed=1b
+  self->SetDirty
   self->UpdateAll
-  if ~keyword_set(nu) then self->Send,/UPDATE
+  if ~keyword_set(nu) then self->Send,/BADPIX_UPDATE
 end
 
+;=============================================================================
+;  SetDirtyPix - Set some pixels "dirty" globally, or per record.
+;                Used to make subsequent cube re-builds very fast.
+;=============================================================================
+pro CubeProj::SetDirtyPix,RECORD=rec,pix
+  if n_elements(rec) ne 0 then begin 
+     if ~ptr_valid(self.DR) then return
+     list=(*self.DR)[rec].DIRTY_PIX
+  endif else list=self.GLOBAL_DIRTY_PIX
+  
+  if ~ptr_valid(list) then begin 
+     if n_elements(rec) ne 0 then $
+        (*self.DR)[rec].DIRTY_PIX=ptr_new(pix) $
+     else self.GLOBAL_DIRTY_PIX=ptr_new(pix)
+     self->UpdateButtons        ;new list, need updating
+     return
+  endif 
+  
+  wh=where_not_array(*list,[pix],cnt)
+  
+  if cnt eq 0 then return       ; already dirty
+  *list=[*list,pix[wh]]
+end
+
+;=============================================================================
+;  ClearDirtyPix - Clear all dirty pixel lists
+;=============================================================================
+pro CubeProj::ClearDirtyPix
+  got=ptr_valid(self.GLOBAL_DIRTY_PIX)
+  if got then ptr_free,self.GLOBAL_DIRTY_PIX
+  if ptr_valid(self.DR) then begin 
+     got OR= ~array_equal(ptr_valid((*self.DR).DIRTY_PIX),0b)
+     ptr_free,(*self.DR).DIRTY_PIX
+  endif 
+  if got then self->UpdateButtons
+end
 
 ;=============================================================================
 ;  LoadBackGroundList - Load background exposures from file
@@ -1750,6 +1795,7 @@ pro CubeProj::Revert
   self.wInfo=ptr_new() & self.MsgList=ptr_new() ;the detachment
   
   oldchange=self.Changed
+  feedback=self.feedback
   self.Changed=0b               ;to ensure we won't try to save ourselves 
   self.ProjectName=''           ;avoid name conflict with new self.
 
@@ -1760,7 +1806,7 @@ pro CubeProj::Revert
   
   self.wInfo=wsav 
   self.MsgList=msav 
-
+  
   if rerr eq 0 then begin 
      ;; Self has been overwritten by restore.... destroy our old self.
      obj_destroy,oldself        ;kill our old self, except detached
@@ -1772,9 +1818,10 @@ pro CubeProj::Revert
      self.ProjectName=nsav
      self.Changed=oldchange
   endelse 
+  self.feedback=feedback
   
   self->Status,status+'done'
-  self->Send,/UPDATE,/NEW_CUBE
+  self->Send,/UPDATE,/NEW_CUBE,/BADPIX_UPDATE
   self->UpdateAll
 end
 
@@ -1802,8 +1849,7 @@ end
 pro CubeProj::UpdateTitle
   if NOT self->IsWidget() then return
   pn=self->ProjectName()
-  if self.Changed then $
-     pn=string('253'OB)+pn+string('273'OB)
+  if self->Dirty() then pn=string('253'OB)+pn+string('273'OB)
   widget_control, (*self.wInfo).Base,  $
                   TLB_SET_TITLE='CUBISM Project: '+ pn + $
                   "  <"+(self.SaveFile?file_basename(self.SaveFile): $
@@ -1839,37 +1885,43 @@ pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv, $
   
   if ~ptr_valid(self.wInfo) then return
   
-  if keyword_set(all) then begin 
-     recs=lindgen(self->N_Records()) 
-  endif else if keyword_set(none) then begin 
+  if keyword_set(none) then begin 
+     nrec=0
      recs=-1                    ;clear selection
-  endif else if keyword_set(inv) then begin 
-     inds=bytarr(self->N_Records())
-     sel=widget_info((*self.wInfo).SList, /LIST_SELECT)
-     if sel[0] ne -1 then inds[sel]=1
-     recs=where(~inds,cnt)
+  endif else begin 
+     self->RecOrSelect,recs, ALL=all
+     nrec=n_elements(recs) 
+  endelse 
+  
+  if keyword_set(inv) then begin 
+     nrec_all=self->N_Records()
+     if nrec gt 0 then begin 
+        inds=bytarr(nrec_all)
+        inds[recs]=1b
+        recs=where(~inds,nrec)
+     endif else begin 
+        self->RecOrSelect,recs, /ALL
+        nrec=nrec_all
+     endelse 
   endif 
   
-  if keyword_set(nd) then begin 
-     if n_elements(recs) eq 0 then $
-        recs=widget_info((*self.wInfo).SList, /LIST_SELECT)
-     if recs[0] ne -1 then begin 
-        wh=where(~(*self.DR)[recs].DISABLED,cnt)
-        if cnt eq 0 then recs=-1 else recs=recs[wh]
-     endif 
+  if keyword_set(nd) && nrec gt 0 then begin ;; remove disabled recs from list
+     wh=where(~(*self.DR)[recs].DISABLED,nrec)
+     if nrec eq 0 then recs=-1 else recs=recs[wh]
   endif 
 
-  if ~keyword_set(npt) then $
+  if ~keyword_set(npt) then $ ;; preserve top location
      top=widget_info((*self.wInfo).SList,/LIST_TOP)
   
   widget_control, (*self.wInfo).SList, SET_LIST_SELECT=recs
-  if ~keyword_set(no_stat) then begin 
-     nrec=n_elements(recs) 
+  
+  if ~keyword_set(npt) then $ ;; restore top location
+     widget_control, (*self.wInfo).SList,SET_LIST_TOP=top
+    
+  if ~keyword_set(no_stat) then $ ;; update status
      if nrec gt 1 then self->Status,strtrim(nrec,2)+' records selected' else $
         self->Status,/CLEAR
-  endif 
-  if ~keyword_set(npt) then $
-     widget_control, (*self.wInfo).SList,SET_LIST_TOP=top
+
   self->UpdateButtons
   if keyword_set(nu) then return
   if nrec eq 1 && recs[0] ne -1 then begin 
@@ -1895,7 +1947,7 @@ function CubeProj::List
       unc_valid=ptr_valid((*self.DR).UNC)
       bmask_valid=ptr_valid((*self.DR).BMASK)
       bpl_valid=ptr_valid((*self.DR).BAD_PIXEL_LIST)
-      gacc_valid=self.ACCOUNTS_VALID AND 1b
+      gacc_valid=~self->Dirty(/ACCOUNTS)
       acct_valid=ptr_valid((*self.DR).ACCOUNT)
       rev_acct_valid=ptr_valid((*self.DR).REV_ACCOUNT)
    endelse 
@@ -1948,12 +2000,16 @@ end
 pro CubeProj::UpdateButtons
   if NOT self->IsWidget() then return
   got_dr=ptr_valid(self.DR)
+  got_cube=ptr_valid(self.CUBE)
+  got_accounts=~self->Dirty(/ACCOUNTS)
+  
   sel=self->CurrentSelect()
   got_sel=got_dr && sel[0] ne -1
   for i=0,n_elements((*self.wInfo).MUST_SELECT)-1  do  $
      widget_control,((*self.wInfo).MUST_SELECT)[i],SENSITIVE=got_sel
   nsel=n_elements(sel) 
-  if (nsel gt 1) ne ((*self.wInfo).nsel_sav gt 1)then begin 
+  if (nsel gt 1) ne ((*self.wInfo).nsel_sav gt 1) then begin 
+     ;; Change in number of selections to more than 1
      if nsel gt 1 then begin 
         widget_control,(*self.wInfo).view_ids[0],SET_VALUE='View Stack... '
         widget_control,(*self.wInfo).view_ids[1], $
@@ -1985,9 +2041,27 @@ pro CubeProj::UpdateButtons
   for i=0,n_elements((*self.wInfo).MUST_PROJ)-1  do  $
      widget_control, (*self.wInfo).MUST_PROJ[i], SENSITIVE=got_dr
   
+  quickbuild=got_cube && got_dr && got_accounts && $
+     (~self.use_unc || ptr_valid(self.CUBE_UNC)) && $
+     (ptr_valid(self.GLOBAL_DIRTY_PIX) || $
+      ~array_equal(ptr_valid((*self.DR).DIRTY_PIX),0b))
+  
+  if quickbuild ne (*self.wInfo).quickbuild_sav then begin 
+     if quickbuild then begin 
+        widget_control, (*self.wInfo).build_ids[0], $
+                        SET_VALUE='Build Cube (Quick)'
+        widget_control, (*self.wInfo).build_ids[1], SET_VALUE='QuickBuild'
+     endif else begin 
+        widget_control, (*self.wInfo).build_ids[0], $
+                        SET_VALUE='Build Cube'
+        widget_control, (*self.wInfo).build_ids[1], SET_VALUE='Build Cube'
+     endelse
+     (*self.wInfo).quickbuild_sav=quickbuild
+  endif 
+  
   for i=0,n_elements((*self.wInfo).MUST_ACCT)-1  do  $
      widget_control, (*self.wInfo).MUST_ACCT[i], $
-                     SENSITIVE=self.ACCOUNTS_VALID AND 1b
+                     SENSITIVE=got_accounts
   
   widget_control, (*self.wInfo).MUST_MODULE,SENSITIVE=self.MODULE ne ''
   
@@ -1995,8 +2069,7 @@ pro CubeProj::UpdateButtons
                   SENSITIVE=ptr_valid(self.VISUALIZE_IMAGE)
   
   for i=0,n_elements((*self.wInfo).MUST_CUBE)-1 do $
-     widget_control, ((*self.wInfo).MUST_CUBE)[i], $
-                     SENSITIVE=ptr_valid(self.CUBE)
+     widget_control, ((*self.wInfo).MUST_CUBE)[i], SENSITIVE=got_cube
   
   for i=0,n_elements((*self.wInfo).MUST_BACK)-1 do $ 
      widget_control, (*self.wInfo).MUST_BACK[i], $
@@ -2032,7 +2105,7 @@ pro CubeProj::UpdateButtons
                      ~array_equal(ptr_valid((*self.DR)[sel].UNC),0b)
   
   widget_control, (*self.wInfo).MUST_SAVE_CHANGED,SENSITIVE= $
-                  strlen(self.SaveFile) ne 0 AND keyword_set(self.Changed)
+                  strlen(self.SaveFile) ne 0 AND self->Dirty()
   
   if ~got_dr then $
      unrestored=1b $
@@ -2224,7 +2297,7 @@ pro CubeProj::LoadVisualize,SELECT=sel
      if size(vis_file,/TYPE) ne 7 then return
      if vis_file ne self.visualize_file then begin 
         self.visualize_file=vis_file
-        self.changed=1b
+        self->SetDirty
      endif 
   endif 
   
@@ -2285,7 +2358,7 @@ pro CubeProj::DisableRecord,recs,DISABLE=dis,_EXTRA=e
   if n_elements(dis) eq 0 then dis=1b
   self->RecOrSelect,recs,_EXTRA=e
   (*self.DR)[recs].DISABLED=dis
-  self.Changed=1b
+  self->SetDirty
   self->Send,/REC_UPDATE,/DISABLED
   self->UpdateAll
 end
@@ -2304,7 +2377,7 @@ pro CubeProj::RenameRecord,rec,name
   if cnt ne 0 AND wh[0] ne rec[0] then $
      self->Error,'ID '+name+' already exists'
   (*self.DR)[rec[0]].ID=name
-  self.Changed=1b
+  self->SetDirty
   self->UpdateAll
 end
 
@@ -2353,7 +2426,7 @@ pro CubeProj::SwitchRecordDataType,r,FLATAP=f2ap,BCD=bcd,DROOPRES=dr,_EXTRA=e
      self->Info,'Rebuilding background from '+jul2date(self.BACK_DATE)
      self->RebuildBackground,/NO_UPDATE
   endif 
-  self.Changed=1b
+  self->SetDirty
   self->UpdateAll
 end
 
@@ -2432,8 +2505,7 @@ pro CubeProj::SetBackgroundFromRecs,recs, BLEND=comb, SET_ONLY=so, $
      if n_elements(back_unc) ne 0 then $
         self.BACKGROUND_UNC=ptr_new(back_unc,/NO_COPY)
      self.BACK_DATE=systime(/JULIAN)
-     self.Changed=1b
-     self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
+     self->SetDirty,/SAVE,/BACKGROUND
      if self.BACK_RECS ne self.AS_BUILT.BACK_RECS then $
         heap_free,self.BACK_RECS
      self.BACK_RECS=ptr_new((*self.DR)[recs].DCEID)
@@ -2484,8 +2556,7 @@ pro CubeProj::BlendBackgrounds,USE_EXISTING_SCALES=ue, ASCALE=ascale, $
                            na,ascale), $
                     string(FORMAT='("B: ",I3," records scaled at ",F0.2)', $
                            nb,bscale)]
-        self.Changed=1b
-        self.ACCOUNTS_VALID AND= NOT 4b ;bg no longer valid
+        self->SetDirty,/SAVE,/BACKGROUND
      endelse 
      catch,/cancel
   endif else begin 
@@ -2531,7 +2602,7 @@ pro CubeProj::RebuildBackground,NO_UPDATE=noupdate
      self->SetListSelect,list
      self->SetBackgroundFromRecs,list
   endelse 
-  self.changed=1b
+  self->SetDirty
   if ~keyword_set(noupdate) then self->UpdateTitle
 end
 
@@ -2559,6 +2630,7 @@ pro CubeProj::ReadBackgroundFromFile,file
   ptr_free,self.BG_SP
   self.BG_SP=ptr_new(transpose([[wav],[sp]]))
   self.BG_SP_FILE=file
+  self->SetDirty,/SAVE,/BACKGROUND
   self->UpdateButtons
 end
 
@@ -2645,7 +2717,7 @@ pro CubeProj::Sort,sort
      b=bytarr(n)
      b[ls]=1b
      b=b[s]
-     self->SetListSelect,where(b),/NO_UPDATE
+     self->SetListSelect,where(b),/NO_UPDATE,/NO_STATUS
   endif 
 end
 
@@ -2661,8 +2733,8 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
   this=keyword_set(as_built)?self.AS_BUILT:self
   
   str=['IRS Spectral Cube: '+self->ProjectName()+ $
-       ((~keyword_set(as_built) && ((self.ACCOUNTS_VALID AND 6b) ne 6b))? $
-     " (needs rebuilding)":"")]
+       ((~keyword_set(as_built) && self->Dirty(/ACCOUNTS,/BACKGROUND))? $
+        " (needs rebuilding)":"")]
   
   str=[str,string(FORMAT='("Cube Size: ",I0.3,"x",I0.3,"x",I0.3,", ' + $
                   'Center: ",A," ",A)', $
@@ -2675,10 +2747,10 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
           (self.CUBE_DATE eq 0.0d?"(not yet)":jul2date(self.CUBE_DATE))]
      if self.CUBE_DATE eq 0.0d then return,str
   endif 
-  str=[str,(this.MODULE?this.MODULE:"(no module)")+ $
-       (this.ORDER ne 0?' Order '+strtrim(this.ORDER,2): $
-        ' all orders') + (self->N_Records() gt 0? $
-                          (' -- '+strtrim(self->N_Records(),2)+' BCDs '):"")]
+  str=[str,$
+       (this.MODULE?this.MODULE:"(no module)") + " " + $
+       (this.ORDER ne 0?'Order '+strtrim(this.ORDER,2):'all orders') + $
+       ' -- '+strtrim(self->N_Records(/ENABLED),2)+' BCDs ']
   
   str=[str,'Using IRS Calib object: '+(this.CAL_FILE?this.cal_file:"(none)")+ $
        " ("+(obj_valid(self.cal)?"":"not ")+"loaded"+")"]
@@ -2797,6 +2869,52 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
   return,str
 end
 
+;=============================================================================
+;  Dirty - With keyword, check with accounts, size, or background (any
+;          set) are invalid, otherwise check if the Changed for save
+;          is set.
+;=============================================================================
+function CubeProj::Dirty,ACCOUNTS=acc,LAYOUT=lo,BACKGROUND=bkg
+  if keyword_set(acc) || keyword_set(lo) || keyword_set(bkg) then begin 
+     test=0b
+     if keyword_set(acc) then test OR=1b
+     if keyword_set(lo)  then test OR=2b
+     if keyword_set(bkg) then test OR=4b
+     return,(self.ACCOUNTS_VALID AND test) ne test
+  endif else return,self.Changed
+end
+
+;=============================================================================
+;  SetDirty - Set the accounts, size, background status, and/or save
+;             changed status as dirty.  Without keywords, set the save
+;             changed status.
+;=============================================================================
+pro CubeProj::SetDirty,ACCOUNTS=acc,LAYOUT=lo,BACKGROUND=bkg, SAVE=save
+  if keyword_set(acc) || keyword_set(lo) || keyword_set(bkg) then begin 
+     if keyword_set(acc) then self.ACCOUNTS_VALID AND= NOT 1b
+     if keyword_set(lo)  then self.ACCOUNTS_VALID AND= NOT 2b
+     if keyword_set(bkg) then self.ACCOUNTS_VALID AND= NOT 4b
+     if keyword_set(acc) || keyword_set(bkg) then self->ClearDirtyPix
+     if keyword_set(save) then self.Changed=1b
+  endif else self.Changed=1b
+end
+
+
+;=============================================================================
+;  SetClean - Set the accounts, size, background status, and/or save
+;             changed status as clean.  Without keywords, remove the
+;             save changed status.  Clears the dirty pixel list if
+;             accounts of background are set clean.
+;=============================================================================
+pro CubeProj::SetClean,ACCOUNTS=acc,LAYOUT=lo,BACKGROUND=bkg, SAVE=save
+  if keyword_set(acc) || keyword_set(lo) || keyword_set(bkg) then begin 
+     if keyword_set(acc) then self.ACCOUNTS_VALID OR= 1b
+     if keyword_set(lo)  then self.ACCOUNTS_VALID OR= 2b
+     if keyword_set(bkg) then self.ACCOUNTS_VALID OR= 4b
+     if keyword_set(acc) || keyword_set(bkg) then self->ClearDirtyPix
+     if keyword_set(save) then self.Changed=0b     
+  endif else self.Changed=0b
+end
 
 ;=============================================================================
 ;  SetProperty - Set various cube properties.  Most of these should be
@@ -2808,7 +2926,7 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
                           STEP_SIZE=stepsz, $
                           MODULE=md,ORDER=ord, PR_WIDTH=prw, $
                           PR_SIZE=prz,CAL_FILE=cal_file,CAL_OBJECT=cal, $
-                          APERTURE=aper,SAVE_FILE=sf,CHANGED=chngd, $
+                          APERTURE=aper,SAVE_FILE=sf, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
                           GLOBAL_BAD_PIXEL_LIST=gbpl, WAVECUT=wavecut, $
                           RECONSTRUCTED_POSITIONS=rcp, USE_BACKGROUND=ubg,$
@@ -2825,26 +2943,26 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
   if n_elements(osf) ne 0 then begin 
      if self.OVERSAMPLE_FACTOR ne osf then begin 
         self.OVERSAMPLE_FACTOR=osf
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
      endif 
   endif 
   if n_elements(nstep) ne 0 then self.NSTEP=nstep
   if n_elements(stepsz) ne 0 then begin 
      if NOT array_equal(self.STEP_SIZE,stepsz) then begin 
         self.STEP_SIZE=stepsz
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
      endif 
   endif 
   if n_elements(md) ne 0 then begin 
      if md ne self.MODULE then begin
         self.MODULE=md
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
      endif 
   endif 
   if n_elements(ord) ne 0 then begin 
      if ord ne self.ORDER then begin 
         self.ORDER=ord
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
         update_cal=1b
      endif 
   endif 
@@ -2852,21 +2970,21 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
      prw=0.>prw 
      if prw ne self.PR_SIZE[1] then begin 
         self.PR_SIZE[1]=prw
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
         update_cal=1b
      endif
   endif
   if n_elements(prz) ne 0 then begin 
      if NOT array_equal(self.PR_SIZE,prz) then begin 
         self.PR_SIZE=prz
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
         update_cal=1b
      endif
   endif
   if n_elements(cal_file) ne 0 then begin 
      if self.cal_file ne cal_file then begin 
         self.cal_file=cal_file
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
         update_cal=1b
      endif 
   endif
@@ -2874,7 +2992,7 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
      if obj_isa(cal,'IRS_Calib') then begin 
         if self.cal ne cal then begin 
            self.cal=cal 
-           self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+           self->ResetAccounts,/NO_UPDATE & self->SetDirty
            update_cal=1b
         endif 
      endif else self->Error,'Calibration object not of correct type.'
@@ -2883,7 +3001,7 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
      if ~self->ApertureEqual(aper) then begin 
         if self.APERTURE ne self.AS_BUILT.APERTURE then ptr_free,self.APERTURE
         self.APERTURE=ptr_new(aper)
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
         update_cal=1b
      endif 
   endif 
@@ -2891,20 +3009,20 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
   if n_elements(pn) ne 0 then begin 
      pn=strmid(pn,0,32)         ;limit it
      self.ProjectName=pn
-     self.Changed=1b
+     self->SetDirty
   endif
   if n_elements(spn) ne 0 then self.Spawned=spn
   if n_elements(fb) ne 0 then self.feedback=fb
   if n_elements(gbpl) ne 0 then begin
      ptr_free,self.GLOBAL_BAD_PIXEL_LIST
      if bpl[0] ne -1 then self.GLOBAL_BAD_PIXEL_LIST=ptr_new(bpl)
-     self.Changed=1b
+     self->SetDirty
   endif
   
   if n_elements(wavecut) ne 0 then begin 
      if self.wavecut ne wavecut then begin 
         self.wavecut=wavecut
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
         update_cal=1b
      endif
   endif
@@ -2912,7 +3030,7 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
   if n_elements(rcp) ne 0 then begin 
      if self.reconstructed_pos ne keyword_set(rcp) then begin 
         self.reconstructed_pos=keyword_set(rcp) 
-        self->ResetAccounts,/NO_UPDATE & self.Changed=1b
+        self->ResetAccounts,/NO_UPDATE & self->SetDirty
      endif 
   endif
   
@@ -2920,31 +3038,31 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
   
   if n_elements(ubg) ne 0 then begin 
      self.use_bg=keyword_set(ubg) 
-     self.Changed=1b
+     self->SetDirty
   endif 
   if n_elements(uunc) ne 0 then begin 
      self.use_unc=keyword_set(uunc) 
-     self.Changed=1b
+     self->SetDirty
   endif
   if n_elements(lm) ne 0 then begin 
      self.load_masks=keyword_set(lm) 
-     self.Changed=1b
+     self->SetDirty
   endif 
   if n_elements(lu) ne 0 then begin 
      self.load_unc=keyword_set(lu) 
-     self.Changed=1b
+     self->SetDirty
   endif 
   if n_elements(fc) ne 0 then begin 
      self.fluxcon=keyword_set(fc) 
-     self.Changed=1b
+     self->SetDirty
   endif 
   if n_elements(slcf) ne 0 then begin 
      self.slcf=keyword_set(slcf) 
-     self.Changed=1b
+     self->SetDirty
   endif 
   if n_elements(po) ne 0 then begin 
      self.pix_omega=keyword_set(po) 
-     self.Changed=1b
+     self->SetDirty
   endif 
   if n_elements(sa) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 2b) OR ishft(keyword_set(sa),1)
@@ -2954,11 +3072,7 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
   if n_elements(relfile) ne 0 then $
      self.SaveMethod=(self.SaveMethod AND NOT 4b) OR $
                      ishft(keyword_set(relfile),2)
-  
-  if n_elements(chngd) ne 0 then begin 
-     self.Changed=chngd
-  endif 
-  if update_cal then self->Send,/CALIB_UPDATE
+    if update_cal then self->Send,/CALIB_UPDATE
   self->UpdateAll,/NO_LIST
 end
 
@@ -3235,7 +3349,7 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,SILENT=silent
            calname=file_basename(calname)
            if calname ne self.cal_file then begin 
               self.cal_file=calname
-              self.changed=1b
+              self->SetDirty
               self->ResetAccounts,/NO_UPDATE
            endif 
         endif else return
@@ -3255,7 +3369,7 @@ pro CubeProj::LoadCalib,SELECT=sel,FORCE=force,NO_RESET=nr,SILENT=silent
   if ~self.cal_file || keyword_set(force) then begin 
      self.cal_file=file_basename(irs_recent_calib()) ;use the most recent
      if ~keyword_set(nr) then self->ResetAccounts,/NO_UPDATE
-     self.changed=1b
+     self->SetDirty
      if n_elements(specified) eq 0 && ~keyword_set(silent) then $
         self->Info,['Calibration set unspecified, loading most recent: ', $
                     '  '+self.cal_file],TITLE='IRS Calibration'
@@ -3333,7 +3447,6 @@ function CubeProj::FluxImage
   ptr_free,prs
   return,fimage
 end
-
 
 ;=============================================================================
 ;  FluxUnits - Return the currently set flux units
@@ -3576,6 +3689,102 @@ pro CubeProj::MergeAccount,dr,order,account
 end 
 
 
+
+;=============================================================================
+;  MakeFeedBackWindow - Make a feedback window of a certain size
+;=============================================================================
+pro CubeProj::MakeFeedBackWindow,xsize,ysize
+  self->GetProperty,TLB_OFFSET=tboff,TLB_SIZE=tbsize
+  device,GET_SCREEN_SIZE=ss
+  
+  window,XSIZE=xsize,YSIZE=ysize, $
+         XPOS=tboff[0]+tbsize[0], YPOS=ss[1]-tboff[1]-ysize, $
+         TITLE=string(FORMAT='(%"%s %s  (%s)  [%dx%d map; ' + $
+                      '%6.1f\"x%6.1f\"]")',$
+                      'Building Cube: ', $
+                      self->ProjectName(), $
+                      (self.MODULE?self.MODULE:"(no module)")+ $
+                      (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
+                       ' all orders'), $
+                      self.NSTEP, $
+                      self.CUBE_SIZE[0:1]*self.PLATE_SCALE*3600.0D),/FREE
+  (*self.wInfo).feedback_window=!D.WINDOW
+end
+
+
+;=============================================================================
+;  ShowFeedBackWindow - Show the feedback window with drawn grid
+;=============================================================================
+pro CubeProj::ShowFeedBackWindow
+  aspect=float(self.CUBE_SIZE[0])/self.CUBE_SIZE[1] ;x=y*aspect
+  
+  ;; Keep the position outline square, 800 is the largest dimension
+  ;; pos=[15,15]+[x,y]-[15,4]
+  if self.CUBE_SIZE[0] gt self.CUBE_SIZE[1] then begin 
+     xsize=800
+     ysize=xsize/aspect
+  endif else begin 
+     ysize=800
+     xsize=ysize*aspect
+  endelse
+  xsize=xsize+30 & ysize=ysize+19
+  tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b], $
+        !D.TABLE_SIZE-20
+  
+  if (*self.wInfo).feedback_window gt 0 then begin 
+     device,WINDOW_STATE=win_valid
+     if win_valid[(*self.wInfo).feedback_window] then $ 
+        wdelete, (*self.wInfo).feedback_window
+     if win_valid[(*self.wInfo).feedback_pixmap] then $ 
+        wdelete, (*self.wInfo).feedback_pixmap
+  endif
+  
+  window,XSIZE=xsize,YSIZE=ysize,/FREE,/PIXMAP
+  (*self.wInfo).feedback_pixmap=!D.WINDOW
+    
+  plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
+       POSITION=[15,15,xsize-15,ysize-4],/DEVICE, $
+       yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
+  
+  (*self.wInfo).feedback_save=[!X.S,!Y.S]
+  
+  ;; Draw the grid
+  for i=0L,self.cube_size[0] do plots,i,!Y.CRANGE
+  for i=0L,self.cube_size[1] do plots,!X.CRANGE,i
+  
+  self->MakeFeedBackWindow,xsize,ysize
+  self->SnapshotFeedBackWindow,/RESTORE
+  wait,0
+end
+
+;=============================================================================
+;  SnapshotFeedBackWindow - Save or restore the drawn contents of the
+;                           feedback window.
+;=============================================================================
+pro CubeProj::SnapshotFeedBackWindow,RESTORE=res
+  if (*self.wInfo).feedback_window eq 0 then self->ShowFeedBackWindow $
+  else begin ;; window has been set, but has been destroyed
+     catch,err
+     if err ne 0 then begin 
+        catch,/cancel
+        wset,(*self.wInfo).feedback_pixmap
+        self->MakeFeedBackWindow,!D.X_SIZE,!D.Y_SIZE
+     endif 
+     wset,(*self.wInfo).feedback_window
+     catch,/cancel
+  endelse 
+  if keyword_set(res) then begin 
+     device,copy=[0,0,!D.X_SIZE,!D.Y_SIZE,0,0,(*self.wInfo).feedback_pixmap]
+     !X.S=(*self.wInfo).feedback_save[0:1]
+     !Y.S=(*self.wInfo).feedback_save[2:3]
+  endif else begin 
+     wset,(*self.wInfo).feedback_pixmap
+     device,copy=[0,0,!D.X_SIZE,!D.Y_SIZE,0,0,(*self.wInfo).feedback_window]
+     wset,(*self.wInfo).feedback_window     
+  endelse 
+end
+
+
 ;=============================================================================
 ;  BuildAccount - Build the accounting lists, listing, for each
 ;                 record, and for all pixels in the cube, all
@@ -3585,61 +3794,15 @@ end
 ;                 corresponding cube pixel.
 ;=============================================================================
 pro CubeProj::BuildAccount,_EXTRA=e
+  widget_control, /HOURGLASS
   self->MergeSetup
   self.CUBE_SIZE[2]=n_elements(*self.WAVELENGTH) 
 
   ords=self->BuildOrders()
   nap=n_elements(*self.APERTURE) 
   RADEG = 180.0d/!DPI           ; preserve double
-  ;;Feedback plots
-  if self.feedback then begin 
-     aspect=float(self.CUBE_SIZE[0])/self.CUBE_SIZE[1] ;x=y*aspect
-     
-     ;; Keep the position outline square, 800 is the largest dimension
-     ;; pos=[15,15]+[x,y]-[15,4]
-     if self.CUBE_SIZE[0] gt self.CUBE_SIZE[1] then begin 
-        xsize=800
-        ysize=xsize/aspect
-     endif else begin 
-        ysize=800
-        xsize=ysize*aspect
-     endelse
-     xsize=xsize+30 & ysize=ysize+19
-     tvlct,[255b,0b,0b,0b],[0b,255b,0b,255b],[0b,0b,255b,255b],!D.TABLE_SIZE-20
-     save_win=!D.WINDOW
-     self->GetProperty,TLB_OFFSET=tboff,TLB_SIZE=tbsize
-     device,GET_SCREEN_SIZE=ss
-     window,XSIZE=xsize,YSIZE=ysize, $
-            XPOS=tboff[0]+tbsize[0], YPOS=ss[1]-tboff[1]-ysize, $
-            TITLE=string(FORMAT='(%"%s %s  (%s)  [%dx%d map; ' + $
-                         '%6.1f\"x%6.1f\"]")',$
-                         'Building Cube: ', $
-                         self->ProjectName(), $
-                         (self.MODULE?self.MODULE:"(no module)")+ $
-                         (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
-                          ' all orders'), $
-                         self.NSTEP, $
-                         self.CUBE_SIZE[0:1]*self.PLATE_SCALE*3600.0D)
-     (*self.wInfo).feedback_window=!D.WINDOW
-     plot,[0],/NODATA,xrange=[0,self.cube_size[0]], $
-          POSITION=[15,15,xsize-15,ysize-4],/DEVICE, $
-          yrange=[0,self.cube_size[1]],xstyle=1,ystyle=1,xticks=1,yticks=1
-     xsave=!X.S & ysave=!Y.S
-     ;; The grid
-     for i=0L,self.cube_size[0] do plots,i,!Y.CRANGE
-     for i=0L,self.cube_size[1] do plots,!X.CRANGE,i
-     wait,0
-  endif
-  ;; End debugging plots
   
-  ;; XXX Possible Time saver: If the cube size was changed, we might
-  ;; need to shift existing accounts by one or more pixels ... only
-  ;; relevant with POSITION-based (not GRID-based) cube layout.
-  ;; E.g. making a cube with overlapping maps taken at different
-  ;; epochs.  A better option is to leave the cube size the same.
-  
-  ;; if self.ACCOUNTS_VALID eq 2b then begin 
-  ;;    new=where(NOT ptr_valid((*self.DR).ACCOUNT)) ;newly added BCD's
+  if self.feedback then self->ShowFeedBackWindow
   
   wh=where(~(*self.DR).DISABLED,good_cnt)
   if good_cnt eq 0 then return
@@ -3652,19 +3815,11 @@ pro CubeProj::BuildAccount,_EXTRA=e
   exp_off=-1
   for iwh=0L,good_cnt-1 do begin 
      i=wh[iwh]                  ;enabled record index
-     feedback_only=0            ;might just be showing the feedback
      
      ;; if the accounts are fully valid and an account exists for this
      ;; DR, assume it's valid.
-     if (self.ACCOUNTS_VALID AND 3b) eq 3b && $
-        ptr_valid((*self.DR)[i].ACCOUNT) then begin 
-        if self.feedback then feedback_only=1 else continue 
-     endif else ptr_free,(*self.DR)[i].ACCOUNT
+     if self->Dirty(/ACCOUNTS,/LAYOUT) then ptr_free,(*self.DR)[i].ACCOUNT
      
-     ;; Color for Feedback PR
-     if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
-     color=!D.TABLE_SIZE-20+((*self.DR)[i].EXP-exp_off) mod 4
-
      ;; Compute the pixel offset of the canonical PR's center for this
      ;; BCD N.B. The slit is laid out differently in Spectral Maps and
      ;; BCD's (ughh) so ROW<-->COLUMN.  A non-full aperture will
@@ -3692,10 +3847,17 @@ pro CubeProj::BuildAccount,_EXTRA=e
      ad2xy,pos[0],pos[1],astr,x,y
      offset=[x,y]+.5            ;NASALib WCS: pixel centered at [0.0,0.0]
      
+     ;; Set list select and color
+     if self.feedback then begin 
+        ;; Color for Feedback PR
+        if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
+        color=!D.TABLE_SIZE-20+((*self.DR)[i].EXP-exp_off) mod 4
+        self->SetListSelect,i,/NO_PRESERVE_TOP,/NO_STATUS
+     endif 
+     
      ;; (Probably small) difference between PA of this BCD and the
      ;; mean map PA
      delta_PA=pa-self.PA
-     
      for ord=0,n_elements(ords)-1 do begin
         aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
         prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
@@ -3704,24 +3866,12 @@ pro CubeProj::BuildAccount,_EXTRA=e
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
         
         ;; Pre-allocate an account list 
-        if ~feedback_only then begin 
-           nacc=4*n_elements(prs) 
-           account=replicate({CUBE_ACCOUNT_LIST},nacc)
-           prmin=0L & prmax=n_elements(prs)-1
-        endif else begin 
-           prmin=1L & prmax=1L
-        endelse 
+        nacc=4*n_elements(prs) 
+        account=replicate({CUBE_ACCOUNT_LIST},nacc)
         acc_ind=0L
+        
         ;; iterate over all the adjacent PRs in the order 
-        
-        ;; Collate all of order's PR info into reverse-indexed lists,
-        ;; and pass en mass to multi_polyclip.  Re-design internal
-        ;; account data layout to match?  Still per-BCD, per-ORDER for
-        ;; easy disable/enable caching.
-        
-        ;; Need an expanded IDL-only version for failed C compilation.
-        
-        for j=prmin,prmax do begin 
+        for j=0L,n_elements(prs)-1 do begin 
            ;; Setup the rotation matrix to rotate back to the +x
            ;; direction
            angle=-prs[j].angle+delta_PA
@@ -3731,13 +3881,15 @@ pro CubeProj::BuildAccount,_EXTRA=e
                              [ st, ct]])
            endif
            
-           ;; Set list select
-           if self.feedback && j eq 1L && self->Showing() then begin 
-              self->SetListSelect,i,/NO_PRESERVE_TOP
-              wset,(*self.wInfo).feedback_window
-              !X.S=xsave & !Y.S=ysave
-           endif 
-              
+           ;; XXX Instead of looping, collate all polys from a single PR
+           ;; into reverse-indexed lists, and pass en mass to a
+           ;; multi-polygon aware polyclip.  Re-design internal
+           ;; account data layout to use as the data layer?  Would
+           ;; still be per-BCD, per-ORDER for easy disable/enable
+           ;; caching.
+           
+           ;; Need an expanded IDL-only version for failed C compilation.
+           
            ;; Iterate over partial pixels clipped by the PR
            for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
               bcdpixel=(*prs[j].PIXELS)[k]
@@ -3751,8 +3903,8 @@ pro CubeProj::BuildAccount,_EXTRA=e
               if angle ne 0.0 then poly=rot#poly ;XXX check!!!
               ;; Offset the polygon correctly into the sky grid
               poly=poly+rebin(offset,size(poly,/DIMENSIONS))
-              if self.feedback AND j eq 1L then begin
-                 
+              
+              if self.feedback && (j eq 0L) then begin
                  plots,[reform(poly[0,*]),poly[0,0]], $
                        [reform(poly[1,*]),poly[1,0]], $
                        COLOR=color
@@ -3760,7 +3912,6 @@ pro CubeProj::BuildAccount,_EXTRA=e
                  wait,0
               endif
               
-              if feedback_only then continue ; already have accounts
               ;; Clip the offset polygon against the sky (cube) grid
               cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
                                           self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
@@ -3774,7 +3925,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
 ;                  print,'  original:'
 ;                 print,*(*prs[j].POLYGONS)[k]
                  continue ;; why isn't our cube big enough?
-             endif
+              endif
               
               ncp=n_elements(cube_spatial_pix)
               ;; Add space to account list, large chunks at a time
@@ -3790,26 +3941,29 @@ pro CubeProj::BuildAccount,_EXTRA=e
            endfor
                  
         endfor
-        if feedback_only then continue
         account=account[0:acc_ind-1] ; trim this order's account to size
         
         ;; Merge this account into the full cube account
         self->MergeAccount,i,ord,account
      endfor
   endfor
+  if self.feedback then self->SnapshotFeedBackWindow
   self->BuildRevAcct            ;we need these too...
   self->Status,status+string(FORMAT='("done in ",F0.2,"s")',systime(1)-t0)
-  if self.feedback then wset,save_win
-  self->ResetAccounts,/VALID
+  self->SetClean,/ACCOUNTS,/LAYOUT,/BACKGROUND
+  self->UpdateButtons
 end
+
 
 ;=============================================================================
 ;  BuildRevAcct - Build the reverse accounts from the regular accounts.
 ;=============================================================================
 pro CubeProj::BuildRevAcct
+  widget_control, /HOURGLASS
   accs_changed=0b
-  if (self.ACCOUNTS_VALID AND 3b) ne 3b then $
-     ptr_free,(*self.DR).REV_ACCOUNT
+  if self->Dirty(/ACCOUNTS,/LAYOUT) then $
+     ptr_free,(*self.DR).REV_ACCOUNT,(*self.DR).REV_DUAL, $
+              (*self.DR).REV_BCD_ACCOUNT
   need=where(~ptr_valid((*self.DR).REV_ACCOUNT) AND ~(*self.DR).DISABLED, $
              need_cnt)
   if need_cnt eq 0 then return
@@ -3817,33 +3971,49 @@ pro CubeProj::BuildRevAcct
   sform='("Building reverse lookup information for ",I0," records...")'
   status=string(need_cnt,FORMAT=sform)
   self->Status,status
-  
-  
+  self->GetProperty,BCD_SIZE=bcd_size
   for ineed=0L,need_cnt-1 do begin
      i=need[ineed]
      ;; Find the x/y bounding box of this DRs footprint in the cube:
      pix=(*(*self.DR)[i].ACCOUNT).cube_pix
-     y=pix/self.CUBE_SIZE[0]
-     x=pix-y*self.CUBE_SIZE[0]
-     mn_x=min(x,MAX=mx_x)
-     mn_y=min(y,MAX=mx_y)
+     y=pix/self.CUBE_SIZE[0] & x=pix-y*self.CUBE_SIZE[0]
+     mn_x=min(x,MAX=mx_x) & mn_y=min(y,MAX=mx_y)
      width=mx_x-mn_x+1 & height=mx_y-mn_y+1
      (*self.DR)[i].REV_WIDTH=width
      (*self.DR)[i].REV_HEIGHT=height
      (*self.DR)[i].REV_OFFSET=[mn_x,mn_y]
      x-=mn_x & y-=mn_y          ;offset into BB
      
-     ;; Compute the reverse indices of the smaller bounding box of the
-     ;; full cube index histogram for this DR's accounting.  E.g. the
-     ;; account records from this BCD pertaining to bounding box pixel
-     ;; z are: ri[ri[z-rev_min]:ri[z+1-rev_min]-1].
+     ;; Compute the reverse indices of cube pixels, within the smaller
+     ;; bounding box where this DR falls.  E.g. the account records
+     ;; from this BCD pertaining to bounding box pixel `z' are:
+     ;; ri[ri[z-rev_min]:ri[z+1-rev_min]-1].
      h=histogram(x+width*(y + height * (*(*self.DR)[i].ACCOUNT).cube_plane), $
                  OMIN=om,REVERSE_INDICES=ri)
      (*self.DR)[i].REV_ACCOUNT=ptr_new(ri,/NO_COPY)
      (*self.DR)[i].REV_CNT=n_elements(h) 
      (*self.DR)[i].REV_MIN=om
+     
+     ;; Now calculate and cache the "dual histogram" reverse indices
+     ;; for the cube pixels, binning by histogram count
+     h2=histogram(h,MIN=1,REVERSE_INDICES=ri)
+     (*self.DR)[i].REV_DUAL=ptr_new(ri,/NO_COPY) ; ri specifies bb-cube pix
+     (*self.DR)[i].REV_DUAL_CNT=n_elements(h2) 
      accs_changed=1b
+     
+     ;; Now generate the BCD_PIX reverse index
+     pix=(*(*self.DR)[i].ACCOUNT).bcd_pix
+     y=pix/bcd_size[0] & x=pix-y*bcd_size[0]
+     mn_x=min(x,MAX=mx_x)
+     width=mx_x-mn_x+1
+     h=histogram((x-mn_x) + y*width,REVERSE_INDICES=ri,OMIN=om)
+     (*self.DR)[i].REV_BCD_ACCOUNT=ptr_new(ri,/NO_COPY)
+     (*self.DR)[i].REV_BCD_XOFF=mn_x
+     (*self.DR)[i].REV_BCD_WIDTH=width
+     (*self.DR)[i].REV_BCD_MIN=om
+     (*self.DR)[i].REV_BCD_CNT=n_elements(h) 
   endfor
+  
   if accs_changed then begin 
      ptr_free,self.AUTO_BPL.BCD_PIX,self.AUTO_BPL.BCD_VALS, $
               SELF.AUTO_BPL.DCEID,self.AUTO_BPL.CNT_VEC, $
@@ -3859,6 +4029,7 @@ end
 ;              fluxing information if appropriate)
 ;=============================================================================
 pro CubeProj::BuildCube
+  widget_control, /HOURGLASS
   if ~ptr_valid(self.DR) then return
   self->RestoreAll              ;get all of the data, if necessary
   
@@ -3867,57 +4038,160 @@ pro CubeProj::BuildCube
      self->Error,'Must enable some records to build cube.'
   
   self->Normalize
-  if (self.ACCOUNTS_VALID AND 3b) eq 1b then begin
-     ;; accts valid, but size changed
+  
+  ;; Check for a layout only account change first, and prompt user
+  if self->Dirty(/LAYOUT) && ~self->Dirty(/ACCOUNTS) then begin
      self->Warning,'Cube layout changed, rebuild accounts?',/CANCEL, $
                    RESULT=res
      if res eq 'Cancel' then return
   endif 
   
-  if (self.ACCOUNTS_VALID AND 3b) ne 3b || $
-     ~array_equal(ptr_valid((*self.DR)[enabled].ACCOUNT),1b) || $
-     self.feedback then self->BuildAccount else self->BuildRevAcct
+  use_unc=self.use_unc && array_equal(ptr_valid((*self.DR)[enabled].UNC),1b)
   
-  status=string(FORMAT='("Building ",I0,"x",I0,"x",I0," cube...")', $
-                self.CUBE_SIZE)
-  self->status,status
+  ;; See what needs rebuilding, and check for the quickbuild option.
+  if self->Dirty(/ACCOUNTS,/LAYOUT) || $
+     ~array_equal(ptr_valid((*self.DR)[enabled].ACCOUNT),1b) $
+  then begin 
+     quickbuild=0b
+     self->BuildAccount
+  endif else begin 
+     ;; See if we can do a "quick build": only quickly re-processing
+     ;; certain marked "dirty" pixels, re-using the rest of the cube
+     ;; (and unc)
+     dirty=ptr_valid((*self.DR)[enabled].DIRTY_PIX)
+     global_dirty=ptr_valid(self.GLOBAL_DIRTY_PIX)
+     quickbuild=ptr_valid(self.CUBE) && $
+        n_elements(*self.CUBE) gt 0 && $
+        (~use_unc || ptr_valid(self.CUBE_UNC)) && $
+        (global_dirty  || ~array_equal(dirty,0b))
+     if self.feedback then self->SnapshotFeedBackWindow,/RESTORE
+     self->BuildRevAcct 
+  endelse 
+    
+  cube_width=self.CUBE_SIZE[0]
+  cube_plane_pix=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
   
   if self.fluxcon || self.slcf then fluxim=self->FluxImage()
-  use_unc=self.use_unc && array_equal(ptr_valid((*self.DR)[enabled].UNC),1b)
   use_bg=self.use_bg && ptr_valid(self.BACKGROUND)
   use_flux=n_elements(fluxim) gt 0
   
   if use_bg && use_unc && ~ptr_valid(self.BACKGROUND_UNC) then $
      self->Error,'Must rebuild background for cube uncertainty.'
   
-  cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
-  areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
-  if use_unc then $
-     cube_unc=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
+  ;; Create the list of dirty cube pixels to revisit for quick-build
+  if quickbuild then begin 
+     self->GetProperty,BCD_SIZE=bcd_size
+     ncp=50L                     ;starting guess
+     cube_dirty_pix=lonarr(ncp,/NOZERO)
+     cube_dirty_cnt=0L
+     for k=0L,enabled_cnt-1 do begin 
+        rec=(*self.DR)[enabled[k]]
+        ri=*rec.REV_BCD_ACCOUNT
+        for i=0,1 do begin 
+           if i then begin 
+              if ~global_dirty then continue
+              pix=*self.GLOBAL_DIRTY_PIX
+           endif else begin 
+              if ~dirty[enabled[k]] then continue
+              pix=*rec.DIRTY_PIX
+           endelse 
+           ind=(pix mod bcd_size[0]) - rec.REV_BCD_XOFF + $
+               pix/bcd_size[0]*rec.REV_BCD_WIDTH - rec.REV_BCD_MIN
+           for j=0L,n_elements(ind)-1 do begin 
+              if ind[j] lt 0 or ind[j] ge rec.REV_BCD_CNT then continue
+              cnt=ri[ind[j]+1]-ri[ind[j]]
+              if cnt eq 0 then continue
+              if (cube_dirty_cnt + cnt) ge ncp then begin 
+                 cube_dirty_pix=[cube_dirty_pix,lonarr(ncp)]
+                 ncp*=2
+              endif 
+              acc=(*rec.ACCOUNT)[ri[ri[ind[j]]:ri[ind[j]+1]-1]]
+              cube_dirty_pix[cube_dirty_cnt]= acc.cube_pix + $
+                                              acc.cube_plane*cube_plane_pix
+              cube_dirty_cnt+=cnt
+           endfor
+        endfor
+     endfor
+     if cube_dirty_cnt eq 0L then begin 
+        self->ClearDirtyPix
+        return 
+     endif else begin 
+        status=string(FORMAT='("Quick-Building ",I0,"x",I0,"x",I0,' + $
+                      '" cube (",I0," dirty pixels - ",F0.1,"%)...")', $
+                      self.CUBE_SIZE,cube_dirty_cnt, $
+                      100.*cube_dirty_cnt/product(self.CUBE_SIZE))
+        self->Status,status
+     endelse 
+
+     if cube_dirty_cnt lt n_elements(cube_dirty_pix) then $
+        cube_dirty_pix=cube_dirty_pix[0L:cube_dirty_cnt-1L]
+     
+     u=uniq(cube_dirty_pix,sort(cube_dirty_pix))
+     cube_dirty_pix=cube_dirty_pix[u]
+     cube_dirty_x=cube_dirty_pix mod cube_plane_pix
+     cube_dirty_y=cube_dirty_x/cube_width
+     cube_dirty_x mod=cube_width
+     cube_dirty_z=cube_dirty_pix/cube_plane_pix
   
-  ;; Bad pixels
+     ;; Set up the cube and associated arrays
+     cube=temporary(*self.CUBE)
+     cube[cube_dirty_pix]=!VALUES.F_NAN
+     if use_unc then begin 
+        cube_unc=temporary(*self.CUBE_UNC)
+        cube_unc[cube_dirty_pix]=!VALUES.F_NAN
+     endif 
+  endif else begin 
+     status=string(FORMAT='("Building ",I0,"x",I0,"x",I0," cube...")', $
+                   self.CUBE_SIZE)
+     self->status,status
+     cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
+     if use_unc then $
+        cube_unc=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
+  endelse 
+  areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
+  
+  ;; Create mask from bad pixels
   if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then begin 
      use_bpmask=1
      bpmask=make_array(size(*(*self.DR)[0].BCD,/DIMENSIONS),VALUE=1b)
      bpmask[*self.GLOBAL_BAD_PIXEL_LIST]=0b
   endif else use_bpmask=0
-  
-  cube_width=self.CUBE_SIZE[0]
-  cube_plane_pix=self.CUBE_SIZE[0]*self.CUBE_SIZE[1]
-  
+    
   update=10<(enabled_cnt/50)>1
   
   for k=0L,enabled_cnt-1 do begin
-     if k mod update eq 0 then $
+     if (k mod update) eq 0 then $
         self->Status,status+string(FORMAT='(I2,"%")',k*100/enabled_cnt)
+     
      rec=(*self.DR)[enabled[k]]
-     acct=*rec.ACCOUNT
-     rev_acc=*rec.REV_ACCOUNT
      rev_min=rec.REV_MIN
      rev_width=rec.REV_WIDTH
      rev_height=rec.REV_HEIGHT
      rev_wh=rev_width*rev_height
      rev_off=rec.REV_OFFSET
+     
+     ;; Locate dirty cube pixels in this record's bounding box
+     if quickbuild then begin 
+        inbb=where((cube_dirty_x-rev_off[0]) lt rev_width AND $
+                   (cube_dirty_x-rev_off[0]) ge 0 AND $
+                   (cube_dirty_y-rev_off[1]) lt rev_height AND $
+                   (cube_dirty_y-rev_off[1]) ge 0,inbb_cnt)
+        if inbb_cnt eq 0 then continue
+        x=cube_dirty_x[inbb]
+        y=cube_dirty_y[inbb]
+        z=cube_dirty_z[inbb]
+        ;; Index in bounding box reverse index vector for cube
+        ind=(x-rev_off[0]) + (y-rev_off[1])*rev_width + z*rev_wh - rev_min
+        
+        ;; Bin on count in the subset of dirty cube pixels
+        count=(*rec.REV_ACCOUNT)[ind+1]-(*rec.REV_ACCOUNT)[ind]
+        h=histogram(count,REVERSE_INDICES=dual,MIN=1)
+        dual_cnt=n_elements(h) 
+     endif else begin 
+        ;; Use pre-cached dual reverse index (binned on count per cube pix)
+        dual=*rec.REV_DUAL
+        dual_cnt=rec.REV_DUAL_CNT
+     endelse 
      
      bcd=*rec.BCD
      if use_bg then bcd-=*self.BACKGROUND
@@ -3928,10 +4202,10 @@ pro CubeProj::BuildCube
         if use_flux then bcd_unc*=fluxim
      endif
      
-     ;; Masks
+     ;; --- Masks
      ;; Start with all BCD NaN's
      mask=finite(bcd)
-     ;; Exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
+     ;; Also exclude BCD pix with any of BMASK bits 8,12,13,& 14 set from
      ;; entering the cube, and add any global bad pixels
      if ptr_valid(rec.BMASK) then $
         mask AND= (*rec.BMASK AND 28928U) eq 0L 
@@ -3941,50 +4215,79 @@ pro CubeProj::BuildCube
      if ptr_valid(rec.BAD_PIXEL_LIST) then $
         mask[*rec.BAD_PIXEL_LIST]=0b
      
-     ;; Use the reverse account for this BCD to populate the cube -- slow
-     for i=0L,rec.REV_CNT-1 do begin 
-        if rev_acc[i] eq rev_acc[i+1] then continue ;nothing for this pixel
+     ;; --- Build using dual reverse histogram, looping over bin count 
+     for i=0L,dual_cnt-1L do begin  
+        if dual[i+1] eq dual[i] then continue
+        inds=dual[dual[i]:dual[i+1]-1]
         
-        ;; Account records from this BCD affecting this cube pixel
-        these_accts=acct[rev_acc[rev_acc[i]:rev_acc[i+1]-1]]
+        ;; Cube pixels and associated "notional" indices for reverse index
+        if quickbuild then begin 
+           pix=cube_dirty_pix[inbb[inds]]
+           inds=ind[inds]       ;convert to real bb-index
+        endif else begin ;; loop in dual histogram bin count 
+           ;; Translate bounding-box-cube pixels into the real cube
+           pix=inds+rev_min
+           z=pix/rev_wh    &  pix-=z*rev_wh
+           y=pix/rev_width &  pix-=y*rev_width
+           y+=rev_off[1]   &  x=rev_off[0]+pix
+           pix=z*cube_plane_pix + y*cube_width + x ;the real cube pixels!
+        endelse
         
-        ;; Translate pix in the smaller cube bounding-box holding this DRs data
-        pix=rev_min+i           ;pixel inside the bounding box
-        z=pix/rev_wh
-        pix-=z*rev_wh
-        y=pix/rev_width
-        pix-=y*rev_width
-        y+=rev_off[1]
-        x=rev_off[0]+pix
-        pix=z*cube_plane_pix+y*cube_width+x
-        
-        bcd_pix=these_accts.BCD_PIX
-        
-        cube[pix]=(finite(cube[pix])?cube[pix]:0.0) + $
-                  total(bcd[bcd_pix] * these_accts.AREA * mask[bcd_pix],/NAN)
-        areas[pix]+=total(these_accts.AREA * mask[bcd_pix])
-        if use_unc then $
-           cube_unc[pix]=(finite(cube_unc[pix])?cube_unc[pix]:0.0) + $
-                         total(bcd_unc[bcd_pix]^2 * these_accts.AREA^2 * $
-                               mask[bcd_pix],/NAN)
+        ;; Find account records in cube from this BCD with this bin count
+        d=[i+1L,n_elements(inds)] ;target (depth in bin, ncubepix)
+        accts=rebin(transpose((*rec.REV_ACCOUNT)[inds]),d,/SAMP) + $
+              rebin(lindgen(d[0]),d,/SAMP)
+        accts=(*rec.ACCOUNT)[(*rec.REV_ACCOUNT)[temporary(accts)]]
+
+        bcd_pix=accts.BCD_PIX   ;the various conributing BCD pixels
            
-        ;; Feedback: outline completed pixels
-        if self.feedback && pix/cube_plane_pix eq self.cube_size[2]/2 then $
-           begin 
-           pix=pix mod cube_plane_pix
-           x=pix mod self.cube_size[0]
-           y=pix/self.cube_size[0]
-           if ptr_valid(self.wInfo) then wset,(*self.wInfo).feedback_window
-           plots,[x,x,x+1,x+1,x],[y,y+1,y+1,y,y],THICK=2
+        ;; Clear out the empties (they're about to get set)
+        empty=where(~finite(cube[pix]),cnt)
+        if cnt gt 0 then begin 
+           cube[pix[empty]]=0.0 
+           if use_unc then cube_unc[pix[empty]]=0.0
+           if self.feedback then begin 
+              ;; Highlight newly filled pixels
+              if quickbuild then begin 
+                 wh=empty    ; Show all quick-builds (maybe none at half plane)
+              endif else begin  ; show only those at halfway-plane
+                 wh=where(z[empty] eq self.cube_size[2]/2,cnt)
+                 if cnt gt 0 then wh=empty[wh]
+              endelse 
+              for j=0,cnt-1 do begin 
+                 xp=x[wh[j]] & yp=y[wh[j]]
+                 plots,[xp,xp,xp+1,xp+1,xp],[yp,yp+1,yp+1,yp,yp],THICK=2
+              endfor 
+           endif 
         endif 
-     endfor
+        
+        cube[pix]+=total(bcd[bcd_pix] * accts.AREA * mask[bcd_pix], /NAN,1)
+        areas[pix]+=total(accts.AREA * mask[bcd_pix],1)
+        if use_unc then $
+           cube_unc[pix]+=total(bcd_unc[bcd_pix]^2 * accts.AREA^2 * $
+                                mask[bcd_pix],/NAN,1)
+     endfor 
   endfor
   
-  areas=areas>1.e-10            ;avoid divide by zero errors
-  ptr_free,self.CUBE,self.CUBE_UNC
-  self.CUBE=ptr_new(cube/areas)
-  if use_unc then self.CUBE_UNC=ptr_new(sqrt(cube_unc)/areas)
-  
+  ;; Normalize by areas
+  if quickbuild then begin 
+     ;; Just the dirty pixels
+     areas[cube_dirty_pix]>=1.e-10 ;avoid divide by zero errors
+     cube[cube_dirty_pix]/=areas[cube_dirty_pix]
+     self.CUBE=ptr_new(cube,/NO_COPY)
+     if use_unc then begin
+        cube_unc[cube_dirty_pix]=sqrt(cube_unc[cube_dirty_pix])/ $
+                                 areas[cube_dirty_pix]
+        self.CUBE_UNC=ptr_new(cube_unc,/NO_COPY)
+     endif 
+  endif else begin 
+     ;; all pixels
+     areas>=1.e-10
+     ptr_free,self.CUBE,self.CUBE_UNC
+     self.CUBE=ptr_new(cube/areas)
+     if use_unc then self.CUBE_UNC=ptr_new(sqrt(cube_unc)/areas)
+  endelse
+
   ;; Subtract off 1D BG spectrum (converting to correct units if necessary)
   if self.use_bg && ptr_valid(self.BG_SP) then begin 
      ;; Assume they are in correct units 
@@ -3994,17 +4297,23 @@ pro CubeProj::BuildCube
         bg=interpol((*self.BG_SP)[1,*],(*self.BG_SP)[0,*], $
                     *self.wavelength,/LSQUADRATIC)
      endelse 
-     ;; First flux the spectrum if necessary
+     ;; First flux the BG spectrum if necessary
      if self.fluxcon && self.BG_SP_TYPE eq 0b then $
         self->Flux,*self.wavelength,bg,SLCF=self.slcf,PIXEL_OMEGA=self.pix_omega
-     bg=rebin(reform(bg,1,1,n_elements(*self.wavelength),/OVERWRITE), $
-              size(*self.CUBE,/DIMENSIONS),/SAMPLE)
-     *self.CUBE-=bg
+     
+     if quickbuild then $
+        (*self.CUBE)[cube_dirty_pix]-=bg[cube_dirty_z] $
+     else begin 
+        bg=rebin(reform(bg,1,1,n_elements(*self.wavelength),/OVERWRITE), $
+                 size(*self.CUBE,/DIMENSIONS),/SAMPLE)
+        *self.CUBE-=bg
+     endelse 
      ;; XXX Treat 1D BG errors
   endif
   
   self.CUBE_DATE=systime(/JULIAN)
   self->SnapshotParameters
+  self->ClearDirtyPix           ;cube is fully valid now, no dirty pixels left
   self.Changed=1
   @cubism_version 
   self.version=cubism_version
@@ -4012,7 +4321,6 @@ pro CubeProj::BuildCube
   
   ;;Mark the records which went into this cube
   (*self.DR).IN_CUBE=0b & (*self.DR)[enabled].IN_CUBE=1b
-
   self->UpdateButtons & self->UpdateList & self->UpdateTitle
   self->Send,/UPDATE,/NEW_CUBE
 end
@@ -4022,11 +4330,10 @@ end
 ;  ResetAccounts - Remove all accounting info, so a cube build will
 ;                  proceed anew.
 ;=============================================================================
-pro CubeProj::ResetAccounts,NO_UPDATE=no,VALID=valid
-  self.ACCOUNTS_VALID=keyword_set(valid)?7b:0b
+pro CubeProj::ResetAccounts,NO_UPDATE=no
+  self->SetDirty,/ACCOUNTS,/LAYOUT,/BACKGROUND
   if ~keyword_set(no) then self->UpdateButtons
 end
-
 
 ;=============================================================================
 ;  Normalize - Map header info in the BCD's to cube-specific data, and
@@ -4325,61 +4632,24 @@ pro CubeProj::LayoutBCDs
   exact_size=[x_max-x_min,y_max-y_min]
   new_size=ceil(exact_size-.001) ; no hangers-on
   self.CUBE_SIZE[0:1]=new_size
-  ;;print,self.CUBE_SIZE,self.AS_BUILT.CUBE_SIZE
-  if (self.ACCOUNTS_VALID AND 3b) eq 3b && $ ;see if size changed
+  
+  ;; See if size changed
+  if ~self->Dirty(/ACCOUNTS,/LAYOUT) && $ 
      ~array_equal(self.AS_BUILT.CUBE_SIZE,0L) && $
      ~array_equal(self.CUBE_SIZE[0:1],self.AS_BUILT.CUBE_SIZE[0:1]) then $
-        self.ACCOUNTS_VALID AND= NOT 2b
+        self->SetDirty,/LAYOUT
 
   ;; Find the cube center in the sky coordinate system
   xy2ad,x_min+float(new_size[0])/2.-.5,y_min+float(new_size[1])/2.-.5, $
         cubeastr,a,d
   
   self.POSITION=[a,d]
-  ;;print,FORMAT='(G)',abs(self.POSITION-self.AS_BUILT.POSITION)
-  if (self.ACCOUNTS_VALID AND 3b) eq 3b && $ ;see if center changed
+  
+  ;; See if center changed
+  if ~self->Dirty(/ACCOUNTS,/LAYOUT) && $ 
      ~array_equal(self.AS_BUILT.POSITION,0.0D) && $
      ~array_equal(abs(self.POSITION-self.AS_BUILT.POSITION) lt 1D-6,1b) then $
-        self.ACCOUNTS_VALID AND= NOT 2b
-     
-    
-;  skyc=3600.D*(skyc-rebin(total(skyc,2)/(n_elements(skyc)/2), $
-;                          size(skyc,/DIMENSIONS)))
-;  plot,skyc[0,*],skyc[1,*],PSYM=4
-    
-
-;  cen_xy=pos_min+float(new_size)/2.*self.PLATE_SCALE
-;  self.POSITION=rot_pa ## cen_xy ;rot_pa^-1=rot_pa
-  
-  ;; Debug stuff!!!
-;   pos_max=[x_max,y_max] & pos_min=[x_min,y_min]  
-;   ;;pos_max=[max(prs[indgen(4)*2,*],MIN=minx),max(prs[indgen(4)*2+1,*],MIN=miny)]
-;   ;;pos_min=[minx,miny]
-;   del=(pos_max-pos_min)
-;   plot,[0],/NODATA, /XSTYLE, /YSTYLE, $
-;        XRANGE=[pos_min[0]-.1*del[0],pos_max[0]+.1*del[0]], $
-;        YRANGE=[pos_min[1]-.1*del[1],pos_max[1]+.1*del[1]]
-  
-;   for i=0,new_size[0] do $
-;      plots,pos_min[0]+i, $
-;            [pos_min[1],pos_min[1]+new_size[1]], $
-;            COLOR=!D.TABLE_SIZE/2
-  
-;   for i=0,new_size[1] do $
-;      plots,[pos_min[0],pos_min[0]+new_size[0]], $
-;            pos_min[1]+i, $
-;            COLOR=!D.TABLE_SIZE/2
-  
-;   for i=0,n_elements(prs)/8-1 do begin 
-;      rect=prs[*,i]
-;      x=rect[indgen(4)*2] & y=rect[indgen(4)*2+1]
-;      plots,[x,x[0]],[y,y[0]],PSYM=-4
-;      plots,skyc[0,i],skyc[1,i],PSYM=7
-;   endfor 
-  
-;  plots,cen_xy[0],cen_xy[1],THICK=2,PSYM=6,SYMSIZE=2
-  ;; XXX Apply FOV offset (often zero when targetting slit center)
-;  wait,5
+        self->SetDirty,/LAYOUT
 end
 
 
@@ -4395,15 +4665,15 @@ end
 ;                      AREA:0.0,BAD:0b,FLAGS:' '}
 ;
 ;                 where DR is the record number, ID is the record
-;                 DCDID.  BCD_PIX is the 1D bcd pixel referenced,
-;                 BCD_VAL is the value of that pixel, BACK_VAL is the
-;                 value of that pixel in the currently set background
-;                 (if any), AREA is the area of overlap the BCD pixels
-;                 has in the cube pixel being tracked, BAD is
-;                 bit-combination of 0: for no bad pix, 1: for global
-;                 bad pix and 2: for BCD-specific bad pix, 4: for all
-;                 other BMASK/PMASK bad pixel.  Flags contain the mask
-;                 flags along with "BP(1)" for bad pixel.
+;                 DCEID, BCD_PIX is the 1D bcd pixel, BCD_VAL is the
+;                 value of that pixel, BACK_VAL is the value of that
+;                 pixel in the currently set background (if any), AREA
+;                 is the area of overlap the BCD pixels has in the
+;                 cube pixel being tracked, BAD is bit-combination of
+;                 0: for no bad pix, 1: for global bad pix and 2: for
+;                 BCD-specific bad pix, 4: for all other BMASK/PMASK
+;                 bad pixel.  Flags contain the mask flags along with
+;                 "BP(1)" for bad pixel.
 ;=============================================================================
 function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow,COUNT=cnt, ERROR=err
   nrec=self->N_Records()
@@ -4601,16 +4871,12 @@ pro CubeProj::BackTrackFullCube,bcd_pix,vals,cnt_vec,dceid,BCD_UNC=unc
      bcd=*rec.BCD
      if use_unc then bcd_unc=*rec.UNC
      acc=*rec.ACCOUNT
+     bpp_ri=*rec.REV_DUAL
      
-     ;; Populate the output arrays many entries at a time, indexed by
-     ;; how many backtrack entries they have (dual histogram thin)
-     backtrack_per_pix=ri[1:rec.REV_CNT]-ri
-     h=histogram(backtrack_per_pix,REVERSE_INDICES=bpp_ri,MIN=1)
-     
-     for j=0L,n_elements(h)-1L do begin 
+     for j=0L,rec.REV_DUAL_CNT-1L do begin 
         if bpp_ri[j+1] eq bpp_ri[j] then continue ; none with that many dupes
         in_cnt_bin=bpp_ri[bpp_ri[j]:bpp_ri[j+1]-1] ;indices in this count bin
-        nbin=h[j]               ; number of cube pixels which had these counts
+        nbin=n_elements(in_cnt_bin) ; number of cube pixels which had these counts
         
         cnt_vec[wh[in_cnt_bin]]+=j+1 ;increment the global count record
         
@@ -5753,7 +6019,7 @@ pro CubeProj::AddBCD,bcd,header, FILE=file,ID=id,UNCERTAINTY=unc,BMASK=bmask, $
   
   if ptr_valid(self.DR) then *self.DR=[*self.DR,rec] else $
      self.DR=ptr_new(rec,/NO_COPY)
-  self.Changed=1b
+  self->SetDirty
 end
 
 ;=============================================================================
@@ -5796,7 +6062,7 @@ pro CubeProj::RemoveBCD,recs,_EXTRA=e
   heap_free,(*self.DR)[recs]
   if keepcnt ne 0 then (*self.DR)=(*self.DR)[keep] else ptr_free,self.DR
   
-  self.Changed=1b               ;but accounts remain valid!
+  self->SetDirty                ;but accounts remain valid!
   self->UpdateList,/CLEAR_SELECTION,/NO_UPDATE
   self->Send,/REC_UPDATE,/DELETED
   self->UpdateButtons & self->UpdateTitle
@@ -5958,8 +6224,14 @@ end
 ;=============================================================================
 ;  N_Records
 ;=============================================================================
-function CubeProj::N_Records
-   if ptr_valid(self.DR) then return,n_elements(*self.DR) else return,0
+function CubeProj::N_Records,ENABLED=enabled
+  if ptr_valid(self.DR) then begin 
+     if keyword_set(enabled) then begin 
+        wh=where(~(*self.DR).DISABLED,good)
+        return,good
+     endif else $
+        return,n_elements(*self.DR)
+  endif else return,0
 end
 
 ;=============================================================================
@@ -6062,7 +6334,7 @@ pro CubeProj__define
      DR: ptr_new(), $           ;All the BCD's: pointer to list of
                                 ; data record structures of type CUBE_DR
      ACCOUNTS_VALID: 0b,$       ; are the account records valid?
-                                ;  1:accts, 2:size, 4: bg
+                                ;  1:accts, 2:layout, 4: background
      CUBE: ptr_new(),$          ;a pointer to the nxmxl data cube
      CUBE_UNC:  ptr_new(),$     ;a pointer to the nxmxl uncertainty cube
      CUBE_DATE: 0.0D, $         ;date the cube was assembled (JULIAN)
@@ -6078,9 +6350,10 @@ pro CubeProj__define
      MERGE:ptr_new(),$          ;a set of records to aid merging the orders
                                 ;  ptr to list of {offset,inds,wave,to,frac}
      AUTO_BPL: {CUBE_AUTO_BPL},$ ;auto bad pixel cached copies
+     GLOBAL_DIRTY_PIX: ptr_new(),$ ;list of globally dirty pixels (all records)
      debug:0b, $                ;whether to debug
      cal:obj_new(), $           ;the irs_calib object.
-     oautobadpix: obj_new(), $  ;automatic bad pixel parameters
+     oAutoBadPix: obj_new(), $  ;automatic bad pixel parameters
      Changed:0b, $              ;if the project is changed since last saved.
      Spawned:0b, $              ;whether we were opened by another instance
      feedback:0b, $             ;whether to show feedback when building cube
@@ -6090,7 +6363,7 @@ pro CubeProj__define
      load_masks:0b, $           ;whether to load masks by default
      load_unc:0b, $             ;whether to load uncertainties by default
      version:'', $              ;the Cubism version of this cube
-     wInfo:ptr_new()}           ;the widget info struct.... a diconnectable ptr
+     wInfo:ptr_new()}           ;the widget info struct.... a disconnectable ptr
       
   
   ;; The account structure is *big* (~1Mb per BCD)
@@ -6109,13 +6382,20 @@ pro CubeProj__define
        TIME:0.0, $              ;The integration time
        DISABLED: 0b, $          ;whether this DR is disabled
        IN_CUBE: 0b, $           ;is this record in the built cube?
-       ACCOUNT: ptr_new(), $    ;list of {CUBE_PLANE,CUBE_PIX,BCD_PIX,AREAS}
-       REV_ACCOUNT: ptr_new(),$ ;reverse indices of the CUBE_INDEX histogram
-       REV_MIN:0L, $            ;minimum cube index affected
+       ACCOUNT: ptr_new(), $    ;list of CUBE_ACCOUNT_LIST's
+       REV_BCD_CNT:0L, $        ;number of bins in the BCD reverse index
+       REV_ACCOUNT: ptr_new(),$ ;reverse indices of the cube index histogram
+       REV_MIN:0L, $            ;minimum offset cube index affected
        REV_CNT:0L, $            ;how many bins in the cube_index histogram?
        REV_WIDTH:0L, $          ;width of the DR bounding-box on the cube
        REV_HEIGHT:0L, $         ;height of the DR bounding-box on the cube
        REV_OFFSET:[0L,0L], $    ;offset of the DR bounding-box into the cube
+       REV_DUAL: ptr_new(), $   ;dual histogram reverse indices for rec
+       REV_DUAL_CNT: 0L, $      ;how many bins in the dual histogram?
+       REV_BCD_ACCOUNT: ptr_new(), $ ;reverse indices into ACCOUNT by bcd_pix
+       REV_BCD_XOFF: 0, $       ;x offset of the BCD bounding box
+       REV_BCD_WIDTH: 0, $      ;width of the BCD pixel bounding box
+       REV_BCD_MIN:0L, $        ;minimum offset BCD index affected
        RQST_POS: [0.0D,0.0D], $ ;Commanded RA,DEC position of slit center
        REC_POS: [0.0D,0.0D],$   ;Reconstructed RA,DEC pos of slit center.
        FOVID: 0, $              ;The IRS Field of View ID
@@ -6131,6 +6411,7 @@ pro CubeProj__define
        UNC:ptr_new(), $         ;the BCD's uncertainty image
        BMASK:ptr_new(), $       ;the BCD's BMASK image
        BAD_PIXEL_LIST: ptr_new(),$ ;this BCD's specific bad pixel list (if any)
+       DIRTY_PIX: ptr_new(), $     ;list of "dirty" pixels for this record
        EXP: 0L, $               ;the exposure number in the mapping sequence
        CYCLE:0L, $              ;the cycle number at this position
        NCYCLES:0L,$             ;the number of cycles at this position
@@ -6152,17 +6433,21 @@ pro CubeProj__define
          list_size_diff:0, $    ;the difference in ysize between list and base
          xsize: 0, $            ;the screen xsize of the show widget
          lines:0, $             ;number of list lines last set
-         view_ids:lonarr(5), $  ;record view button ids
-         nsel_sav: 0, $          ;save number of selected records
-         feedback_window: 0, $  ;window id of feedback
+         view_ids:lonarr(3), $  ;record view button ids
+         build_ids:lonarr(2), $ ;cube build button ids
+         nsel_sav: 0, $         ;save number of selected records
+         quickbuild_sav: 0b, $  ;save status of whether we can quick-build
+         feedback_window: 0L, $ ;window id of feedback
+         feedback_save:dblarr(4), $ ;feedback !X.S and !Y.S
+         feedback_pixmap: 0L, $     ;id of feedback pixmap for quick restores
          background_menu: 0L, $ ;widget ID of background menu bar
          MUST_NO_DATA:0L, $     ;no data saved
          MUST_MODULE:lonarr(1),$ ;must have a module set
          MUST_CAL:lonarr(1), $   ;Must have a calibration set loaded
          MUST_CAL_FILE:0L, $     ;Must have a calibration set specified.
-         MUST_SELECT:lonarr(18),$ ;the SW buttons which require any selected
+         MUST_SELECT:lonarr(17),$ ;the SW buttons which require any selected
          MUST_SAVE_CHANGED:0L, $ ;require changed and a saved File
-         MUST_PROJ:lonarr(6), $ ;SW button which requires a valid project
+         MUST_PROJ:lonarr(7), $ ;SW button which requires a valid project
          MUST_ACCT:lonarr(4), $ ;Must have valid accounts
          MUST_CUBE:lonarr(4), $ ;SW button requires valid cube created.
          MUST_BACK:lonarr(5), $ ;background record must be set
