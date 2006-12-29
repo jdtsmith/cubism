@@ -1234,9 +1234,8 @@ function IRS_Calib::CalibrationFileVersion,base,version,name,type,md
      endif
      major_version=fix((stregex(cal_files,base+"([0-9]+)[a-z]*"+"."+type+"$",$
                                 /EXTRACT,/SUBEXPR))[1,*])
-     mx=max(major_version)
-     wh=where(major_version eq mx,cnt)
-     cfile=cal_files[wh]      ;use the latest version
+     mx=max(major_version,m_ind)
+     cfile=cal_files[m_ind]      ;use the latest version
   endelse
   return,cfile
 end
