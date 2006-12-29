@@ -19,7 +19,8 @@
 ;                     PLATESCALE_VERSION=,PMASK_VERSION=, $
 ;                     FLUXCON_VERSION=,SLCF_VERSION=, $
 ;                     WAVECUT_VERSION=, PIXEL_OMEGA_VERSION=,
-;                     RECOVER_FROM_WAVSAMP=, CALIB_OBJECT= ]
+;                     RECOVER_FROM_WAVSAMP=, CALIB_OBJECT= ,
+;                     /OVERWRITE]
 ;
 ; INPUT PARAMETERS:
 ;
@@ -31,9 +32,12 @@
 ; KEYWORD PARAMETERS:
 ;
 ;    X_VERSION: Specify the numeric version of calibration file type X
-;      (e.g. WAVSAMP), stored in calib/data/ssc/.  Must be an integer.
+;      (e.g. WAVSAMP), stored in calib/data/ssc/.  Must be an integer,
 ;      By default, the highest version available is automatically
-;      employed.
+;      employed.  For multiple versions of a given file, use the same
+;      integer followed by a letter, e.g. v7 and v7a.  This is only
+;      necessary for calibrations which change depending on the date
+;      the data were obtained (e.g. LH Fluxcon bias change).
 ;      
 ;    RECOVER_FROM_WAVSAMP: Rather than using the LINETILT and ORDER
 ;      calibration files (not shipped by default from the SSC with
@@ -42,6 +46,8 @@
 ;      are not available.
 ;
 ;    CALIB_OBJECT: On output, a variable to hold the calibration object.
+;
+;    OVERWRITE: If set, overwrite any existing calibration set.
 ;
 ; NOTES:
 ;
@@ -78,13 +84,15 @@
 ;
 ;##############################################################################
 
-pro make_calib_set,calibname,CALIB_OBJECT=c,_EXTRA=e
+pro make_calib_set,calibname,CALIB_OBJECT=c,OVERWRITE=ow,_EXTRA=e
   @cubism_dir
+  on_error,2
   
   if ~stregex('\.cal$',calibname,/BOOLEAN) then $
      calibname+='.cal'
   file=filepath(ROOT=irs_calib_dir,SUBDIRECTORY='sets',calibname)
-  if file_test(file) then message,'Calibration file exists: ' + file
+  if ~keyword_set(ow) && file_test(file) then $
+     message,'Calibration file exists: ' + file
   
   c=obj_new('IRS_Calib')
   c->ReadCalib,_EXTRA=e
