@@ -88,8 +88,7 @@ pro make_calib_set,calibname,CALIB_OBJECT=c,OVERWRITE=ow,_EXTRA=e
   @cubism_dir
   on_error,2
   
-  if ~stregex('\.cal$',calibname,/BOOLEAN) then $
-     calibname+='.cal'
+  if ~stregex(calibname,'\.cal$',/BOOLEAN) then calibname+='.cal'
   file=filepath(ROOT=irs_calib_dir,SUBDIRECTORY='sets',calibname)
   if ~keyword_set(ow) && file_test(file) then $
      message,'Calibration file exists: ' + file
