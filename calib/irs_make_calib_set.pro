@@ -11,6 +11,7 @@
 ; CATEGORY:
 ;
 ;    IRS Spectral Reduction, Analysis and Processing.
+;    Calibration.
 ;
 ; CALLING SEQUENCE:
 ;
@@ -50,6 +51,14 @@
 ;    OVERWRITE: If set, overwrite any existing calibration set.
 ;
 ; NOTES:
+;
+;    To include new SSC-delivered calibration files, you must rename
+;    them with form "irs_b[0-3]_NAMEvV.{tbl,fits}", where b0=SL,
+;    b1=SH, b2=LL, b3=LH, NAME is one of the calibration file types,
+;    and V is the version integer (see X_VERSION above).  Other
+;    modifications may be required as well, e.g. adding the \VALIDFROM
+;    keyword to FLUXCONs which have a forking date due to bias change,
+;    etc.
 ;
 ;    Typically, a given set of calibration inputs are only applicable
 ;    to a single pipeline processing version (e.g. S15).  Though no
