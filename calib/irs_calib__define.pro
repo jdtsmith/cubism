@@ -478,7 +478,7 @@ function IRS_Calib::Info, modules, orders,SHORT=short
                                                   fc.FLUXCON), $
                    "         KEY WAVE"+add+string(FORMAT='(G8.4)', $
                                                 fc.FLUXCON_KEY_WAV),$
-                   "             TUNE"+add+strjoin(string(FORMAT='(G9.4)', $
+                   "             TUNE"+add+strjoin(string(FORMAT='(G10.3)', $
                                                        fc.TUNE))]
            endfor 
         endif 
