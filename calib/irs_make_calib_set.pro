@@ -14,12 +14,12 @@
 ;
 ; CALLING SEQUENCE:
 ;
-;      make_calib_set,filename, WAVSAMP_VERSION=,ORDER_VERSION=, $
-;                         LINETILT_VERSION=,FRAMETABLE_VERSION=, $
-;                         PLATESCALE_VERSION=,PMASK_VERSION=, $
-;                         FLUXCON_VERSION=,SLCF_VERSION=, $
-;                         WAVECUT_VERSION=, PIXEL_OMEGA_VERSION=,
-;                         RECOVER_FROM_WAVSAMP=
+;      make_calib_set,filename, [ WAVSAMP_VERSION=,ORDER_VERSION=, $
+;                     LINETILT_VERSION=,FRAMETABLE_VERSION=, $
+;                     PLATESCALE_VERSION=,PMASK_VERSION=, $
+;                     FLUXCON_VERSION=,SLCF_VERSION=, $
+;                     WAVECUT_VERSION=, PIXEL_OMEGA_VERSION=,
+;                     RECOVER_FROM_WAVSAMP=, CALIB_OBJECT= ]
 ;
 ; INPUT PARAMETERS:
 ;
@@ -28,17 +28,20 @@
 ;       by date, name the file like 'irs_YYYY_MM_DD....cal'.
 ;       Otherwise, it can be loaded manually.
 ;
-; INPUT KEYWORD PARAMETERS:
+; KEYWORD PARAMETERS:
 ;
 ;    X_VERSION: Specify the numeric version of calibration file type X
-;      (e.g. WAVSAMP).  Must be an integer.  By default, the highest
-;      version is automatically employed.
+;      (e.g. WAVSAMP), stored in calib/data/ssc/.  Must be an integer.
+;      By default, the highest version available is automatically
+;      employed.
 ;      
 ;    RECOVER_FROM_WAVSAMP: Rather than using the LINETILT and ORDER
 ;      calibration files (not shipped by default from the SSC with
 ;      archive data), recover the values by fitting polynomials to the
 ;      WAVSAMP.  Only needed if corresponding LINETILT and ORDER files
 ;      are not available.
+;
+;    CALIB_OBJECT: On output, a variable to hold the calibration object.
 ;
 ; NOTES:
 ;
@@ -75,7 +78,7 @@
 ;
 ;##############################################################################
 
-pro make_calib_set,calibname,_EXTRA=e
+pro make_calib_set,calibname,CALIB_OBJECT=c,_EXTRA=e
   @cubism_dir
   
   if ~stregex('\.cal$',calibname,/BOOLEAN) then $
