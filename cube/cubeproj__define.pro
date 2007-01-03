@@ -4092,7 +4092,7 @@ pro CubeProj::BuildCube
               if ~global_dirty then continue
               pix=*self.GLOBAL_DIRTY_PIX
            endif else begin 
-              if ~dirty[enabled[k]] then continue
+              if ~dirty[k] then continue
               pix=*rec.DIRTY_PIX
            endelse 
            ind=(pix mod bcd_size[0]) - rec.REV_BCD_XOFF + $
