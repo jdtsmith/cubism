@@ -607,7 +607,7 @@ pro tvDraw::Snapshot
      wset,self.dbwin
      device,copy=[0,0,self.winsize,0,0,self.drawwin]
   endelse 
-  wset,self.drawwin
+  wset,db?self.dbwin:self.drawwin
 end
 
 ;=============================================================================
