@@ -58,7 +58,7 @@
 ;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
-pro cubism,pname,_EXTRA=e
+pro cubism,pname,PROJECT=project,_EXTRA=e
   project=obj_new('CubeProj')
   
   pname_passed=n_elements(pname) ne 0
@@ -81,5 +81,8 @@ pro cubism,pname,_EXTRA=e
      endif 
      project->SetProperty,/SPAWNED 
      project->Show,/FORCE,SET_NEW_PROJECTNAME=~got_name,_EXTRA=e
-  endif else obj_destroy,project
+  endif else begin 
+     obj_destroy,project
+     project=opened_project
+  endelse 
 end
