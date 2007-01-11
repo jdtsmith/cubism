@@ -133,7 +133,7 @@ pro CubeBackTrack::Message, msg
         endif else begin 
            if widget_info(self.wBase,/VALID_ID) then $
               widget_control, self.wBase,/DESTROY
-           self->Off,/DISABLE
+           self->Reset,/DISABLE
            return
         endelse 
      end
@@ -148,17 +148,25 @@ pro CubeBackTrack::Message, msg
 end
 
 ;=============================================================================
-;  Off - No more events needed
+;  Reset - Close down the box
 ;=============================================================================
-pro CubeBackTrack::Off,_EXTRA=e
-  self->tvPlug::Off,_EXTRA=e
+pro CubeBackTrack::Reset,_EXTRA=e
+  self->wDestroy
   if self.lock then begin 
      self->DrawMark,/ERASE
      self.lock=0b
   endif 
-  self->wDestroy
-  ;; still listen for cube mode changes
-  self.oDraw->MsgSignup,self,DRAW_MOTION=0,DRAW_BUTTON=0,TVDRAW_REDRAW=0
+  self.oDraw->MsgSignup,self,TVDRAW_REDRAW=0 ; not drawn any longer
+  self->Off,_EXTRA=e
+end
+
+;=============================================================================
+;  Off - No more events needed
+;=============================================================================
+pro CubeBackTrack::Off,_EXTRA=e
+  self->tvPlug::Off,_EXTRA=e
+  ;; disable events (still listen for cube mode changes)
+  self.oDraw->MsgSignup,self,DRAW_MOTION=0,DRAW_BUTTON=0
 end
 
 ;=============================================================================
@@ -166,7 +174,7 @@ end
 ;=============================================================================
 pro CubeBackTrack::On
   if self->On() then begin 
-     self->Off
+     self->Reset
      return
   endif 
   self->EnsureCube
@@ -178,31 +186,34 @@ pro CubeBackTrack::On
      "BCD                      Pix          Frac       Val                 "+$
      "Back                (Val-Back)     Flag"
   msg=self.msg_base+string(10b)+self.msg_head
-  self.wBase=widget_base(/COLUMN, SPACE=1,GROUP_LEADER=self.parent, $
-                         TITLE=title, /TLB_SIZE_EVENTS,UVALUE=self)
-  self.wLabel=widget_label(self.wBase,value=msg,/ALIGN_LEFT, $
-                           /DYNAMIC_RESIZE)
-  if self.list_size gt 0 then $
-     self.wList=widget_list(self.wBase,XSIZE=111,SCR_YSIZE=self.list_size, $
-                            /CONTEXT_EVENTS) $
-  else self.wList=widget_list(self.wBase,XSIZE=111,YSIZE=8,/CONTEXT_EVENTS)
   
-  self.wMenu=widget_base(self.wList,/CONTEXT_MENU)
-  self.wCBut_global_mark=widget_button(self.wMenu, /CHECKED_MENU,$
-                                       VALUE='Bad Pixel (Global)')
-  self.wCBut_bcd_mark=widget_button(self.wMenu,/CHECKED_MENU, $
-                                    VALUE='Bad Pixel (This Record)')
+  if ~widget_info(self.wBase,/VALID_ID) then begin 
+     self.wBase=widget_base(/COLUMN, SPACE=1,GROUP_LEADER=self.parent, $
+                            TITLE=title, /TLB_SIZE_EVENTS,UVALUE=self)
+     self.wLabel=widget_label(self.wBase,value=msg,/ALIGN_LEFT, $
+                              /DYNAMIC_RESIZE)
+     if self.list_size gt 0 then $
+        self.wList=widget_list(self.wBase,XSIZE=111,SCR_YSIZE=self.list_size, $
+                               /CONTEXT_EVENTS) $
+     else self.wList=widget_list(self.wBase,XSIZE=111,YSIZE=8,/CONTEXT_EVENTS)
   
-  widget_control, self.wBase, SET_UVALUE=self,/REALIZE
-  make_widget_adjacent,self.wBase,self.parent
+     self.wMenu=widget_base(self.wList,/CONTEXT_MENU)
+     self.wCBut_global_mark=widget_button(self.wMenu, /CHECKED_MENU,$
+                                          VALUE='Bad Pixel (Global)')
+     self.wCBut_bcd_mark=widget_button(self.wMenu,/CHECKED_MENU, $
+                                       VALUE='Bad Pixel (This Record)')
   
-  ;; Save geometry for re-sizing
-  geom=widget_info(self.wList,/GEOMETRY)
-  self.list_size_diff=geom.SCR_YSIZE- $
-     (widget_info(self.wBase,/GEOMETRY)).SCR_YSIZE
-  self.oDraw->MsgSignup,self,/DRAW_MOTION,/DRAW_BUTTON
-  XManager,title, self.wBase,/NO_BLOCK, EVENT_HANDLER='CubeBackTrack_event', $
-           CLEANUP='CubeBackTrack_kill'
+     widget_control, self.wBase, SET_UVALUE=self,/REALIZE
+     make_widget_adjacent,self.wBase,self.parent
+  
+     ;; Save geometry for re-sizing
+     geom=widget_info(self.wList,/GEOMETRY)
+     self.list_size_diff=geom.SCR_YSIZE- $
+                         (widget_info(self.wBase,/GEOMETRY)).SCR_YSIZE
+     XManager,title, self.wBase,/NO_BLOCK, EVENT_HANDLER='CubeBackTrack_event', $
+              CLEANUP='CubeBackTrack_kill'
+  endif 
+  self.oDraw->MsgSignup,self,DRAW_MOTION=~self.lock,/DRAW_BUTTON
 end
 
 ;=============================================================================
@@ -238,8 +249,9 @@ end
 ;;*************************End OverRiding methods******************************
 
 pro CubeBackTrack::DrawMark,ERASE=erase
-  self.oDraw->GetProperty,ZOOM=zoom
   pt=self.oDraw->Convert(self.mark,/DEVICE,/SHOWING)
+  if pt[0] eq -1 then return
+  self.oDraw->GetProperty,ZOOM=zoom
   if keyword_set(erase) then self.oDraw->Erase,pt-zoom/2-1,[zoom,zoom]+2 $
   else plots,pt[0],pt[1],/DEVICE,COLOR=self.color,PSYM=7,SYMSIZE=zoom/7, $
              THICK=zoom ge 4?2.:1.
@@ -247,7 +259,7 @@ end
 
 pro CubeBackTrack_kill,id
   widget_control, id,get_uvalue=self
-  if obj_valid(self) then self->Off
+  if obj_valid(self) then self->Reset
 end
 
 pro CubeBackTrack_event, ev
@@ -318,7 +330,7 @@ pro CubeBackTrack::UpdateList
      
   list=self.cube->BackTrackPix(self.point,self.plane,/FOLLOW,ERROR=err)
   if keyword_set(err) then begin 
-     self->Off
+     self->Reset
      return
   endif 
   oldid=''
@@ -356,7 +368,7 @@ end
 ;=============================================================================
 pro CubeBackTrack::EnsureCube
   if ~obj_valid(self.cube) then begin 
-     self->Off
+     self->Reset
      self->Error,'Cube no longer valid.'
   endif 
 end
