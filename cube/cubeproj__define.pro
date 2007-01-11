@@ -3503,7 +3503,7 @@ pro CubeProj::MergeSetup,ORDS=ords
   heap_free,self.MERGE
   wave1=(self.cal->GetWAVSAMP(self.MODULE,ords[0],/PIXEL_BASED, $
                               WAVECUT=self.wavecut, $
-                              PR_WIDTH=self.PR_SIZE[1], /SAVE_POLYGONS, $
+                              PR_WIDTH=self.PR_SIZE[1], $
                               APERTURE=(*self.APERTURE)[0])).lambda
   if self.ORDER gt 0 then begin ;single order, nothing to do
      self.WAVELENGTH=ptr_new(wave1)
@@ -3872,8 +3872,8 @@ pro CubeProj::BuildAccount,_EXTRA=e
         
         ;; iterate over all the adjacent PRs in the order 
         for j=0L,n_elements(prs)-1 do begin 
-           ;; Setup the rotation matrix to rotate back to the +x
-           ;; direction
+           ;; Setup the rotation matrix to rotate this PR back to the
+           ;; +x direction (which may lie at any angle to the cube grid)
            angle=-prs[j].angle+delta_PA
            if angle ne 0.0D then begin 
               ct=cos(angle/RADEG) & st=sin(angle/RADEG)
@@ -3881,65 +3881,56 @@ pro CubeProj::BuildAccount,_EXTRA=e
                              [ st, ct]])
            endif
            
-           ;; XXX Instead of looping, collate all polys from a single PR
-           ;; into reverse-indexed lists, and pass en mass to a
-           ;; multi-polygon aware polyclip.  Re-design internal
-           ;; account data layout to use as the data layer?  Would
-           ;; still be per-BCD, per-ORDER for easy disable/enable
-           ;; caching.
+           bcdpixels=*prs[j].PIXELS ;corresponding BCD pixel for each polygon
+           polys=*prs[j].POLYGONS ; x, y list indexed by reverse indices
+           poly_inds=*prs[j].POLY_INDS
+           polys=(polys-rebin(prs[j].cen,size(polys,/DIMENSIONS),/SAMPLE)) * $
+                 self.OVERSAMPLE_FACTOR
            
-           ;; Need an expanded IDL-only version for failed C compilation.
+           ;; Rotate this polygon to the cube sky grid, if necessary
+           if angle ne 0.0 then polys=rot#polys ;XXX check!!!
+           ;; Offset the polygon correctly into the sky grid
+           polys+=rebin(offset,size(polys,/DIMENSIONS),/SAMPLE)
            
-           ;; Iterate over partial pixels clipped by the PR
-           for k=0L,n_elements(*prs[j].POLYGONS)-1 do begin 
-              bcdpixel=(*prs[j].PIXELS)[k]
-              ;; associated polygon (2xn list) this pixel got clipped to
-              ;; by the PR on the detector grid
-              poly=*(*prs[j].POLYGONS)[k]
-              ;; Offset to canonical slit center and scale with plate scale
-              poly=(poly-rebin(prs[j].cen,size(poly,/DIMENSIONS)))* $
-                   self.OVERSAMPLE_FACTOR
-              ;; Rotate this polygon to the cube sky grid, if necessary
-              if angle ne 0.0 then poly=rot#poly ;XXX check!!!
-              ;; Offset the polygon correctly into the sky grid
-              poly=poly+rebin(offset,size(poly,/DIMENSIONS))
-              
-              if self.feedback && (j eq 0L) then begin
-                 plots,[reform(poly[0,*]),poly[0,0]], $
-                       [reform(poly[1,*]),poly[1,0]], $
-                       COLOR=color
-                 plots,offset,PSYM=4,COLOR=color
-                 wait,0
-              endif
-              
-              ;; Clip the offset polygon against the sky (cube) grid
-              cube_spatial_pix=polyfillaa(reform(poly[0,*]),reform(poly[1,*]),$
-                                          self.CUBE_SIZE[0],self.CUBE_SIZE[1],$
-                                          AREAS=areas)
-              if cube_spatial_pix[0] eq -1 then begin 
-                 ; print,FORMAT='("Not hitting cube for pixel: "' + $
-;                        ',I0,",",I0," -- step [",I0,",",I0,"]")', $
-;                        bcdpixel mod 128, bcdpixel/128, $
-;                        (*self.DR)[i].COLUMN,(*self.DR)[i].ROW
-;                  print, poly
-;                  print,'  original:'
-;                 print,*(*prs[j].POLYGONS)[k]
-                 continue ;; why isn't our cube big enough?
-              endif
-              
-              ncp=n_elements(cube_spatial_pix)
-              ;; Add space to account list, large chunks at a time
-              if acc_ind+ncp ge nacc then begin 
-                 account=[account,replicate({CUBE_ACCOUNT_LIST},nacc)]
-                 nacc*=2
-              endif
-              account[acc_ind:acc_ind+ncp-1].cube_pix=cube_spatial_pix
-              account[acc_ind:acc_ind+ncp-1].cube_plane=j ;just this order's
-              account[acc_ind:acc_ind+ncp-1].bcd_pix=bcdpixel
-              account[acc_ind:acc_ind+ncp-1].area=areas
-              acc_ind=acc_ind+ncp
-           endfor
-                 
+           if (j eq 0L) && self.feedback then begin
+              for k=0,n_elements(bcdpixels)-1L do $
+                 plots,[reform(polys[0,poly_inds[k]:poly_inds[k+1]-1]), $
+                        polys[0,poly_inds[k]]], $
+                       [reform(polys[1,poly_inds[k]:poly_inds[k+1]-1]), $
+                        polys[1,poly_inds[k]]],COLOR=color
+              plots,offset,PSYM=4,COLOR=color
+              wait,0
+           endif
+           
+           cube_spatial_pix=polyfillaa(reform(polys[0,*]),reform(polys[1,*]),$
+                                       self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
+                                       AREAS=areas,POLY_INDICES=poly_inds)
+           
+           if cube_spatial_pix[0] eq -1 then continue ;none clipped
+           
+           poly_cnt=poly_inds[1:*]-poly_inds ; per-bcdpix number pixels clipped
+           keep=where(poly_cnt gt 0,kcnt)    ; only those which actually clipped
+           if kcnt eq 0 then continue
+           
+           ;; chunk index the bcdpixel array
+           h=histogram(total(poly_cnt[keep],/CUMULATIVE,/PRESERVE_TYPE)-1L, $
+                       /BINSIZE,MIN=0,REVERSE_INDICES=ri)
+           bcdpixels=bcdpixels[keep[ri[0:n_elements(h)-1]-ri[0]]]
+           
+           ncp=n_elements(cube_spatial_pix) ; Total number of new clipped polys
+           
+           ;; Add space to account list as necessary, large chunks at a time
+           if acc_ind+ncp ge nacc then begin 
+              add=nacc>ncp
+              account=[account,replicate({CUBE_ACCOUNT_LIST},add)]
+              nacc+=add
+           endif
+           
+           account[acc_ind:acc_ind+ncp-1].cube_pix=cube_spatial_pix
+           account[acc_ind:acc_ind+ncp-1].cube_plane=j ;just this pr's
+           account[acc_ind:acc_ind+ncp-1].bcd_pix=bcdpixels
+           account[acc_ind:acc_ind+ncp-1].area=areas
+           acc_ind+=ncp
         endfor
         account=account[0:acc_ind-1] ; trim this order's account to size
         
