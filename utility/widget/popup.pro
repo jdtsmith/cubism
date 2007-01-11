@@ -79,7 +79,7 @@ pro popup_event,ev
 end
 
 function popup, label, list, TITLE=ttl, PARENT_GROUP=parent, MODAL=md, $
-                SELECT=sel,COMBOBOX=cb,ENTRY=entry,_EXTRA=e
+                SELECT=sel,COMBOBOX=cb,ENTRY=entry,INDEX=index,_EXTRA=e
    if n_elements(ttl) eq 0 then ttl='Choose One'
    if n_elements(md) eq 0 then md=0
    if n_elements(sel) ne 0 then begin 
@@ -114,9 +114,10 @@ function popup, label, list, TITLE=ttl, PARENT_GROUP=parent, MODAL=md, $
    state.ok=widget_button(base,value='  OK  ')
    widget_control, base, /REALIZE, set_uvalue=state
    XManager, 'popup', base
+   index=*state.index
    if keyword_set(entry) then $
-      val={text:*state.text, select:list[*state.index]} $
-   else val=list[*state.index]
+      val={text:*state.text, select:list[index]} $
+   else val=list[index]
    ptr_free,state.index,state.text
    return,val
 end
