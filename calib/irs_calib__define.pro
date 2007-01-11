@@ -629,18 +629,18 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
                        PIXEL_BASED=pb, PR_WIDTH=width,WAVELENGTH_SCALED=wvscld)
   
   if ~keyword_set(sp) then begin ;no polygons requested
-     ;; return the first match
+     ;; return the first matching record
      if nsamp gt 0 then prs=*(*rec.WAVSAMPS)[ws[0]].PR 
   endif else begin 
      for i=0,nsamp-1 do begin 
-        ;; return the first match with saved polygons
+        ;; use the first match with saved polygons
         pr=(*rec.WAVSAMPS)[ws[i]].PR
         if ptr_valid((*pr)[0].POLYGONS) then begin 
            prs=*pr
            break
         endif 
      endfor 
-     ;; free all these matches, to create them again below *with* POLYs
+     ;; free all these matches, to re-create them below *with* POLYs included
      if nsamp gt 0 && n_elements(prs) eq 0 then $
         self->FreeWAVSAMP,RECORD=rec,INDEX=ws
   endelse
@@ -653,7 +653,7 @@ function IRS_Calib::GetWAVSAMP, module, order, APERTURE=aperture, FULL=full, $
      if size(ws,/TYPE) ne 8 then message,'Error clipping WAVSAMP.'
      
      prs=*ws.PR
-     ;; And add it to the cache for rapid recovery, unless asked not to
+     ;; And add it to the WS cache for rapid recovery, unless asked not to
      if ~keyword_set(nc) then begin 
         if ptr_valid(rec.WAVSAMPS) then begin 
            ;; Only add it if it's a new, distinct WAVSAMP record
@@ -842,6 +842,38 @@ function IRS_Calib::IsFullAperture,aps
   return,total(aps.low eq 0. AND aps.high eq 1.,1) eq 2.
 end
 
+
+;=============================================================================
+;  UpdatePolygonListStorage - Update the list of polygons in a given
+;                             IRS_WAVSAMP struct from the old style
+;                             (list of pointers) to the new style
+;                             (Jan/2007, reverse-indexed list), if
+;                             necessary.  Should only be needed on
+;                             full (non-clipped) PRs with saved
+;                             polygons (i.e. a rare case).
+;=============================================================================
+pro IRS_Calib::UpdatePolygonListStorage,ws
+  if ~ptr_valid(ws.PR) then return
+  wh=where(ptr_valid((*ws.PR).POLYGONS) AND $
+           ~ptr_valid((*ws.PR).POLY_INDS),cnt)
+  if cnt eq 0 then return
+  for i=0L,cnt-1 do begin 
+     pr=(*ws.PR)[wh[i]]
+     if ~ptr_valid(pr.POLYGONS) then continue
+     npol=n_elements(*pr.POLYGONS)
+     psz=lonarr(npol,/NOZERO)
+     for j=0,npol-1 do $        ; collect the polygon dimensions
+        psz[j]=(size(*(*pr.POLYGONS)[j],/DIMENSIONS))[1]
+     plist=fltarr(2,total(psz,/PRESERVE_TYPE),/NOZERO)
+     pinds=[0L,total(psz,/CUMULATIVE,/PRESERVE_TYPE)]
+     for j=0,npol-1 do plist[0,pinds[j]]=*(*pr.POLYGONS)[j]
+     
+     ptr_free,*(*ws.PR)[wh[i]].POLYGONS,(*ws.PR)[wh[i]].POLYGONS
+     (*ws.PR)[wh[i]].POLYGONS=ptr_new(plist,/NO_COPY)
+     (*ws.PR)[wh[i]].POLY_INDS=ptr_new(pinds,/NO_COPY)
+  endfor 
+end
+
 ;=============================================================================
 ;  Clip - Clip a WAVSAMP with specified aperture against the pixels,
 ;         and add it to the records WAVSAMP list, returning the new
@@ -883,14 +915,20 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
         '(check for WAVSAMP files).'
   endif
   
+  
+  ;; Translate from old-style "collection of pointers" polygon list
   full=(*rec.WAVSAMPS)[wh_full[0]]
+     
+  self->UpdatePolygonListStorage,full
+  
   new=full                      ;The new clip
   if n_elements(aper) eq 0 then aper=irs_aperture(0.,1.)
   npr=n_elements(*new.PR)
   if ~keyword_set(clip_full) then begin
-     new.PR=ptr_new(*full.PR)   ; Copy the psuedo-rects
+     new.PR=ptr_new(*full.PR)   ; Copy the full psuedo-rects
      new.FULL=0b
      (*new.PR).POLYGONS=ptrarr(npr) ;In case these aren't asked for
+     (*new.PR).POLY_INDS=ptrarr(npr)
      newap=new.Aperture
      struct_assign,aper,newap
      new.Aperture=newap
@@ -920,16 +958,20 @@ function IRS_Calib::Clip, module, order, APERTURE=aper, FULL=clip_full, $
         ;; in the original WAVSAMP set.
         (*new.PR)[i].PIXELS=ptr_new(pixels,/NO_COPY)
         (*new.PR)[i].AREAS =ptr_new(ar,/NO_COPY)
-        if keyword_set(sp) then $
-           (*new.PR)[i].POLYGONS=ptr_new(polys,/NO_COPY)
-     endif else begin 
+        if keyword_set(sp) then begin 
+           (*new.PR)[i].POLYGONS=ptr_new(polys.polys,/NO_COPY)
+           (*new.PR)[i].POLY_INDS=ptr_new(polys.inds,/NO_COPY)
+        endif 
+     endif else begin           ; no pixels clipped
         (*new.PR)[i].PIXELS=ptr_new()
         (*new.PR)[i].AREAS =ptr_new()
-        if keyword_set(sp) then $
+        if keyword_set(sp) then begin 
            (*new.PR)[i].POLYGONS=ptr_new()
+           (*new.PR)[i].POLY_INDS=ptr_new()
+        endif 
      endelse 
   endfor
-  ;; Remove the PR's which didn't fall on the array
+  ;; Remove the PRs which didn't fall anywhere on the array
   good=where(ptr_valid((*new.PR).PIXELS),goodcnt)
   if goodcnt eq 0 then message,'No WAVSAMP pseudo-rects exist on array'
   if goodcnt lt npr then (*new.PR)=(*new.PR)[good]
@@ -1561,12 +1603,8 @@ pro IRS_Calib::CleanWAVSAMP, ws,PA_ONLY=pao
   for i=0,n_elements(ws)-1 do begin
      pr=ws[i].PR
      if ptr_valid(pr) && n_elements(*pr) gt 0 then begin 
-        ptr_free,(*pr).PIXELS,(*pr).AREAS
-        for j=0,n_elements(*pr)-1 do begin 
-           if ptr_valid((*pr)[j].POLYGONS) then $
-              ptr_free,*(*pr)[j].POLYGONS, (*pr)[j].POLYGONS
-        endfor 
-        if keyword_set(pao) eq 0 then ptr_free,pr
+        ptr_free,(*pr).PIXELS,(*pr).AREAS,(*pr).POLYGONS,(*pr).POLY_INDS
+        if ~keyword_set(pao) then ptr_free,pr
      endif 
   endfor 
 end
@@ -1705,6 +1743,8 @@ pro IRS_Calib__define
       angle: 0.0, $             ;Angle, anti-clockwise about x axis
       PIXELS: ptr_new(), $      ;The pixels at least partially inside the PR
       AREAS: ptr_new(), $       ;The area inside the PR for each of PIXELS.
-      POLYGONS: ptr_new()}      ;(optional) the resulting clipped polygons
-                                ; as a list of pointers to 2xn coord pairs
+      POLYGONS: ptr_new(), $    ;(optional) the resulting clipped polygons
+                                ; as a list of 2xn coord pairs,
+                                ; indexed by POLY_INDS
+      POLY_INDS: ptr_new()}     ;reverse list for POLYGONS
 end
