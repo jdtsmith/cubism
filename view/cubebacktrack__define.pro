@@ -202,7 +202,10 @@ pro CubeBackTrack::On
                                           VALUE='Bad Pixel (Global)')
      self.wCBut_bcd_mark=widget_button(self.wMenu,/CHECKED_MENU, $
                                        VALUE='Bad Pixel (This Record)')
-  
+     self.wCBut_bcds_mark=widget_button(self.wMenu,/CHECKED_MENU, $
+                                      VALUE='Bad Pixel (These Records)')
+
+     
      widget_control, self.wBase, SET_UVALUE=self,/REALIZE
      make_widget_adjacent,self.wBase,self.parent
   
@@ -210,8 +213,8 @@ pro CubeBackTrack::On
      geom=widget_info(self.wList,/GEOMETRY)
      self.list_size_diff=geom.SCR_YSIZE- $
                          (widget_info(self.wBase,/GEOMETRY)).SCR_YSIZE
-     XManager,title, self.wBase,/NO_BLOCK, EVENT_HANDLER='CubeBackTrack_event', $
-              CLEANUP='CubeBackTrack_kill'
+     XManager,title, self.wBase,/NO_BLOCK, $
+              EVENT_HANDLER='CubeBackTrack_event',CLEANUP='CubeBackTrack_kill'
   endif 
   self.oDraw->MsgSignup,self,DRAW_MOTION=~self.lock,/DRAW_BUTTON
 end
@@ -290,10 +293,13 @@ pro CubeBackTrack::Event,ev
         pix=item.bcd_pix
         widget_control, self.wCBut_global_mark, SET_BUTTON=item.bad AND 1b
         widget_control, self.wCBut_bcd_mark, SET_BUTTON=(item.bad AND 2b) ne 0b
+        got=where((*self.list).bcd_pix eq item.bcd_pix)
+        widget_control, self.wCBut_bcds_mark, $
+                        SET_BUTTON=array_equal((*self.list)[got].bad AND 2b,2b)
         widget_displaycontextmenu,ev.id,ev.x,ev.y,self.wMenu
      end
      
-     'WIDGET_BUTTON': begin ;context menus
+     'WIDGET_BUTTON': begin     ;context menu buttons clicked
         item=widget_info(self.wList,/LIST_SELECT)
         if item lt 0 then return
         item=(*self.list)[item] ;the actual backtrack record
@@ -303,6 +309,12 @@ pro CubeBackTrack::Event,ev
            self.wCBut_bcd_mark: $ 
               self.cube->ToggleBadPixel,item.bcd_pix,/UPDATE, $
                                         RECORD_SET=item.dceid
+           self.wCBut_bcds_mark: begin 
+              got=where((*self.list).bcd_pix eq item.bcd_pix)
+              self.cube->ToggleBadPixel,item.bcd_pix,/UPDATE, $
+                                        RECORD_SET=(*self.list)[got].dceid, $
+                                        SET=~(item.bad AND 2b) 
+           end
         endcase 
         self->UpdateList
      end 
@@ -424,5 +436,6 @@ pro CubeBackTrack__define
       wList:0L, $               ;list widget
       wMenu:0L, $               ;context menu
       wCBut_global_mark: 0L, $  ;mark button (global)
-      wCBut_bcd_mark: 0L}       ;mark button (bcd)
+      wCBut_bcd_mark: 0L, $     ;mark button (bcd)
+      wCBut_bcds_mark: 0L}      ;mark button (these bcds)
 end
