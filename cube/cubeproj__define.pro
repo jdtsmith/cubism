@@ -1305,9 +1305,9 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
                              UPDATE=ud,AUTO=auto
   if n_elements(rset) ne 0 then rec=self->DCEIDtoRec(rset)
   if n_elements(rec) ne 0 then $
-     list=(*self.DR)[rec[0]].BAD_PIXEL_LIST $
+     list=(*self.DR)[rec].BAD_PIXEL_LIST $
   else begin 
-     ;; Fork if necessary
+     ;; Fork Global bad pixel list if necessary
      if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) && $
         self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST eq self.GLOBAL_BAD_PIXEL_list $
      then self.GLOBAL_BAD_PIXEL_LIST= $
@@ -1315,7 +1315,7 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
      list=self.GLOBAL_BAD_PIXEL_LIST
   endelse 
      
-  ;; Add or remove bp from appropriate list
+  ;; Add or remove bp from appropriate list(s)
   if n_elements(set) ne 0 then begin 
      do_set=keyword_set(set)
      do_clear=set eq 0
@@ -1326,51 +1326,63 @@ pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
   status_changed=0b
   set=1                         ;primary status is setting
   pix=reform(pix,/OVERWRITE)
-  if keyword_set(auto) then bit=2b else bit=1b
+  if keyword_set(auto) then bit=2b else bit=1b ;record auto-bad pix as such
   
   self->SetDirtyPix,pix,RECORD=rec ;; these pixels are now dirty
   
-  if ptr_valid(list) then begin ;; already have a list
-     keep=make_array(n_elements(*list),VALUE=1b)
-     
-     if do_set then begin 
-        wh=where_not_array(*list,[pix],cnt) ;new pix not on the list
-        if cnt gt 0 then add_new=pix[wh]
-     endif 
-     
-     if do_clear then begin 
-        wh=where_array([pix],*list,cnt) ;pix already on the list
-        if cnt gt 0 then begin 
-           keep[wh]=0b          ;toggle these off
-           set=0                ;signify that we're toggling at least some off
-        endif 
-     endif
+  for i=0,n_elements(list)-1 do begin 
+     if ptr_valid(list[i]) then begin ;; already have a list
+        keep=make_array(n_elements(*list[i]),VALUE=1b)
         
-     wh=where(keep,nkeep)
-     if nkeep eq 0 then begin 
-        if n_elements(add_new) eq 0 then begin 
-           ptr_free,list
-           status_changed=1b
-        endif else *list=add_new
-     endif else begin 
-        if n_elements(add_new) gt 0 then *list=[(*list)[wh],add_new] else $
-           *list=(*list)[wh]
-     endelse
-     self.GLOBAL_BP_TYPE OR=bit & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
-  endif else begin
-     if do_clear && ~do_set then return ;can't clear any if no list!
-     if n_elements(rec) ne 0 then $
-        (*self.DR)[rec[0]].BAD_PIXEL_LIST=ptr_new([pix]) $
-     else self.GLOBAL_BAD_PIXEL_LIST=ptr_new([pix])
-     status_changed=1b
-     self.GLOBAL_BP_TYPE OR=bit & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
-  endelse 
+        if do_set then begin 
+           wh=where_not_array(*list[i],[pix],cnt) ;new pix not on the list
+           if cnt gt 0 then add_new=pix[wh]
+        endif 
+     
+        if do_clear then begin 
+           wh=where_array([pix],*list[i],cnt) ;pix already on the list
+           if cnt gt 0 then begin 
+              keep[wh]=0b       ;toggle these off
+              set=0             ;signify that we're toggling at least some off
+           endif 
+        endif
+        
+        wh=where(keep,nkeep)
+        if nkeep eq 0 then begin 
+           if n_elements(add_new) eq 0 then begin 
+              ptr_free,list[i]
+              status_changed=1b
+           endif else *list[i]=add_new
+        endif else begin 
+           if n_elements(add_new) gt 0 then $
+              *list[i]=[(*list[i])[wh],add_new] $
+           else *list[i]=(*list[i])[wh]
+        endelse
+        self.GLOBAL_BP_TYPE OR=bit & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
+     endif else begin                      ; no list exists yet
+        if do_clear && ~do_set then return ;can't clear any if no list!
+        if n_elements(rec) ne 0 then $
+           (*self.DR)[rec[i]].BAD_PIXEL_LIST=ptr_new([pix]) $
+        else self.GLOBAL_BAD_PIXEL_LIST=ptr_new([pix])
+        status_changed=1b
+        self.GLOBAL_BP_TYPE OR=bit & self.GLOBAL_BP_SAVEFILE_UPTODATE=0b
+     endelse 
+  endfor 
   if ~self->Dirty() then begin 
      self->SetDirty
      self->UpdateTitle
   endif 
   if status_changed then self->UpdateButtons
   if keyword_set(ud) then self->Send,/BADPIX_UPDATE
+end
+
+
+;=============================================================================
+;  UpdateListForBPChange - Update the list if BPs are being listed.
+;=============================================================================
+pro CubeProj::UpdateListForBPChange
+  if ptr_valid(self.wInfo) && (*self.wInfo).which_list eq 1 then $
+     self->UpdateList     
 end
 
 ;=============================================================================
@@ -1579,18 +1591,21 @@ pro CubeProj::SetDirtyPix,RECORD=rec,pix
      list=(*self.DR)[rec].DIRTY_PIX
   endif else list=self.GLOBAL_DIRTY_PIX
   
-  if ~ptr_valid(list) then begin 
-     if n_elements(rec) ne 0 then $
-        (*self.DR)[rec].DIRTY_PIX=ptr_new(pix) $
-     else self.GLOBAL_DIRTY_PIX=ptr_new(pix)
-     self->UpdateButtons        ;new list, need updating
-     return
-  endif 
+  update=0b
+  for i=0,n_elements(list)-1 do begin 
+     if ~ptr_valid(list[i]) then begin 
+        if n_elements(rec) ne 0 then $
+           (*self.DR)[rec[i]].DIRTY_PIX=ptr_new(pix) $
+        else self.GLOBAL_DIRTY_PIX=ptr_new(pix)
+        update=1b
+     endif else begin 
+        wh=where_not_array(*list[i],[pix],cnt)
+        if cnt eq 0 then return ; already dirty
+        *list[i]=[*list[i],pix[wh]]
+     endelse 
+  endfor 
   
-  wh=where_not_array(*list,[pix],cnt)
-  
-  if cnt eq 0 then return       ; already dirty
-  *list=[*list,pix[wh]]
+  if update then self->UpdateButtons           ;new list, need updating
 end
 
 ;=============================================================================
@@ -4176,6 +4191,7 @@ pro CubeProj::BuildCube
         
         ;; Bin on count in the subset of dirty cube pixels
         count=(*rec.REV_ACCOUNT)[ind+1]-(*rec.REV_ACCOUNT)[ind]
+        if array_equal(count,0) then continue
         h=histogram(count,REVERSE_INDICES=dual,MIN=1)
         dual_cnt=n_elements(h) 
      endif else begin 
