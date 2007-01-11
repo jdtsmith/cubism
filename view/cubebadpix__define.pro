@@ -92,16 +92,13 @@ pro CubeBadPix::Message, msg
         if pt eq -1 then return
         if pt eq self.last_pt then return
         self.last_pt=pt
-        if self.press eq 2b then begin ;middle click: this bcd only
-           if ptr_valid(self.rec_set) then begin 
-              if n_elements(*self.rec_set) gt 1 then return
-              this_rec=(*self.rec_set)[0]
-           endif else return
-        endif 
+        if self.press eq 2b then $ ;middle click: this bcd only
+           if ptr_valid(self.rec_set) then recs=*self.rec_set else return
+        
         do_set=self.setting
-        self.cube->ToggleBadPixel,pt,SET=do_set,RECORD_SET=this_rec
+        self.cube->ToggleBadPixel,pt,SET=do_set,RECORD_SET=recs
         if do_set ne self.setting then return
-        self->DrawMark,pt,ERASE=~do_set,SINGLE_REC=n_elements(this_rec) gt 0
+        self->DrawMark,pt,ERASE=~do_set,SINGLE_REC=n_elements(recs) gt 0
      end 
         
      'DRAW_BUTTON': begin 
@@ -128,8 +125,9 @@ pro CubeBadPix::Message, msg
            self.setting=-1
            if got_one then begin 
               self.cuberec->MsgSignup,self,/NONE
-              self.cube->Send,/BADPIX_UPDATE ;let everyone but us know about changes
+              self.cube->Send,/BADPIX_UPDATE ;alert on new badpix (skipping us)
               self.cuberec->MsgSignup,self,/CUBEREC_UPDATE
+              if ptr_valid(self.rec_set) then self.cube->UpdateListForBPChange
            endif 
            return
         endif 
@@ -144,8 +142,7 @@ pro CubeBadPix::Message, msg
         
         if press eq 2b then begin ;control or middle click: this bcd only
            if ptr_valid(self.rec_set) then begin 
-              if n_elements(*self.rec_set) gt 1 then return
-              this_rec=(*self.rec_set)[0]
+              recs=*self.rec_set
            endif else begin 
               self.last_pt=-1
               return
@@ -155,9 +152,9 @@ pro CubeBadPix::Message, msg
         self.press=press
         self.last_pt=pt
         self.oDraw->MsgSignup,self,/DRAW_MOTION
-        self.cube->ToggleBadPixel,pt,SET=set,RECORD_SET=this_rec
+        self.cube->ToggleBadPixel,pt,SET=set,RECORD_SET=recs
         self.setting=set
-        self->DrawMark,pt,ERASE=~set,SINGLE_REC=n_elements(this_rec) gt 0
+        self->DrawMark,pt,ERASE=~set,SINGLE_REC=n_elements(recs) gt 0
      end
      
      'TVDRAW_SNAPSHOT': begin 
