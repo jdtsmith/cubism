@@ -14,12 +14,16 @@
 ;
 ; CALLING SEQUENCE:
 ;
-;    inds=polyfillaa(px,py,sx,sy,[AREAS=,POLYGONS=,/NO_COMPILED,/RECOMPILE])
+;    inds=polyfillaa(px,py,sx,sy,[POLY_INDICES=,
+;                    AREAS=,POLYGONS=,/NO_COMPILED,/RECOMPILE])
 ;
 ; INPUT PARAMETERS:
 ;
 ;    px,py: The vectors containing the x and y subscripts of the
-;       polygon.  May be in fractional units.
+;       polygon.  May be in fractional units.  These lists can contain
+;       multiple polygons concatenated together, which will all be
+;       clipped at once.  If multiple polygons are passed,
+;       POLY_INDICES must be set to separate inputs and outputs.
 ;
 ;    sx,sy: The size of the pixel grid on which the polygon is
 ;       superposed.  
@@ -37,13 +41,31 @@
 ;      succeeded once, to actually link to the recompiled version you
 ;      must unload the old version.
 ;
+;
 ; OUTPUT KEYWORD PARAMETERS:
 ;
 ;    AREAS: For each pixel index returned, the fractional area of that
 ;       pixel contained inside the polygon, between 0 and 1.
 ;
-;    POLYGONS: A list of pointers to 2xn arrays containing the polygon
-;       vertex information (as columns x,y).
+;    POLYGONS: A structure of the form {INDS: inds, POLYS: polys}
+;       where POLYS is a 2xn array containing the polygon vertex
+;       information (as columns x,y), and INDS is the reverse index of
+;       length n_poly_out + 1 (where n_poly_out is the total number of
+;       resulting clipped polygons).  POLYGONS can only be returned
+;       when clipping single polygons, and so cannot be used with
+;       POLY_INDICES.
+;
+;
+; INPUT/OUTPUT KEYWORD PARAMETERS:
+;
+;    POLY_INDICES: Only used for passing multiple encoded polygons,
+;      this keyword serves two purpose.  On input, it should be a
+;      "reverse index" style vector of length n_polygons + 1, where
+;      vec[i]:vec[i+1]-1 gives the indices into px and py
+;      corresponding to polygon i.  On output, it similarly lists the
+;      indices into inds, and areas, with vec[i]:vec[i+1] giving the
+;      range of indices corresponding to input polygon i.  Note that
+;      POLYGONS is not an allowed output with multiple polygons.
 ;
 ; OUTPUTS:
 ;
@@ -59,8 +81,8 @@
 ;    POLYFILLAA attempts to auto-compile a C-language version of the
 ;    clipping algorithm, found in polyclip.c.  In order for this
 ;    compilation to succeed, a compiler which IDL recognizes must be
-;    installed.  See MAKE_DLL and the !MAKE_DLL system variable for
-;    more information.
+;    installed.  See documentation for MAKE_DLL and the !MAKE_DLL
+;    system variable for more information.
 ;
 ; EXAMPLE:
 ;
@@ -99,89 +121,214 @@
 ;##############################################################################
 
 function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
-                     RECOMPILE=rc
+                     RECOMPILE=rc, POLY_INDICES=poly_inds
   common polyfillaa_external,polyclip_compiled,polyclip_path
   if n_elements(polyclip_compiled) eq 0 || keyword_set(rc) then begin 
      catch, err
      if err ne 0 then begin   ; any failure in compiling, just use the IDL vers
         message, $
            /CONTINUE, $
-           'Failed compiling DLM clipper -- reverting to internal version. '+ $
+           'DLM clipper failed -- reverting to internal version. '+ $
            'Error: '+!ERROR_STATE.MSG
         polyclip_compiled=0
      endif else begin 
         @cubism_dir
         path=filepath(ROOT=cubism_dir,'calib')
-        make_dll,'polyclip',['polyclip_test','polyclip'],INPUT_DIRECTORY=path,$
-                 DLL_PATH=polyclip_path,/REUSE_EXISTING
-        ;; Test for a correctly compiled library
-        tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE)
-        if tmp[0] ne 42b then $
-           message,'Testing clipper DLM: Incorrect value returned.'
+        reuse=~keyword_set(rc)  ; Don't reuse if re-compiling
+        done=0
+        i=1
+        while ~done && i le 2 do begin 
+           make_dll,'polyclip', $
+                    ['polyclip_test','polyclip_single','polyclip_multi'], $
+                    INPUT_DIRECTORY=path,$
+                    DLL_PATH=polyclip_path,REUSE_EXISTING=reuse, $
+                    EXTRA_CFLAGS=!VERSION.OS_FAMILY eq 'unix'?'-O2':''
+                                ;,EXTRA_CFLAGS='-DDEBUG'
+           
+           ;; Test for a correctly compiled library
+           tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE, $
+                             UNLOAD=keyword_set(rc))
+           
+           case tmp[0] of
+              42b: begin 
+                 message, /CONTINUE,'Outdated clipper detected, recompiling.'
+                 reuse=0b       ;old version, recompile it
+                 tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE, $
+                                   /UNLOAD) ; Unload it for next round compile
+              end 
+           
+              43b: done=1       ;correct version, continue
+              else: message,'Testing clipper DLM: Incorrect value returned.', $
+                            /NONAME
+           endcase
+           i++
+        endwhile 
+        if ~done then message,'Clipper version test failed.',/NONAME
         polyclip_compiled=1
      endelse 
-     catch,/cancel
+     catch,/cancel 
   endif
   
-  ;; Clip grid to the nearest enclosing region
-  left=floor(min(px,max=maxx))>0L
-  right=floor(maxx)<(sx-1L)
-  bottom=floor(min(py,max=maxy))>0L
-  top=floor(maxy)<(sy-1L)
-  nx=right-left+1L & ny=top-bottom+1L
-  if nx lt 1 || ny lt 1 then return,-1L
-  npol=long(n_elements(px)) & npix=long(nx*ny)
-  if npix le 0L then return,-1L
-  ret=lonarr(npix,/NOZERO)
-  apa=arg_present(areas)
-  areas=fltarr(npix,/NOZERO)
   app=arg_present(polys)
-  if app then polys=ptrarr(npix,/NOZERO)
-  ind=0L
+    
+  ;; See if we have multiple polygons passed
+  if n_elements(poly_inds) ne 0 then begin 
+     n_poly=n_elements(poly_inds)-1L
+     if app then $
+        message,'Clipped polygon output not supported for multiple poly inputs.'
+  endif else n_poly=1
   
-  if keyword_set(nc) OR polyclip_compiled eq 0 then begin ; IDL version
-     for j=bottom,top do begin 
-        for i=left,right do begin
-           px_out=px & py_out=py
-           polyclip,i,j,px_out,py_out
-           if px_out[0] eq -1 then continue
-           ret[ind]=i+j*sx
-           if apa then $
-              areas[ind]=abs(total(double(px_out)*shift(double(py_out),-1) - $
-                                   double(py_out)*shift(double(px_out),-1))/2.)
-           if app then $
-              polys[ind]=ptr_new([transpose(px_out),transpose(py_out)])
-           ind=ind+1L
-        endfor
+  ;; Count up the pixels from the various polygon's bounding boxes
+  if n_poly gt 1 then begin 
+     npix=0L                   ;use histogram over poly length
+     h=histogram(poly_inds[1:*]-poly_inds,OMIN=om,REVERSE_INDICES=ri)
+     bottom=lonarr(n_poly,/NOZERO) & top=lonarr(n_poly,/NOZERO)
+     left=lonarr(n_poly,/NOZERO) & right=lonarr(n_poly,/NOZERO)
+     
+     for i=0,n_elements(h)-1 do begin 
+        if ri[i] eq ri[i+1] then continue
+        targ=[h[i],i+om]
+        set=ri[ri[i]:ri[i+1]-1] ;the polys of this length
+        take=rebin(poly_inds[set],targ,/SAMPLE) + $ ;all the poly indices
+             rebin(lindgen(1,i+om),targ,/SAMPLE)
+        left[set]=floor(min(px[take],DIMENSION=2,MAX=maxx))>0L
+        right[set]=floor(maxx)<(sx-1L)
+        bottom[set]=floor(min(py[take],DIMENSION=2,max=maxy))>0L
+        top[set]=floor(maxy)<(sy-1L)
      endfor
-  endif else begin        ; Compiled code, use call_external and the shared lib
-     inds=reform(rebin(lindgen(nx),nx,ny)+left+ $
-                 (rebin(transpose(lindgen(ny)),nx,ny)+bottom)*sx, npix)
-     vi=inds mod sx & vj=inds/sx
-     px_out=fltarr((npol+4)*npix,/NOZERO)
-     py_out=fltarr((npol+4)*npix,/NOZERO)
-     ri_out=lonarr(npix+1)
+     nx=total(right-left+1,/PRESERVE_TYPE) 
+     ny=total(top-bottom+1,/PRESERVE_TYPE)
+  endif else begin              ; Single polygon
+     ;; Clip grid to the enclosing box
+     left=floor(min(px,max=maxx))>0L
+     right=floor(maxx)<(sx-1L)
+     bottom=floor(min(py,max=maxy))>0L
+     top=floor(maxy)<(sy-1L)
+     nx=right-left+1L & ny=top-bottom+1L
+     if nx lt 1 || ny lt 1 then return,-1L
+  endelse 
+  
+  npix=nx*ny
+  
+  if npix le 0L then return,-1L
+  
+  ;; npix is the maximum possible number of clipped polys
+  nverts=n_elements(px)         
+  apa=arg_present(areas)
+  if apa then areas=fltarr(npix,/NOZERO) 
+  
+  if keyword_set(nc) OR polyclip_compiled eq 0 then begin 
+     ;; --- pure IDL version
+     ind=0L
+     
+     ret=lonarr(npix,/NOZERO)
+     beg=0
+     for p=0L,n_poly-1 do begin 
+        nclip_poly=0L
+        if n_poly gt 1 then begin 
+           px1=px[beg:poly_inds[p+1]-1]
+           py1=py[beg:poly_inds[p+1]-1]
+        endif else begin 
+           px1=px
+           py1=py
+        endelse 
+        
+        for j=bottom[p],top[p] do begin 
+           for i=left[p],right[p] do begin
+              px_out=px1 & py_out=py1
+              polyclip,i,j,px_out,py_out
+              if px_out[0] eq -1 then continue
+              ret[ind]=i+j*sx
+              if apa then $
+                 areas[ind]=abs(total(double(px_out)* $
+                                      shift(double(py_out),-1)- $
+                                      double(py_out)* $
+                                      shift(double(px_out),-1))/2.)
+              if app then begin 
+                 if n_elements(polys_out_poly) eq 0 then begin
+                    polys_out_poly=[transpose(px_out),transpose(py_out)]
+                    polys_out_ind=[0,n_elements(px_out)]
+                 endif else begin 
+                    polys_out_poly=[[polys_out_poly], $
+                                [transpose(px_out),transpose(py_out)]]
+                    polys_out_ind=[polys_out_ind, $
+                                   polys_out_ind[n_elements(polys_out_ind)-1]+$
+                                   n_elements(px_out)]
+                 endelse 
+              endif 
+              ind++
+              nclip_poly++
+           endfor
+        endfor
+        if n_poly gt 1 then begin
+           beg=poly_inds[p+1]
+           poly_inds[p+1]=poly_inds[p] + nclip_poly
+        endif
+     endfor 
+     if app then polys=create_struct('POLYS',temporary(polys_out_poly), $
+                                     'INDS',temporary(polys_out_ind))
+     if apa then areas=areas[0:ind-1L]
+     ret=ret[0:ind-1L]
+  endif else begin        
+     ;; --- Compiled version, use call_external and the shared lib
      if size(px,/TYPE) eq 5 then begin ; No double please
         px=float(px) & py=float(py)
      endif
-     tmp=call_external(polyclip_path,'polyclip',$
-                       VALUE= $
-                       [0b,0b,1b,   0b,0b,1b,    0b,    0b,    0b,   0b], $
-                       vi,vj,npix,  px,py,npol,  px_out,py_out,areas,ri_out)
+     
+     nclip_poly=0L              ;actual number of clipped polygons
+     inds=lonarr(2,npix)        ;Output x,y indices which clipped the poly(s)
 
-     for i=0L,npix-1 do begin 
-        if ri_out[i] ge ri_out[i+1] then continue ;no overlap for this one
-        px_new=px_out[ri_out[i]:ri_out[i+1]-1] 
-        py_new=py_out[ri_out[i]:ri_out[i+1]-1]
-;         ;;oplot,[px_new,px_new[0]],[py_new,py_new[0]],COLOR=!D.TABLE_SIZE/2
-        ret[ind]=vi[i]+vj[i]*sx
-        areas[ind]=areas[i]
-        if app then polys[ind]=ptr_new([transpose(px_new),transpose(py_new)])
-        ind=ind+1L
-     endfor 
+     if n_poly gt 1 then begin 
+        ;; Multiple polys input: no output polygons; poly_inds is
+        ;; input/output for area & inds
+        tmp=call_external(polyclip_path,'polyclip_multi',$
+                          VALUE= $
+                          [0b,0b,0b,0b,$
+                           0b,0b, $
+                           1b,   0b, $
+                           0b, $
+                           0b, $
+                           0b], $
+                          left,right,bottom,top, $ ; bounding box arrays
+                          px,py, $            ; input polygon indices
+                          n_poly,poly_inds, $ ; indices per poly into px,py
+                          inds, $             ; OUT: x,y inds within array
+                          nclip_poly, $       ; OUT: final number clipped polys
+                          areas)              ; OUT: output areas
+        if nclip_poly eq 0L then return,-1L
+     endif else begin 
+        ;; Single poly input: ri_out is for output clipped polygons
+        ri_out=lonarr(npix+1)      
+        py_out=(px_out=fltarr((nverts+4)*npix,/NOZERO)) ; at most 4 new legs
+        
+        tmp=call_external(polyclip_path,'polyclip_single',$
+                          VALUE= $
+                          [1b, 1b,   1b,    1b,  $
+                           0b,0b,1b, $
+                           0b, $
+                           0b, $
+                           0b, $
+                           0b,0b,0b], $
+                          left,right,bottom,top, $ ; bound-box to consider
+                          px,py,nverts, $          ; input polygon indices
+                          inds, $                  ; OUT: x,y inds within array
+                          nclip_poly, $       ; OUT: final number clipped polys
+                          areas, $            ; OUT: output areas
+                          px_out,py_out,ri_out) ; OUT: clipped poly verts
+        
+        if nclip_poly eq 0L then return,-1L
+        if app then begin 
+           pmax=ri_out[nclip_poly]-1 ;max index into p[xy]_out
+           polys=create_struct('POLYS', $
+                               [transpose(px_out[0:pmax]), $
+                                transpose(py_out[0:pmax])],$
+                               'INDS',ri_out[0:nclip_poly])
+        endif 
+     endelse
+     
+     areas=areas[0:nclip_poly-1]
+     ret=reform(inds[0,0:nclip_poly-1]+sx*inds[1,0:nclip_poly-1],/OVERWRITE)
   endelse 
-  if ind eq 0L then return,-1
-  if apa then areas=areas[0L:ind-1L]
-  if app then polys=polys[0L:ind-1L]
-  return,ret[0L:ind-1L]
+  
+  return,ret
 end
