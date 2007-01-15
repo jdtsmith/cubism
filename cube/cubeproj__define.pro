@@ -4093,7 +4093,7 @@ pro CubeProj::BuildCube
      for k=0L,enabled_cnt-1 do begin 
         rec=(*self.DR)[enabled[k]]
         ri=*rec.REV_BCD_ACCOUNT
-        for i=0,1 do begin 
+        for i=0,1 do begin      ; record and global dirty pixels
            if i then begin 
               if ~global_dirty then continue
               pix=*self.GLOBAL_DIRTY_PIX
@@ -4122,6 +4122,11 @@ pro CubeProj::BuildCube
         self->ClearDirtyPix
         return 
      endif else begin 
+        ;; Eliminate duplicates.
+        if cube_dirty_cnt lt n_elements(cube_dirty_pix) then $
+           cube_dirty_pix=cube_dirty_pix[0L:cube_dirty_cnt-1L]
+        cube_dirty_pix=cube_dirty_pix[uniq(cube_dirty_pix,sort(cube_dirty_pix))]
+        cube_dirty_cnt=n_elements(cube_dirty_pix) 
         status=string(FORMAT='("Quick-Building ",I0,"x",I0,"x",I0,' + $
                       '" cube (",I0," dirty pixels - ",F0.1,"%)...")', $
                       self.CUBE_SIZE,cube_dirty_cnt, $
@@ -4129,8 +4134,7 @@ pro CubeProj::BuildCube
         self->Status,status
      endelse 
 
-     if cube_dirty_cnt lt n_elements(cube_dirty_pix) then $
-        cube_dirty_pix=cube_dirty_pix[0L:cube_dirty_cnt-1L]
+
      
      u=uniq(cube_dirty_pix,sort(cube_dirty_pix))
      cube_dirty_pix=cube_dirty_pix[u]
