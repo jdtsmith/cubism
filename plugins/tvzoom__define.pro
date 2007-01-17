@@ -237,14 +237,29 @@ pro tvZoom::ZoomIt, X, Y,TRANSLATE=translate
         return
      endif 
      ;; show as much as possible at 2x zoom, centered on pix
-     max=self.winsize/zoom
-     scale=keyword_set(translate)?2:4
-     halfsize=floor(max/scale-1)>1
+     max=floor(self.winsize/(zoom*(keyword_set(translate)?1.:2.)))
+     halfsize=((max-1)/2)>1
      
-     left=pix[0]-halfsize[0]>0
-     right=pix[0]+halfsize[0]<(size[0]-1)
-     bottom=pix[1]-halfsize[1]>0
-     top=pix[1]+halfsize[1]<(size[1]-1)
+     left=(pix[0]-halfsize[0])
+     if left le 0 then begin 
+        left=0
+        right=(left+2*halfsize[0])<(size[0]-1)
+     endif else right=pix[0]+halfsize[0]
+     if right gt (size[0]-1) then begin 
+        right=size[0]-1
+        left=(right-2*halfsize[0])>0
+     endif 
+     
+     bottom=(pix[1]-halfsize[1])
+     if bottom le 0 then begin 
+        bottom=0
+        top=(bottom+2*halfsize[1])<(size[1]-1)
+     endif else top=pix[1]+halfsize[1]
+     if top gt (size[1]-1) then begin 
+        top=size[1]-1
+        bottom=(top-2*halfsize[1])>0
+     endif 
+     
      offset=[left,bottom]
   endif else offset=offset+[left,bottom]
   
@@ -255,7 +270,7 @@ pro tvZoom::ZoomIt, X, Y,TRANSLATE=translate
   if ~keyword_set(translate) then begin 
      if ptr_valid(self.zoomlist) then begin 
         n=n_elements(*self.zoomlist) 
-        if array_equal((*self.zoomlist)[n-1].off, offset) AND $
+        if array_equal((*self.zoomlist)[n-1].off, offset) && $
            array_equal((*self.zoomlist)[n-1].size,dispsize) then return
         *self.zoomlist=[*self.zoomlist, {ZoomBox,offset, dispsize}]
      endif else  $
