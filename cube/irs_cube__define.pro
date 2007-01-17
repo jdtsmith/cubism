@@ -159,14 +159,42 @@ pro IRS_Cube::Save,sf
   endif 
 end
 
-
 ;=============================================================================
 ;  Read - Read a Cube file.
 ;=============================================================================
 pro IRS_Cube::Read,file
-  ;; XXXXXX
+  file=self->ReadFile(file)
+  
+  cube=readfits(file,hdr,/SILENT)
+  self->ReadHeader,hdr
+
+  self.cube=ptr_new(cube,/NO_COPY)
+  
+  unc_f=file_basename(file,'.fits')+'_unc.fits'
+  if file_test(unc_f,/READ) then $
+     self.cube_unc=ptr_new(readfits(unc_f,/SILENT))
+  
+  fxbopen,un,file,'WCS-TAB'
+  fxbread,un,wl,'WAVELENGTH'
+  fxbclose,un
+  
+  self.WAVELENGTH=ptr_new(reform(wl))
 end
 
+
+;=============================================================================
+;  ReadHeader - Read info from the FITS header
+;=============================================================================
+pro IRS_Cube::ReadHeader,hdr
+  if sxpar(hdr,'NAXIS') ne 3 then message,'Incorrect cube dimensions.'
+  self.cube_date=date2jul(sxpar(hdr,'CUBE-DT'))
+    
+  extast,hdr,astr,np
+  if np ne 3 then message,'Failed to identify cube astrometry.'
+  self.astrometry=ptr_new(astr,/NO_COPY)
+  
+  self->IRS_File_IO::ReadHeader,hdr
+end
 
 ;=============================================================================
 ;  Cleanup
