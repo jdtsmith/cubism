@@ -957,35 +957,47 @@ end
 ;=============================================================================
 pro CubeProj::Open,pname,PROJECT=proj,SUCCESS=success,_EXTRA=e
   if size(pname,/TYPE) ne 7 then begin 
-     xf,pname,/RECENT,FILTERLIST=['*.cpj','*.*','*'],$
+     xf,pname,/RECENT,FILTERLIST=['*.cpj','*.fits','*.*','*'],$
         TITLE='Load Cube Project...',/NO_SHOW_ALL,SELECT=0, $
         /MODAL,PARENT_GROUP=self->TopBase(),_EXTRA=e
   endif 
   widget_control, /HOURGLASS
   if size(pname,/TYPE) ne 7 then return ;cancelled
-  proj=self->Load(pname)
+  proj=self->Load(pname,type)
   success=obj_valid(proj)
   if ~success then return
   proj->SetProperty,/SPAWNED,CHANGED=0b
-  proj->Show,_EXTRA=e
+  if type eq 'fits' then proj->ViewCube,/NEW_VIEWER,/KILL_CUBE else $
+     proj->Show,_EXTRA=e
 end
 
 ;=============================================================================
 ;  Load - Load a Project from file
 ;=============================================================================
-function CubeProj::Load,file,ERROR=err
+function CubeProj::Load,file,type,ERROR=err
   on_error,2
   catch, err
   if err ne 0 then begin 
      catch,/cancel
+     if obj_valid(cube) then obj_destroy,cube
      self->Error,['Error loading project from '+file,!ERROR_STATE.MSG],$
                  /RETURN_ONLY
      return,-1
   endif
   if self->IsWidget() then widget_control,/HOURGLASS
-  cube=cubeproj_load(file)
+  
+  if stregex(file,'\.fits$',/BOOLEAN) then begin 
+     type='fits'
+     cube=obj_new('CubeProj')
+     cube->LoadCubeFromFITS,file
+  endif else begin 
+     cube=cubeproj_load(file)
+     type='cpj'
+  endelse 
   return,cube
 end
+
+
 
 ;=============================================================================
 ;  Initialize - We want to do this on Init or Load
@@ -1032,15 +1044,17 @@ pro CubeProj::Initialize
   
   ;; Default recent cube build parameters for older versions of cubes
   ;; (e.g. if loaded from file)
-  parts=stregex(self.version,'v([0-9.]+)',/SUBEXPR,/EXTRACT)
-  version=float(parts[1])
-  if version lt 0.95 then begin ;; Didn't know about IN_CUBE back then
-     if ptr_valid(self.DR) then (*self.DR).IN_CUBE=~(*self.DR).DISABLED
+  if self.version then begin 
+     parts=stregex(self.version,'v([0-9.]+)',/SUBEXPR,/EXTRACT)
+     version=float(parts[1])
+     if version lt 0.95 then begin ;; Didn't know about IN_CUBE back then
+        if ptr_valid(self.DR) then (*self.DR).IN_CUBE=~(*self.DR).DISABLED
+     endif 
+     if version lt 0.91 then self->SetProperty,OVERSAMPLE_FACTOR=1.0
+     if version lt 0.89 then self->SetProperty,/LOAD_MASKS
+     if version lt 0.87 then self->SetProperty,/USE_BACKGROUND
+     if version lt 0.82 then self->SetProperty,/RECONSTRUCTED_POSITIONS
   endif 
-  if version lt 0.91 then self->SetProperty,OVERSAMPLE_FACTOR=1.0
-  if version lt 0.89 then self->SetProperty,/LOAD_MASKS
-  if version lt 0.87 then self->SetProperty,/USE_BACKGROUND
-  if version lt 0.82 then self->SetProperty,/RECONSTRUCTED_POSITIONS
 end
 
 ;=============================================================================
@@ -2172,7 +2186,7 @@ end
 ;               indicated by the CUBE keyword (default to BCD mode)
 ;=============================================================================
 pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode, $
-                         VISUALIZE_MODE=vmode
+                         VISUALIZE_MODE=vmode,_EXTRA=e
   FORWARD_FUNCTION LookupManagedWidget
   
   recs=self->GetMsgObjs(CLASS='CubeRec')
@@ -2211,7 +2225,8 @@ pro CubeProj::FindViewer,NEW_VIEWER=new_viewer,CUBE_MODE=cube_mode, $
      
   ;; Do we need a new viewer?  Spawn one if necessary (i.e. if requested).
   if keyword_set(new_viewer) then begin 
-     cubeview,CUBE=self     ;have them sign up for all our messages, by default
+     ;; Have them sign up for all our messages, by default
+     cubeview,CUBE=self,_EXTRA=e 
      return
   endif
   
@@ -2235,9 +2250,9 @@ end
 ;=============================================================================
 ;  ViewCube - View the cube in an existing or new viewer
 ;=============================================================================
-pro CubeProj::ViewCube,NEW_VIEWER=new
+pro CubeProj::ViewCube,NEW_VIEWER=new,_EXTRA=e
   if NOT ptr_valid(self.CUBE) then self->Error,'No cube to view'
-  self->FindViewer,/CUBE_MODE,NEW_VIEWER=new
+  self->FindViewer,/CUBE_MODE,NEW_VIEWER=new,_EXTRA=e
   self->Send,/CUBE
 end
 
@@ -3097,7 +3112,7 @@ end
 ;=============================================================================
 pro CubeProj::GetProperty, $ 
    ;; Pointer or data, depending on POINTER
-   POINTER=ptr,ACCOUNT=account,WAVELENGTH=wave, CUBE=cube, $
+   POINTER=ptr,WAVELENGTH=wave, CUBE=cube, $
    UNCERTAINTY_CUBE=unc, DR=dr, BACKGROUND=bg, PMASK=pmask, $  
    ;; Global or AS_BUILT options
    AS_BUILT=as_built, GLOBAL_BAD_PIXEL_LIST=gbpl,APERTURE=ap, MODULE=module, $
@@ -3111,8 +3126,8 @@ pro CubeProj::GetProperty, $
    SAVE_ACCOUNT=sa, CUBE_DATE=cdate, $
    ;; Record based property options
    ALL_RECORDS=all_recs,RECORDS=recs, RECORD_SET=rec_set, DATE_OBS=dobs, $
-   BAD_PIXEL_LIST=bpl, FILENAMES=fn, DCEID=dceid, DISABLED=dis, $
-   _REF_EXTRA=e
+   ACCOUNTS_VALID=av,BAD_PIXEL_LIST=bpl, FILENAMES=fn, DCEID=dceid, $
+   DISABLED=dis,  _REF_EXTRA=e
    
   if n_elements(e) ne 0 then begin ;; chain up the inheritance chain
      self->ObjMsg::GetProperty,_EXTRA=e
@@ -3121,8 +3136,6 @@ pro CubeProj::GetProperty, $
   
   ;;--- Global, potentially pointer-based data
   ptr=keyword_set(ptr)
-  if arg_present(account) && ptr_valid(self.ACCOUNT) then $
-     account=ptr?self.account:*self.account
   if arg_present(wave) && ptr_valid(self.WAVELENGTH) then $
      wave=ptr?self.WAVELENGTH:*self.WAVELENGTH
   if arg_present(cube) && ptr_valid(self.CUBE) then $
@@ -3245,7 +3258,7 @@ pro CubeProj::GetProperty, $
         endfor 
      endelse 
   endif 
-  
+  if arg_present(av) then av=ptr_valid((*self.DR)[recs].ACCOUNT)
   if arg_present(fn) then fn=(*self.DR)[recs].file
   if arg_present(dis) then dis=(*self.DR)[recs].DISABLED
   if arg_present(dceid) then dceid=(*self.DR)[recs].DCEID
@@ -4121,23 +4134,19 @@ pro CubeProj::BuildCube
      if cube_dirty_cnt eq 0L then begin 
         self->ClearDirtyPix
         return 
-     endif else begin 
-        ;; Eliminate duplicates.
-        if cube_dirty_cnt lt n_elements(cube_dirty_pix) then $
-           cube_dirty_pix=cube_dirty_pix[0L:cube_dirty_cnt-1L]
-        cube_dirty_pix=cube_dirty_pix[uniq(cube_dirty_pix,sort(cube_dirty_pix))]
-        cube_dirty_cnt=n_elements(cube_dirty_pix) 
-        status=string(FORMAT='("Quick-Building ",I0,"x",I0,"x",I0,' + $
-                      '" cube (",I0," dirty pixels - ",F0.1,"%)...")', $
-                      self.CUBE_SIZE,cube_dirty_cnt, $
-                      100.*cube_dirty_cnt/product(self.CUBE_SIZE))
-        self->Status,status
-     endelse 
-
-
+     endif 
      
-     u=uniq(cube_dirty_pix,sort(cube_dirty_pix))
-     cube_dirty_pix=cube_dirty_pix[u]
+     ;; Eliminate duplicates.
+     if cube_dirty_cnt lt n_elements(cube_dirty_pix) then $
+        cube_dirty_pix=cube_dirty_pix[0L:cube_dirty_cnt-1L]
+     cube_dirty_pix=cube_dirty_pix[uniq(cube_dirty_pix,sort(cube_dirty_pix))]
+     cube_dirty_cnt=n_elements(cube_dirty_pix) 
+     status=string(FORMAT='("Quick-Building ",I0,"x",I0,"x",I0,' + $
+                   '" cube (",I0," dirty pixels - ",F0.1,"%)...")', $
+                   self.CUBE_SIZE,cube_dirty_cnt, $
+                   100.*cube_dirty_cnt/product(self.CUBE_SIZE))
+     self->Status,status
+
      cube_dirty_x=cube_dirty_pix mod cube_plane_pix
      cube_dirty_y=cube_dirty_x/cube_width
      cube_dirty_x mod=cube_width
@@ -4150,7 +4159,7 @@ pro CubeProj::BuildCube
         cube_unc=temporary(*self.CUBE_UNC)
         cube_unc[cube_dirty_pix]=!VALUES.F_NAN
      endif 
-  endif else begin 
+  endif else begin              ; A fresh build
      status=string(FORMAT='("Building ",I0,"x",I0,"x",I0," cube...")', $
                    self.CUBE_SIZE)
      self->status,status
@@ -4282,7 +4291,7 @@ pro CubeProj::BuildCube
   
   ;; Normalize by areas
   if quickbuild then begin 
-     ;; Just the dirty pixels
+     ;; Just do the dirty pixels
      areas[cube_dirty_pix]>=1.e-10 ;avoid divide by zero errors
      cube[cube_dirty_pix]/=areas[cube_dirty_pix]
      self.CUBE=ptr_new(cube,/NO_COPY)
@@ -4493,6 +4502,10 @@ end
 ;                          +w and +x correspond, EXCEPT FOR LH, where +w=-x
 ;=============================================================================
 function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
+  ;; If astrometry has been recovered from FITS, it's all we've got,
+  ;; so return it
+  if ptr_valid(self.RECOV_ASTROM) then return,*self.RECOV_ASTROM
+  
   RADEG = 180.0d/!DPI           ; preserve double
   angle=(self.PA + 90.D)/RADEG
   if self.module eq 'LH' then angle+=180./RADEG
@@ -4689,7 +4702,7 @@ end
 function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow,COUNT=cnt, ERROR=err
   nrec=self->N_Records()
   if nrec eq 0 then return,-1
-  if ~(self.ACCOUNTS_VALID AND 1b) OR $
+  if self->Dirty(/ACCOUNTS) || $
      array_equal(ptr_valid((*self.DR).ACCOUNT),0b) then begin 
      self->Error,"Must rebuild cube to backtrack",RETURN_ONLY=arg_present(err)
      err=1
@@ -4811,13 +4824,13 @@ end
 ;=============================================================================
 ;  BackTrackFullCube - Run backtracking over the full array of cube
 ;                      pixel values into a reverse-indices style
-;                      array: highly-optimized: much faster than one
-;                      at a time.
+;                      array: highly-optimized (much faster than one
+;                      at a time).
 ;=============================================================================
 pro CubeProj::BackTrackFullCube,bcd_pix,vals,cnt_vec,dceid,BCD_UNC=unc
   nrec=self->N_Records()
   if nrec eq 0 then return
-  if ~(self.ACCOUNTS_VALID AND 1b) || $
+  if self->Dirty(/ACCOUNTS) || $
      array_equal(ptr_valid((*self.DR).ACCOUNT),0b) then $
         self->Error,"Accounts not valid: must rebuild cube"
   
@@ -5227,9 +5240,7 @@ end
 ;  AddOutputInfo - Add the output info only we know.
 ;=============================================================================
 pro CubeProj::AddOutputInfo,out_obj,_EXTRA=e
-  self->LoadCalib
-  calname=self.cal->Name()
-  if calname eq '' then calname=self.cal_file
+  calname=self.cal_file
   fullname=irs_fov(MODULE=self.MODULE,ORDER=self.ORDER,POSITION=0,/SLIT_NAME, $
                    /LOOKUP_MODULE)
   out_obj->SetProperty,SOFTWARE='CUBISM',VERSION=self.version, $
@@ -5238,6 +5249,19 @@ pro CubeProj::AddOutputInfo,out_obj,_EXTRA=e
   widget_control,/HOURGLASS  
 end
 
+
+;=============================================================================
+;  ParseCubeHeaderInfo - Read local information from the cube header.
+;=============================================================================
+pro CubeProj::ParseCubeHeaderInfo,in_obj
+  in_obj->GetProperty,HEADER=hdr
+  
+  self.CUBE_SIZE=sxpar(hdr,'NAXIS*')
+  
+  ;; Here we assume the first header gives a valid step setup
+  self.NSTEP=[sxpar(hdr,'STEPSPER'),sxpar(hdr,'STEPSPAR')]
+  self.STEP_SIZE=[sxpar(hdr,'SIZEPER'),sxpar(hdr,'SIZEPAR')]/3600.D
+end
 
 ;=============================================================================
 ;  SaveCube - Save the cube using a cube object
@@ -5273,6 +5297,44 @@ pro CubeProj::SaveCube,file,COMMENTS=comm
   if n_elements(comm) ne 0 then oC->AddHist,comm,/COMMENT
 
   oC->Save,file
+  obj_destroy,oC
+end
+
+;=============================================================================
+;  LoadCubeFromFITS - Load a cube from a FITS file (not all data complete)
+;=============================================================================
+pro CubeProj::LoadCubeFromFITS,file
+  oC=obj_new('IRS_Cube')
+  oC->Read,file
+  self->ParseCubeHeaderInfo,oC
+  
+  oC->GetProperty,CUBE_FLUX=cube,CUBE_UNCERTAINTY=cunc,ASTROMETRY=astr, $
+                  CUBE_DATE=date,WAVELENGTH=wl,CAL_SET=cal,APERNAME=aper, $
+                  SOFTWARE=soft, VERSION=soft_ver,FLUX_UNITS=un
+  
+  if soft ne 'CUBISM' then begin 
+     obj_destroy,oC
+     self->Error,'Not a CUBISM FITS cube.'
+  endif 
+  
+  void=irs_fov(strtrim(aper,2)+'_cen',MODULE=md,ORDER=ord,/SHORT_NAME)
+  self.MODULE=md
+  self.ORDER=ord
+  self.VERSION=soft_ver
+  
+  self.cal_file=cal
+  
+  
+  ptr_free,self.cube,self.cube_unc,self.WAVELENGTH,self.RECOV_ASTROM
+  self.cube=ptr_new(cube,/NO_COPY)
+  self.WAVELENGTH=ptr_new(wl)
+  if n_elements(cunc) gt 0 then self.cube_unc=ptr_new(cunc,/NO_COPY)
+  self.cube_date=date
+  self.RECOV_ASTROM=ptr_new(astr)
+  self.ProjectName=file_basename(file,'.fits')+' [FITS]'
+  
+  if un eq 'MJy/sr' || un eq 'Jy/pix' then self.fluxcon=1b
+  if stregex(un,'/sr',/BOOLEAN) then self.pix_omega=1b
   obj_destroy,oC
 end
 
@@ -6255,7 +6317,7 @@ pro CubeProj::Cleanup
   heap_free,self.AS_BUILT
   ptr_free,self.APERTURE,self.CUBE,self.CUBE_UNC, $
            self.BACKGROUND,self.BACKGROUND_UNC, $
-           self.wInfo,self.WAVELENGTH, $
+           self.wInfo,self.WAVELENGTH,self.RECOV_ASTROM, $
            self.VISUALIZE_HEADER,self.VISUALIZE_IMAGE, $
            self.AUTO_BPL.BCD_PIX,self.AUTO_BPL.BCD_VALS, $
            self.AUTO_BPL.DCEID,self.AUTO_BPL.BCD_UNC,self.AUTO_BPL.CNT_VEC
@@ -6354,6 +6416,7 @@ pro CubeProj__define
      BACKGROUND: ptr_new(),$    ;the background image (if any) to subtract
      BACKGROUND_UNC:ptr_new(),$ ;the uncertainty in the background
      BG_SP: ptr_new(), $        ;2xn background spectrum for 1D subtractions
+     RECOV_ASTROM: ptr_new(), $ ;astrometry recovered from file
      PA:0.0D, $                 ;optimized position angle of the cube
      VISUALIZE_FILE:'',$        ;file for visualization image
      VISUALIZE_IMAGE:ptr_new(),$ ;image for AOR visulization
