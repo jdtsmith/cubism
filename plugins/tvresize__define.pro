@@ -68,6 +68,13 @@
 ;
 ;##############################################################################
 
+pro tvResize::Message,msg
+  if msg.press gt 0 && msg.type eq 5 then begin 
+     v=msg.ch-48
+     if v ge 0 && v le 4 then self->Resize,v-1,WRAP=v eq 0
+  endif 
+end
+
 pro tvResize_event,ev
   widget_control, ev.handler,GET_UVALUE=self
   self->Event,ev
@@ -75,7 +82,11 @@ end
 
 pro tvResize::Event,ev
   widget_control, ev.id,GET_UVALUE=val
-  if size(val,/type) eq 7 then begin 
+  self->Resize,val,WRAP=size(val,/type) eq 7
+end
+
+pro tvResize::Resize,val,WRAP=wrap
+  if keyword_set(wrap) then begin 
      device,get_screen_size=ss
      self.oDraw->GetProperty,ZOOM=zm,SIZE=sz,WINSIZE=winsize
      maxsz=ss*2/3
@@ -89,9 +100,11 @@ pro tvResize::Event,ev
      self.oDraw->SetProperty,WINSIZE=targ,OFFSET=[0,0]
   endif else begin 
      val=(*self.sizes)[val]
-     self.oDraw->SetProperty,WINSIZE=[val,val]
+     self.oDraw->SetProperty,WINSIZE=[val,val]     
   endelse 
+  
 end
+
 
 pro tvResize::BuildMenu
   if ~ptr_valid(self.sizes) then return
@@ -121,7 +134,7 @@ function tvResize::Init,oDraw,sizes,SIZE_MENU=menu
         self->BuildMenu
      endif 
   endif 
-     
+  self.oDraw->MsgSignup,self,/DRAW_KEY
   return,1
 end
 
