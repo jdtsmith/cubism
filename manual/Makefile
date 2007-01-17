@@ -11,7 +11,7 @@ TEXI2DVI = texi2dvi
 MAKEINFO = makeinfo
 
 # How to create the HTML file
-TEXI2HTML = texi2html --split chapter -number
+TEXI2HTML = texi2html --split chapter -number --init-file cubism_texi2html.init
 
 # How to create the PDF file
 TEXI2PDF = texi2pdf
