@@ -62,7 +62,6 @@ end
 pro IRS_File_IO::SetProperty,FITS=fits,IPAC_TABLE=it,VERSION=cv, $
                              CAL_SET=cs, SOFTWARE=soft, FLUX_UNITS=fu, $
                              APERNAME=an
-                             
   if n_elements(fits) ne 0 then new_fits=keyword_set(fits) else $
      if n_elements(it) ne 0 then new_fits=~keyword_set(it)
   if n_elements(new_fits) ne 0 && new_fits ne self.fits then $
@@ -73,6 +72,34 @@ pro IRS_File_IO::SetProperty,FITS=fits,IPAC_TABLE=it,VERSION=cv, $
   if n_elements(soft) ne 0 then self.software=soft
   if n_elements(fu) ne 0 then self.flux_units=fu
   if n_elements(an) ne 0 then self.apername=an
+end
+
+;=============================================================================
+;  GetProperty
+;=============================================================================
+pro IRS_File_IO::GetProperty,HEADER=hdr,SOFTWARE=sw,VERSION=vers, $
+                             APERNAME=aper,CAL_SET=cs,FLUX_UNITS=fu, $
+                             _REF_EXTRA=e
+  if arg_present(hdr) && ptr_valid(self.hdr) then hdr=*self.hdr
+  if arg_present(sw) then sw=self.software
+  if arg_present(vers) then vers=self.version
+  if arg_present(cs) then cs=self.cal
+  if arg_present(aper) then aper=self.apername
+  if arg_present(fu) then fu=self.flux_units
+  self->ObjMsg::GetProperty,_EXTRA=e
+end
+
+;=============================================================================
+;  ReadHeader
+;=============================================================================
+pro IRS_File_IO::ReadHeader,hdr
+  ptr_free,self.hdr
+  self.hdr=ptr_new(hdr,/NO_COPY)
+  self.apername=self->GetPar('APERNAME')
+  self.version=strtrim(self->GetPar('SOFT_VER'),2)
+  self.cal=strtrim(self->GetPar('CAL_SET'),2)
+  self.software=strtrim(self->GetPar('SOFTWARE'),2)
+  self.flux_units=strtrim(self->GetPar('BUNIT'),2)
 end
 
 ;=============================================================================
@@ -96,6 +123,14 @@ pro IRS_File_IO::InitHeader,data,_EXTRA=e
                                      ' Product assembly software'
   if self.version then $
      self->AddPar,'SOFT_VER',self.version,' Software version used'
+end
+
+;=============================================================================
+;  GetPar
+;=============================================================================
+function IRS_File_IO::GetPar,name
+  if self.fits then return,sxpar(*self.hdr,name) else $
+     return,ipac_table_xpar(*self.hdr,name)
 end
 
 ;=============================================================================
@@ -204,7 +239,7 @@ function IRS_File_IO::ReadFile,sf
      if size(file,/TYPE) ne 7 then return,-1
      sf=file
   endif
-  if size(sf,/TYPE) eq 7 then self.fits=stregex(sf,'\.fits\$',/BOOLEAN)
+  if size(sf,/TYPE) eq 7 then self.fits=stregex(sf,'\.fits$',/BOOLEAN)
   return,sf
 end 
 
