@@ -238,21 +238,19 @@ pro tvSwitcher::Start
   self.wTList=ptr_new(lonarr(no))
   ;; Add them to a tool menu in two separate categories (if appropriate)
   exc=where((*self.MsgList).EXCLUSIVE,ecnt,COMPLEMENT=tog,NCOMPLEMENT=tcnt)
-  for i=0,ecnt-1 do begin 
-     desc=objs[exc[i]]->Description()
-     if (*self.MsgList)[i].keys then desc+=" ("+(*self.MsgList)[i].keys+")"
-     if NOT keyword_set(desc) then continue
-     (*self.wTList)[exc[i]]= $  
-        widget_button(self.toolMenu,value=desc,UVALUE=exc[i],/CHECKED_MENU, $
-                      SENSITIVE=objs[exc[i]]->Enabled())
-  endfor 
   
-  for i=0,tcnt-1 do begin 
-     desc=objs[tog[i]]->Description()
-     if NOT keyword_set(desc) then continue
-     (*self.wTList)[tog[i]]= $
-        widget_button(self.toolMenu,value=desc,UVALUE=tog[i],/CHECKED_MENU, $
-                      SEPARATOR=i eq 0, SENSITIVE=objs[tog[i]]->Enabled()) 
+  for t=0,1 do begin 
+     list=t?tog:exc
+     for i=0,(t?tcnt:ecnt)-1 do begin 
+        desc=objs[list[i]]->Description()
+        if (*self.MsgList)[list[i]].keys then $
+           desc+=" ("+(*self.MsgList)[list[i]].keys+")"
+        if ~keyword_set(desc) then continue
+        (*self.wTList)[list[i]]= $  
+           widget_button(self.toolMenu,value=desc,UVALUE=list[i], $
+                         /CHECKED_MENU,SENSITIVE=objs[list[i]]->Enabled(), $
+                         SEPARATOR=t eq 1 && i eq 0)
+     endfor 
   endfor 
   
   widget_control, self.topmenu,/UPDATE
