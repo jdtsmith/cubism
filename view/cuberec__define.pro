@@ -145,7 +145,7 @@ pro CubeRec::Message, msg
         if ptr_valid(msg.RECORD_SET) then self.rec_set=ptr_new(*msg.RECORD_SET)
         self->SwitchMode,/BCD
      end
-     'CUBEPROJ_CUBE': begin 
+     'CUBEPROJ_CUBE': begin     ; a cube to view
         widget_control, self.wInfoLine,set_value='Cube: '+msg.INFO
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
         self.cube=msg.CUBE
