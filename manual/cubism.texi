@@ -1068,6 +1068,7 @@ Create a new CUBISM project, prompting for the name.
 Open an existing CUBISM project, or a CUBISM FITS cube for display.
 
 @item Save Setup
+Set the options for saving projects.
 
 @table @code
 @item Save Data with Project
@@ -1326,6 +1327,8 @@ an average of trimmed-average combination.
 Load a saved list of background records to use from a @file{.bgl} file.
 
 @item Background Blend
+Blend data to create background.
+
 @table @code
 @item Set and Scale Background A...
 Set the first background in a blend from the selected records,
@@ -1473,39 +1476,39 @@ information recorded is:
 
 @multitable @columnfractions .15 .85
 
-@item @samp{ID}
+@item @code{ID}
 @tab A (hopefully) unique ID formed from filename.
 
-@item @samp{Exp}
-@tab The @samp{BCD} exposure time in seconds (from the headers).
+@item @code{Exp}
+@tab The @code{BCD} exposure time in seconds (from the headers).
 
-@item @samp{Observed}
-@tab The date and time the @samp{BCD} observation (GMT).
-@item @samp{Added}
+@item @code{Observed}
+@tab The date and time the @code{BCD} observation (GMT).
+@item @code{Added}
 @tab The date and time this data record was added to the project (local
 time zone).
 
-@item @samp{Type}
-@tab The type of the record, encoded as @samp{tMMO_pos}, with
+@item @code{Type}
+@tab The type of the record, encoded as @code{tMMO_pos}, with
 
 @itemize @bullet
-@item @samp{t}: The type of data record -- @samp{d} for @samp{DROOPRES},
-@samp{c} for @samp{COADD}, @samp{f} for @samp{FLATAP}, or blank for the
+@item @code{t}: The type of data record: @code{d} for @samp{DROOPRES},
+@code{c} for @samp{COADD}, @code{f} for @samp{FLATAP}, or blank for the
 (by far most common) @samp{BCD} (@pxref{Record Data Types}).
 
-@item @samp{M}: The module -- @samp{SL}, @samp{SH}, @samp{LL}, or @samp{LH}.
+@item @code{MM}: The module: @samp{SL}, @samp{SH}, @samp{LL}, or @samp{LH}.
 
-@item @samp{O}: The targeted order -- @samp{1}, @samp{2}, or blank, for
+@item @code{O}: The targeted order: @code{1}, @code{2}, or blank, for
 high-res or full-slit low-res (e.g. @samp{LLBoth}) targeting.
 
-@item @samp{pos}: The position within the slit which was targeted --
-@samp{cen}: the slit center, @samp{a}: nod position 1, @samp{b}: nod
-position 2).  @samp{b}: nod position 2.
+@item @code{pos}: The position within the slit which was targeted:
+@code{cen}: the slit center, @code{a}: nod position 1, @code{b}: nod
+position 2.
 @end itemize
 
-@item @samp{Step}
-@tab The step sequence within the map as @samp{I[X,Y]}, where @samp{I}
-is the @samp{EXPID} of this step, and @samp{X} and @samp{Y} are the row
+@item @code{Step}
+@tab The step sequence within the map as @code{I[X,Y]}, where @code{I}
+is the @code{EXPID} of this step, and @code{X} and @code{Y} are the row
 and column positions within the map.
 
 @end multitable
@@ -1516,31 +1519,31 @@ This page includes:
 
 @multitable @columnfractions .15 .85
 
-@item @samp{RA}
+@item @code{RA}
 @tab RA targeted by the slit field of view position (J2000).
 
-@item @samp{DEC}
+@item @code{DEC}
 @tab DEC targeted by the slit field of view position (J2000).
 
-@item @samp{DATA}
+@item @code{DATA}
 @tab Whether the data for this record are loaded, rather than just a
 link to the file.  Data are loaded on demand.
 
-@item @samp{UNC}
+@item @code{UNC}
 @tab Whether the associated uncertainty data for this record are
 loaded.  These are discovered automatically alongside the primary data
 products and loaded.
 
-@item @samp{BMSK}
-@tab Whether the associated @samp{BMASK} mask data for this record are
-loaded.  The @samp{BMASKs} are discovered automatically alongside the
+@item @code{BMSK}
+@tab Whether the associated @code{BMASK} mask data for this record are
+loaded.  The @code{BMASKs} are discovered automatically alongside the
 primary data products and loaded.
 
-@item @samp{ACCT}
+@item @code{ACCT}
 @tab Whether the ``accounting information'' for this record is cached,
-mapping @samp{BCD} pixels to sky pixels.
+mapping @code{BCD} pixels to sky pixels.
 
-@item @samp{BPL}
+@item @code{BPL}
 @tab How many record level bad pixels exist for this record
 (@pxref{Bad Pixels}).
 
@@ -1548,7 +1551,7 @@ mapping @samp{BCD} pixels to sky pixels.
 
 The records can be sorted by any of the available data fields by
 clicking the button associated with each header word, e.g. to sort by
-RA, click @samp{RA}.
+RA, click @code{RA}.
 
 @node Record Enabled State, Record Data Types, Record Info, Data Records
 @subsubsection Record Enabled State
@@ -1731,6 +1734,7 @@ Close the viewer window.
 Change the display color map for the image and color bar.
 
 @item Scale Image
+
 @table @code
 @item Linear
 Scale image linearly between the clipping limits.
@@ -1758,6 +1762,7 @@ Lock/Unlock the low and high scale clipping limits at their current value.
 This can also be done with @key{Space}.
 
 @item Set Size
+
 @table @code
 
 @item 256,384,512,768
@@ -2607,6 +2612,7 @@ by which @samp{Mouse:} mode is selected in the button panes above:
 Click twice to zoom in on the wavelength or flux scale.
 
 @item Region/Lambda
+
 @table @code
 @item Full Cube
 Clicking on a wavelength plane sends that plane to the viewer.  The
