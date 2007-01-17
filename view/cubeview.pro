@@ -73,14 +73,14 @@
 ;
 ;##############################################################################
 pro cubeview_cleanup,id
-  widget_control, id, get_uvalue=objs
-  obj_destroy,objs
+  widget_control, id, get_uvalue=kill
+  obj_destroy,kill
 end
 
 pro cubeview_event,ev
-  widget_control, ev.id,GET_UVALUE=uv
-  if size(uv,/TYPE) eq 7 && uv eq "quit" then begin 
+  if widget_info(ev.id,/UNAME) eq "quit" then begin 
      widget_control, ev.top, /DESTROY ;quit
+     cubeview_cleanup,ev.id
      return
   endif
   
@@ -89,7 +89,7 @@ pro cubeview_event,ev
 end
 
 pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
-             ODRAW=odraw,CUBE=cube,_EXTRA=e
+             ODRAW=odraw,CUBE=cube,KILL_CUBE=kc,_EXTRA=e
   if n_elements(sz) eq 0 then sz=[384L,384L]
   if n_elements(sz) eq 1 then sz=[sz,sz]
   if n_elements(xn) eq 0 then xn='CubeView'
@@ -98,28 +98,24 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   base=widget_base(/COLUMN,SPACE=1,/BASE_ALIGN_CENTER,TITLE=ttl,MBAR=mbar, $
                    /TRACKING_EVENTS)
   
-  ;; a base for all our buttons, at top
+  ;; A base for all our buttons, at top
   sbase=widget_base(base,/COLUMN,/ALIGN_LEFT)
   
-  ;; a color bar canvas, for later use by the color tool
-  cbar=widget_draw(base,xsize=sz[0],ysize=sz[1]/10,/FRAME,_EXTRA=e)
+  ;; A color bar canvas, for later use by the color tool
+  cbar=widget_draw(base,xsize=sz[0],ysize=(sz[1]/10)>30,/FRAME,_EXTRA=e)
   
-  ;; the tvDraw object and draw canvas, and message-passer extraordinaire
+  ;; The tvDraw object and draw canvas, and message-passer extraordinaire
   oDraw=obj_new('tvDraw',base,TVD_XSIZE=sz[0],TVD_YSIZE=sz[1], $
                 /INVISIBLE_BASE,_EXTRA=e)
 
-  ;; Menus
+  ;; Menus (many tools add their own menu items below)
   file_menu=widget_button(mbar,value="File",/MENU) 
-  ;;  "Print..." tool in file menu (uses David Fanning's excellent
-  ;; `FSC_PSConfig' to configure the print job)
-;  tmp=obj_new('tvPrint',oDraw,file_menu,_EXTRA=e)
   tmp=obj_new('tvExportImage',oDraw,file_menu,_EXTRA=e)
-;  tmp=obj_new('tvExportImage',oDraw,file_menu,_EXTRA=e)
   
   option_menu=widget_button(mbar,value="Options",/MENU) 
   tool_menu=widget_button(mbar,value="Tools",/MENU)
   
-   ;; a display line.
+  ;; Display line.
   line=obj_new('cvLine',oDraw,base,_EXTRA=e) 
   
   ;;************ Setup the Exclusive Tools (with icons!) **************
@@ -209,7 +205,11 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   ;; Various other buttons
   resize=obj_new('tvResize',oDraw,SIZE_MENU=option_menu)
   
-  bquit=widget_button(file_menu,value="Close",UVALUE='quit',/SEPARATOR) 
+  kill=[oDraw]
+  if keyword_set(kc) then kill=[kill,cube]
+
+  bquit=widget_button(file_menu,value="Close",UNAME='quit',/SEPARATOR, $
+                      KILL_NOTIFY='cubeview_cleanup',UVALUE=kill)
   
   ;; put the tvD into the uvalue, to destroy on cleanup.
   widget_control,base,SET_UVALUE=oDraw,/REALIZE
@@ -218,6 +218,5 @@ pro cubeview,SIZE=sz,BLOCK=bl,TITLE=ttl,RECORD=cuberec,XNAME=xn, $
   oDraw->Start
   widget_control,base,/UPDATE   ;make sure everything's in place
 
-  XManager,xn,base,NO_BLOCK=(keyword_set(bl) eq 0), $
-           EVENT_HANDLER='cubeview_event', CLEANUP='cubeview_cleanup'
+  XManager,xn,base,NO_BLOCK=~keyword_set(bl),EVENT_HANDLER='cubeview_event'
 end
