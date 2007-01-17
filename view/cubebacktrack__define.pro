@@ -119,7 +119,14 @@ pro CubeBackTrack::Message, msg
            if self.cube ne msg.CUBE && obj_valid(msg.CUBE) then begin 
               self.cube=msg.CUBE
               self.cube->GetProperty,BCD_SIZE=bcdsz,PROJECT_NAME=pn, $
-                                     WAVELENGTH=wave
+                                     WAVELENGTH=wave,ACCOUNTS_VALID=av
+              if n_elements(av) eq 0 || array_equal(av,0b) then begin 
+                 if widget_info(self.wBase,/VALID_ID) then $
+                    widget_control, self.wBase,/DESTROY
+                 self->Reset,/DISABLE
+                 return
+              endif 
+              
               if widget_info(self.wBase,/VALID_ID) then $
                  widget_control,BASE_SET_TITLE= $
                                 string(FORMAT='(%"Backtracking: %s")',pn), $
