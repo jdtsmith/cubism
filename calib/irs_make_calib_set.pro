@@ -1,7 +1,7 @@
 ;+
 ; NAME:
 ;
-;    MAKE_CALIB_SET
+;    IRS_MAKE_CALIB_SET
 ;
 ; DESCRIPTION:
 ;
@@ -15,7 +15,7 @@
 ;
 ; CALLING SEQUENCE:
 ;
-;      make_calib_set,filename, [ WAVSAMP_VERSION=,ORDER_VERSION=, $
+;      irs_make_calib_set,filename, [ WAVSAMP_VERSION=,ORDER_VERSION=, $
 ;                     LINETILT_VERSION=,FRAMETABLE_VERSION=, $
 ;                     PLATESCALE_VERSION=,PMASK_VERSION=, $
 ;                     FLUXCON_VERSION=,SLCF_VERSION=, $
@@ -93,7 +93,7 @@
 ;
 ;##############################################################################
 
-pro make_calib_set,calibname,CALIB_OBJECT=c,OVERWRITE=ow,_EXTRA=e
+pro irs_make_calib_set,calibname,CALIB_OBJECT=c,OVERWRITE=ow,_EXTRA=e
   @cubism_dir
   on_error,2
   
