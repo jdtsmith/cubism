@@ -5,26 +5,26 @@
 ;
 ; DESCRIPTION:
 ;    
-;    Rotate a given celestial coordinate pair by an amount and along
-;    an angle implied by two other points.  E.g. given a reference
-;    point (ra_ref, dec_ref), and a new point (ra_new, dec_new) into
-;    which it will be rotated, update (ra, dec) by applying the
-;    implied rotation between them.
+;    Rotate a given celestial coordinate by an amount and about an
+;    axis implied by two other points.  E.g. given a reference point
+;    (ra_ref, dec_ref), and a new point (ra_new, dec_new) into which
+;    the reference point will be rotated, update the original point
+;    (ra, dec) by applying this same spherical rotation.
 ;    
 ; CATEGORY:
 ;
-;    Astro Utility
+;    Astro Utility, Coordinate Offseting
 ;
 ; CALLING SEQUENCE:
 ;
-;    spherical_coord_rotate,ra_ref,dec_ref,ra_new,dec_new,ra,dec
+;    spherical_coord_rotate, ra_ref,dec_ref,ra_new,dec_new,ra,dec
 ;
 ; INPUT PARAMETERS:
 ;
 ;    (ra,dec)_ref: The RA/DEC for the reference position in decimal
 ;       degrees.
 ;       
-;    (ra,dec)_new: The new coordinate into which (ra_ref,dec_ref) are
+;    (ra,dec)_new: The new coordinate into which (ra_ref,dec_ref) is
 ;      to be rotated, in decimal degrees.
 ;
 ;    (ra, dec): The coordinate to update with the rotation implied by
@@ -34,6 +34,11 @@
 ;
 ;    (ra, dec): Will be udpated by rotating along the angle between
 ;      (ra_ref, dec_ref) and (ra_new, dec_new).
+;
+; NOTES: Based loosely on the vector method described in the
+;    2000-09-09 sci.math posting of James Van Buskirk:
+;
+;      http://groups.google.com/group/sci.math/msg/0c95aa791f44b3cd?hl=en&
 ;    
 ; MODIFICATION HISTORY:
 ;    
@@ -64,6 +69,7 @@
 ;##############################################################################
 
 function spherical_coord_rotate_cartesian,ra,dec
+  ;; Convert to cartesian coordinates
   cd=cos(dec)
   return,[cd*cos(ra),cd*sin(ra),sin(dec)]
 end
@@ -76,10 +82,10 @@ pro spherical_coord_rotate,ra_ref,dec_ref,ra_new,dec_new,ra,dec
   v_ref=spherical_coord_rotate_cartesian(ra_ref/RADEG,dec_ref/RADEG)
   v=spherical_coord_rotate_cartesian(ra/RADEG,dec/RADEG)
   
-  ;; Construct coordinate frame: x along ref direction, z along rotation axis
+  ;; Construct coordinate frame with x -> ref point & z -> rotation axis
   x=v_ref
   z=crossp(v_new,v_ref)         ; rotate about this axis
-  z/=sqrt(total(z^2))
+  z/=sqrt(total(z^2))           ; normalize
   y=crossp(z,x)
   y/=sqrt(total(y^2))
   
@@ -88,10 +94,10 @@ pro spherical_coord_rotate,ra_ref,dec_ref,ra_new,dec_new,ra,dec
   y2=crossp(z,x2)               ; z axis is the same in new frame
   y2/=sqrt(total(y2^2))
   
-  ;; Project onto the initial frame, re-express in the rotated one
+  ;; Project onto the initial frame, then re-express in the rotated one
   v=total(v*x)*x2 + total(v*y)*y2 + total(v*z)*z
   
   dec=asin(v[2])*RADEG
   ra=atan(v[1],v[0])*RADEG
-  if ra lt 0. then ra+=360.D
+  if ra lt 0.D then ra+=360.D
 end
