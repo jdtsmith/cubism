@@ -1,0 +1,32 @@
+\comment  New fluxcon as of Nov. 17, 2004 based on HR 6688
+\comment v2.0	kjs	05/02/05     Deriving a new fluxcon from ksi Dra from C-18 because LH wavsamp change
+\comment v2.1   kjs     05/03/05     Redid after taking out all the spikes.
+\comment v3.0   pmo     11/03/05     New LH fluxcon from ksi Dra C18-23 average, sky-subtracted, with new S13 wavsamp and flat. Fluxcon created with calc_tune using p=2 and 10% outlier rejection.
+\comment v3.1   pmo     11/18/05     Rederive LH fluxcon (as on Nov 3, but using spectra extracted with extract v4.2 with NaN-replacement), to remove a mysterious 30% level offset seen in test 
+\comment                              particle runs.
+\comment v4.0   pmo     12/05/06     S15 LH fluxcon all orders, using HR6688 Campaigns 18-24 median, off sky background-subtracted, with new S15 flat. Fit with calc_tune using 2nd order polynomials 
+\comment                              and 10% outlier rejection. 
+\comment                              ***** USE ONLY FOR PRE-25 IRS CAMPAIGNS.
+\comment v4.1   pmo     01/21/07     S15 LH fluxcon all orders, using HR6688 Campaigns 18-24 median, off sky background-subtracted, with S15 flat ver. 2 (with zody spatial correction). Fit with 
+\comment                              calc_tune using 2nd order polynomials and 5-10% outlier rejection.
+\comment                              ***** USE ONLY FOR PRE-25 IRS CAMPAIGNS.
+\comment                              ***** Using /stage/ssc-testdata-irs/pipedrop/cal/S15.0/OPS/15Jan2007/b3_flatfield.fits,b3_flatfield_cmask.fits
+\comment v4.2   pmo     01/27/07     S15 LH fluxcon all orders, using HR6688 Campaigns 18-24 median, off sky background-subtracted, with ver. 3 S15 frankenflat (divided by zody spatial
+\comment                              correction except orders 11-12). Fit with calc_tune using 2nd order polynomials and 10% outlier rejection. Spliced together orders 11-12 from 12/05/06 version
+\comment                              with orders 13-20 from 01/21/07 verson, to avoid zody noise in orders 11-12. 
+\comment                              ***** USE ONLY FOR PRE-25 IRS CAMPAIGNS. 
+\comment                              ***** Using /stage/ssc-testdata-irs/pipedrop/cal/S15.0/OPS/26jan2007/b3_flatfield.fits, b3_flatfield_cmask.fits
+\comment v4.3   pmo     01/29/07      Modified fluxcon polynomial for LH-pre25 order 11 to fix dip at 36 microns.
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |               |            |               |           |               |           |               |           |              |
+ 11          35.5000         0.0000           0.0000           0.0000           0.0000          0.0000         137.9862        124.5000       1.000000         0.000000   -0.027340         0.000000      0.017804       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 12          32.5000         0.0000           0.0000           0.0000           0.0000          0.0000         140.1512        124.5000       1.000000         0.000000   -0.001725         0.000000      0.003813       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 13          30.0000         0.0000           0.0000           0.0000           0.0000          0.0000         141.1089        124.5000       1.000000         0.000000    0.088276         0.000000      0.002801       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 14          28.0000         0.0000           0.0000           0.0000           0.0000          0.0000         134.1085        124.5000       1.000000         0.000000    0.088517         0.000000      0.014802       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 15          26.0000         0.0000           0.0000           0.0000           0.0000          0.0000         128.4661        124.5000       1.000000         0.000000    0.085465         0.000000      0.014231       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 16          24.5000         0.0000           0.0000           0.0000           0.0000          0.0000         126.8159        124.5000       1.000000         0.000000    0.098207         0.000000      0.025682       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 17          23.0000         0.0000           0.0000           0.0000           0.0000          0.0000         122.8713        124.5000       1.000000         0.000000    0.067323         0.000000      0.022499       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 18          22.0000         0.0000           0.0000           0.0000           0.0000          0.0000         128.8529        124.5000       1.000000         0.000000    0.094872         0.000000      0.018875       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 19          20.5000         0.0000           0.0000           0.0000           0.0000          0.0000         129.0041        124.5000       1.000000         0.000000    0.080793         0.000000      0.052368       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+ 20          19.5000         0.0000           0.0000           0.0000           0.0000          0.0000         129.1730        124.5000       1.000000         0.000000    0.058304         0.000000      0.072293       0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
