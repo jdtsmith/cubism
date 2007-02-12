@@ -17,8 +17,8 @@
 \comment                             ***** in /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b0_psf_fov.tbl.  Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b0_wavsamp.tbl.
 \comment         3.0 18/11/04 MB    Updated all coefficients
 \comment         3.1 24/11/04 MB    Updated all coefficients, corrected for use of wrong FF in orders 2 and 3
-\comment	 3.2  05/Oct/18 KS  Making an aperture loss fluxcon with 28 PIXEL WIDE SLIT using S13 flats and HR 7341 decin model.  
-\comment 	 3.2  05/Oct/18 KS  Using Poly ord=2 for SL2, and Poly ord=1 for SL1, and SL3
+\comment         3.2  05/Oct/18 KS  Making an aperture loss fluxcon with 28 PIXEL WIDE SLIT using S13 flats and HR 7341 decin model.  
+\comment         3.2  05/Oct/18 KS  Using Poly ord=2 for SL2, and Poly ord=1 for SL1, and SL3
 \comment         3.3  06/Dec/27 KS  Redid fluxcon for S15.  Order 1 and 2 show bumps and wiggles.  No way to get rid of it without higher orders.
 \comment              06/Dec/27 KS  See Readme file at /stage/ssc-testdata-irs/pipedrop/cal/S15.0/OPS/26dec06/README_SL.
 \comment History

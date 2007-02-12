@@ -1,5 +1,5 @@
 \comment  New fluxcon as of Nov. 17, 2004 based on HR 6688
-\comment v2.0	kjs	05/02/05     Deriving a new fluxcon from ksi Dra from C-18 because LH wavsamp change
+\comment v2.0   kjs     05/02/05     Deriving a new fluxcon from ksi Dra from C-18 because LH wavsamp change
 \comment v2.1   kjs     05/03/05     Redid after taking out all the spikes.
 \comment v3.0   pmo     11/03/05     New LH fluxcon from ksi Dra C18-23 average, sky-subtracted, with new S13 wavsamp and flat. Fluxcon created with calc_tune using p=2 and 10% outlier rejection.
 \comment v3.1   pmo     11/18/05     Rederive LH fluxcon (as on Nov 3, but using spectra extracted with extract v4.2 with NaN-replacement), to remove a mysterious 30% level offset seen in test 

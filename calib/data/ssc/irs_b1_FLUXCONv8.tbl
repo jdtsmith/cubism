@@ -15,7 +15,7 @@
 \comment                             HR6688 stare (7836416) at the nods, and map (7462400) at center and near-nod positions, HR6606 (8882176) and tested against calibrators HR7310 (7453424), HR2491 (7857408).
 \comment                             ***** Using /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b1_wavsamp.tbl and flatfield /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b1_flatfield.fits.
 \comment         x.x 11/08/04 PMO   Preliminary S10plus fluxcon using HR6688
-\comment	 3.1 12/03/04 PMO   Modified values of fluxcon and a1 in order to obtain proper slope of spectra.
+\comment         3.1 12/03/04 PMO   Modified values of fluxcon and a1 in order to obtain proper slope of spectra.
 \comment         3.2 05/05/05 PMO   S12 SH fluxcon all orders, using HR6688 Campaign 18 data (r13195008) with new S12 wavsamp. Background subtracted using sky observation r13196544. Fit with calc_tune using 
 \comment                             2nd order polynomials, except order 16 (3rd order). 
 \comment         4.0 11/02/05 PMO   S13 SH fluxcon all orders, using HR6688 Campaigns 18-24 average, off sky background-subtracted, with new S13 flat and wavsamp. Fit with calc_tune using 2nd order

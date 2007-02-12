@@ -17,7 +17,7 @@
 \comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S10.5/040723/b2_psf_fov.tbl file. Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_wavsamp.tbl.
 \comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b2_flatfield.fits.
 \comment         x.x Nov/15/2004    Fluxcon for LL for S11 pipeline using HR 6606 as the calibrator.
-\comment	 1.0 Jul 22/05 KS   Making a new fluxcon based on the spectrum of KsiDra.  Extracted in a 28-pix aperture, did polynomial fits to Decin model, chose p5 for LL2, and p2 for LL1 and LL3 
+\comment         1.0 Jul 22/05 KS   Making a new fluxcon based on the spectrum of KsiDra.  Extracted in a 28-pix aperture, did polynomial fits to Decin model, chose p5 for LL2, and p2 for LL1 and LL3 
 \comment         1.1 Jul 24/05 KS   Trying these with p2 -- they should be pretty close.  
 \comment History
 \character channelID = 2

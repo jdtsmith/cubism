@@ -17,7 +17,7 @@
 \comment                             ***** in /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b0_psf_fov.tbl.  Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b0_wavsamp.tbl.
 \comment         3.0 18/11/04 MB    Updated all coefficients
 \comment         3.1 24/11/04 MB    Updated all coefficients, corrected for use of wrong FF in orders 2 and 3
-\comment	 xx  05/Oct/18 KS   Making a ALCF using S13 flats and HR 7341 decin model.  Using Poly ord=2 for SL2, and Poly ord=1 for SL1, and SL3
+\comment         xx  05/Oct/18 KS   Making a ALCF using S13 flats and HR 7341 decin model.  Using Poly ord=2 for SL2, and Poly ord=1 for SL1, and SL3
 \comment History
 \character channelID = 0
 | order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |

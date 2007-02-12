@@ -17,10 +17,10 @@
 \comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S10.5/040723/b2_psf_fov.tbl file. Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_wavsamp.tbl.
 \comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b2_flatfield.fits.
 \comment         x.x Nov/15/2004    Fluxcon for LL for S11 pipeline using HR 6606 as the calibrator.
-\comment	 1.0 Jul 22/05 KS   Making a new fluxcon based on the spectrum of KsiDra.  Extracted in a 28-pix aperture, did polynomial fits to Decin model, chose p5 for LL2, and p2 for LL1 and LL3 
-\comment	 1.1 Sep 19/05 KS   New aperture loss flat using S13 flatfield and 28 PIX WIDE APERTURE.  Flat made with median averaged HR7341. 1st order poly fitting
+\comment         1.0 Jul 22/05 KS   Making a new fluxcon based on the spectrum of KsiDra.  Extracted in a 28-pix aperture, did polynomial fits to Decin model, chose p5 for LL2, and p2 for LL1 and LL3 
+\comment         1.1 Sep 19/05 KS   New aperture loss flat using S13 flatfield and 28 PIX WIDE APERTURE.  Flat made with median averaged HR7341. 1st order poly fitting
 \comment         3.2 Apr 20/06 KS   Checking and remaking LL S13 fluxcon because it appeared to be a bit high in LL1 from LL2.  
-\comment	 3.3 Apr 24/06 KS   Re-doing it for LL with S13 data for HR 7341.  Used IRS21,22 data to make 28-pix fluxcons.
+\comment         3.3 Apr 24/06 KS   Re-doing it for LL with S13 data for HR 7341.  Used IRS21,22 data to make 28-pix fluxcons.
 \comment         3.4 Dec 26/06 KS   Re-deriving aploss for LL for S15 using HR7341.  Used large number of AORs to make fluxcon.  See Readme file at 
 \comment                            /stage/ssc-testdata-irs/pipedrop/cal/S15.0/OPS/26dec06/README_LL.
 \comment History

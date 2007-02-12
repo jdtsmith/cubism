@@ -17,7 +17,7 @@
 \comment                             ***** WARNING:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with full SH slit extractions, 
 \comment                             ***** using /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b1_wavsamp.tbl and flatfield /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b1_flatfield.fits.
 \comment         x.x Nov/08/2004    Preliminary S10plus fluxcon using HR6688
-\comment	 3.1 Dec/03/2004    Modified values of fluxcon and a1 in order to obtain proper slope of spectra
+\comment         3.1 Dec/03/2004    Modified values of fluxcon and a1 in order to obtain proper slope of spectra
 \comment
 \comment         3.2 May/05/2005  S12  SH fluxcon all orders, using HR6688 Campaign 18 data (r13195008) with new S12 wavsamp. Background subtracted using sky observation r13196544. Fit with calc_tune using 2nd order polynomials, except order 16 (3rd order). PMO 
 \comment         4.0 Nov/02/2005  S13  SH fluxcon all orders, using HR6688 Campaigns 18-24 average, off sky background-subtracted, with new S13 flat and wavsamp. Fit with calc_tune using 2nd order polynomial and 5% outlier rejection. PMO   
