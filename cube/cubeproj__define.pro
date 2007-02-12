@@ -841,7 +841,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).view_ids[2]=ids[3]
   
   ;; a cube must exist
-  (*self.wInfo).MUST_CUBE=[wMustCube,ids[3]]
+  (*self.wInfo).MUST_CUBE=[wMustCube,ids[4]]
   
   widget_control, base,set_uvalue=self,/REALIZE
   
