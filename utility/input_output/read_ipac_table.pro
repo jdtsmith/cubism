@@ -42,7 +42,12 @@
 ; NOTES:
 ;  
 ;    See http://irsa.ipac.caltech.edu/applications/DDGEN/Doc/ipac_tbl.html
-;    for format description.
+;    for format description.  In particular, the valid columns for
+;    data are:
+;
+;      |  column1 |  column2 | column3 | column4  |    column5       |   
+;      |  double  |  double  |   int   |   double |     char         | 
+;      111111111111222222222223333333333444444444445555555555555555555  
 ;
 ; EXAMPLE:
 ;
@@ -51,6 +56,8 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2007-02-12 (J.D. Smith): Null value check, using explicit field
+;                             widths, and handling tabs.
 ;    2006-08-04 (J.D. Smith): Improved header reading speed for long
 ;                             headers.
 ;    2005-03-25 (J.D. Smith): Brought into compliance with "new" IRSA
@@ -59,7 +66,8 @@
 ;    2003-11-24 (J.D. Smith): Better header keyword value treatment.
 ;    2002-08-27 (J.D. Smith): Initial migration from SMART codebase.
 ;    2001-12-02 (J.D. Smith): Written, based very loosely on routine
-;        "read_tbl" provided by Jim Ingalls of the SSC.
+;                             "read_tbl" provided by Jim Ingalls of
+;                             the SSC.
 ;        
 ;-
 ;    $Id$
@@ -68,7 +76,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002,2004,2005 J.D. Smith
+;  Copyright (C) 2001,2002,2004,2005,2006,2007 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -112,61 +120,81 @@ function read_ipac_table,file, hdr,UNITS=units
            end
            '|': begin
               line=strtrim(line) ;no trailing blanks, please
-              sep_pos=[strsplit(line,'|'),strlen(line)-1]
+              sep_pos=strsplit(line,'|')
               tok=strtrim(strsplit(line,'|',/EXTRACT),2) 
+              
+              nt=n_elements(tok) 
+              width=[sep_pos[1:*],strlen(line)]-sep_pos
+              width[0]+=1       ;first gets an extra column
+              toff=sep_pos+1    ; T format code is 1-based
+              toff[0]--         ;first column starts on the separator
+              
               case chead++ of 
                  0: begin       ;column names
-                    tags=strarr(n_elements(tok))
+                    tags=strarr(nt)
                     ;; Remove disallowed characters from the tag
-                    for i=0,n_elements(tok)-1 do $
+                    for i=0,nt-1 do begin 
                        tags[i]=idl_validname(strjoin(strsplit($
                                tok[i],'-',/EXTRACT),'_'), /CONVERT_ALL)
+                    endfor
                  end
                  1: begin       ;format flags
-                    got=bytarr(n_elements(tags))
+                    got=bytarr(nt)
+                    format=strarr(nt)
+                    tok=strlowcase(tok)
                     for i=0,n_elements(tok)-1 do begin 
                        case 1 of 
                           strmatch(tok[i],'r*'): begin 
                              val=0.0
-                             if n_elements(format) eq 0 then $
-                                format=['F0'] else format=[format,'F0']
+                             got[i]=2b
+                             format[i]='F'
                           end 
                           strmatch(tok[i],'i*'): begin 
                              val=0L
-                             got[i]=2b ;indicate integer
-                             if n_elements(format) eq 0 then $
-                                format=['I0'] else format=[format,'I0']
+                             got[i]=1b ;indicate integer
+                             format[i]='I'
                           end 
                           strmatch(tok[i],'d*'): begin 
                              val=0.0D
-                             if n_elements(format) eq 0 then $
-                                format=['D0'] else format=[format,'D0']
+                             got[i]=3b
+                             format[i]='D'
                           end
                           strmatch(tok[i],'c*'): begin 
-                             got[i]=1b ;indicate string
+                             got[i]=0b ;indicate string
                              val=''
-                             aform=['T'+strtrim(sep_pos[i],2), $
-                                    'A'+strtrim(sep_pos[i+1]-sep_pos[i]+1,2)]
-                             if n_elements(format) eq 0 then $
-                                format=[aform] else format=[format,aform]
+                             format[i]='A'
                           end
-                          1: begin 
-                             message,'warning, unknown type '+tok[i], $
-                                     /INFORMATIONAL
-                             break
-                          end 
+                          1: message,'Unknown format code '+tok[i]
                        endcase 
-                 
-                       ;; Create/extend data structure
+                       
+                       ;; Create/extend the input data structure
                        if n_elements(data_elem) eq 0 then $
                           data_elem=create_struct(tags[i],val) $
                        else data_elem=create_struct(data_elem,tags[i],val) 
                     endfor
+                    format=reform(['T'+transpose(strtrim(toff,2)), $
+                                   transpose(format+strtrim(width,2))], $
+                                  2*n_elements(format))
+                    format='('+strjoin(format,",")+')'
                  end
                  2: begin       ;units
                     units=tok
                  end 
-                 else: ;just skip other column header rows
+                 3: begin       ;null value
+                    nullvalue=strtrim(tok,2)
+                    null_elem=data_elem
+                    for i=0,n_elements(got)-1 do begin 
+                       case got[i] of $
+                          0b: val=nullvalue[i] ; string
+                          1b: val=stregex(nullvalue[i],'[^0-9-]',/BOOLEAN)? $
+                                  -9999:long(nullvalue[i]) ; int
+                          2b: val=!VALUES.F_NAN            ; float
+                          3b: val=!VALUES.D_NAN            ; double
+                       endcase 
+                       null_elem.(i)=val
+                    endfor 
+                 end 
+                 else: ;just skip any other column header rows
               endcase 
            end 
            else: begin 
@@ -178,8 +206,29 @@ function read_ipac_table,file, hdr,UNITS=units
         endcase
         if at_data eq 0 then continue
      endif 
-     ;; reading data
-     reads,line,data_elem,FORMAT='('+strjoin(format,",")+')'
+     
+     ;; Trim out "null" entries, and replace
+     if n_elements(nullvalue) ne 0 then begin 
+        parts=strmid(line,toff-1,width)
+        null=where(strtrim(parts,2) eq nullvalue,nullcnt,COMPLEMENT=keep, $
+                   NCOMPLEMENT=keepcnt)
+        
+        if nullcnt gt 0 then begin 
+           if keepcnt gt 0 then begin 
+              p=parts[null]
+              ;; Set to 00000 so it will always parse
+              mx=max(width[null])
+              strput,p,string(make_array(mx,VALUE=byte('0')))
+              parts[null]=p
+              line=strjoin(parts)
+              ;; read data
+              reads,line,data_elem,FORMAT=format
+              ;; set nulls in
+              for i=0,nullcnt-1 do data_elem.(null[i])=null_elem.(null[i])
+           endif else data_elem=null_elem ;no reading required
+        endif else reads,line,data_elem,FORMAT=format
+     endif else reads,line,data_elem,FORMAT=format
+              
      ret[line_cnt++]=data_elem
   endwhile
   
@@ -189,10 +238,8 @@ function read_ipac_table,file, hdr,UNITS=units
      ret=ret[0:line_cnt-1]
   endif 
   
-  if n_elements(got_string) ne 0 then begin 
-     wh=where(got_string eq 1b,cnt)
-     for i=0,cnt-1 do ret.(wh[i])=strtrim(ret.(wh[i]),2)
-  endif 
+  wh=where(got eq 0b,stringcnt)
+  for i=0,stringcnt-1 do ret.(wh[i])=strtrim(ret.(wh[i]),2)
   if arg_present(units) && chead lt 2 then units=replicate('',n_tags(ret))
   free_lun,un
   return,ret
