@@ -3975,7 +3975,17 @@ end
 
 
 ;=============================================================================
-;  BuildRevAcct - Build the reverse accounts from the regular accounts.
+;  BuildRevAcct - Build the reverse accounts from the regular
+;                 accounts.  There are three main reverse index
+;                 classes, all computed per-record: A reverse index
+;                 over cube pixels (REV_ACCOUNT), in an offset
+;                 bounding box, a dual histogram reverse index over
+;                 histogram count in the cube pixel list (REV_DUAL),
+;                 and a BCD pixel reverse index of accounts (also in
+;                 an offset bounding box): REV_BCD_ACCOUNT.  These are
+;                 used for rapid backtracking, quickbuild of dirty
+;                 cube pixels, and faster full rebuilds (via the dual
+;                 histogram method).
 ;=============================================================================
 pro CubeProj::BuildRevAcct
   widget_control, /HOURGLASS
@@ -4135,10 +4145,10 @@ pro CubeProj::BuildCube
         self->ClearDirtyPix
         return 
      endif 
-     
-     ;; Eliminate duplicates.
      if cube_dirty_cnt lt n_elements(cube_dirty_pix) then $
         cube_dirty_pix=cube_dirty_pix[0L:cube_dirty_cnt-1L]
+     
+     ;; Eliminate duplicates.
      cube_dirty_pix=cube_dirty_pix[uniq(cube_dirty_pix,sort(cube_dirty_pix))]
      cube_dirty_cnt=n_elements(cube_dirty_pix) 
      status=string(FORMAT='("Quick-Building ",I0,"x",I0,"x",I0,' + $
@@ -4147,19 +4157,20 @@ pro CubeProj::BuildCube
                    100.*cube_dirty_cnt/product(self.CUBE_SIZE))
      self->Status,status
 
+     ;; Decompose into dirty X,Y,Z positions in the cube
      cube_dirty_x=cube_dirty_pix mod cube_plane_pix
      cube_dirty_y=cube_dirty_x/cube_width
      cube_dirty_x mod=cube_width
      cube_dirty_z=cube_dirty_pix/cube_plane_pix
   
-     ;; Set up the cube and associated arrays
+     ;; Set up the (existing) cube and associated arrays
      cube=temporary(*self.CUBE)
      cube[cube_dirty_pix]=!VALUES.F_NAN
      if use_unc then begin 
         cube_unc=temporary(*self.CUBE_UNC)
         cube_unc[cube_dirty_pix]=!VALUES.F_NAN
      endif 
-  endif else begin              ; A fresh build
+  endif else begin              ; A fresh build, make a new cube
      status=string(FORMAT='("Building ",I0,"x",I0,"x",I0," cube...")', $
                    self.CUBE_SIZE)
      self->status,status
@@ -4176,7 +4187,7 @@ pro CubeProj::BuildCube
      bpmask[*self.GLOBAL_BAD_PIXEL_LIST]=0b
   endif else use_bpmask=0
     
-  update=10<(enabled_cnt/50)>1
+  update=10<(enabled_cnt/50)>1  ;status update interval
   
   for k=0L,enabled_cnt-1 do begin
      if (k mod update) eq 0 then $
@@ -4199,7 +4210,8 @@ pro CubeProj::BuildCube
         x=cube_dirty_x[inbb]
         y=cube_dirty_y[inbb]
         z=cube_dirty_z[inbb]
-        ;; Index in bounding box reverse index vector for cube
+        
+        ;; Index into XY bounding box reverse index vector for cube
         ind=(x-rev_off[0]) + (y-rev_off[1])*rev_width + z*rev_wh - rev_min
         
         ;; Bin on count in the subset of dirty cube pixels
@@ -4207,7 +4219,7 @@ pro CubeProj::BuildCube
         if array_equal(count,0) then continue
         h=histogram(count,REVERSE_INDICES=dual,MIN=1)
         dual_cnt=n_elements(h) 
-     endif else begin 
+     endif else begin ;; Not a quickbuild but a full build, use dual histogram
         ;; Use pre-cached dual reverse index (binned on count per cube pix)
         dual=*rec.REV_DUAL
         dual_cnt=rec.REV_DUAL_CNT
@@ -4235,7 +4247,8 @@ pro CubeProj::BuildCube
      if ptr_valid(rec.BAD_PIXEL_LIST) then $
         mask[*rec.BAD_PIXEL_LIST]=0b
      
-     ;; --- Build using dual reverse histogram, looping over bin count 
+     ;; --- Build using dual reverse histogram, looping over cube
+     ;;     pixels binned by bin count
      for i=0L,dual_cnt-1L do begin  
         if dual[i+1] eq dual[i] then continue
         inds=dual[dual[i]:dual[i+1]-1]
