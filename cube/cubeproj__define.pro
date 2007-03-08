@@ -2332,9 +2332,27 @@ pro CubeProj::LoadVisualize,SELECT=sel
   endif 
   
   catch,err
-  if ~file_test(self.visualize_file) || err then $
+  if ~file_test(self.visualize_file) || err then begin 
+     if n_elements(fcb) ne 0 then fits_close,fcb,/NO_ABORT
      self->Error,["Couldn't load visualization image:",self.visualize_file]
-  im=readfits(self.visualize_file,hdr)
+  endif 
+  fits_open,self.visualize_file, fcb,/NO_ABORT
+  
+  if fcb.nextend gt 1 then begin 
+     good=where(fcb.naxis eq 2,cnt)
+     if cnt eq 0 then self->Error,'No image data found: ',self.visualize_file
+     
+     exts=strtrim(fcb.extname[good],2)
+     if good[0] eq 0 and ~exts[0] then exts[0]='Main (PDU)'
+     wh=where(~exts,cnt)
+     if cnt gt 0 then exts[wh]='EXT '+strtrim(good[wh],2)
+     ext=popup('Choose an extension to load: ',exts,INDEX=ind, $
+               PARENT_GROUP=self->TopBase(),/MODAL, $
+               TITLE='Visualization Image Extension')
+     ext=good[ind]
+     fits_read,fcb,im,hdr,EXTEN_NO=ext
+  endif else fits_read,fcb,im,hdr
+  fits_close,fcb
   catch,/cancel
   
   if size(im,/N_DIMENSIONS) ne 2 then $
@@ -3803,8 +3821,7 @@ pro CubeProj::SnapshotFeedBackWindow,RESTORE=res
   endelse 
   if keyword_set(res) then begin 
      device,copy=[0,0,!D.X_SIZE,!D.Y_SIZE,0,0,(*self.wInfo).feedback_pixmap]
-     !X.S=(*self.wInfo).feedback_save[0:1]
-     !Y.S=(*self.wInfo).feedback_save[2:3]
+     self->FeedbackWindowSet
   endif else begin 
      wset,(*self.wInfo).feedback_pixmap
      device,copy=[0,0,!D.X_SIZE,!D.Y_SIZE,0,0,(*self.wInfo).feedback_window]
@@ -3812,6 +3829,15 @@ pro CubeProj::SnapshotFeedBackWindow,RESTORE=res
   endelse 
 end
 
+
+;=============================================================================
+;  FeedbackWindowSet - Restore Feedback Window set.
+;=============================================================================
+pro CubeProj::FeedbackWindowSet
+  wset,(*self.wInfo).feedback_window
+  !X.S=(*self.wInfo).feedback_save[0:1]
+  !Y.S=(*self.wInfo).feedback_save[2:3]
+end
 
 ;=============================================================================
 ;  BuildAccount - Build the accounting lists, listing, for each
@@ -3881,6 +3907,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
         if exp_off lt 0 then exp_off=(*self.DR)[i].EXP
         color=!D.TABLE_SIZE-20+((*self.DR)[i].EXP-exp_off) mod 4
         self->SetListSelect,i,/NO_PRESERVE_TOP,/NO_STATUS
+        self->FeedbackWindowSet
      endif 
      
      ;; (Probably small) difference between PA of this BCD and the
