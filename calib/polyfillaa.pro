@@ -6,7 +6,7 @@
 ; DESCRIPTION:
 ;
 ;    Finds the fractional area of all pixels at least partially inside
-;    a specified polygon.
+;    a specified polygon, or multiple polygons.
 ;
 ; CATEGORY:
 ;
@@ -23,7 +23,8 @@
 ;       polygon.  May be in fractional units.  These lists can contain
 ;       multiple polygons concatenated together, which will all be
 ;       clipped at once.  If multiple polygons are passed,
-;       POLY_INDICES must be set to separate inputs and outputs.
+;       POLY_INDICES must be set to separate inputs and outputs (which
+;       see).
 ;
 ;    sx,sy: The size of the pixel grid on which the polygon is
 ;       superposed.  
@@ -35,6 +36,8 @@
 ;       compilation of the external C version succeeded.  Otherwise,
 ;       POLYFILLAA will attempt to compile a C version of the
 ;       Sutherland Hodgemand algorithm found in the file "polyclip.c".
+;       This version is ~50x faster, in particular when clipping
+;       multiple polygons at once.
 ;
 ;    RECOMPILE: If set, recompile the C version, even if it has
 ;      already been compiled.  Note: if compilation has already
@@ -58,14 +61,15 @@
 ;
 ; INPUT/OUTPUT KEYWORD PARAMETERS:
 ;
-;    POLY_INDICES: Only used for passing multiple encoded polygons,
-;      this keyword serves two purpose.  On input, it should be a
-;      "reverse index" style vector of length n_polygons + 1, where
-;      vec[i]:vec[i+1]-1 gives the indices into px and py
+;    POLY_INDICES: Only used when passing multiple encoded polygons in
+;      px and py, this keyword serves two purpose.  On input, it
+;      should be a "reverse index" style vector of length n_polygons +
+;      1, where vec[i]:vec[i+1]-1 gives the index range in px and py
 ;      corresponding to polygon i.  On output, it similarly lists the
-;      indices into inds, and areas, with vec[i]:vec[i+1] giving the
-;      range of indices corresponding to input polygon i.  Note that
-;      POLYGONS is not an allowed output with multiple polygons.
+;      indices into inds and areas, with vec[i]:vec[i+1] giving the
+;      range of pixel indices and areas corresponding to input polygon
+;      i.  Note that POLYGONS is not an allowed output with multiple
+;      polygons.
 ;
 ; OUTPUTS:
 ;
@@ -79,16 +83,34 @@
 ; NOTES:
 ;
 ;    POLYFILLAA attempts to auto-compile a C-language version of the
-;    clipping algorithm, found in polyclip.c.  In order for this
-;    compilation to succeed, a compiler which IDL recognizes must be
-;    installed.  See documentation for MAKE_DLL and the !MAKE_DLL
-;    system variable for more information.
+;    resource-intensive clipping algorithm, found in polyclip.c.  In
+;    order for this compilation to succeed, a compiler which IDL
+;    recognizes must be installed.  See documentation for MAKE_DLL and
+;    the !MAKE_DLL system variable for more information.  The
+;    resulting compiled shared library is located in, e.g. (modify for
+;    architecture and version):
+;
+;      ~/.idl/rsi/compile_dir-118-idl_6_3-linux-x86-m32-f64/polyclip.so
+;
+;    This library is loaded with CALL_EXTERNAL automatically.
+;
+; RESTRICTIONS:
+;
+;    When passing multiple polygons on input for simultaneous
+;    clipping, only the areas and pixel indices clipped can be
+;    returned (not POLYGONS).
 ;
 ; EXAMPLE:
 ;
 ;    inds=polyfillaa([1.2,3,5.3,3.2],[1.3,6.4,4.3,2.2],10,10,AREAS=areas)
 ;
 ; MODIFICATION HISTORY:
+;
+;       2007-01-11 (J.D. Smith): Major rewrite to accommodate the new
+;          multi-polygon clipper polyclip.c, greatly improving speed
+;          when only the clipped areas are needed.  Has two
+;          entrypoints into polyclip: polyclip_single and
+;          polyclip_multi.
 ;
 ;       2003-01-03 (J.D. Smith): Substantial rewrite to use external C
 ;          code (if possible) for a significant performance
@@ -101,7 +123,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001,2002,2003 J.D. Smith
+;  Copyright (C) 2001-2007 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -217,7 +239,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   apa=arg_present(areas)
   if apa then areas=fltarr(npix,/NOZERO) 
   
-  if keyword_set(nc) OR polyclip_compiled eq 0 then begin 
+  if keyword_set(nc) || polyclip_compiled eq 0 then begin 
      ;; --- pure IDL version
      ind=0L
      
