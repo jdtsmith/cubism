@@ -184,7 +184,10 @@ pro IRSMapVisualize::Message, msg
               self.cube->MsgSignup,self,/CUBEPROJ_SELECT, $
                                    /CUBEPROJ_RECORD_UPDATE
            self->UpdateMapRecords
-        endif else if msg.calib_update then self->UpdateMapRecords
+        endif else if msg.calib_update then begin 
+           self->UpdateMapRecords
+           self.oDraw->ReDraw,/SNAPSHOT
+        endif 
      end
      
      'CUBEPROJ_SELECT': begin 
