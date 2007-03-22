@@ -1910,7 +1910,7 @@ end
 ;=============================================================================
 pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv, $
                             NONE=none,NO_DISABLED=nd,NO_UPDATE=nu, $
-                            NO_STATUS=no_stat
+                            NO_STATUS=no_stat,_EXTRA=e
   
   if ~ptr_valid(self.wInfo) then return
   
@@ -1918,7 +1918,7 @@ pro CubeProj::SetListSelect,recs,ALL=all,NO_PRESERVE_TOP=npt,INVERT=inv, $
      nrec=0
      recs=-1                    ;clear selection
   endif else begin 
-     self->RecOrSelect,recs, ALL=all
+     self->RecOrSelect,recs, ALL=all,_EXTRA=e
      nrec=n_elements(recs) 
   endelse 
   
@@ -2704,7 +2704,9 @@ pro CubeProj::RecOrSelect,recs,ALL=all,DCEID=dceid
      recs=self->CurrentSelect()
      if recs[0] eq -1 then $
         self->Error,'No Records Selected or Passed'
-  endif   
+  endif else if keyword_set(dceid) then begin 
+     recs=self->DCEIDtoRec(recs)
+  endif 
 end
 
 ;=============================================================================
