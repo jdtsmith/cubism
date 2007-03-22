@@ -193,7 +193,7 @@ pro IRSMapVisualize::Message, msg
      'CUBEPROJ_SELECT': begin 
         if msg.single_select ne -1 then begin 
            self.oDraw->SetWin
-           self->Select,msg.single_select,/DCEID,/NO_UPDATE
+           self->Select,msg.single_select,/DCEID,/NO_SET
         endif else begin        ; just redraw everything
            self->UpdateMapStatus
            self->DrawAllRecords,/DOUBLE_BUFFER
@@ -259,8 +259,12 @@ end
 ;=============================================================================
 ;  UpdateCubeSelect - Update the cube and our select status
 ;=============================================================================
-pro IRSMapVisualize::UpdateCubeSelect,_EXTRA=e
-  self.cube->SetListSelect,where((*self.recs).SELECTED),_EXTRA=e
+pro IRSMapVisualize::UpdateCubeSelect,NO_SET=ns,_EXTRA=e
+  if ~keyword_set(ns) then begin 
+     recs=where((*self.recs).SELECTED,cnt)
+     if cnt gt 0 then recs=(*self.recs)[recs].dceid
+     self.cube->SetListSelect,recs,/DCEID,_EXTRA=e
+  endif 
   self->UpdateSelectStatus
 end
 
@@ -284,6 +288,7 @@ pro IRSMapVisualize::UpdateMapRecords
   recs.ymin=ymin
   recs.xmax=xmax
   recs.ymax=ymax
+  recs=recs[sort(recs.dceid)]   ;keep them sorted
   self.recs=ptr_new(recs,/NO_COPY)
   self.last=-1L
   self->UpdateMapStatus
