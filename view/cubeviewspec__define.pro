@@ -95,11 +95,6 @@ pro CubeViewSpec::Message, msg
      widget_control, self.wToggles,GET_VALUE=ren
      if ren[0] then begin 
         med=median(*self.sp)
-        self.renorm=med gt 0.?round(alog10(med)):0
-     endif 
-     if self.renorm ne 0. then begin 
-        *self.sp=*self.sp/10.0D^self.renorm
-        if n_elements(*self.sp_unc) ne 0 then *self.sp_unc/=10.D^self.renorm
      endif 
      widget_control, self.wDraw,/DRAW_BUTTON_EVENTS, /DRAW_MOTION_EVENTS
      self.movestart=-1
@@ -654,9 +649,8 @@ pro CubeViewSpec::Fit
      if pcnt le 3 then self->Error,'Not enough points in peak.'
      
      ;; The line strength
-     strength=int_tabulated(/SORT,(*self.lam)[whpeak], $
+     self.strength=int_tabulated(/SORT,(*self.lam)[whpeak], $
                             (*self.sp)[whpeak]-cont_under)
-     self.strength=strength*10.0^self.renorm
      
      ;; find location where trapezoidal flux integral is half the
      ;; cumulative total
@@ -922,6 +916,7 @@ end
 ;=============================================================================
 pro CubeViewSpec::Plot,NOOUTLINE=noo
   if n_elements(*self.lam) eq 0 then return
+  old=!D.WINDOW
   wset,self.pixwin              ;Double buffering
   erase
   plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=5,YSTYLE=5, $
@@ -942,9 +937,6 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
      xyouts,.99,.97,add,/NORMAL,ALIGNMENT=1.0,CHARSIZE=1.2, $
             COLOR=self.colors_base+3
   endif 
-  
-  if self.renorm ne 0 then $
-     xyouts,.05,.96,/NORMAL,'!MX!X10!U'+strtrim(self.renorm,2),CHARSIZE=1.25
   if self.mode ne 0 then begin 
      self->HighlightPeak
      if NOT keyword_set(noo) then self->Outline
@@ -955,6 +947,7 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   self->ShowValueLine
   wset,self.win
   device,COPY=[0,0,!D.X_SIZE,!D.Y_SIZE,0,0,self.pixwin]
+  wset,old
 end
 
 ;=============================================================================
@@ -1328,7 +1321,6 @@ pro CubeViewSpec__define
       weights:ptr_new(), $      ;the weights vector for the foreground
       redshift:0.0, $           ;any redshift as cz in km/s
       ;; Data of the fit and peak
-      renorm:0, $               ;power 10^n to renormalize all data with
       ew: 0.0, $                ;Equivalent Width
       max: 0.0, $               ;The max data value
       maxlam: 0.0, $            ;x value of max data
@@ -1376,7 +1368,7 @@ pro CubeViewSpec__define
       pixwin: 0l, $             ;window id of double-buffer pixmap
       win: 0L, $                ;window id of the real window
       wOrder:0L, $              ;the continuum fit order widget
-      wToggles:0L, $            ;the renorm/value-line check box  
+      wToggles:0L, $            ;the value-line/errors check box  
       wFull:0L, $               ;widget id for selecting full mode
       wParams:0L , $            ;widget where the fitted parameters are listed
       wSaveBut:0L, $            ;save to fits
