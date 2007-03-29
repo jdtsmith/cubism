@@ -116,7 +116,8 @@ pro CubeBackTrack::Message, msg
      
      'CUBEREC_UPDATE': begin 
         if msg.FULL_MODE then begin ; Full cube mode
-           if self.cube ne msg.CUBE && obj_valid(msg.CUBE) then begin 
+           if (self.cube ne msg.CUBE && obj_valid(msg.CUBE)) || $
+              self.bcd_size[0] eq 0 then begin 
               self.cube=msg.CUBE
               self.cube->GetProperty,BCD_SIZE=bcdsz,PROJECT_NAME=pn, $
                                      WAVELENGTH=wave,ACCOUNTS_VALID=av
@@ -237,6 +238,17 @@ function CubeBackTrack::Icon
 end
 
 ;=============================================================================
+;  Cursor
+;=============================================================================
+function CubeBackTrack::Cursor,mask,offset
+  mask=[4096U,4096U,4096U,4096U,61185U,4096U,4096U,4096U, $
+        4348U,255U,255U,252U,252U,255U,255U,252U]
+  offset=[4,11]
+  return,[4096U,4096U,0U,0U,33537U,0U,0U,4096U, $
+          4096U,255U,0U,252U,0U,255U,0U,252U]
+end
+
+;=============================================================================
 ;  Description
 ;=============================================================================
 function CubeBackTrack::Description
@@ -247,7 +259,7 @@ end
 ;  MouseHelp
 ;=============================================================================
 function CubeBackTrack::MouseHelp
-  return,['Lock/Unlock Pixel','','']
+  return,['Lock Pixel','','Unlock Pixel']
 end
 
 ;=============================================================================
