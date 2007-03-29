@@ -124,12 +124,13 @@ pro tvZoom::Message, msg
                  n=ptr_valid(self.zoomlist)?n_elements(*self.zoomlist):0
                  if msg.clicks eq 2 || n lt 2 then begin ;all the way out
                     self.oDraw->GetProperty, SIZE=size
-                    self.oDraw->SetProperty,offset=[0,0],dispsize=size   
+                    self.oDraw->SetProperty,offset=[0,0],dispsize=size, $
+                                            /DOUBLE_BUFFER   
                     ptr_free,self.zoomlist ;no zoom list left
                  endif else begin ;a single click, 2 or more levels of zoom
                     self.oDraw->SetProperty, $
                        DISPSIZE=(*self.zoomlist)[n-2].Size, $
-                       OFFSET=(*self.zoomlist)[n-2].Off
+                       OFFSET=(*self.zoomlist)[n-2].Off,/DOUBLE_BUFFER
                     *self.zoomlist=(*self.zoomlist)[0:n-2] ;remove newest
                  endelse 
               endif else begin  ; zoom or pan
@@ -182,6 +183,15 @@ function tvZoom::Icon
           [ 12b, 25b],[ 24b, 12b],[ 56b, 14b],[224b,  3b], $
           [192b,  1b],[192b,  1b],[192b,  1b],[192b,  1b]]
 end
+
+function tvZoom::Cursor,mask,offset
+  mask=[4096U,4096U,4096U,4096U,61185U,4096U,4220U,4282U, $
+        4334U,198U,238U,186U,124U,56U,56U,56U]
+  offset=[4,11]
+  return,[4096U,4096U,0U,0U,33537U,0U,124U,4226U, $
+          4226U,130U,130U,130U,108U,40U,40U,40U]
+end
+
 
 function tvZoom::Description
   return,'Zoom/Pan Image'
@@ -277,7 +287,7 @@ pro tvZoom::ZoomIt, X, Y,TRANSLATE=translate
         self.zoomlist=ptr_new({ZoomBox,offset,dispsize})
   endif 
   ;; set and draw it
-  self.oDraw->SetProperty,offset=offset,dispsize=dispsize
+  self.oDraw->SetProperty,offset=offset,dispsize=dispsize,/DOUBLE_BUFFER
 end
 
 pro tvZoom::Pan,X,Y,modifier
