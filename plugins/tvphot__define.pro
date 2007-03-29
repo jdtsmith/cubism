@@ -117,6 +117,14 @@ function tvPhot::Icon
           [252b, 63b],[248b, 31b],[224b,  7b],[  0b,  0b]]
 end
 
+function tvPhot::Cursor,mask,offset
+  mask=[4096U,4096U,4096U,4096U,61185U,4096U,4096U,4096U, $
+        4156U,126U,255U,255U,255U,255U,126U,60U]
+  offset=[4,11]
+  return,[4096U,4096U,0U,0U,33537U,0U,0U,4096U, $
+          4096U,60U,102U,90U,90U,102U,60U,0U]
+end
+
 function tvPhot::Description
   return,'Aperture Photometry'
 end
@@ -216,8 +224,9 @@ function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
      ;; compute x centroid
      d=shift(cbox,-1,0)-cbox    ;derivative in x direction
      d=d[0:nbox-2,*]            ;don't take the last edge
-     d=total(d,2)
-     sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
+     d=total(d,2,/NAN)
+     sumd=total(w*d,/NAN) 
+     sumxd=total(w*d*pos,/NAN) & sumxsq=total(w*pos^2,/NAN)
      dx=sumxsq*sumd/(sumc*sumxd)
      if ( abs(dx) GT nhalf ) then begin ;Reject if centroid outside box
         err=2b
@@ -231,9 +240,9 @@ function tvPhot::Centroid, im, ERROR=err,FWHM=fwhm, SILENT=silent,TRUST=tr
      ;; compute y centroid
      d=shift(cbox,0,-1)-cbox    ;derivative in x direction
      d=d[*,0:nbox-2]            ;don't take the last edge
-     d=total(d,1)
-     sumd=total(w*d) & sumxd=total(w*d*pos) & sumxsq=total(w*pos^2)
-     
+     d=total(d,1,/NAN)
+     sumd=total(w*d,/NAN) 
+     sumxd=total(w*d*pos,/NAN) & sumxsq=total(w*pos^2)
      dy=sumxsq*sumd/(sumc*sumxd)
      if ( abs(dy) GT nhalf ) then begin ;Reject if centroid outside box
         err=2b
@@ -327,14 +336,15 @@ pro tvPhot::Phot
      self->ApPhot,take,photcen,ERROR=err,/SILENT
      self.photgood=(1b-err)+2b*(cerr eq 2b)
      if self.photgood then begin 
-        str=string(FORMAT='("CEN:[",2F6.2,"]  PHOT:",G12.6," SKY:",G12.6)', $
+        str=string(FORMAT='("CEN:[",F7.2,",",F7.2,"]  ' + $
+                   'PHOT:",G12.6," SKY:",G12.6)', $
                    self.cntrd,self.phot,self.sky )
      endif else $ 
-        str=string(FORMAT='("CEN:[",2F6.2,"]  PHOT:",A12," SKY:",A12)', $
+        str=string(FORMAT='("CEN:[",F7.2,",",F7.2,"]  ' + $
+                   'PHOT:",A12," SKY:",A12)', $
                    self.cntrd,'***','***') 
   endelse 
   widget_control, self.wSlab, set_value=str
-  erase
   self.oDraw->ReDraw,/SNAPSHOT
 end
 
