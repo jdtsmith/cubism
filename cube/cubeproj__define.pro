@@ -2405,6 +2405,7 @@ pro CubeProj::DisableRecord,recs,DISABLE=dis,_EXTRA=e
   if NOT ptr_valid(self.DR) then return
   if n_elements(dis) eq 0 then dis=1b
   self->RecOrSelect,recs,_EXTRA=e
+  if recs[0] eq -1 then return
   (*self.DR)[recs].DISABLED=dis
   self->SetDirty
   self->Send,/REC_UPDATE,/DISABLED
@@ -2822,7 +2823,7 @@ function CubeProj::Info,entries, NO_DATA=nd,AS_BUILT=as_built
   endif 
   if this.BG_SP_FILE then begin 
      str=[str,'Background: 1D from file'+ $
-          ' ('+(this.BG_SP_TYPE?"raw":"fluxed")+ $
+          ' ('+(this.BG_SP_TYPE?"fluxed":"raw e/s")+ $
                (this.use_bg?")":",disabled)")+ $
           ' --',$
           '   '+this.BG_SP_FILE]
@@ -5528,9 +5529,9 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
-     oMap->GetMap,mname,WEIGHTS=weights,FORERANGES=foreranges, $
+     oMap->GetMap,mname,FORERANGES=foreranges, $
                   BACKRANGES=backranges, WAVELENGTH_CONVERT=wl, $
-                  _EXTRA=e
+                  WEIGHTS=weights, _EXTRA=e
   endif else if keyword_set(all) then $
      foreranges=[0,n_elements(wl)-1]
   
@@ -5678,8 +5679,10 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      use_weights=0
      if nw gt 0 then if weights[0] ne -1 then use_weights=1
      if use_weights then begin  ;A weight vector overrides foreground regions
-        w=rebin(reform(weights,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],/SAMPLE)
-        tw=total(weights)
+        wconv=interpol(weights[1,*],weights[0,*],wl)
+        nw=n_elements(wl) 
+        w=rebin(reform(wconv,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],/SAMPLE)
+        tw=total(wconv)
         stack=total(*self.CUBE*w,3,/NAN)/tw
         if use_unc then stack_unc=sqrt(total(*self.CUBE_UNC^2*w^2,3,/NAN))/tw
      endif else begin           ;Foreground regions
