@@ -401,7 +401,7 @@ end
 
 pro tvRBox::DrawBox,DOUBLE=dbl,_REF_EXTRA=e
   if self.snap_mode then self->SnapCoords
-  self.oDraw->SetWin,DOUBLE=dbl
+  if keyword_set(dbl) then self.oDraw->SetWin,/DOUBLE
   plots, $
         [self.boxoff[0],self.boxoff[0],self.boxoff[0]+self.boxsize[0], $
          self.boxoff[0]+self.boxsize[0], self.boxoff[0]], $
