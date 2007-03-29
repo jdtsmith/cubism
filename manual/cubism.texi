@@ -1971,21 +1971,25 @@ images (i.e. images with WCS information).
 @subsubsection Zoom Tool
 @cindex Zooming images
 
-The zoom tool allow arbitrary zooming in on image regions.  By default,
-images are displayed at the maximum integer zoom which fits the entire
-image in the display window.  To zoom in, drag a rectangular region
-around the area of interest, or simply left-click to double the zoom
-level and center on the clicked point.  To zoom out, right-click.  All
-zoom levels are saved onto a ``zoom stack'', which is navigated
-backwards one step at a time.  To zoom all the way out, right
-double-click.
+The zoom tool allow arbitrary zooming in on image regions, and panning
+within images.  By default, images are displayed at the maximum integer
+zoom which fits the entire image in the display window.  To zoom in,
+drag a rectangular region around the area of interest, or simply click
+and release to double the zoom level and center on the clicked point.
+To zoom out, right-click.  All zoom levels are saved onto a ``zoom
+stack'', which is navigated backwards one step at a time when
+right-clicking.  To zoom all the way out, right double-click.
 
 When an image is zoomed in, middle-click dragging (or
-@key{Control}-click dragging) pans the image smoothly.  Middle-clicking,
-or @key{Control}-clicking without moving re-centers the image on the
-point clicked.  If the display canvas is resized (either using the
-@kbd{Set Size} menu item, see @ref{CubeView Options Menu}, or by
-re-sizing the entire CubeView window), the image is re-zoomed.
+@key{Control}-click dragging) pans the image smoothly.  While panning in
+this way, holding @key{Shift} constrains the pan to be vertical or
+horizontal.  
+
+Middle-click (or @key{Control}-click) and release re-centers the image
+on the point clicked, if possible.  If the display canvas is resized
+(either using the @kbd{Set Size} menu item, see @ref{CubeView Options
+Menu}, or by re-sizing the entire CubeView window), the image is
+re-zoomed.
 
 The zoom tool's key shortcut is @kbd{z}.
 
@@ -3945,11 +3949,11 @@ are assembled here.
 @tab Toggle zoom tool.
 
 @table @kbd
-@item Click
+@item Click and release
 Zoom-in on region 2x.
 
 @item Click-drag
-Zoom in on defined region.
+Zoom in on defined rectangular region.
 
 @item Right-click
 Zoom out one level.
@@ -3966,8 +3970,14 @@ Recenter on point.
 @item Middle-click-drag
 Pan image (if zoomed in).
 
+@item Middle-click-drag + Shift
+Pan image, contrained to horizontal or vertical (if zoomed in).
+
 @item Control-click-drag
 Pan image (if zoomed in).
+
+@item Control-click-drag + Shift
+Pan image, contrained to horizontal or vertical (if zoomed in).
 @end table
 
 @item @kbd{h}
