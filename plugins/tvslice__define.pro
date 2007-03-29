@@ -228,6 +228,14 @@ function tvSlice::Icon
           [124B, 000B],[110B, 000B],[070B, 000B],[000B, 000B]]
 end
 
+function tvSlice::Cursor,mask,offset
+  mask=[4096U,4096U,4096U,4096U,61185U,4096U,4096U,4288U, $
+        4320U,112U,56U,29U,32783U,7U,32783U,32773U]
+  offset=[4,11]
+  return,[4096U,4096U,0U,0U,33537U,0U,0U,4288U, $
+          4256U,80U,40U,21U,11U,4U,13U,32768U]
+end
+
 function tvSlice::Description
   return,'Line Slicing'
 end
@@ -371,6 +379,7 @@ pro tvSlice::PlotWin
   ss=get_screen_size()
   
   self.wBase=widget_base(/COLUMN,TITLE=self.oDraw->Title()+' - Slice')
+  widget_control, self.wBase,UPDATE=0
   self.wPlot=widget_draw(self.wBase,XSIZE=512,YSIZE=384,/TRACKING,/MOTION)
   widget_control, self.wBase,set_uvalue=self,/REALIZE
   
@@ -383,10 +392,13 @@ pro tvSlice::PlotWin
   widget_control, self.wPlot,get_value=win
   self.plotwin=win
   wset,save
+  widget_control, self.wBase,/UPDATE
   XManager,'tvSlice_Plot',self.wBase,/NO_BLOCK, $
            EVENT_HANDLER='tvslice_plot_event',GROUP_LEADER=tlb, $
            CLEANUP='tvslice_plot_kill'
 end
+
+
 
 
 ;=============================================================================
