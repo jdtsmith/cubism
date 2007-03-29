@@ -80,6 +80,28 @@ function tvPlug_lite::Icon
   return,''                     ; obj_class(self)
 end
 
+
+;=============================================================================
+;  Cursor - Return the 16x16 bitmap array for a special cursor when in
+;           this mode (useful for exclusive plug-ins).  A bitmap array
+;           consists of 16 unsigned integers, encoded for 16x16 array
+;           a (with 0=black, 255=dark, 128=mask) as:
+;
+;             curs=total(2U^rebin([reverse(indgen(8)),reverse(8+indgen(8))],
+;                        16,16,/SAMP)*(rotate(a,2) eq 0),1,/PRESERVE_TYPE)
+;             mask=total(2U^rebin([reverse(indgen(8)),reverse(8+indgen(8))],
+;                        16,16,/SAMP)*(rotate(a,2) ne 128),1,/PRESERVE_TYPE)
+;
+;           Offset is the pixel offset from top left (bottom left in
+;           printed array) 
+;=============================================================================
+function tvPlug_lite::Cursor,mask,offset
+  ;; Default is no special cursor, just crosshairs
+  mask=-1
+  offset=[0,0]
+  return,-1
+end
+
 ;=============================================================================
 ;  Description - A concise description of the plug-in, suitable for a
 ;                tool-tip or menu item.  To be overridden. Defaults to
