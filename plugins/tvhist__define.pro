@@ -141,6 +141,14 @@ function tvHist::Icon
           [  0b,  0b],[170b,170b],[ 85b, 85b],[170b,170b]]
 end
 
+function tvHist::Cursor,mask,offset
+  mask=[4096U,4096U,4096U,4096U,61185U,4096U,4096U,4096U, $
+        4097U,32769U,32793U,32957U,33021U,32999U,33023U,33023U]
+  offset=[4,11]
+  return,[4096U,4096U,0U,0U,33537U,0U,0U,4096U, $
+          4096U,32768U,32768U,32776U,32924U,32998U,32768U,33023U]
+end
+
 function tvHist::Description
   return,'Scale Image with Histogram'
 end
