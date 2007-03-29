@@ -147,8 +147,7 @@ pro IRSMapSet::GetMap,name,WEIGHTS=weights,FORERANGES=fr,BACKRANGES=br, $
   
   if ptr_valid(map.weights) then begin ;; Weight maps first
      weights=*map.weights
-     if n_elements(wc) ne 0 && keyword_set(nwc) eq 0 && redQ then $
-        weights[0,*]*=1.+redshift/299792.458
+     if ~keyword_set(nwc) && redQ then weights[0,*]*=1.+redshift/299792.458
   endif 
   
   if ptr_valid(map.foreranges) then begin 
