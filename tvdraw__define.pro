@@ -409,7 +409,8 @@ end
 pro tvDraw::GetProperty, IMORIG=io,IMMOD=im, IMSCL=is, IMDISP=id, PAN=pn, $
                          SIZE=sz, ZOOM=zm, OFFSET=off,DISPSIZE=disp, $
                          DRAWWIN=draw, WINSIZE=ws, PIXWIN=pw,TOP=top, $
-                         BOTTOM=bot, DRAWWIDGET=draww,_REF_EXTRA=re
+                         BOTTOM=bot, DRAWWIDGET=draww,_REF_EXTRA=re, $
+                         FOCUSED=foc
   
   ;; Chain up using by-reference keyword inheritance
   if n_elements(re) ne 0 then self->ObjMsg::GetProperty,_EXTRA=re
@@ -428,6 +429,7 @@ pro tvDraw::GetProperty, IMORIG=io,IMMOD=im, IMSCL=is, IMDISP=id, PAN=pn, $
   if arg_present(im) then im=self.immod
   if arg_present(off) then off=self.offset
   if arg_present(disp) then disp=self.dispsize
+  if arg_present(foc) then foc=self.entered
 end
 
 ;=============================================================================
@@ -641,16 +643,20 @@ pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era,NO_SHOW=no_show
      return
   endif 
   if snap then begin 
-     no_show=keyword_set(no_show) 
-     if no_show then oldwin=!D.WINDOW
+     oldwin=!D.WINDOW
      ;; do it all to the double buffer
-     self->SetWin,DOUBLE=no_show
+     self->SetWin,/DOUBLE
      if keyword_set(era) then self->EraseBackground
   endif 
   tv, *self.imdisp, self.pan[0], self.pan[1] 
   if snap then self->Snapshot
   self->SendRedraw
-  if snap && no_show then wset,oldwin
+  
+  if snap then begin 
+     wset,oldwin
+     if ~keyword_set(no_show) then      $
+        device,COPY=[0,0,self.winsize,0,0,self.dbwin]
+  endif 
 end
 
 ;=============================================================================
@@ -713,7 +719,8 @@ pro tvDraw::Draw,PREDRAW=pre,DOUBLE_BUFFER=db
   self.pan=(self.winsize-self.zoom*self.dispsize)/2>0
 
   ;; Actually draw it
-  self->EraseBackground & tv, *self.imdisp, self.pan[0], self.pan[1]
+  self->EraseBackground
+  tv, *self.imdisp, self.pan[0], self.pan[1]
   
   ;; Grab a copy of it with a device copy
   self->Snapshot
@@ -845,7 +852,7 @@ function tvDraw::Init,parent,IMORIG=imdata,TVD_XSIZE=xs,TVD_YSIZE=ys, $
                   'TLB_WIDGET_BASE','TVDRAW_PREDRAW','TVDRAW_POSTDRAW', $
                   'TVDRAW_REDRAW','TVDRAW_SNAPSHOT','TVDRAW_RESIZE']
   
-  ;; Sign us up for resize and tracking events
+  ;; Sign us up first for resize and tracking events
   self->MsgSignup,self,/TLB_WIDGET_BASE,/WIDGET_TRACKING
   
   ;; we don't draw it here since our widget is as of yet unrealized.
