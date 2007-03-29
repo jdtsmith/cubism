@@ -101,14 +101,6 @@ pro IRS_Spectrum::GetProperty,REGION=region,WAVE_UNITS=wu, $
   self->IRS_File_IO::GetProperty,_EXTRA=e
 end
 
-
-;=============================================================================
-;  SaveInit - Normalize save file, and pull FITS status from extension.
-;=============================================================================
-pro IRS_Spectrum::SaveInit,sf
-  sf=self->SaveFile(sf)
-end
-
 ;=============================================================================
 ;  SaveSpectrum - Save the Spectrum to FITS or IPAC_TABLE
 ;=============================================================================
@@ -184,8 +176,8 @@ pro IRS_Spectrum::Save,sf
      endif
      
      data=replicate(base,n_elements(*self.wavelength))
-     data.wavelength=*self.wavelength
-     data.flux=*self.flux
+     data.wavelength=reform(*self.wavelength)
+     data.flux=reform(*self.flux)
      off=2
      if ptr_valid(self.unc) then begin 
         data.flux_uncertainty=*self.unc
