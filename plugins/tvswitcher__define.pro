@@ -93,24 +93,26 @@ pro tvSwitcher::Message, msg
   self->tvPlug_lite::Message,msg,TYPE=type
   if type eq 'TVPLUG_ON_OFF' || type eq 'TVPLUG_ENABLE_DISABLE' then begin 
      wh=where(self->GetMsgObjs() eq msg.Object,cnt)
-     ;; If we're managing it, set the button (if there is one)
+     ;; If we're managing it, set the button/cursor (if there is one)
      if cnt gt 0 then self->SetButton,msg.Object,wh[0] else return
      if type eq 'TVPLUG_ENABLE_DISABLE' then return
      ;; If an exclusive has reported turning on (from off), turn all others off
-     if (*self.MsgList)[wh[0]].Exclusive && (msg.Status AND 1b) && $
-        msg.Changed then self->Exclusive,wh[0]
-     return
-  endif 
+     if (*self.MsgList)[wh[0]].Exclusive && msg.Changed then begin 
+        if (msg.Status AND 1b) then self->Exclusive,wh[0]
+        self->CheckCursor,msg.Object
+     endif 
+  endif else if type eq 'WIDGET_TRACKING' then begin 
+     self->SetCursor,REMOVE=~msg.enter
+  endif else begin 
+     ;; A key press
+     if msg.release then return ; Press only 
+     if msg.type eq 6 then return ; non-ASCII keys not allowed
+     if (msg.modifiers AND (NOT 5L)) ne 0L then return ; only Shift/Caps Lock
   
-  ;; A key press
-  if msg.release then return    ; Press only 
-  if msg.type eq 6 then return  ; non-ASCII keys not allowed
-  if (msg.modifiers AND (NOT 5L)) ne 0L then return ; only Shift/Caps Lock
-  
-  if NOT self.UseCase then char=strlowcase(msg.CH) else char=string(msg.CH)
-  wh=where((*self.MsgList).keys eq char,cnt)
-  if cnt eq 0 then return
-  self->Toggle,wh[0]
+     if ~self.UseCase then char=strlowcase(msg.CH) else char=string(msg.CH)
+     wh=where((*self.MsgList).keys eq char,cnt)
+     if cnt gt 0 then self->Toggle,wh[0]
+  endelse 
 end
 
 function tvSwitcher::GetMsgListObj, ml
@@ -166,15 +168,17 @@ pro tvSwitcher::Exclusive, keep
   if cnt eq 0 then return
   wh=where(wh ne keep,cnt)
   if cnt eq 0 then return
+  self.inhibit_cursor=1b      ;we don't want forced offs to set the cursor
   for i=0,cnt-1 do begin 
      obj=self->GetMsgListObj((*self.MsgList)[wh[i]])
      if obj->On() then obj->Off
   endfor
+  self.inhibit_cursor=0b
 end
 
 ;=============================================================================
 ;  SetButton - Set a button icon, and modify menu checked status, if
-;              present.
+;              present.  
 ;=============================================================================
 pro tvSwitcher::SetButton,object,which
   if ~ptr_valid(self.wList) then return
@@ -185,6 +189,39 @@ pro tvSwitcher::SetButton,object,which
   if ~ptr_valid(self.wTList) then return
   if widget_info((*self.wTList)[which],/VALID_ID) then $
      widget_control, (*self.wTList)[which],SET_BUTTON=onQ,SENSITIVE=enabledQ
+end
+
+
+;=============================================================================
+;  CheckCursor -  Check for changes in the cursor
+;=============================================================================
+pro tvSwitcher::CheckCursor,object
+  if self.inhibit_cursor then return
+  if ~obj_valid(object) then return
+  self.oDraw->GetProperty,FOCUSED=focused
+  
+  self.active_cursor=object     ;assume it will be picked up by the enter event
+  if focused then self->SetCursor ;if we are inside, do the cursor change now
+end
+
+;=============================================================================
+;  SetCursor -  Set or remove the custom cursor
+;=============================================================================
+pro tvSwitcher::SetCursor,object,REMOVE=remove
+  if keyword_set(remove) then begin 
+     device,/CURSOR_CROSSHAIR
+     return
+  endif 
+  object=self.active_cursor
+  if obj_valid(object) && object->On() && object->Enabled() then begin
+     cursor=object->Cursor(mask,offset)
+     if cursor[0] ne -1 then begin 
+        device,CURSOR_IMAGE=cursor,CURSOR_MASK=mask,CURSOR_XY=offset 
+     endif else device,/CURSOR_CROSSHAIR
+  endif else begin 
+     self.active_cursor=obj_new()
+     device,/CURSOR_CROSSHAIR
+  endelse 
 end
 
 ;=============================================================================
@@ -224,7 +261,7 @@ pro tvSwitcher::Start
   endfor 
   
   ;; Ask for key events:
-  self.oDraw->MsgSignup,self,/DRAW_KEY
+  self.oDraw->MsgSignup,self,/DRAW_KEY,/WIDGET_TRACKING
   
   ;; Get the Color object, if any
   oCol=self.oDraw->GetMsgObjs(CLASS='tvColor')
@@ -321,6 +358,8 @@ pro tvSwitcher__define
       oColor:obj_new(), $       ;the color object (if any)
       toolMenu: 0L, $           ;the menu for the tools
       topmenu:0L, $
+      active_cursor:obj_new(),$ ;the active object for cursor (if any)
+      inhibit_cursor:0b,$       ;whether to inhibit cursor setting
       wList: ptr_new(), $       ;list of buttons, for each on MsgList
       wTList:ptr_new(), $       ;list of tool menu buttons
       cur:0}                    ;which is currently the active one
