@@ -194,7 +194,7 @@ pro CubeRec::Message, msg
         endif 
         
         ;; Re-extraction with updated cube
-        if (self.Box->IsDrawn() || self.region_file && self->On()) then begin 
+        if (self.Box->IsDrawn() || self.region_file) then begin 
            method=self.region_file?"ExtractFileRegion":"Extract"
            call_method,method,self,FILE=self.region_file
         endif
@@ -252,6 +252,7 @@ end
 pro CubeRec::Reset,_EXTRA=e
   self.Box->Reset
   self.Region->Reset
+  self.region_file=''
   self->Off,_EXTRA=e
 end
 
@@ -263,6 +264,14 @@ function CubeRec::Icon
           [068B, 036B],[254B, 035B],[066B, 034B],[066B, 050B],$
           [066B, 042B],[254B, 039B],[066B, 034B],[066B, 018B],$
           [226B, 010B],[002B, 006B],[254B, 003B],[000B, 000B]]
+end
+
+function CubeRec::Cursor,mask,offset
+  mask=[4096U,4096U,4096U,4096U,61185U,4096U,4096U, $
+        4096U,4351U,255U,255U,255U,255U,255U,255U,255U]
+  offset=[4,11]
+  return,[4096U,4096U,0U,0U,33537U,0U,0U,4096U, $
+          4351U,165U,165U,165U,165U,165U,165U,255U]
 end
 
 ;=============================================================================
