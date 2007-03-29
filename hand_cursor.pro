@@ -19,5 +19,5 @@ pro hand_cursor, CENTER=cent
                ]
    
   if n_elements(cent) eq 0 then cxy=[6,16] else cxy=[8,8]
-  device,cursor_image=make_cursor(hand), cursor_xy=cxy
+  device,cursor_image=uint(hand[1,*])+ishft(uint(hand[0,*]),8), cursor_xy=cxy
 end
