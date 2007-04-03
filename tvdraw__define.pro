@@ -653,9 +653,11 @@ pro tvDraw::ReDraw,SNAPSHOT=snap,ERASE=era,NO_SHOW=no_show
   self->SendRedraw
   
   if snap then begin 
-     wset,oldwin
-     if ~keyword_set(no_show) then      $
+     if ~keyword_set(no_show) then begin 
+        self->SetWin
         device,COPY=[0,0,self.winsize,0,0,self.dbwin]
+     endif 
+     wset,oldwin
   endif 
 end
 
