@@ -4181,10 +4181,14 @@ pro CubeProj::BuildCube
      ;; Eliminate duplicates.
      cube_dirty_pix=cube_dirty_pix[uniq(cube_dirty_pix,sort(cube_dirty_pix))]
      cube_dirty_cnt=n_elements(cube_dirty_pix) 
+     dfrac=100.*cube_dirty_cnt/product(self.CUBE_SIZE)
+     if dfrac gt 15. then begin ; Approximate break-even in quickbuild speedup
+        quickbuild=0b
+        dfmsg=': full build forced'
+     endif else dfmsg=''
      status=string(FORMAT='("Quick-Building ",I0,"x",I0,"x",I0,' + $
-                   '" cube (",I0," dirty pixels - ",F0.1,"%)...")', $
-                   self.CUBE_SIZE,cube_dirty_cnt, $
-                   100.*cube_dirty_cnt/product(self.CUBE_SIZE))
+                   '" cube (",I0," dirty pixels - ",F0.1,"%",A,")...")', $
+                   self.CUBE_SIZE,cube_dirty_cnt,dfrac,dfmsg)
      self->Status,status
 
      ;; Decompose into dirty X,Y,Z positions in the cube
@@ -4200,14 +4204,17 @@ pro CubeProj::BuildCube
         cube_unc=temporary(*self.CUBE_UNC)
         cube_unc[cube_dirty_pix]=!VALUES.F_NAN
      endif 
-  endif else begin              ; A fresh build, make a new cube
+  endif else begin 
      status=string(FORMAT='("Building ",I0,"x",I0,"x",I0," cube...")', $
                    self.CUBE_SIZE)
      self->status,status
+  endelse 
+  
+  if ~quickbuild then begin     ; A fresh build, make a new cube
      cube=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
      if use_unc then $
         cube_unc=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
-  endelse 
+  endif 
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
   
   ;; Create mask from bad pixels
