@@ -1,1 +1,1 @@
-cubism_version='v1.50pre4 (March-2007)'
+cubism_version='v1.50pre5 (May-2007)'
