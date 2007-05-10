@@ -346,7 +346,7 @@ pro CubeBadPix::MarkAll
      for i=0,n_elements(*bpl)-1 do self->DrawMark,(*bpl)[i]
   if ptr_valid(self.rec_set) then begin 
      self.cube->GetProperty,BAD_PIXEL_LIST=rbpl,RECORD_SET=*self.rec_set
-     for i=0,n_elements(rbpl)-1 do $
+     for i=0L,n_elements(rbpl)-1 do $
         self->DrawMark,rbpl[i],/SINGLE_REC
   endif 
 end
