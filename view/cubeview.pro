@@ -79,7 +79,6 @@ end
 
 pro cubeview_event,ev
   if widget_info(ev.id,/UNAME) eq "quit" then begin 
-     widget_control, ev.top, /DESTROY ;quit
      cubeview_cleanup,ev.id
      return
   endif
