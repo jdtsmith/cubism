@@ -694,7 +694,7 @@ pro CubeViewSpec::Fit
      order=d+1                  ;The order of the fit... 1st,2nd,3rd,...
      odd_max=(order+2)/2*2-1    ;the closest odd number <= n+1
      params=fltarr(odd_max+1)   ;room for it
-     params[0]=-strength        ;bring over the line strength 
+     params[0]=-self.strength        ;bring over the line strength 
      f=*self.fit
      for j=1,odd_max,2 do begin 
         for n=j-1,order do begin 
@@ -723,7 +723,7 @@ pro CubeViewSpec::Fit
         self.ew=-.999999999999999e6
      endif else if cnt gt 1 then begin 
         ;;find the closest one to our approximation
-        approx=strength/poly(self.medlam,*self.fit) ;linear approximate
+        approx=self.strength/poly(self.medlam,*self.fit) ;linear approximate
         mn=min(abs(float(roots[wh])-approx),pos)
         self.ew=float(roots[wh[pos]])
      endif else self.ew=float(roots[wh[0]])
@@ -792,22 +792,23 @@ pro CubeViewSpec::ShowFit
   spfit=poly(lam,*self.fit)
   oplot,lam,spfit
   
-  if NOT ptr_valid(self.reg[1]) then return
+  if ~ptr_valid(self.reg[1]) then return
   ;; show the equivalent width.
   ew_left=self.medlam-self.ew/2.  & c_left= poly(ew_left,*self.fit)
   ew_right=self.medlam+self.ew/2. & c_right=poly(ew_right,*self.fit)
-  plots,ew_left, [0,c_left], COLOR=self.colors_base+3
-  plots,ew_right,[0,c_right],COLOR=self.colors_base+3
-  plots,[ew_left,ew_right],[0.,0.],COLOR=self.colors_base+3
+  l=!Y.CRANGE[0]
+  plots,ew_left, [l,c_left], COLOR=self.colors_base+3
+  plots,ew_right,[l,c_right],COLOR=self.colors_base+3
+  plots,[ew_left,ew_right],[l,l],COLOR=self.colors_base+3
   
   low=value_locate(lam,ew_left)+1
   high=value_locate(lam,ew_right)
   if low gt high then begin 
      fillx=[ew_left,ew_left,ew_right,ew_right]
-     filly=[0.,c_left,c_right,0.]
+     filly=[l,c_left,c_right,l]
   endif else begin 
      fillx=[ew_left,ew_left,lam[low:high],ew_right,ew_right]
-     filly=[0.,c_left,spfit[low:high],c_right,0.]
+     filly=[l,c_left,spfit[low:high],c_right,l]
   endelse 
   polyfill,fillx,filly,/LINE_FILL,ORIENTATION=45
 end
