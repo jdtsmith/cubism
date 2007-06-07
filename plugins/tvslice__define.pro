@@ -93,7 +93,6 @@ pro tvSlice::Message,msg
               self->EraseLine              
               self.width=width
            endif else begin 
-              self->EraseLine
               if self.constrain || (msg.modifiers AND 2b) ne 0b then begin 
                  delx=abs(pt[0]-self.opt[0])
                  dely=abs(pt[1]-self.opt[1])
@@ -105,6 +104,8 @@ pro tvSlice::Message,msg
                     pt[0]=self.opt[0] $ ; up-down 
                  else pt[1]=self.opt[1] ;left-right
               endif 
+              if array_equal(self.ept,pt) then return
+              self->EraseLine
               self.ept=pt
            endelse 
            self->DrawLine
@@ -116,6 +117,7 @@ pro tvSlice::Message,msg
         case msg.type of
            0: $                 ;button press
               begin  
+              if msg.press gt 4b then return
               if self.opt[0] ne -1 then self->EraseLine 
               self.constrain=(msg.press AND 4b) ne 0
               self.width=0.0
@@ -151,9 +153,14 @@ pro tvSlice::Message,msg
                  if pt[0] ne -1 then self.ept=pt ;otherwise just use last one 
               endif   
               self.constrain=0b & self.widen=0b
-              if array_equal(self.opt,self.ept) then return
-              self.oDraw->SendRedraw ;probably overwrote stuff
-              self->PlotSlice
+              self.oDraw->SendRedraw ;probably overdrew stuff
+              if array_equal(self.opt,self.ept) then begin ; not large enough
+                 skip=1
+              endif else self->PlotSlice,SHORT_SEGMENT=skip
+              if keyword_set(skip) then begin 
+                 ptr_free,self.plotvec
+                 self->ErasePlot
+              endif 
            end
         endcase 
         break
@@ -259,6 +266,7 @@ end
 ;  PlotEvent -  Update indicator and overlay point
 ;=============================================================================
 pro tvSlice::PlotEvent,ev
+  if ~ptr_valid(self.plotvec) then return
   type=tag_names(ev,/STRUCTURE_NAME)
   if type eq 'WIDGET_TRACKING' then begin 
      if ev.enter eq 0 then begin ; Leaving
@@ -266,6 +274,7 @@ pro tvSlice::PlotEvent,ev
         self.oDraw->GetProperty,DRAWWIN=dw
         wset,dw
         self->DrawLine
+        self.oDraw->SendRedraw
         self.plotpt=[-1,-1]     ;indicate we're not plotting anymore
      endif 
      return
@@ -292,7 +301,7 @@ pro tvSlice::ShowIndicator, IMONLY=il
   self.oDraw->SendRedraw ;some of it got erased probably
   indx=long((*self.plotvec)[0,self.plotpt[0]])
   x=indx mod sz[0] & y=indx/sz[0]
-     
+  
   self.ImCoords=self.oDraw->Convert([x,y],/DEVICE)
   plots,self.ImCoords,/DEVICE,PSYM=1,SYMSIZE=1.5,THICK=1.5,COLOR=self.color
   
@@ -399,12 +408,19 @@ pro tvSlice::PlotWin
 end
 
 
-
+;=============================================================================
+;       tvSlice::ErasePlot.  Erase the plotted slice line
+;=============================================================================
+pro tvSlice::ErasePlot
+  if widget_info(self.wBase,/VALID) eq 0 then self->PlotWin
+  wset,self.plotwin
+  erase
+end
 
 ;=============================================================================
 ;       tvSlice::PlotSlice.  Plot the sliced line
 ;=============================================================================
-pro tvSlice::PlotSlice
+pro tvSlice::PlotSlice, SHORT_SEGMENT=ss
   ;; Start it up, if it's  not yet started.
   if widget_info(self.wBase,/VALID) eq 0 then self->PlotWin
   wset,self.plotwin
@@ -412,9 +428,12 @@ pro tvSlice::PlotSlice
   del=float(self.ept-self.opt)
   d=sqrt(total(del^2))
   n=floor(d)
-  if n lt 2 then return
-  x=round(findgen(n)/(n-1)*del[0]+self.opt[0])
-  y=round(findgen(n)/(n-1)*del[1]+self.opt[1])
+  if n lt 2 then begin 
+     ss=1
+     return
+  endif 
+  x=round(findgen(n+1)/n*del[0]+self.opt[0])
+  y=round(findgen(n+1)/n*del[1]+self.opt[1])
 
   wh=where(x ge 0 and x lt sz[0],cnt)
   if cnt eq 0 then begin
@@ -463,6 +482,7 @@ pro tvSlice::DrawLine
   ;; Pixel to device coordinates
   bg=self.oDraw->Convert(self.opt,/DEVICE)
   en=self.oDraw->Convert(self.ept,/DEVICE)
+  self.oDraw->SetWin
   plots,[bg[0],en[0]],[bg[1],en[1]],COLOR=self.color,$
         THICK=1.5,/DEVICE
   
