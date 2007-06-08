@@ -177,9 +177,9 @@ pro tvRBox::Message, msg
                  if self.handcurs then device,/cursor_cross $
               else if self.boxflag eq 0 then $ ;box resize
                  self.boxsize=abs(self.save-self.boxoff)
-              self->SendBox     ;maybe send a box message
               ;; A redraw message (since box might have erased other things)
               if ~self.no_redraw then self.oDraw->SendRedraw    
+              self->SendBox     ;maybe send a box message
            end 
         endcase
      end
