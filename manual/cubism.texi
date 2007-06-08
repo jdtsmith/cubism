@@ -1710,9 +1710,12 @@ block.
 
 @table @code
 @item Save as PNG...
+@cindex{PNG, saving image as}
+@cindex{Saving image as PNG}
 Save the current image as a PNG file.
 
 @item Save Map as FITS...
+@cindex{FITS, saving spectral map as}
 Save the current spectral map (if available) as a FITS file, with
 complete WCS header information.
 
@@ -3237,6 +3240,10 @@ QuickBuild.
 @subsection Automatic Bad Pixels
 @cindex Bad pixels, automatic selection
 
+@callout{Since CUBISM uses the BCD pixel contributions to the cube to
+discover bad pixels automatically, you must first build the cube before
+the automatic bad pixel options are enabled.}
+
 CUBISM offers a powerful method to automatically discover and mark bad
 pixels in an assembled cube.  Selecting @kbd{BadPix->Auto-Gen Global Bad
 Pixels} or @kbd{BadPix->Auto-Gen Record Bad Pixels} will show a dialog
@@ -3588,14 +3595,14 @@ in @samp{[FITS]}.  The associated uncertainty cube will also be loaded
 if available.  Note that most of the features associated with a full
 CUBISM project will be unavailable when viewing a cube loaded from a
 FITS file, including the CUBISM project interface, record and overlay
-visualization, pixel backtracking (@pxref{Pixel Backtracking Tool}),
-etc.  Cubes cannot be (re)-built from versions saved as FITS, since they
-do not contain all the information on input data records, bad pixels,
-backgrounds, calibration settings, etc.  Spectra can be extracted and
-maps can be created and saved from a FITS cube; see @xref{Cube
-Analysis}.  Except for low-level analysis of completely validated cubes,
-it is preferable to work with full cube project files (@pxref{Saving the
-Project}).
+visualization, bad pixel lists, pixel backtracking (@pxref{Pixel
+Backtracking Tool}), etc.  Cubes cannot be (re)-built from versions
+saved as FITS, since they do not contain all the information on input
+data records, bad pixels, backgrounds, calibration settings, etc.
+Spectra can be extracted and maps can be created and saved from a FITS
+cube; see @xref{Cube Analysis}.  Except for low-level analysis of
+completely validated cubes, it is preferable to work with full cube
+project files (@pxref{Saving the Project}).
 
 @callout{By default, when opening a cube from @kbd{File->Open...} or
 when calling @file{cubism} directly, only @file{.cpj} files will be
@@ -4388,6 +4395,18 @@ specify another PDF reader by setting the environment variable
 @example
 setenv IDL_ONLINE_HELP_PDF_CMD xpdf
 @end example
+
+@item
+@strong{I get an IDL compile syntax error like:}
+@example
+(*self.DR)[which].BCD=ptr_new(readfits(file,/SILENT,hdr))
+                                             ^
+ % Syntax error.
+@end example
+
+You have an outdated version of @code{AstroLib}, update it.
+
+
 @end enumerate
 
 
