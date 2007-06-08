@@ -5582,8 +5582,9 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
         if ~self.as_built.fluxcon then $
            self->Error,'Integrated maps available for fluxed cubes only'
         delta_nu=(wl[1:*]-wl)
-        conv=(self.as_built.pix_omega?2.9979246e-6: $ ;Jy->W/m^2
-              2.9979246e-12)/wl^2 ;MJy->W/m^2
+        conv=(self.as_built.pix_omega? $
+              2.9979246e-6: $     ;MJy/sr->W/m^2/sr
+              2.9979246e-12)/wl^2 ;Jy->W/m^2
         delta_nu=conv*[delta_nu[0], $
                        (delta_nu[1:*]+delta_nu)/2., $
                        delta_nu[n_elements(wl)-2]]
