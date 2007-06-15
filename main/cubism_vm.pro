@@ -89,11 +89,9 @@ pro cubism_vm,pname
      catch,err
      if err ne 0 then begin 
         XManager                ;just silently restart event processing
+        catch,/cancel
         return
      endif 
-     catch,/cancel
   endif 
-  if command_line then $
-     cubism,pname,/NO_BLOCK $
-  else cubism,pname
+  cubism,pname,NO_BLOCK=command_line
 end
