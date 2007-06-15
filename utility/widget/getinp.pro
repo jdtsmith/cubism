@@ -102,7 +102,7 @@ function getinp, question, DEFAULT, TITLE=t,MODAL=md,PARENT_GROUP=group, $
    widget_control, base,/realize,DEFAULT_BUTTON=ok
    widget_control, input,/INPUT_FOCUS
    XManager,'getinp',base
-   if NOT ptr_valid(val_ptr) then return,''
+   if ~ptr_valid(val_ptr) then return,''
    ret=*val_ptr
    ptr_free,val_ptr
    return, ret[0]
