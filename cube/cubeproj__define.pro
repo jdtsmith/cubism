@@ -2538,11 +2538,12 @@ pro CubeProj::SetBackgroundFromRecs,recs, BLEND=comb, SET_ONLY=so, $
      (*self.BACK_RECS)[pos].DCEIDs=ptr_new((*self.DR)[recs].DCEID)
      
      if keyword_set(so) then return ;just set the relevant background
-     self->ViewBackground,BLEND=pos
+     ;;self->ViewBackground,BLEND=pos
      
      widget_control, (*self.wInfo).background_menu,SENSITIVE=0
-     val=getinp('Fiducial Background Value (check viewer):',0.0, $
-                TITLE="Background Combine "+(['A','B'])[pos])
+     val=getinp('Fiducial Background Value:',0.0, $
+                TITLE="Background Combine "+(['A','B'])[pos], $
+                PARENT_GROUP=self->TopBase(),/MODAL)
      if ~val then begin         ;cancelled
         heap_free,(*self.BACK_RECS)[pos]
      endif else (*self.BACK_RECS)[pos].FIDUCIAL=float(val)
@@ -2583,6 +2584,7 @@ pro CubeProj::BlendBackgrounds,USE_EXISTING_SCALES=ue, ASCALE=ascale, $
            tval=getinp( $
                 string(FORMAT='(%"Fiducial Target Value (%0.2f-%0.2f):")', $
                        aval<bval,aval>bval), 0.0, $
+                PARENT_GROUP=self->TopBase(),/MODAL, $
                 TITLE="Background Combination")
         if ~tval then message,'No Target Value Selected',/NONAME
         tval=float(tval)
