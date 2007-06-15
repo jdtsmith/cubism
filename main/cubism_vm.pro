@@ -93,5 +93,7 @@ pro cubism_vm,pname
      endif 
      catch,/cancel
   endif 
-  cubism,pname,NO_BLOCK=command_line
+  if command_line then $
+     cubism,pname,/NO_BLOCK $
+  else cubism,pname
 end
