@@ -5525,14 +5525,12 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                          CONTINUUM_SAVE=save_c,CONTINUUM_IMAGE=background, $
                          CONTINUUM_UNCERTAINTY=background_unc, $
                          WAVELENGTH_WEIGHTED=ww, ALL=all, TEMP_STACK=ts, $
-                         COMMENTS=comm, INTEGRATE=int, $
+                         COMMENTS=comm, INTEGRATE=int, UNITS=units,$
                          STACK_UNCERTAINTY=stack_unc,_EXTRA=e
+  
   if ~ptr_valid(self.CUBE) then self->Error,'No cube to stack'
   ;; Get a map set by name
   wl=*self.WAVELENGTH
-  
-  use_unc=(arg_present(stack_unc) || keyword_set(stack_unc)) $
-          && ptr_valid(self.CUBE_UNC)
   
   if n_elements(mname) ne 0 then begin 
      oMap=IRSMapSet()
@@ -5556,180 +5554,62 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      endif 
   endif
   
+  
+  ;; Total number of planes involved
   if nfr gt 0 then fore_cnt=long(total(foreranges[1,*]-foreranges[0,*]+1))
   if nbr gt 0 then back_cnt=long(total(backranges[1,*]-backranges[0,*]+1))
   
+  ;; Fixed background values
+  nbgv=n_elements(bg_vals)
+  if nbgv gt 0 && nbgv ne fore_cnt then $
+     self->Error,'Wrong number of background values passed'
   
-  if keyword_set(ww) then begin 
-     ;; Wavelength weighted Backgrounds
-     if nbr eq 0 then $
-        self->Error,'Must select continuum regions for wavelength weighting.'
-     
-     back_wav=fltarr(back_cnt) & back_planes=lonarr(back_cnt)
-     cnt=0
-     for i=0,nbr-1 do begin 
-        this_cnt=backranges[1,i]-backranges[0,i]+1
-        back_wav[cnt]=wl[backranges[0,i]:backranges[1,i]]
-        back_planes[cnt]=backranges[0,i]+lindgen(this_cnt)
-        cnt+=this_cnt
-     endfor
-     
-     back_cube=(*self.CUBE)[*,*,back_planes]
-     if use_unc then back_cube_unc=(*self.CUBE_UNC)[*,*,back_planes]
-     back_finite=finite(back_cube)
-     
-     if keyword_set(int) then begin 
-        if ~self.as_built.fluxcon then $
-           self->Error,'Integrated maps available for fluxed cubes only'
-        delta_nu=(wl[1:*]-wl)
-        conv=(self.as_built.pix_omega? $
-              2.9979246e-6: $     ;MJy/sr->W/m^2/sr
-              2.9979246e-12)/wl^2 ;Jy->W/m^2
-        delta_nu=conv*[delta_nu[0], $
-                       (delta_nu[1:*]+delta_nu)/2., $
-                       delta_nu[n_elements(wl)-2]]
-        stack=fltarr(self.CUBE_SIZE[0:1])
-        if use_unc then stack_unc=stack
-        background=fltarr(self.CUBE_SIZE[0:1])
-        if use_unc then background_unc=background
-        fore_cnt=0
-        for i=0,nfr-1 do begin 
-           this_cnt=foreranges[1,i]-foreranges[0,i]+1
-           fore_cnt+=this_cnt
-           fore_cube=(*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]]
-           if use_unc then fore_cube_unc= $
-              (*self.CUBE_UNC)[*,*,foreranges[0,i]:foreranges[1,i]]
-           fore_wav=wl[foreranges[0,i]:foreranges[1,i]]
-           for j=0,this_cnt-1 do begin ;background value for each plane
-              back_weights=rebin(reform(1./(1.+abs(fore_wav[j]-back_wav)), $
-                                        [1,1,back_cnt]), $
-                                 [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
-              wvec=total(back_weights*back_finite>1.e-25,3)
-              back=total(back_cube*back_weights,3,/NAN)/wvec
-              background+=back  ;background is not integrated
-              fore_cube[*,*,j]-=back
-              if use_unc then begin 
-                 back_unc=sqrt(total(back_cube_unc^2* $
-                                     back_weights^2,3,/NAN))/wvec
-                 background_unc=sqrt(background_unc^2+back_unc^2)
-                 fore_cube_unc[*,*,j]=sqrt(fore_cube_unc[*,*,j]^2+back_unc^2)
-              endif 
-           endfor 
-           fore_dnu=rebin(reform(delta_nu[foreranges[0,i]:foreranges[1,i]], $
-                                 1,1,this_cnt),size(fore_cube,/DIMENSIONS))
-           ;; Integral f_nu dnu.
-           fcube_count=(total(finite(fore_cube),3)>1)/this_cnt
-           stack+=total(fore_cube*fore_dnu,/NAN,3)/fcube_count
-           if use_unc then stack_unc=sqrt(stack_unc^2+ $
-                                          total(fore_cube_unc^2*fore_dnu^2,3, $
-                                                /NAN)/fcube_count^2)
-        endfor
-        background/=fore_cnt
-        if use_unc then background_unc/=fore_cnt
-     endif else begin 
-        ;; Collect the cube planes and associated wavelengths
-        fore_wav=fltarr(fore_cnt) & fore_planes=lonarr(fore_cnt)
+  if keyword_set(ww) && nbr gt 0 && back_cnt le 1 then ww=0
+  
+  use_unc=(arg_present(stack_unc) || keyword_set(stack_unc)) $
+          && ptr_valid(self.CUBE_UNC)
+  
+  use_weights=keyword_set(weights) && weights[0] ne -1 && $
+     size(weights,/N_DIMENSIONS) eq 2
+  
+  lam_weight=keyword_set(ww)
+  integrate=keyword_set(int) 
+  if integrate && ~self.as_built.fluxcon then $
+     self->Error,'Integrated maps available for fluxed cubes only'
+    
+  if use_weights then begin     ;Overrides any foreground range passed
+     ;; Disable all backgrounds
+     nbgv=0 & ww=0 & nbr=0
+     nfr=1
+     foreranges=[0,self.CUBE_SIZE[2]-1]
+     fore_cnt=self.CUBE_SIZE[2]
+  endif 
+  
+  ;;--- Setup some useful background arrays beforehand
+  use_bg=0
+  if nbgv eq 0 then begin
+     if lam_weight then begin 
+        ;; Wavelength weighted Backgrounds
+        if nbr eq 0 then $
+           self->Error,'Must select continuum regions for wavelength weighting.'
+        
+        use_bg=1
+        back_wav=fltarr(back_cnt) & back_planes=lonarr(back_cnt)
         cnt=0
-        for i=0,nfr-1 do begin 
-           this_cnt=foreranges[1,i]-foreranges[0,i]+1
-           fore_wav[cnt]=wl[foreranges[0,i]:foreranges[1,i]]
-           fore_planes[cnt]=foreranges[0,i]+lindgen(this_cnt)
+        for i=0,nbr-1 do begin 
+           this_cnt=backranges[1,i]-backranges[0,i]+1
+           back_wav[cnt]=wl[backranges[0,i]:backranges[1,i]]
+           back_planes[cnt]=backranges[0,i]+lindgen(this_cnt)
            cnt+=this_cnt
         endfor
-        
-        fore_cube=(*self.CUBE)[*,*,fore_planes]
-        if use_unc then fore_cube_unc=(*self.CUBE_UNC)[*,*,fore_planes]
-        fcube_count=(total(finite(fore_cube),3)>1)/fore_cnt
-
-        stack=total(fore_cube,/NAN,3)/fcube_count
-        if use_unc then $
-           stack_unc=sqrt(total(fore_cube_unc^2,/NAN,3))/fcube_count
-        
-        background=fltarr(self.CUBE_SIZE[0:1])
-        if use_unc then background_unc=background
-        if back_cnt eq 1 then begin 
-           background=back_cube*fore_cnt
-           if use_unc then background_unc=back_cube_unc
-        endif else begin 
-           for i=0,fore_cnt-1 do begin 
-              ;;print,1./(1.+abs(fore_wav[i]-back_wav))
-              fweights=1./(1.+abs(fore_wav[i]-back_wav))
-              back_weights=rebin(reform(fweights,[1,1,back_cnt]), $
-                                 [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
-              if i eq 0 then fweight_avg=fweights else fweight_avg+=fweights
-              ;; Remove the weighted average background for foreground plane
-              wvec=total(back_weights*back_finite>1.e-25,3)
-              
-              background+=total(back_cube*back_weights,3,/NAN)/wvec
-           endfor 
-           fweight_avg/=fore_cnt
-           if use_unc then begin 
-              fweight_avg=rebin(reform(fweight_avg,[1,1,back_cnt]), $
-                                [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
-              background_unc=sqrt(total(back_cube_unc^2*fweight_avg^2, $
-                                        3,/NAN))/ $
-                             total(fweight_avg*back_finite>1.e-25,3,/NAN)
-           endif 
-        endelse 
-        stack-=background
-        stack/=fore_cnt
-        background/=fore_cnt
-        if use_unc then begin 
-           stack_unc/=fore_cnt
-           stack_unc=sqrt(stack_unc^2+background_unc^2)
-        endif 
-     endelse 
-  endif else begin 
-     ;; Non wavelength-weighted
-     nbgv=n_elements(bg_vals)
      
-     nw=n_elements(weights)
-     use_weights=0
-     if nw gt 0 then if weights[0] ne -1 then use_weights=1
-     if use_weights then begin  ;A weight vector overrides foreground regions
-        wconv=interpol(weights[1,*],weights[0,*],wl)
-        nw=n_elements(wl) 
-        w=rebin(reform(wconv,[1,1,nw]),[self.CUBE_SIZE[0:1],nw],/SAMPLE)
-        tw=total(wconv)
-        stack=total(*self.CUBE*w,3,/NAN)/tw
-        if use_unc then stack_unc=sqrt(total(*self.CUBE_UNC^2*w^2,3,/NAN))/tw
-     endif else begin           ;Foreground regions
-        stack=fltarr(self.CUBE_SIZE[0:1])
-        if use_unc then stack_unc=stack
-        fcnt=lonarr(self.CUBE_SIZE[0:1])
-        for i=0,nfr-1 do begin 
-           if foreranges[0,i] eq foreranges[1,i] then begin 
-              stack+=(*self.CUBE)[*,*,foreranges[0,i]]
-              if use_unc then $
-                 stack_unc=sqrt(stack_unc^2+ $
-                                (*self.CUBE_UNC)[*,*,foreranges[0,i]]^2)
-              fcnt+=long(finite((*self.CUBE)[*,*,foreranges[0,i]]))
-           endif else begin 
-              stack+= $
-                 total((*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]], $
-                       /NAN,3)
-              if use_unc then $
-                 stack_unc=sqrt(stack_unc^2+ $
-                                total((*self.CUBE_UNC)[*,*,foreranges[0,i]: $
-                                                       foreranges[1,i]]^2, $
-                                      /NAN,3))
-              fcnt+=total(finite((*self.CUBE)[*,*,foreranges[0,i]: $
-                                              foreranges[1,i]]),3)
-           endelse 
-        endfor
-        if nfr gt 0 then begin 
-           stack/=(fcnt>1L)
-           if use_unc then stack_unc/=(fcnt>1L)
-        endif 
-     endelse 
-     
-     ;; Background 
-     if nbgv gt 0 then begin 
-        if nbgv ne fore_cnt then $
-           self->Error,'Wrong number of background values passed'
-        stack-=total(bg_vals)
-        return,stack
+        ;; All the planes in the background in one cube
+        back_cube=(*self.CUBE)[*,*,back_planes]
+        if use_unc then back_cube_unc=(*self.CUBE_UNC)[*,*,back_planes]
+        back_finite=finite(back_cube)
      endif else if nbr gt 0 then begin 
+        ;; Normal "averaged" backgrounds
+        use_bg=1
         bcnt=lonarr(self.CUBE_SIZE[0:1])
         background=fltarr(self.CUBE_SIZE[0:1])
         if use_unc then background_unc=background
@@ -5752,27 +5632,173 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
                                                    backranges[1,i]]),3))
            endelse 
         endfor 
-        background/=bcnt>1L
-        stack-=background
-        if use_unc then begin 
-           background_unc/=bcnt>1L
-           stack_unc=sqrt(stack_unc^2+background_unc^2)
-        endif
+        bcnt>=1L
+        background/=bcnt        ;average background, for *all* planes
+        if use_unc then background_unc/=bcnt
      endif 
-  endelse
+  endif else begin 
+     use_bg=1
+     use_unc=0
+  endelse 
+
+  ;;---- Compute the foreground stack
+  stack=fltarr(self.CUBE_SIZE[0:1])
+  if use_unc then stack_var=stack
+  stack_cnt=lonarr(self.CUBE_SIZE[0:1])
+  
+  if integrate then begin 
+     ;; Avoid roundoff.  Exponent in conversion:
+     ;;   Jy -> W/m^2 or MJy/sr -> W/m^2/sr
+     post_fac=self.as_built.pix_omega?1.e-6:1.e-12
+     delta_nu_sum=0.0
+  endif 
+  
+  ;mostly the same at each position
+  if use_bg then back_weights_accum=fltarr([self.cube_size[0:1],back_cnt])
+  
+  for i=0,nfr-1 do begin ;; Iterate over all foreground ranges
+     ;; First compute the per-plane background (and uncertainty) cube,
+     ;; either a normal average, or "wavelength-weighted" average.  This
+     ;; subtraction method is used even when integrating, or performing a
+     ;; weighted integral or average using a weight vector.
+     
+     this_fore_cnt=foreranges[1,i]-foreranges[0,i]+1
+     fore_wav=wl[foreranges[0,i]:foreranges[1,i]]
+     
+     ftarg=[self.CUBE_SIZE[0:1],this_fore_cnt]
+     
+     ;; Setup concatenated cube for this particular foreground range
+     range_cube=(*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]]
+     if use_unc then range_cube_unc= $
+        (*self.CUBE_UNC)[*,*,foreranges[0,i]:foreranges[1,i]]
+     range_cube_finite=total(finite(range_cube),3)
+
+     ;; Setup weightings and normalizations
+     bottom_norm=1. & top_weight=1.
+     if integrate then begin ;; integrate f_nu d_nu (or weight-avg with d_nu)
+        delta_nu=fore_wav[1:*]-fore_wav
+        conv=2.9979246/fore_wav^2 ;flux density to flux, modulo post_fac
+        delta_nu=conv*[delta_nu[0], $
+                       (delta_nu[1:*]+delta_nu)/2., $
+                       delta_nu[n_elements(fore_wav)-2]]
+        top_weight=delta_nu
+        if use_unc && use_bg then delta_nu_sum+=total(delta_nu)
+        bottom_norm=(range_cube_finite>1)/this_fore_cnt ;finite fraction
+     endif 
+     
+     if use_weights then begin  ;A weight vector overrides foreground regions
+        ;; An integrated weight vector is "synthetic photometry
+        ;; style", aka sum(f_nu w d_nu)/sum(w d_nu)
+        weight_vec=interpol(weights[1,*],weights[0,*],fore_wav)
+        top_weight*=weight_vec
+        bottom_norm*=integrate?total(weight_vec*delta_nu):total(weight_vec)
+     endif 
+     
+     ;; Setup backgrounds (normal, or wavelength-weighted): not
+     ;; applicable for Weight Maps
+     if nbgv gt 0 then begin 
+        ;; "One-value-per-plane" BG-subtraction
+        if n_elements(bgv_off) eq 0 then bgv_off=0L
+        these_bgs=rebin(reform(bg_vals[bgv_off:bgv_off+this_fore_cnt-1], $
+                             1,1,this_fore_cnt),ftarg,/SAMPLE)
+        bgv_off+=this_fore_cnt
+     endif else if lam_weight then begin 
+        ;; Wavelength-weighted BG averaging
+        these_bgs=fltarr(ftarg)   ;different for each plane!
+        if use_unc then these_bgs_unc=these_bgs
+        
+        for j=0,this_fore_cnt-1 do begin 
+           ;; a background value for each foreground plane
+           back_weights=rebin(reform(1./(1.+abs(fore_wav[j]-back_wav)), $
+                                     [1,1,back_cnt]), $
+                              [self.CUBE_SIZE[0:1],back_cnt],/SAMPLE)
+           ;; normalized weights for this wavelength (all background frames)
+           wvec=total(back_weights*back_finite>1.e-8,3)
+           back_weights/=rebin(wvec,size(back_weights,/DIMENSIONS),/SAMPLE)
+           
+           if integrate then $
+              back_weights_accum+=back_weights*delta_nu[j] $
+           else back_weights_accum+=back_weights ;normal FG averaging
+           these_bgs[0,0,j]=total(back_cube*back_weights*back_finite,3,/NAN)
+        endfor
+     endif else if nbr gt 0 then begin 
+        ;; Normal BG-averaging
+        these_bgs=rebin(background,ftarg,/SAMPLE) ; pre-averaged BG
+     endif 
+
+     ;; Background-subtract it
+     if use_bg then range_cube-=temporary(these_bgs)
+     
+     ;; To test a given set, make a 'test' map, and:
+     ;;
+     
+     ;; Sum and normalize this range's stack
+     if integrate || use_weights then begin 
+        top_weight=rebin(reform(top_weight,1,1,this_fore_cnt,/OVERWRITE), $
+                         ftarg,/SAMPLE)
+        this_stack=total(range_cube*top_weight, 3,/NAN)
+        if use_unc then $
+           this_stack_var=total(range_cube_unc^2*top_weight^2,3,/NAN)
+        this_stack/=bottom_norm
+        if use_unc then this_stack_var/=bottom_norm^2
+     endif else begin ;; simple average, no weights or normalizations
+        this_stack=total(range_cube,3,/NAN)
+        if use_unc then this_stack_var=total(range_cube_unc^2,3,/NAN)
+        stack_cnt+=range_cube_finite
+     endelse 
+     
+     stack+=this_stack
+     if use_unc then stack_var+=this_stack_var
+  endfor
+
+  ;; Normalize
+  stack_cnt>=1L
+  if ~integrate && ~use_weights then begin 
+     ;; No integration or weighting
+     stack/=stack_cnt
+     if use_unc then stack_var/=stack_cnt^2
+  endif 
+  
+  ;; Add in uncertainty from background
+  if use_bg then begin 
+     ;; With the accumulated weights, we can now compute the BG uncertainty
+     if lam_weight then $
+        background_unc=sqrt(total(back_finite* $
+                                  back_weights_accum^2*back_cube_unc^2, $
+                                  3,/NAN))/stack_cnt $
+     else if integrate then background_unc*=delta_nu_sum ; included in accum above
+     stack_var+=background_unc^2
+  endif 
+  
+  stack_unc=sqrt(temporary(stack_var))
+  
+  ;; Put post-multiply factors back in (except for weight maps: they
+  ;; are weighted by d_nu only)
+  if integrate && ~use_weights then begin 
+     stack*=post_fac
+     if use_unc then stack_unc*=post_fac
+  endif 
   
   ;; Form comments regarding the stack
   if nfr gt 0 then begin 
-     if n_elements(mname) ne 0 then extra=" (map "+mname+")" else extra=""
+     if use_weights then extras="weight"
+     if n_elements(mname) ne 0 then if n_elements(extras) eq 0 then $
+        extras="map "+mname else extras=[extras,"map "+mname]
+     if integrate then if n_elements(extras) eq 0 then $
+        extras="int d_nu" else extras=[extras,"int d_nu"]
+     
+     if n_elements(extras) ne 0 then extra=' ('+strjoin(extras,", ")+')' else $
+        extra=""
+     
      reg_comm=["Foreground regions"+extra+":",$
                "  "+strjoin(string(format='(F6.3,"um -> ",F6.3,"um")', $
                                    wl[foreranges]),", ")]
   endif 
   
-  
+  ;; Comment on the background
   if nbr gt 0 then begin 
      if n_elements(mname) ne 0 then bextra="map "+mname
-     if keyword_set(ww) then begin 
+     if lam_weight then begin 
         if n_elements(bextra) eq 0 then bextra="wave-weighted" $
         else bextra=[bextra,"wave-weighted"]
      endif 
@@ -5786,15 +5812,19 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      if n_elements(reg_comm) eq 0 then reg_comm=back_comm else $
         reg_comm=[reg_comm,back_comm]
   endif 
-     
+   
   if n_elements(reg_comm) ne 0 then begin 
      if n_elements(comm) eq 0 then comment=reg_comm $
      else comment=[comm,reg_comm]
   endif 
   
+  ;; Set units
+  units=self->FluxUnits(INTEGRATE=integrate && ~use_weights,/AS_BUILT)
+  
   ;; Possibly save the stack
   if keyword_set(save) then self->SaveMap,stack,save,COMMENTS=comment, $
-                                          INTEGRATE=int,UNCERTAINTY=stack_unc
+                                          INTEGRATE=int && ~use_weights, $
+                                          UNCERTAINTY=stack_unc
   if keyword_set(save_c) && n_elements(background) gt 0 $
   then self->SaveMap,background,save_c,COMMENTS=back_comm, $
                      UNCERTAINTY=background_unc
