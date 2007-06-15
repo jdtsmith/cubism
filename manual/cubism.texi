@@ -9,7 +9,7 @@
 @set EDITION 1.50
 @set VERSION 1.50
 @set IDLVERSIONREQUIRED 6.1
-@set DATE January, 2007
+@set DATE June, 2007
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jdsmith@@as.arizona.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -33,7 +33,7 @@ IRS Spectral Maps.
 This is edition @value{EDITION} of the @cite{CUBISM User Manual} for
 CUBISM @value{VERSION}
 
-Copyright @copyright{} 2006 J.D. Smith
+Copyright @copyright{} 2006, 2007 J.D. Smith
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.2 or
@@ -279,6 +279,8 @@ Creating 2D Maps
 * Pre-defined Maps::            
 * Map Sets::                    
 * Redshift and Maps::           
+* Integrated Maps::             
+* Wavelength Weighting::        
 * Line Fits::                   
 
 Tips and Troubleshooting
@@ -2576,12 +2578,17 @@ This button is used in conjunction with the Region button stated above.
 With Continuum chosen, you will select points to use for the continuum.  
 With Peak chosen, you will select points to use for the emission lines.  
 
-@item Lambda-Weighted
-If set, the continuum to subtract in maps with both peak and continuum
-region will be based on an average weighted by the distance away in
-wavelength from the peak to continuum point.  Normally, all continuum
-planes are averaged with equal weight.  Only available when both peak
-and continuum regions are defined.
+@item Lam-Weight
+If set, the continuum subtracted will be based on an average weighted by
+the distance away in wavelength from the peak to continuum point.
+Normally, all continuum planes are averaged with equal weight.  Only
+available when both peak and continuum regions are defined.
+
+@item Integrate
+If set, an integral over the background-subtracted foreground region of
+@samp{f_nu d_nu} is performed.  In the case of weight maps (e.g. MIPS
+24um), the @samp{d_nu}--weighted integral @samp{int(f_nu w d_nu)/int(w
+d_nu)} is performed, where @samp{w} is the weight vector.
 
 @item Reset Plot
 Pressing this button removes all zooms and region selections.
@@ -2727,7 +2734,7 @@ to produce spectral cubes.  It reads positional information from the
 headers, loads pipeline mask files and uncertainty images, and uses all
 of this information together to map record-level pixels to the sky
 plane.  Details of the algorithm employed by CUBISM can be found in
-Smith et al., 2006 (in prep).
+Smith et al., 2007 (PASP, submitted).
 
 CUBISM works best when applied directly to raw AOR directories
 downloaded from the Spitzer archives.  To import all data
@@ -3756,14 +3763,21 @@ the source.
 
 Just as the cube can be used to generate 1D spectra over any extraction
 region, so too can the 1D spectra be used to create 2D images (slices of
-the cube) over any specified wavelength interval.  @xref{CubeSpec} for
-more detail on defining regions on the displayed spectrum.
+the cube) averaged or integrated over any specified wavelength interval.
+@xref{CubeSpec} for more detail on defining regions on the displayed
+spectrum.
+
+@callout{Any map produced by CubeSpec can be saved to a FITS file by selecting
+@kbd{File->Save Map as FITS...} from the CubeView menu.}
+
 
 @menu
 * User-defined Maps::           
 * Pre-defined Maps::            
 * Map Sets::                    
 * Redshift and Maps::           
+* Integrated Maps::             
+* Wavelength Weighting::        
 * Line Fits::                   
 @end menu
 
@@ -3777,9 +3791,8 @@ selection from @kbd{Full Cube} to @kbd{Map}, and select either
 @kbd{c} set both of these at once and permit quickly switching between
 peak and continuum region definition).  A spectral map consists of any
 number of peak and continuum regions.  The continuum regions are
-averaged (either directly, or weighted by the wavelength offset, if
-@kbd{Lambda-Weighted} is selected), and then subtracted from the average
-of planes over the peak regions.  Continuum regions are optional.
+averaged, and then subtracted from the average or integral of planes
+over the peak regions.  Continuum regions are optional.
 
 For example, if you wish to create a continuum-subtracted 11.3 micron
 PAH map from a SL1 cube, you can first use the mouse to define the
@@ -3847,7 +3860,7 @@ saved as @file{siII.map}, and later re-used to create similar [SiII]
 image from another LL1 cube.  To make a map saved in this way one of the
 default maps, move it to the @file{cubism/map_sets} directory.
 
-@node Redshift and Maps, Line Fits, Map Sets, Creating 2D Maps
+@node Redshift and Maps, Integrated Maps, Map Sets, Creating 2D Maps
 @subsection Redshift and Maps
 @cindex Redshift, map creation
 
@@ -3863,8 +3876,37 @@ Note that pre-defined map sets based on filter curves are not shifted in
 this way (since they are meant to define pseudo-images simulating direct
 observation).
 
+@node Integrated Maps, Wavelength Weighting, Redshift and Maps, Creating 2D Maps
+@subsection Integrated Maps
+@cindex Maps, integrated
+@cindex Integrated maps
 
-@node Line Fits,  , Redshift and Maps, Creating 2D Maps
+By default, CubeSpec produces average surface brightness maps, typically
+in units of @samp{MJy/sr}, averaged over all foreground wavelength
+planes (after optional continuum subtraction).  If the @kbd{Integrate}
+button is selected, the foreground region(s) will instead be integrated
+over @math{\sum f_\nu d\nu}, which will change from flux density to flux
+units, e.g. @samp{W/m^2/sr}.  For weight maps, e.g. the MIPS 24um or
+IRAC 8um maps, the frequency-spacing weighted integral @math{\sum f_\nu
+w d\nu/\sum w d\nu} is performed instead, where @math{w} is the
+weighting vector (e.g. filter transmission function). Often this results
+in only a small difference in the resulting map image.
+
+@node Wavelength Weighting, Line Fits, Integrated Maps, Creating 2D Maps
+@subsection Wavelength Weighting
+@cindex Wavelength Weighting
+
+If the @kbd{Lam-Weight} button is selected, rather than average all
+continuum planes together, CubeSpec preforms a weighted average for each
+foreground plane, with the weight set to
+@math{1/(1 + abs(\lambda_f-\lambda_c ))} where @math{\lambda_f} is the
+wavelength of the given foreground plane, and @math{\lambda_c} is the
+wavelength of a continuum plane.  In this way, each foreground plane
+gets a custom background with more weight given to the closest continuum
+regions.  This can be useful when averaging multiple peaks with a
+strongly varying continuum.
+
+@node Line Fits,  , Wavelength Weighting, Creating 2D Maps
 @subsection Line Fits
 @cindex Line fits
 
@@ -3880,6 +3922,7 @@ corresponding spectral maps, can be defined.  Such fits are for
 informational purposes only, and do not affect the map displayed.
 
 
+
 @node Complex Maps and Extractions,  , Creating 2D Maps, Cube Analysis
 @section Complex Maps and Extractions
 
@@ -3891,6 +3934,7 @@ non-rectangular areas, or create maps by fitting multiple components to
 at each position in a maps, it is convenient to export the full cube to
 the IDL command line or as a separate FITS file.  @xref{Saving the Cube
 as FITS}, for more information.
+
 
 
 @c
