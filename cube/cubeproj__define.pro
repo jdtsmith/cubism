@@ -467,7 +467,7 @@ pro CubeProj::ShowEvent, ev
                     thiscube,                                 $
                     '                                   ', $
                     '    JD Smith and the SINGS Team    ', $
-                    '         (c) 2002-2006             ', $
+                    '         (c) 2002-2007             ', $
                     '   http://sings.stsci.edu/cubism   ', $
                     '***********************************']
      end
