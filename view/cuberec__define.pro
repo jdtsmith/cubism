@@ -126,7 +126,6 @@ pro CubeRec::Message, msg
      'CUBEVIEWSPEC_STACK': begin
         self->EnsureCube
         *self.stack_msg=msg
-        widget_control, self.wStackInfo,SET_VALUE=msg.info
         self->SwitchMode,/STACK
      end
      'CUBEPROJ_RECORD': begin 
@@ -316,8 +315,9 @@ pro CubeRec::BuildStack,UNCERTAINTY=stack_unc,_EXTRA=e
   if msg.name then begin        ; A named map
      self.STACK=ptr_new(self.cube->Stack(MAP_NAME=msg.name, $
                                          WAVELENGTH_WEIGHTED=msg.weight_cont,$
-                                         STACK_UNCERTAINTY=stack_unc, $
-                                         _EXTRA=e))
+                                         STACK_UNCERTAINTY=stack_unc, $ 
+                                         INTEGRATE=msg.integrate, $
+                                         _EXTRA=e,UNITS=units))
   endif else begin 
      if ptr_valid(msg.background) then begin
         type=size(*msg.background,/TYPE)
@@ -325,18 +325,25 @@ pro CubeRec::BuildStack,UNCERTAINTY=stack_unc,_EXTRA=e
            self.STACK=ptr_new(self.cube-> $
                               Stack(*msg.foreground, $
                                     WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                    INTEGRATE=msg.integrate, $
                                     STACK_UNCERTAINTY=stack_unc, $
-                                    BG_VALS=*msg.background,_EXTRA=e))
+                                    BG_VALS=*msg.background,_EXTRA=e, $
+                                    UNITS=units))
         endif else $            ;background index ranges
            self.STACK=ptr_new(self.cube-> $
                               Stack(*msg.foreground, $
                                     WAVELENGTH_WEIGHTED=msg.weight_cont,$
+                                    INTEGRATE=msg.integrate, $
                                     STACK_UNCERTAINTY=stack_unc, $
-                                    BACKRANGES=*msg.background,_EXTRA=e))
+                                    BACKRANGES=*msg.background,_EXTRA=e, $
+                                    UNITS=units))
      endif else self.STACK= $
         ptr_new(self.cube->Stack(*msg.foreground, $
-                                 STACK_UNCERTAINTY=stack_unc,_EXTRA=e))
+                                 INTEGRATE=msg.integrate, $
+                                 STACK_UNCERTAINTY=stack_unc,_EXTRA=e, $
+                                 UNITS=units))
   endelse 
+  self.map_units=units
 end
 
 
@@ -467,6 +474,11 @@ pro CubeRec::UpdateView
      0: begin                   ;full cube
         widget_control, self.wLambda,SET_COMBOBOX_SELECT=self.cur_wav
      end
+     1: begin                   ;stack
+        if ptr_valid(self.stack_msg) then $
+           widget_control, self.wStackInfo,SET_VALUE=(*self.stack_msg).info+$ 
+                           " ["+self.map_units+"]"
+     end 
      2: begin                   ;record, update BG button
         widget_control, self.wBGSub,SENSITIVE=ptr_valid(self.BCD_BACKGROUND)
      end
@@ -795,6 +807,7 @@ pro CubeRec__define
       oVis: obj_new(), $        ;the visualization tool
       STACK:ptr_new(), $        ;the stacked image
       stack_msg: ptr_new(), $   ;cache the stack message
+      map_units: '', $          ;name of units for displayed map
       BCD:ptr_new(), $          ;the BCD (or flatap,droopres, etc.) data
       BCD_UNC:ptr_new(), $      ;uncertainty in the BCD
       BCD_BMASK:ptr_new(), $    ;the BCD mask data
