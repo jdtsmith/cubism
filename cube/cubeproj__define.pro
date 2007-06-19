@@ -454,9 +454,11 @@ pro CubeProj::ShowEvent, ev
         if self.version ne '' AND cubism_version ne self.version then begin 
            thiscube='(Curr. Cube: '+self.version+')'
            spaces=35-strlen(thiscube)
-           if spaces gt 0 then $
-              thiscube=strjoin(replicate(' ',spaces/2))+thiscube+ $
-                       strjoin(replicate(' ',spaces-spaces/2))
+           if spaces gt 1 then begin 
+              s=spaces/2>1
+              thiscube=strjoin(replicate(' ',s))+thiscube+ $
+                       strjoin(replicate(' ',spaces-s))
+           endif 
         end else thiscube=''
         title='CUBISM '+cubism_version
         tlen=strlen(title) & left=(35-tlen)/2
@@ -5762,17 +5764,17 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   endif 
   
   ;; Add in uncertainty from background
-  if use_bg then begin 
+  if use_unc && use_bg then begin 
      ;; With the accumulated weights, we can now compute the BG uncertainty
      if lam_weight then $
         background_unc=sqrt(total(back_finite* $
                                   back_weights_accum^2*back_cube_unc^2, $
                                   3,/NAN))/stack_cnt $
-     else if integrate then background_unc*=delta_nu_sum ; included in accum above
+     else if integrate then background_unc*=delta_nu_sum 
      stack_var+=background_unc^2
   endif 
   
-  stack_unc=sqrt(temporary(stack_var))
+  if use_unc then stack_unc=sqrt(temporary(stack_var))
   
   ;; Put post-multiply factors back in (except for weight maps: they
   ;; are weighted by d_nu only)
