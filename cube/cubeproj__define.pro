@@ -3760,7 +3760,8 @@ pro CubeProj::MakeFeedBackWindow,xsize,ysize
                       (self.ORDER ne 0?' Order '+strtrim(self.ORDER,2): $
                        ' all orders'), $
                       self.NSTEP, $
-                      self.CUBE_SIZE[0:1]*self.PLATE_SCALE*3600.0D),/FREE
+                      self.CUBE_SIZE[0:1]* $
+                      self.PLATE_SCALE/self.OVERSAMPLE_FACTOR*3600.0D),/FREE
   (*self.wInfo).feedback_window=!D.WINDOW
 end
 
