@@ -271,8 +271,7 @@ pro tvSlice::PlotEvent,ev
   if type eq 'WIDGET_TRACKING' then begin 
      if ev.enter eq 0 then begin ; Leaving
         self->EraseIndicator    ;erase
-        self.oDraw->GetProperty,DRAWWIN=dw
-        wset,dw
+        self.oDraw->SetWin
         self->DrawLine
         self.oDraw->SendRedraw
         self.plotpt=[-1,-1]     ;indicate we're not plotting anymore
@@ -394,9 +393,10 @@ pro tvSlice::PlotWin
   
   gb=widget_info(self.wBase,/GEOMETRY)
   xpos=(geom.xoffset+geom.scr_xsize/2) gt ss[0]/2?  $
-       geom.xoffset-2*geom.margin-gb.scr_xsize-6*gb.xpad: $
-       geom.xoffset+2*geom.margin+geom.scr_xsize+2*geom.xpad
-  ypos=geom.yoffset-(geom.scr_ysize-geom.ysize+2*geom.ypad)
+       (geom.xoffset-2*geom.margin-gb.xsize-5*gb.xpad): $
+       (geom.xoffset+2*geom.margin+geom.xsize+2*geom.xpad)
+  
+  ypos=geom.yoffset-(geom.scr_ysize-geom.ysize-2*geom.ypad)
   widget_control, self.wBase,XOFFSET=xpos,YOFFSET=ypos
   widget_control, self.wPlot,get_value=win
   self.plotwin=win
@@ -482,7 +482,6 @@ pro tvSlice::DrawLine
   ;; Pixel to device coordinates
   bg=self.oDraw->Convert(self.opt,/DEVICE)
   en=self.oDraw->Convert(self.ept,/DEVICE)
-  self.oDraw->SetWin
   plots,[bg[0],en[0]],[bg[1],en[1]],COLOR=self.color,$
         THICK=1.5,/DEVICE
   
