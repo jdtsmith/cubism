@@ -132,12 +132,11 @@ pro CubeBackTrack::Message, msg
                  widget_control,BASE_SET_TITLE= $
                                 string(FORMAT='(%"Backtracking: %s")',pn), $
                                 self.wBase
-              self.wavelength=wave[msg.plane<(n_elements(wave)-1) ]
               self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
               if bcdsz[0] ne -1 then self.bcd_size=bcdsz
            endif 
+           self.wavelength=msg.wavelength
            self->Enable 
-           self->UpdateList
         endif else begin 
            if widget_info(self.wBase,/VALID_ID) then $
               widget_control, self.wBase,/DESTROY
@@ -335,7 +334,6 @@ pro CubeBackTrack::Event,ev
                                         SET=~(item.bad AND 2b) 
            end
         endcase 
-        self->UpdateList
      end 
      else: ; Flush all other events
   endcase 
@@ -346,22 +344,33 @@ end
 ;=============================================================================
 pro CubeBackTrack::UpdateList
   if ~widget_info(self.wLabel,/VALID_ID) then return
+  widget_control, self.wList,UPDATE=0
   msg=self.msg_base+ $
       (self.point[0] eq -1?$
        string(FORMAT='(%" Pix: [--,--] %6.3f um")',self.wavelength): $
        string(FORMAT='(%" Pix: [%d,%d] %6.3f um")',self.point, $
               self.wavelength))+ $
       string(10b)+self.msg_head
-  widget_control, self.wLabel,SET_VALUE=msg
+  widget_control, self.wLabel,GET_VALUE=oldmsg
+  if oldmsg ne msg then widget_control, self.wLabel,SET_VALUE=msg
   if self.point[0] eq -1 then begin 
      widget_control,self.wList,SET_VALUE='---'
+     widget_control, self.wList,/UPDATE
      return
   endif 
   self->EnsureCube
      
   list=self.cube->BackTrackPix(self.point,self.plane,/FOLLOW,ERROR=err)
+  if n_elements(*self.list) gt 0 then begin 
+     cnt=n_elements(tag_names(list))
+     good=0
+     for i=0,cnt-1 do good+=array_equal(list.(i),(*self.list).(i))
+     if good eq cnt then return
+  endif 
+  
   if keyword_set(err) then begin 
      self->Reset
+     widget_control, self.wList,/UPDATE
      return
   endif 
   oldid=''
@@ -391,6 +400,7 @@ pro CubeBackTrack::UpdateList
   select=widget_info(self.wList,/LIST_SELECT)
   widget_control, self.wList,SET_VALUE=str
   widget_control, self.wList,SET_LIST_TOP=top,SET_LIST_SELECT=select
+  widget_control, self.wList,/UPDATE
   *self.list=temporary(list)
 end
 
