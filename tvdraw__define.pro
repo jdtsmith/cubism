@@ -329,6 +329,10 @@ pro tvDraw::ResetWidgetEvents
                   TRACKING_EVENTS=self->IsSet('TLB_WIDGET_TRACKING')
 end
 
+pro tvDraw::ClearEvents
+  widget_control, self.wDraw,/CLEAR_EVENTS
+end
+
 function tvDraw::GetMsgListObj,list
   return,list.Obj
 end 
