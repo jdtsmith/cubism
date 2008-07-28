@@ -317,6 +317,8 @@ pro tvHist::Histo,im
      mn=s[((nt-1)*([1,5])[self.trim_mode-1]/100)>1]
   endelse
   
+  
+  if self.non_finite then finite=where(*self.finite)
   switch self.scale_mode of 
      0: begin                   ; linear
         if mx gt mn then self.oDraw->SetDrawMinMax,MIN=mn,MAX=mx
@@ -324,13 +326,18 @@ pro tvHist::Histo,im
      end
      
      1: begin                   ;sqrt
-        *im=sqrt((mn>*im)-mn)
+        if self.non_finite then $
+           (*im)[finite]=sqrt((mn>(*im)[finite])-mn) $
+        else *im=sqrt((mn>*im)-mn)
+        
         if mx gt mn then self.oDraw->SetDrawMinMax,MIN=0.,MAX=sqrt(mx-mn)
         break
      end
      
      2: begin                   ;logarithm
-        *im=alog10((mn>*im)-mn+(mx-mn)*.05)
+        if self.non_finite then $
+           (*im)[finite]=alog10((mn>(*im)[finite])-mn+(mx-mn)*.05) $
+        else *im=alog10((mn>*im)-mn+(mx-mn)*.05)
         if mx gt mn then $
            self.oDraw->SetDrawMinMax,MIN=alog10((mx-mn)*.05), $
                                      MAX=alog10((mx-mn)*(1.+.05))
@@ -344,10 +351,9 @@ pro tvHist::Histo,im
         h[0]=0.                 ;don't elevate the background
         h=total(temporary(h),/CUMULATIVE,/DOUBLE)
         self.oDraw->SetDrawMinMax,MIN=0,MAX=max(h)
-        if self.non_finite then begin 
-           good=where(*self.finite)
-           (*im)[good]=h[((mn>(*im)[good]<mx)-mn)/bs]
-        endif else *im=h[((mn>*im<mx)-mn)/bs]
+        if self.non_finite then $
+           (*im)[finite]=h[((mn>(*im)[finite]<mx)-mn)/bs] $
+        else *im=h[((mn>*im<mx)-mn)/bs]
         break
      end
   endswitch
