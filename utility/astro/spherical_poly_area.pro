@@ -27,7 +27,8 @@
 ;    
 ; MODIFICATION HISTORY:
 ;    
-;    2005-11-12 (J.D. Smith): Written
+;    2005-11-12 (J.D. Smith): Written, based on methods of R. Miller
+;       in Graphics Gems IV.
 ;-
 ;    $Id$
 ;##############################################################################
