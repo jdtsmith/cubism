@@ -119,9 +119,11 @@
 pro tvRBox::Message, msg
   type=tag_names(msg,/STRUCTURE_NAME)
   case type of
-     'DRAW_MOTION': $
+     'DRAW_MOTION': begin 
         if self.buttondwn ne 0b then self->MoveBox,msg.X,msg.Y
-     
+        self.oDraw->ClearEvents
+     end 
+        
      'DRAW_BUTTON': begin 
         case msg.type of
            0: begin             ;button press
@@ -276,9 +278,9 @@ pro tvRBox::GetLRTB, l, r, t, b
      l=tmp[0] & t=tmp[1]
      tmp=self.oDraw->Convert(self.boxoff+[1,-1]*self.boxsize,/TRUNCATE)
      r=tmp[0] & b=tmp[1]
-  endif else begin 
-     l=self.coords[0] & r=self.coords[0]+self.size[0]-1
-     t=self.coords[1] & b=self.coords[1]-(self.size[1]-1)
+  endif else begin              ; pixel bounding only
+     l=self.coords[0] & r=l+self.size[0]-1
+     t=self.coords[1] & b=t-(self.size[1]-1)
   endelse 
 end
 
@@ -341,9 +343,11 @@ pro tvRBox::MoveBox,X,Y
            nc=floor(new_coord)
            if array_equal(nc,self.save_coords) then return
            self->Erasebox,/DOUBLE,CACHE=bounds_cache
-           self.coords=[off[0],off[1]+self.size[1]-1] > $
-                       (self.coords+(nc-self.save_coords)) < $
-                       [off[0]+ds[0]-self.size[0],off[1]+ds[1]-1]
+           
+           self.coords=self.coords+(nc-self.save_coords)
+           self.coords=[0,self.size[1]-1] > $
+                       self.coords < $
+                       [sz[0]-self.size[0],sz[1]-1]
            self.save_coords=nc
         end
         
