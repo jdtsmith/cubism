@@ -231,6 +231,8 @@ pro CubeViewSpec::Event,ev
               if ev.release then return ; Just press events
               if ev.key lt 5 or ev.key gt 8 then return ; Only Arrow Keys
               del=(ev.modifiers AND 1)?((ev.modifiers AND 2) ne 0?10:5):1
+              ;; Clear out keyboard events, since they can accumulate
+              widget_control, self.wDraw, /CLEAR_EVENTS
               if self.mode eq 0 then begin ;; Change wavelengths
                  self.wav_ind=0>$
                               (self.wav_ind+ $
@@ -309,7 +311,8 @@ pro CubeViewSpec::Event,ev
                           ;; XXX regs and weights presently incompatible
                           ptr_free,self.weights 
                           self.map_name=''
-                          for i=0,n_elements(*self.wMapSets)-1 do $
+                          if ptr_valid(self.wMapSets) then $
+                             for i=0,n_elements(*self.wMapSets)-1 do $
                                 widget_control, (*self.wMapSets)[i], $
                                                 SET_BUTTON=0
                           self->UpdateButtons
@@ -440,9 +443,10 @@ pro CubeViewSpec::MapEvent,ev
   if n_elements(uval) eq 0 then begin 
      ;; A specific map choice selected
      self->SwitchMode,/MAP
-     for i=0,n_elements(*self.wMapSets)-1 do $
-        widget_control, (*self.wMapSets)[i], $
-                        SET_BUTTON=(*self.wMapSets)[i] eq ev.id
+     if ptr_valid(self.wMapSets) then $
+        for i=0,n_elements(*self.wMapSets)-1 do $
+           widget_control, (*self.wMapSets)[i], $
+                           SET_BUTTON=(*self.wMapSets)[i] eq ev.id
      widget_control, ev.id,get_value=name
      self->ApplyMap,name
      return
@@ -456,12 +460,14 @@ pro CubeViewSpec::MapEvent,ev
         if NOT (ptr_valid(self.reg[1]) OR ptr_valid(self.weights)) then $
            self->Error,'No valid region specified.'
         replid=0L
-        for i=0,n_elements(*self.wMapSets)-1 do begin 
-           if widget_info((*self.wMapSets)[i],/BUTTON_SET) then begin 
-              replid=(*self.wMapSets)[i]
-              break
-           endif 
-        endfor 
+        if ptr_valid(self.wMapSets) then begin 
+           for i=0,n_elements(*self.wMapSets)-1 do begin 
+              if widget_info((*self.wMapSets)[i],/BUTTON_SET) then begin 
+                 replid=(*self.wMapSets)[i]
+                 break
+              endif 
+           endfor 
+        endif 
         if widget_info(replid,/VALID_ID) then $
            widget_control, replid, get_value=name
         oMap->SaveMap,name,CANCELED=cncld,WEIGHTS=self.weights, $
@@ -495,13 +501,15 @@ pro CubeViewSpec::MapEvent,ev
   endcase 
 
   ;; Rebuild the menu
-  menu=widget_info((*self.wMapSets)[0],/PARENT)
-  for i=0,n_elements(*self.wMapSets)-1 do begin 
-     if n_elements(name) eq 0 then $
-        if widget_info((*self.wMapSets)[i],/BUTTON_SET) then $
-        widget_control, (*self.wMapSets)[i],GET_VALUE=name
-     widget_control, (*self.wMapSets)[i],/DESTROY
-  endfor 
+  if ptr_valid(self.wMapSets) then begin 
+     menu=widget_info((*self.wMapSets)[0],/PARENT)
+     for i=0,n_elements(*self.wMapSets)-1 do begin 
+        if n_elements(name) eq 0 then $
+           if widget_info((*self.wMapSets)[i],/BUTTON_SET) then $
+              widget_control, (*self.wMapSets)[i],GET_VALUE=name
+        widget_control, (*self.wMapSets)[i],/DESTROY
+     endfor 
+  endif 
   self->BuildMapMenu,menu,ACTIVATE=name
 end
 
@@ -821,7 +829,7 @@ pro CubeViewSpec::ShowFit
   spfit=poly(lam,*self.fit)
   oplot,lam,spfit
   
-  if ~ptr_valid(self.reg[1]) then return
+  if ~ptr_valid(self.reg[1]) || self.ew le 0.0 then return
   ;; show the equivalent width.
   ew_left=self.medlam-self.ew/2.  & c_left= poly(ew_left,*self.fit)
   ew_right=self.medlam+self.ew/2. & c_right=poly(ew_right,*self.fit)
