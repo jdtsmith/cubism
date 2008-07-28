@@ -96,7 +96,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002-2006 J.D. Smith
+;  Copyright (C) 2002-2008 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -999,8 +999,6 @@ function CubeProj::Load,file,type,ERROR=err
   return,cube
 end
 
-
-
 ;=============================================================================
 ;  Initialize - We want to do this on Init or Load
 ;=============================================================================
@@ -1089,14 +1087,12 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
          (noacc?' no accts':' with accts') + $
          (relfile?', rel names)':')') + '...'
   self->Status,status
-  ;; Detach the stuff we don't want to save!
-  detMsgList=self.MsgList & self.MsgList=ptr_new() ;or the message list
-  detCal=self.cal & self.cal=obj_new() ;or the calibration object
-  detabpl_pix=self.AUTO_BPL.BCD_PIX & self.AUTO_BPL.BCD_PIX=ptr_new()
-  detabpl_vals=self.AUTO_BPL.BCD_VALS & self.AUTO_BPL.BCD_VALS=ptr_new()
-  detabpl_id=self.AUTO_BPL.DCEID & self.AUTO_BPL.DCEID=ptr_new()
-  detabpl_cnt=self.AUTO_BPL.CNT_VEC & self.AUTO_BPL.CNT_VEC=ptr_new()
-  detabpl_unc=self.AUTO_BPL.BCD_UNC & self.AUTO_BPL.BCD_UNC=ptr_new()
+  
+  ;; Don't save stuff we know we don't want
+  heap_nosave,[self.wInfo,self.MsgList]
+  heap_nosave,self.cal
+  for i=0,n_tags(self.AUTO_BPL)-1 do $
+     if size(self.AUTO_BPL.(i),/TYPE) eq 10 then heap_nosave,self.AUTO_BPL.(i)
   
   nr=self->N_Records()
   
@@ -1106,38 +1102,32 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
      if self.savefile then cd,file_dirname(self.savefile)
      for i=0,nr-1 do begin 
         (*self.DR)[i].file=file_expand_path((*self.DR)[i].file)
-        if relfile then $
+        if relfile then $       ;make it a relative path name
            (*self.DR)[i].file=make_filename_relative((*self.DR)[i].file,root)
      endfor 
      
-     stub=ptrarr(nr)
-     detRevAccts=(*self.DR).REV_ACCOUNT ;never save reverse accounts
-     detRevBcdAccts=(*self.DR).REV_BCD_ACCOUNT ;never save reverse accounts
-     detRevDual=(*self.DR).REV_DUAL
-     (*self.DR).REV_ACCOUNT=stub
-     (*self.DR).REV_BCD_ACCOUNT=stub
-     (*self.DR).REV_DUAL=stub
+     ;;never save any reverse account information
+     heap_nosave,[(*self.DR).REV_ACCOUNT,(*self.DR).REV_BCD_ACCOUNT, $
+                  (*self.DR).REV_DUAL]
+     
      if keyword_set(nodata) then begin 
-        detBCD=(*self.DR).BCD
-        (*self.DR).BCD=stub
-        detUNC=(*self.DR).UNC
-        (*self.DR).UNC=stub
-        detBMASK=(*self.DR).BMASK
-        (*self.DR).BMASK=stub
-     endif else self->RestoreAll
+        heap_nosave,[(*self.DR).BCD,(*self.DR).UNC,(*self.DR).BMASK]
+     endif else begin 
+        ;; Saving the data: restore and mark
+        self->RestoreAll
+        void=heap_save([(*self.DR).BCD,(*self.DR).UNC,(*self.DR).BMASK],1b)
+     endelse 
+     
      if keyword_set(noacc) then begin 
         av=self.ACCOUNTS_VALID
         self.ACCOUNTS_VALID=0b
-        detACCOUNT=(*self.DR).ACCOUNT
-        (*self.DR).ACCOUNT=stub
-     endif
+        heap_nosave,(*self.DR).ACCOUNT
+     endif else void=heap_save((*self.DR).ACCOUNT,1b)
   endif
   
-  if keyword_set(nodata) then begin 
-     detVIZ=self.visualize_image & self.visualize_image=ptr_new()
-     detVIZH=self.visualize_header & self.visualize_header=ptr_new()
-  endif 
-  
+  ;; If not saving data, don't save the vis image
+  void=heap_save([self.visualize_image,self.visualize_header], $
+                 ~keyword_set(nodata))
   if relfile && self.visualize_file then $
      self.visualize_file=make_filename_relative(self.visualize_file,root)
   
@@ -1146,46 +1136,16 @@ pro CubeProj::Save,file,AS=as,CANCELED=canceled,COMPRESS=comp,NO_DATA=nodata, $
   
   catch, serr
   if serr ne 0 then self.Changed=oldchange $ ;failed, reassign old changed
-  else begin 
-      ;; save this for last to allow error reporting in the meantime
-      detInfo=self.wInfo & self.wInfo=ptr_new() ;don't save the widgets
-      save,self,FILENAME=file,COMPRESS=comp
-  endelse 
+  else save,self,FILENAME=file,COMPRESS=comp ; save last for error reporting
   catch,/CANCEL
   
-  ;; Reattach 
-  self.wInfo=detInfo           
-  self.MsgList=detMsgList   
-  self.cal=detCal
-  self.AUTO_BPL.BCD_PIX=detabpl_pix
-  self.AUTO_BPL.BCD_VALS=detabpl_vals
-  self.AUTO_BPL.DCEID=detabpl_id
-  self.AUTO_BPL.BCD_UNC=detabpl_unc
-  self.AUTO_BPL.CNT_VEC=detabpl_cnt
   
-  if ptr_valid(self.DR) then begin 
-     (*self.DR).REV_ACCOUNT=detRevAccts
-     (*self.DR).REV_BCD_ACCOUNT=detRevBcdAccts
-     (*self.DR).REV_DUAL=detRevDual
-     if keyword_set(nodata) then begin 
-        (*self.DR).BCD=detBCD
-        (*self.DR).UNC=detUNC
-        (*self.DR).BMASK=detBMASK
-     endif 
-     if keyword_set(noacc) then begin 
+  if ptr_valid(self.DR) && keyword_set(noacc) then $
         self.ACCOUNTS_VALID=av
-        (*self.DR).ACCOUNT=detACCOUNT
-     endif
-  endif 
-  
-  if keyword_set(nodata) then begin 
-     self.visualize_image=detVIZ
-     self.visualize_header=detVIZH
-  endif 
   
   if serr then self->Error,['Error Saving to File: ',file]
   
-  if strlen(self.SaveFile) eq 0 or keyword_set(AS) then $
+  if strlen(self.SaveFile) eq 0 || keyword_set(AS) then $
      self.SaveFile=file_expand_path(file)
   self->Status,status+'done ['+ $
                file_size_string((file_info(self.SaveFile)).size)+']'
@@ -1567,19 +1527,38 @@ end
 pro CubeProj::ClearBadPixels, recs, CLEAR_RECORDS=clear_recs, $
                               NO_UPDATE=nu,_EXTRA=e
   if keyword_set(clear_recs) then self->RecOrSelect,recs,_EXTRA=e
-  
+  nr=n_elements(recs) 
+
   ;; Clear the record based bad pixels
-  if n_elements(recs) gt 0 then begin
+  if nr gt 0 then begin
      if ~ptr_valid(self.DR) then return
-     for i=0,n_elements(recs)-1 do $
+     if array_equal(ptr_valid((*self.DR)[recs].BAD_PIXEL_LIST),0b) then return
+     
+     if self->IsWidget() then begin  
+        ans=dialog_message('Clear '+strtrim(nr,2)+' records of record-level' +$ 
+                           ' bad pixels?', $
+                           /QUESTION,TITLE='Clear record bad pixels', $
+                           DIALOG_PARENT=self->TopBase())
+        if ans ne 'Yes' then return
+     endif 
+     
+     
+     for i=0,nr-1 do $
         if ptr_valid((*self.DR)[recs[i]].BAD_PIXEL_LIST) then $
            self->SetDirtyPix,*(*self.DR)[recs[i]].BAD_PIXEL_LIST,RECORD=recs[i]
      ptr_free,(*self.DR)[recs].BAD_PIXEL_LIST
   endif else begin 
+     if self->IsWidget() then begin  
+        ans=dialog_message('Clear global bad pixels?', $
+                           /QUESTION,TITLE='Clear global bad pixels', $
+                           DIALOG_PARENT=self->TopBase())
+        if ans ne 'Yes' then return
+     endif 
+     
      if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then $
         self->SetDirtyPix,*self.GLOBAL_BAD_PIXEL_LIST ;; all now dirty
      
-     ;; Clear out the bad pixels
+     ;; Clear out the bad pixels, but save it as as_built.
      if self.GLOBAL_BAD_PIXEL_LIST ne self.AS_BUILT.GLOBAL_BAD_PIXEL_LIST $
      then ptr_free,self.GLOBAL_BAD_PIXEL_LIST else $
         self.GLOBAL_BAD_PIXEL_LIST=ptr_new()
@@ -3137,7 +3116,7 @@ end
 ;=============================================================================
 pro CubeProj::GetProperty, $ 
    ;; Pointer or data, depending on POINTER
-   POINTER=ptr,WAVELENGTH=wave, CUBE=cube, $
+   POINTER=ptr,WAVELENGTH=wave, CUBE_DATA=cube, $
    UNCERTAINTY_CUBE=unc, DR=dr, BACKGROUND=bg, PMASK=pmask, $  
    ;; Global or AS_BUILT options
    AS_BUILT=as_built, GLOBAL_BAD_PIXEL_LIST=gbpl,APERTURE=ap, MODULE=module, $
@@ -3437,22 +3416,11 @@ end
 ;=============================================================================
 pro CubeProj::Flux,lam,sp,ORDER=ord,SLCF=do_slcf,PIXEL_OMEGA=solid
   if n_elements(ord) eq 0 then ord=self.ORDER
-  if ord eq 0 then self->Error,'Cannot flux combined multi-order spectrum.'
-  self.cal->GetProperty,self.MODULE,ord,FLUXCON=fluxcon,TUNE=tune, $
-                        KEY_WAV=key_wav,SLCF=slcf, $
-                        PIXEL_OMEGA=pix_effective_omega, $
-                        DATE_OBS=self->MinObservedDate()
-  flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
-  
-  if keyword_set(do_slcf) then begin 
-     if ptr_valid(slcf) then begin 
-        slcf=*slcf
-        slcf=interpol(slcf[1,*],slcf[0,*],lam,/LSQUADRATIC)
-        sp*=slcf/flux_conv      ;Jy/pix
-     endif else sp/=flux_conv
-  endif else sp/=flux_conv
-  
-  if keyword_set(solid) then sp/=pix_effective_omega*1.e6 ; MJy/sr
+  if ord eq 0 then self->Error,'Cannot flux combined multi-order spectra.'
+  sp*=self.cal->FluxConv(self.MODULE,ord,WAVELENGTH=lam, $
+                         SLCF=do_slcf, $
+                         DATE_OBS=self->MinObservedDate(), $
+                         PIX_OMEGA=solid)
 end
 
 
@@ -3460,8 +3428,7 @@ end
 ;  FluxImage - Make an image to match the BCD which contains, for each
 ;              pixel, the factor to convert it from e/s/pix to
 ;              Jy/pixel (or MJy/sr) by
-;              multiplication. (fluxed=instrumental*fluximage).  Also
-;              modify by the SLCF, if requested.  
+;              multiplication. (fluxed=instrumental*fluximage).
 ;=============================================================================
 function CubeProj::FluxImage
   if ~ptr_valid(self.DR) then return,-1
@@ -3473,26 +3440,17 @@ function CubeProj::FluxImage
   
   for i=0,n_elements(ords)-1 do begin 
      lam=(*prs[i]).lambda
-     self.cal->GetProperty,self.MODULE,ords[i],FLUXCON=fluxcon,TUNE=tune, $
-                           KEY_WAV=key_wav,SLCF=slcf,PIXEL_OMEGA=pix_omega, $
-                           DATE_OBS=self->MinObservedDate()
-     
-     flux_conv=fluxcon*poly(lam-key_wav,tune) ;(e/s)/Jy
-     if ptr_valid(slcf) then begin 
-        slcf=*slcf
-        slcf=interpol(slcf[1,*],slcf[0,*],lam,/LSQUADRATIC)
-     endif else tmp=temporary(slcf)
-     
+     flux_conv=self.cal->FluxConv(self.MODULE,ords[i], $
+                                  WAVELENGTH=lam, $
+                                  DATE_OBS=self->MinObservedDate(), $
+                                  SLCF=self.slcf,PIX_OMEGA=self.pix_omega)
+
      for j=0,n_elements(lam)-1 do begin 
-        fac=1.
-        if self.fluxcon then fac/=flux_conv[j] ; now in Jy/px
-        if self.slcf && n_elements(slcf) gt 0 then fac*=slcf[j]
-        if self.pix_omega gt 0 then fac/=pix_omega*1.e6 ;MJy/sr
         pix=*(*prs[i])[j].pixels
         areas=*(*prs[i])[j].areas
         total_areas[pix]+=areas
-        fimage[pix]+=fac*areas
-     endfor 
+        fimage[pix]+=flux_conv[j]*areas
+     endfor
   endfor 
   wh=where(total_areas gt 0.,cnt,COMPLEMENT=wh_none,NCOMPLEMENT=cnt_none)
   if cnt gt 0 then fimage[wh]/=total_areas[wh]
@@ -4420,17 +4378,22 @@ pro CubeProj::Normalize
   if ~ptr_valid(self.DR) then $
      self->Error,'No data records'
   
-  ;; For low-res use the target order as the order, if they're all the same.
-;   if array_equal((*self.DR).TARGET_ORDER,(*self.DR)[0].TARGET_ORDER) AND $
-;      self.ORDER eq 0 AND $
-;      (self.module eq 'SL' OR self.module eq 'SH') $
-;      then self.ORDER=(*self.DR)[0].TARGET_ORDER
-  
-  
+  ;;--- These are independent of any logical step sequence for the
+  ;;    cube, and so don't need any enabled records
+                 
   ;; Plate scale for our module
   self.cal->GetProperty,self.module,self.order,PLATE_SCALE=ps
   self.PLATE_SCALE=ps
     
+  ;; Normalize the build aperture(s)
+  self->NormalizeApertures
+  
+  ;; Ensure the pseudo-rect size is set up.
+  self->NormalizePRSize
+  
+  ;;--- These depend on the enabled records defining the map
+  ;;    dimensions
+  
   ;; Normalize the number of steps and step size (they should all be the same)
   enabled=where((*self.DR).DISABLED eq 0,good_cnt)
   if good_cnt eq 0 then return
@@ -4446,12 +4409,6 @@ pro CubeProj::Normalize
   
   ;; Check to ensure all steps are present and accounted for
   self->CheckSteps
-  
-  ;; Ensure the pseudo-rect size is set up.
-  self->NormalizePRSize
-  
-  ;; Normalize the build aperture(s)
-  self->NormalizeApertures
   
   ;; And the cube size and center
   self->LayoutBCDs
@@ -5087,7 +5044,7 @@ function CubeProj::GuessBadPix,MAXVAR=maxvar,MINFRAC=minfrac, $
      ;; Make it large enough to hold them
      mn=min(dceid,MAX=mx)
      allids=lonarr(size(dceid,/DIMENSION),/NOZERO)
-     if mx-mn lt 1000000L then begin 
+     if mx-mn lt 1000000L then begin ; prevent excessive histogram size
         h=histogram(dceid,MIN=mn,MAX=mx,REVERSE_INDICES=ri)
         wh=where(h gt 0,cnt)
         recids=self->DCEIDtoRec(mn+wh)
@@ -5205,19 +5162,16 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
   use_unc=ptr_valid(self.CUBE_UNC)
   
   if keyword_set(rff) then begin
-     oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
-                 self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
-                 PARENT_GROUP=self->TopBase())
-     oSP->Read,rff
-     oSP->GetProperty,REGION=oReg
-     if ~obj_valid(oReg) then return,-1
+     oReg=obj_new('IRS_Region')
+     oReg->ReadRegion,rff,PARENT_GROUP=self->TopBase(), $
+                      ASTROMETRY=self->CubeAstrometryRecord()
+     if size(rff,/TYPE) ne 7 || ~file_test(rff) then return,-1
   endif
   
-  if obj_valid(oReg) then begin ;we've got a region object
-     ;; Celestial coord region: convert ra,dec to x,y
-     r=oReg->Region()           ;first region
-     self->ConvertCoords,r[0,*],r[1,*],x,y,/TO_X_Y 
-     if arg_present(op) then op=[x,y]
+  if obj_valid(oReg) then begin ;we've got a region object, use it!
+     ;; Celestial coord region: convert ra,dec list to x,y
+     oReg->GetProperty,X=x,Y=y,ASTROMETRY=self->CubeAstrometryRecord()
+     if arg_present(op) then op=[1#x,1#y]
      overlap_pix=polyfillaa(x,y,self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
                             AREAS=areas)
      err=0b
@@ -5242,7 +5196,7 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      if use_unc then $
         sp_unc=sqrt(total((*self.CUBE_UNC)[pix]^2*area^2,1,/NAN))/area_tot
   endif else begin 
-     ;; Regular "four corners" integral pixel extraction
+     ;; Simple "four corners" integral pixel extraction
      max=(size(*self.CUBE,/DIMENSIONS))[0:1]-1
      low=0>low<max
      high=0>high<max
@@ -5254,31 +5208,23 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
                           1,/NAN))/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
      endif 
      
-     h=high+1
-     op=[[low[0],low[1]], $
-         [low[0],h[1]], $
-         [h[0],h[1]], $
-         [h[0],low[1]]]
-     
-     ;; Output region, from polygon
-     if arg_present(oReg) then begin 
-        oReg=obj_new('IRS_Region')
-        oReg->SetRegion,op,ASTROMETRY=self->CubeAstrometryRecord()
-     endif 
+     oReg=obj_new('IRS_Region')
+     oReg->SetRegionFromBox,low,high+1,OUTPUT_POLY=op, $
+                            ASTROMETRY=self->CubeAstrometryRecord()
   endelse 
   
   if keyword_set(sf) then $
-     self->SaveSpectrum,sf,sp,oSP,POLYGON=op,UNCERTAINTY=sp_unc,_EXTRA=e
-
+     self->SaveSpectrum,sf,sp,UNCERTAINTY=sp_unc,REGION=oReg,_EXTRA=e
+  
+  
   if keyword_set(exp) then begin 
      if use_unc then      $
         self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH], $
                                                 [sp],[sp_unc]]) $
      else self->ExportToMain, SPECTRUM=transpose([[*self.WAVELENGTH],[sp]])
   endif 
-  if n_elements(oSP) ne 0 then $
-     obj_destroy,oSP,NO_REGION_DESTROY=arg_present(oReg)
-  if keyword_set(pkg) then begin 
+  
+  if keyword_set(pkg) then begin ; Make it a structure on return
      if n_elements(sp_unc) ne 0 then $
         rec={WAVELENGTH:0.0,FLUX:0.0,UNCERTAINTY:0.0} else $
            rec={WAVELENGTH:0.0,FLUX:0.0}
@@ -5444,22 +5390,24 @@ end
 ;=============================================================================
 ;  SaveSpectrum - Save a Spectrum using a spectrum object
 ;=============================================================================
-pro CubeProj::SaveSpectrum,file,sp,oSP,UNCERTAINTY=unc,POLYGON=op,COMMENTS=comm
+pro CubeProj::SaveSpectrum,file,sp,oSP,UNCERTAINTY=unc, $
+                           COMMENTS=comm,REGION=reg
   if ~obj_valid(oSP) then begin 
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
                  self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
                  PARENT_GROUP=self->TopBase())
-     ;; If the region was created by hand, create a region object for it
+     ;; If the region was created by hand in pixel coordinates, create
+     ;; a region object for it
      if n_elements(op) ne 0 then begin 
         oReg=obj_new('IRS_Region')
         oReg->SetRegion,op,ASTROMETRY=self->CubeAstrometryRecord()
         oSP->SetProperty,REGION=oReg
      endif 
      destroy=1
+     if obj_valid(reg) then oSP->SetProperty,REGION=reg
   endif else begin 
      ;; Re-use a given region: it must have been extracted from that.
      oSP->GetProperty,REGION=oReg
-     oReg->UpdateAstrometry,self->CubeAstrometryRecord()
   endelse 
   
   oSP->SaveInit,file
