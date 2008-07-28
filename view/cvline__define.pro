@@ -254,7 +254,7 @@ function cvLine::ValString, im,point,EXTRA_STRING=ext
      endif else ext='           '
   endif else ext=''
   if ptr_valid(self.UNC) then $
-     val=string(FORMAT='(G13.7," ",A0," ",G0.6)', $
+     val=string(FORMAT='(G10.4," ",A0," ",G10.4)', $
                 (*im)[pt[0],pt[1]],string(177b), $
                 (*self.UNC)[pt[0],pt[1]]) $
   else val=string(FORMAT='(G14.8)',(*im)[pt[0],pt[1]])
