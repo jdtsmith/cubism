@@ -387,6 +387,20 @@ pro tvColor::Stretch,_EXTRA=e
 end
 
 ;=============================================================================
+;  Reverse - Reverse color table
+;=============================================================================
+pro tvColor::Reverse,_EXTRA=e
+  ;;total colors in our used range
+  ncolors=(self.topval-self.bottom-self.nreserve+1)
+  
+  (*self.r)[0]=reverse((*self.r)[0:ncolors-1])
+  (*self.g)[0]=reverse((*self.g)[0:ncolors-1])
+  (*self.b)[0]=reverse((*self.b)[0:ncolors-1])
+  self->SetColors,_EXTRA=e
+  return
+end
+
+;=============================================================================
 ;  LoadCT - Load color table, remembering which with a system variable
 ;           !ctabl
 ;=============================================================================
@@ -418,16 +432,28 @@ end
 pro tvColor::CtablEvent, ev
   ;; load the color table into range
   if tag_names(ev,/STRUCTURE_NAME) eq 'WIDGET_DROPLIST' then ind=ev.index $
-  else widget_control, ev.id,get_uvalue=ind
-  self->Loadct,(*self.col_list)[ind],/silent,BOTTOM=self.bottom, $
-               NCOLORS=self.topval-self.bottom-self.nreserve+1
-  ;self.oDraw->BackGround        ;set the background color
-  ;; chop the colors appropriately
-  tvlct,r,g,b,/GET
-  (*self.rorig)=r[self.bottom:self.topval]
-  (*self.gorig)=g[self.bottom:self.topval]
-  (*self.borig)=b[self.bottom:self.topval]
-  self->Stretch,/SNAPSHOT       ;restretch
+  else begin 
+     widget_control, ev.id,get_uvalue=ind
+  endelse 
+  rev=0
+  if string(ind) eq 'reverse' then begin 
+     set=widget_info(self.wReverseBut,/BUTTON_SET)
+     widget_control, self.wReverseBut,SET_BUTTON=~set
+     do_reverse=1               ;either way, we reverse them from before
+  endif else begin 
+     if widget_info(self.wReverseBut,/VALID_ID) then $
+        do_reverse=widget_info(self.wReverseBut,/BUTTON_SET) 
+     
+     self->Loadct,(*self.col_list)[ind],/silent,BOTTOM=self.bottom, $
+                  NCOLORS=self.topval-self.bottom-self.nreserve+1
+     ;; chop the colors appropriately
+     tvlct,r,g,b,/GET
+     (*self.rorig)=r[self.bottom:self.topval]
+     (*self.gorig)=g[self.bottom:self.topval]
+     (*self.borig)=b[self.bottom:self.topval]
+     self->Stretch,SNAPSHOT=~do_reverse,NO_UPDATE=do_reverse,ERASE=~do_reverse
+  endelse 
+  if do_reverse then self->Reverse,/SNAPSHOT,/ERASE
 end
 
 pro tvColor_Event, ev
@@ -541,7 +567,11 @@ function tvColor::Init,oDraw,parent,COL_TABLE_PARENT=ctp,COL_TABLE_MENU=menu, $
                                     /MENU,uvalue=self,  $
                                     event_pro='tvColor_ctabl_event')
         for i=0,n_elements(uc)-1 do $
-           but=widget_button(self.wColtabl,value=colors[uc[i]],uvalue=i) 
+           but=widget_button(self.wColtabl,VALUE=colors[uc[i]],UVALUE=i, $
+                             /CHECKED_MENU)
+        self.wReverseBut=widget_button(self.wColtabl,VALUE='Reverse', $
+                                       UVALUE='reverse',/NO_RELEASE, $
+                                       /SEPARATOR,/CHECKED_MENU)
      endif else begin           ; droplist it is
         p=parent
         if size(ctp,/TYPE) eq 3 then if widget_info(ctp,/VALID_ID) then p=ctp 
@@ -622,6 +652,7 @@ pro tvColor__define
           col_list: ptr_new(),$ ;which of IDL's built-in colormaps to use
           winsize:[0,0], $      ;size of the draw window
           wBar:0L, $            ;widget id of color bar
+          wReverseBut: 0L, $    ;the reverse button
           bSize:[0,0], $        ;the size of the color bar        
           wLow:0L, $            ;low stretch widget slider id
           wHigh:0L, $           ;high widget slider id
