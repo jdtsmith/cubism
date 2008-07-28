@@ -264,6 +264,19 @@
 ;    Nota Bene: All pixel coordinates in the WAVSAMP and related
 ;    follow the convention of the first pixel centered at [0.5,0.5].
 ;
+;    Order mismatch and extraction: In Aug, 2007, it was discovered
+;    that SSC extraction method lead to very large tuning
+;    coefficients, by extracting over the *full* WAVSAMP
+;    pseudo-rectangle with a variable PR width).  This injects, e.g. a
+;    20% slope to each order of LH, which the tuning functions later
+;    "take out".  Since CUBISM uses 1 pixel wide PRs, it doesn't need
+;    this correction.  One strangeness: SH has tuning functions which
+;    go in the opposite direction.  The problem should be universal,
+;    but it doesn't appear to be.  An optional De-Tune
+;    parameter can be used 
+;     
+;
+;    
 ; INHERITANCE TREE:
 ;
 ;     IRS_Calib
@@ -294,7 +307,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2001-2005 J.D. Smith
+;  Copyright (C) 2001-2007 J.D. Smith
 ;
 ;  This file is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published
@@ -312,6 +325,56 @@
 ;  Boston, MA 02110-1301, USA.
 ;
 ;##############################################################################
+
+
+;=============================================================================
+;  FluxConv - Return the flux conversion vector (flux density/(e/s))
+;             for the given wavelength vector, with optional SLCF
+;             correction, FLUXCON selection by date (if applicable),
+;             and with conversion to flux intensity (MJy/sr).  Use by
+;             *MULTIPLICATION* with the flux conversion vector.  E.g.
+;               f_nu=f_instrumental * cal->FluxConv('LH',WAVELENGTH=lam)
+;=============================================================================
+function IRS_Calib::FluxConv,module,order,WAVELENGTH=lam, $
+                             SLCF=do_slcf, DATE_OBS=dobs, PIX_OMEGA=solid, $
+                             DETUNE=detune
+  self->GetProperty,module,order,FLUXCON=fluxcon,TUNE=tune, $
+                    KEY_WAV=key_wav,SLCF=slcf, $
+                    PIXEL_OMEGA=pix_effective_omega, $
+                    DATE_OBS=dobs
+  
+  tune_func=poly(lam-key_wav,tune)
+  
+;;   if keyword_set(detune) then begin ;; Detune based on PR width
+;;      prs=self->GetWAVSAMP(module,order,/FULL)
+;;      len=sqrt((prs.x[1,*]-prs.x[0,*])^2+(prs.y[1,*]-prs.y[0,*])^2)
+     
+;;      ;; Perpendicular distance from one line to other of each PR in
+;;      ;; the SSC's WAVSAMP
+;;      pr_d1=abs((prs.x[1,*]-prs.x[0,*])*(prs.y[0,*]-prs.y[2,*]) - $
+;;                (prs.x[0,*]-prs.x[2,*])*(prs.y[1,*]-prs.y[0,*]))/len
+           
+;;      pr_d2=abs((prs.x[1,*]-prs.x[0,*])*(prs.y[0,*]-prs.y[3,*]) - $
+;;                (prs.x[0,*]-prs.x[3,*])*(prs.y[1,*]-prs.y[0,*]))/len
+;;      pr_width=(pr_d1+pr_d2)/2.
+;;      pr_lam=prs.lambda
+     
+     
+  flux_conv=1./(fluxcon*tune_func)
+  if keyword_set(do_slcf) then begin 
+     if ptr_valid(slcf) then begin 
+        slcf=*slcf
+        ;; Interpolate quadratically onto the wavelength vector
+        slcf=interpol(slcf[1,*],slcf[0,*],lam,/LSQUADRATIC)
+        flux_conv*=slcf 
+     endif 
+  endif 
+  
+  if keyword_set(solid) then flux_conv/=pix_effective_omega*1.e6 ; MJy/sr
+  
+  return,flux_conv
+end
+
 
 ;=============================================================================
 ;  GetProperty - Get object properties
@@ -340,7 +403,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   if arg_present(ps) then   ps=rec.PLATE_SCALE
   if arg_present(po) then po=rec.PIXEL_OMEGA
   
-  ;; Date-specific fluxcons
+  ;; Date-specific fluxcons (e.g. LH, bias change).
   if arg_present(fluxcon) || arg_present(fluxcon_kw) || $
      arg_present(tune) then begin 
      if ptr_valid(rec.FLUXCON_RECS) then begin 
@@ -349,7 +412,7 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
            keep=where(dobs-dates gt 0.0,cnt)
            if cnt eq 0 then $ ;observed date before any cut-on date
               message, 'Cannot find valid FLUXCON for this date!'
-           void=min(dobs-dates[keep],pos)
+           void=min(dobs-dates[keep],pos) ;closest after
            keep=keep[pos]
         endif else void=min(dates,keep) ;assume the original, oldest cal
         fc=(*rec.FLUXCON_RECS)[keep]
@@ -1647,7 +1710,8 @@ pro IRS_Calib::Validate
                           0.0D, $
                           (*self.cal[i])[j].FLUXCON, $
                           (*self.cal[i])[j].FLUXCON_KEY_WAV, $
-                          (*self.cal[i])[j].TUNE})
+                          (*self.cal[i])[j].TUNE, $
+                          0b})
            endif 
         endfor 
      end 
@@ -1717,7 +1781,8 @@ pro IRS_Calib__define
       VALID_FROM: 0.0D, $        ;the Julian data this fluxcon set is valid from
       FLUXCON:0.0, $             ;the fluxcon value for this order e/s/Jy
       FLUXCON_KEY_WAV: 0.0, $    ;fluxcon reference wavelength
-      TUNE: fltarr(6)}           ;fluxcon tuning coefficients "a"
+      TUNE: fltarr(6), $         ;fluxcon tuning coefficients "a"
+      DETUNED: 0b}               ;whether this fluxcon has been "de-tuned"
   
   
   ;; A wavsamp set for a single order and a given aperture, either
