@@ -104,7 +104,7 @@ pro CubeRec::Message, msg
   free=0b
   case type of
      'BOX': begin 
-        if self.region->On() then self.region->Reset
+        if self.oFixReg->On() then self.oFixReg->Reset
         if ~widget_info(self.wSaveDS9But,/SENSITIVE) then self->SetButtons
         self->Extract
         return
@@ -132,6 +132,7 @@ pro CubeRec::Message, msg
         widget_control, self.wInfoLine,set_value='Record: '+msg.INFO
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
         if self.free_bcd then ptr_free,self.BCD,self.BCD_UNC,self.BCD_BMASK
+        self.info=msg.info
         self.free_bcd=msg.free
         self.cube=msg.CUBE
         self.bcd=msg.BCD
@@ -148,6 +149,7 @@ pro CubeRec::Message, msg
         widget_control, self.wInfoLine,set_value='Cube: '+msg.INFO
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
         self.cube=msg.CUBE
+        self.info=msg.info
         ptr_free,self.rec_set
         if ptr_valid(self.wavelength) then $
            cur_wav=(*self.wavelength)[self.cur_wav< $
@@ -168,6 +170,7 @@ pro CubeRec::Message, msg
         self.oDraw->SetTitle,'CubeView: '+msg.INFO
         widget_control, self.wInfoLine,set_value='Visualizing '+msg.INFO
         self.cube=msg.CUBE
+        self.info=msg.info
         self.module=msg.MODULE
         self.visualize_image=msg.IMAGE
         self->SwitchMode,/VISUALIZE
@@ -189,7 +192,7 @@ pro CubeRec::Message, msg
               fg=*(*self.stack_msg).foreground
               if ~array_equal(fg le (cs[2]-1),1b) then $
                  self->SwitchMode,/FULL
-           endif 
+           endif else self->SwitchMode,/FULL ;stack without foreground? No.
         endif 
         
         ;; Re-extraction with updated cube
@@ -213,11 +216,16 @@ pro CubeRec::Message, msg
   if ~badpix_update then self->UpdateData
   if n_elements(astr) ne 0 then astr=ptr_new(astr,/NO_COPY) else $
      astr=ptr_new()
+  if self.mode eq 3 then self.VISUALIZE_ASTR=astr
+  
   self->MsgSend,{CUBEREC_UPDATE, $
                  self.mode eq 2b,self.mode eq 0b,self.mode eq 3b,$
-                 self.cur_wav, self.cube,self.MODULE,self.BCD,self.BCD_BMASK, $
+                 self.cur_wav, $
+                 ptr_valid(self.wavelength)? $
+                 (*self.wavelength)[self.cur_wav]:0.0, $
+                 self.cube,self.MODULE,self.BCD,self.BCD_BMASK, $
                  self.UNCERTAINTY, astr,self.rec_set,cal_update,badpix_update}
-  ptr_free,astr
+  if self.mode ne 3 then ptr_free,astr
   if ~(cal_update || badpix_update) then self->UpdateView
 end
 
@@ -231,7 +239,7 @@ pro CubeRec::On
      return
   end
   self->tvPlug::On
-  self.Box->On & self.Region->On
+  self.Box->On & self.oFixReg->On
   self->SetButtons
 end
 
@@ -241,7 +249,7 @@ end
 pro CubeRec::Off,_EXTRA=e
   self->tvPlug::Off,_EXTRA=e
   self.Box->Off
-  self.Region->Off
+  self.oFixReg->Off
   self->SetButtons
 end
 
@@ -250,7 +258,7 @@ end
 ;=============================================================================
 pro CubeRec::Reset,_EXTRA=e
   self.Box->Reset
-  self.Region->Reset
+  self.oFixReg->Reset
   self.region_file=''
   self->Off,_EXTRA=e
 end
@@ -414,10 +422,12 @@ pro CubeRec::SetButtons
   ;; The menu buttons
   if widget_info(self.wMapSaveBut,/VALID_ID) then begin 
      widget_control, self.wMapSaveBut,SENSITIVE=self.mode eq 1
-     widget_control, self.wExtractRegionBut,SENSITIVE=self.mode lt 2
+     widget_control, self.wExtractRegionBut, $
+                     SET_VALUE=(self.mode lt 2?"Extract":"Display")+ $
+                     " Region from File...",SENSITIVE=self.mode ne 2
      widget_control, self.wSaveDS9But,SENSITIVE=self.mode lt 2 && $
         ((obj_valid(self.box) && self.Box->IsDrawn()) || $
-         (obj_valid(self.region) && self.region_file && self.region->On()))
+         (obj_valid(self.oFixReg) && self.region_file && self.oFixReg->On()))
   endif 
 end
 
@@ -608,6 +618,32 @@ pro CubeRec::SetupViewSpec
   endif 
 end
 
+pro CubeRec::FileRegion,_EXTRA=e
+  if self.mode le 1 then self->ExtractFileRegion,_EXTRA=e else $
+     self->DisplayFileRegion,_EXTRA=e
+end
+
+
+;=============================================================================
+;  DisplayFileRegion -  Simply display a file's region
+;=============================================================================
+pro CubeRec::DisplayFileRegion,FILE=rff
+  if ~self->On() then self->On
+  self->CheckCube
+  if self.mode eq 3 && ~ptr_valid(self.VISUALIZE_ASTR) then return
+  if n_elements(rff) eq 0 then rff=1 ;select and return the file
+  oReg=obj_new('IRS_Region')
+  oReg->ReadRegion,rff,PARENT_GROUP=self.cube->TopBase()
+  if size(rff,/TYPE) ne 7 || ~file_test(rff) then return
+  astr=self.mode eq 3?*self.VISUALIZE_ASTR:self.cube->CubeAstrometryRecord()
+  oReg->GetProperty,X=x,Y=y,ASTROMETRY=astr
+  obj_destroy,oReg
+  
+  self.oFixReg->SetProperty,REGION=[1#x,1#y]
+  if ~self.oFixReg->On() then self.oFixReg->On
+  self->SetButtons  
+end
+
 ;=============================================================================
 ;  ExtractFileRegion -  Extract a region from a file
 ;=============================================================================
@@ -625,10 +661,12 @@ pro CubeRec::ExtractFileRegion,FILE=rff,_EXTRA=e
   spec=ptr_new(spec,/NO_COPY)
   if n_elements(spec_unc) ne 0 then spec_unc=ptr_new(spec_unc,/NO_COPY) else $
      spec_unc=ptr_new()
-  info=string(FORMAT='(%"Region from %s")',file_basename(self.region_file))
+  
+  info=self.cube->ProjectName() +': '+ $
+       string(FORMAT='(%"Region from %s")',file_basename(self.region_file))
   self.Box->Reset & self.Box->On ;clear any box, but leave active
-  self.region->SetProperty,REGION=op
-  if ~self.region->On() then self.region->On
+  self.oFixReg->SetProperty,REGION=op
+  if ~self.oFixReg->On() then self.oFixReg->On
   self->SetButtons
   self->MsgSend,{CUBEREC_SPEC,info,self.wavelength,spec,spec_unc}
   ptr_free,spec,spec_unc
@@ -636,11 +674,12 @@ end
 
 
 ;=============================================================================
-;  SaveDS9Region -  Save region as a DS9 .reg file
+;  SaveDS9Region -  Save box region as a DS9 .reg file
 ;=============================================================================
 pro CubeRec::SaveDS9Region
   self.Box->Getlrtb,l,r,t,b
-  void=self.cube->Extract(FROM_FILE=self.region_file,[l,b],[r,t],REGION=reg)
+  reg=obj_new('IRS_Region')
+  reg->SetRegionFromBox,[l,b],[r,t],ASTROMETRY=self.cube->CubeAstrometryRecord()
   reg->WriteDS9Region,PARENT_GROUP=self.cube->TopBase()
   obj_destroy,reg
 end
@@ -653,7 +692,7 @@ pro CubeRec::Extract,_EXTRA=e
   self.Box->Getlrtb,l,r,t,b
   self.region_file=''           ;no longer extracting by region
   spec=self.cube->Extract([l,b],[r,t],UNCERTAINTY=spec_unc,_EXTRA=e)
-  info=string(FORMAT='(%"Extracted from %s, [%d,%d]->[%d,%d]")', $
+  info=string(FORMAT='(%"%s: [%d,%d]->[%d,%d]")', $
               self.cube->ProjectName(),l,b,r,t)
   self->SetupViewSpec
   spec=ptr_new(spec,/NO_COPY)
@@ -696,7 +735,7 @@ function CubeRec::Init,oDraw,parent,CUBE=cube,APER_OBJECT=aper, $
   self.Box=obj_new('tvRBox', oDraw,/CORNERS,/SNAP,_EXTRA=e)
   self.Box->MsgSignup,self,/BOX
   
-  self.Region=obj_new('tvFixedRegion',oDraw,_EXTRA=e)
+  self.oFixReg=obj_new('tvFixedRegion',oDraw,_EXTRA=e)
   
   ;; listen for this cube's messages
   if obj_valid(cube) then $
@@ -771,7 +810,7 @@ function CubeRec::Init,oDraw,parent,CUBE=cube,APER_OBJECT=aper, $
                                           value='Extract Region from File...',$
                                           EVENT_PRO='cuberec_event', $
                                           UVALUE={self:self, $
-                                                  method:'ExtractFileRegion', $
+                                                  method:'FileRegion', $
                                                   event:0},/SEPARATOR)
      self.wSaveDS9But=widget_button(menu, $
                                     value='Save DS9 Region...', $
@@ -793,14 +832,15 @@ pro CubeRec__define
   st={CubeRec, $
       INHERITS tvPlug,$         ;it's a tvDraw plugin
       cube:obj_new(), $         ;the cube project we're servicing
-      mode:0, $                 ;full (=0),stacked (=1), bcd (=2), viz (=3)
+      info:'', $                ;the passed info on the displayed object
+      mode:0, $                  ;full (=0),stacked (=1), bcd (=2), viz (=3)
       wavelength:ptr_new(), $   ;the wavelength planes of our cube
       cur_wav:0L,$              ;the index of wavelength plane being viewed
       playing:0, $              ;whether we're "playing" the full cube
       delay:0.0, $              ;the play speed delay
       spec:obj_new(), $         ;our CubeSpec tool
       box:obj_new(), $          ;our extraction box object
-      region:obj_new(), $       ;fixed region object
+      oFixReg:obj_new(), $      ;fixed region object
       region_file:'', $         ;file from which region recovered
       oAper: obj_new(), $       ;our aperture viewing/editing tool
       oView: obj_new(), $       ;our ViewSpec tool
@@ -814,6 +854,7 @@ pro CubeRec__define
       BCD_BACKGROUND:ptr_new(),$ ;the BCD background to subtract (togglable)
       BCD_BACKGROUND_UNC:ptr_new(),$ ;the uncertainty in the background
       VISUALIZE_IMAGE: ptr_new(), $ ;the vis image
+      VISUALIZE_ASTR: ptr_new(), $  ;the vis astrometry
       MODULE:'',$               ;the modules for cube or rec
       IMAGE: ptr_new(), $       ;the displayed image
       UNCERTAINTY:ptr_new(), $  ;the uncertainty in BCD,Cube,etc.
@@ -847,7 +888,7 @@ pro CubeRec__define
   
   ;; General update
   msg={CUBEREC_UPDATE,BCD_MODE:0b,FULL_MODE:0b,VISUALIZE_MODE:0b,PLANE:0L, $
-       CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new(), $
+       WAVELENGTH:0.0,CUBE:obj_new(),MODULE:'',BCD:ptr_new(), BMASK:ptr_new(),$
        UNC: ptr_new(), ASTROMETRY: ptr_new(), RECORD_SET: ptr_new(), $
        CALIB_UPDATE:0b,BADPIX_UPDATE:0b}
 end
