@@ -6,20 +6,28 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.50
-@set VERSION 1.50
+@set EDITION 1.60
+@set VERSION 1.60
 @set IDLVERSIONREQUIRED 6.1
-@set DATE June, 2007
+@set DATE July, 2008
 @set AUTHOR J.D. Smith
-@set AUTHOREMAIL jdsmith@@as.arizona.edu
+@set AUTHOREMAIL jd.smith@@utoledo.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
 
-@macro callout {text}
+@macro callout {title,text}
+@iftex
+@bigskip
+@end iftex
 @quotation
 @cartouche
+@strong{@sc{\title\}}:
+
 @strong{\text\}
 @end cartouche
 @end quotation
+@iftex
+@bigskip
+@end iftex
 @end macro
 
 @c %**end of header
@@ -33,7 +41,7 @@ IRS Spectral Maps.
 This is edition @value{EDITION} of the @cite{CUBISM User Manual} for
 CUBISM @value{VERSION}
 
-Copyright @copyright{} 2006, 2007 J.D. Smith
+Copyright @copyright{} 2006, 2007, 2008 J.D. Smith
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.2 or
@@ -266,12 +274,12 @@ Cube Analysis
 
 * Extracting 1D Spectra::       
 * Creating 2D Maps::            
-* Complex Maps and Extractions::  
+* Complex Maps::                
 
 Extracting 1D Spectra
 
 * Direct Extraction::           
-* Matched Extraction::          
+* Matched Region Extraction::   
 
 Creating 2D Maps
 
@@ -495,10 +503,10 @@ Ensure the @file{irs_cubism} directory which is unpacked is on the
 in a location accessible by your entire group.
 
 @cindex SMART, using CUBISM with
-@callout{Users of SMART may experience file name conflicts with CUBISM,
-in particular in an IDL session started by SMART.  As of version 6.2.4,
-SMART has been modified to avoid such conflicts; upgrading to this
-version or later is highly recommended.}
+@callout{SMART Users,Users of SMART may experience file name conflicts
+with CUBISM@comma{} in particular in an IDL session started by SMART.  As of
+version 6.2.4@comma{} SMART has been modified to avoid such conflicts;
+upgrading to this version or later is highly recommended.}
 
 
 @node Binary Installation, Setup, Source Installation, Installation
@@ -996,13 +1004,15 @@ to a single spectral cube.  This is where the raw spectral data are
 collected, the calibration parameters are loaded and managed,
 preferences are set, the cube is assembled, and outputs are saved.  
 
-@callout{A single CUBISM project contains information for only one
-spectral cube, corresponding to a single IRS module and order.}
+@callout{One Project per Order,A single CUBISM project contains
+information for only one spectral cube@comma{} corresponding to a single IRS
+module and order.}
 
 @noindent This includes sub-slits for single IRS modules, e.g. SL1 
 and SL2 would be two separate cubes.  There is a separate project window
 for each open cube. For information on how to extract spectra from
-matched areas in multiple overlapping cubes, see @ref{Matched Extraction}.
+matched areas in multiple overlapping cubes, see @ref{Matched Region
+Extraction}.
 
 CUBISM projects, with all their associated meta-data, can be saved to
 and recovered from disk, with the default file extension @file{.cpj}
@@ -1727,7 +1737,7 @@ Export the current image as an array variable on the IDL command line.
 @item Extract Region from File...
 Extract a spectrum from the current cube from the extraction region
 encoded in the header of an existing extracted spectrum (@file{.tbl}
-file).
+file), or DS9 region (@file{.reg}).
 
 @item Save DS9 Region...
 Save the current extraction region (whether specified directly, or
@@ -2830,8 +2840,9 @@ well below the sky brightness level are more affected by residual
 background and low-level systematics (which often vary in magnitude and
 shape among orders and modules).
 
-@callout{Subtracting a 2D background frame can greatly improve the
-quality of the assembled cube, especially for faint sources.}
+@callout{Improving Cubes with Background Subtraction,Subtracting a 2D background
+frame can greatly improve the quality of the assembled cube@comma{}
+especially for faint sources.}
 
 @menu
 * In Situ Background::          
@@ -2955,10 +2966,11 @@ contamination (use the visualization if possible, @pxref{Background
 Selection Using Visualization}), and use this extracted spectrum as a 1D
 level background.
 
-@callout{Note that any fluxed 1D spectrum must be extracted from cubes
-built with the same flux options (e.g. the SLCF correction) as the cube
-to which it is being applied.  Spectra extracted from @emph{raw} cubes
-(in @samp{e/s} units) do not have this restriction.}
+@callout{Flux Units Warning,Note that any fluxed 1D spectrum must be
+extracted from cubes built with the same flux options (e.g. the SLCF
+correction) as the cube to which it is being applied.  Spectra extracted
+from @emph{raw} cubes (in @samp{e/s} units) do not have this
+restriction.}
 
 This method does @emph{not} help mitigate rogue pixels, and is
 essentially equivalent to extracting spectra and differencing them after
@@ -3004,9 +3016,9 @@ warning that both 1D and 2D (record-level) backgrounds are being
 applied.  Re-build the cube, and extract the same region: the spectrum
 should be near zero (with noise).
 
-@callout{CUBISM does not verify that fluxed 1D background spectra have
-the same extended source corrections applied as the target cube.  Ensure
-this yourself.}
+@callout{Extended Source Warning,CUBISM does not verify that fluxed 1D
+background spectra have the same extended source corrections applied as
+the target cube.  Ensure this yourself.}
 
 @node No Background, Background Selection Using Visualization, Combined 1D and 2D Background, Backgrounds
 @subsection No Background
@@ -3141,8 +3153,9 @@ stack of records, and mark errant pixels.  @xref{Bad Pixel Tool}, for
 more on marking user or record level bad pixels, and on the identifying
 symbols used to mark pixels.  
 
-@callout{Setting record level bad pixels on a stack of more than one
-record sets that pixel in @emph{all} the records in the stack.}
+@callout{Multiple Record Bad Pixels at Once,Setting record level bad
+pixels on a stack of more than one record sets that pixel in @emph{all}
+the records in the stack.}
 
 @noindent A typical workflow for manually marking bad pixels at the 
 @samp{BCD} level:
@@ -3187,10 +3200,10 @@ are ``flat-field questionable'' pixels, but experience shows that many
 of these pixels are useful.  They can be trimmed away by narrowing the
 WAVSAMP (@pxref{WAVSAMP}), but aren't considered fatal by default.
 
-@callout{When selecting bad pixels in cubes being built with a
-background, be sure to enable the @kbd{BGSub} button @emph{before}
-selection, since this can mitigate many rogue pixels, which would
-otherwise appear bad.}
+@callout{Bad Pixel Tip,When selecting bad pixels in cubes being built
+with a background@comma{} be sure to enable the @kbd{BGSub} button
+@emph{before} selection@comma{} since this can mitigate many rogue
+pixels@comma{} which would otherwise appear bad.}
 
 
 @node Backtracking to Discover Bad Pixels, Automatic Bad Pixels, Manual Bad Pixel Selection, Bad Pixels
@@ -3247,9 +3260,10 @@ QuickBuild.
 @subsection Automatic Bad Pixels
 @cindex Bad pixels, automatic selection
 
-@callout{Since CUBISM uses the BCD pixel contributions to the cube to
-discover bad pixels automatically, you must first build the cube before
-the automatic bad pixel options are enabled.}
+@callout{Using Auto Bad Pix,Since CUBISM uses the BCD pixel
+contributions to the cube to discover bad pixels automatically@comma{}
+you must first build the cube before the automatic bad pixel options are
+enabled.}
 
 CUBISM offers a powerful method to automatically discover and mark bad
 pixels in an assembled cube.  Selecting @kbd{BadPix->Auto-Gen Global Bad
@@ -3261,10 +3275,11 @@ the previous section, except that @emph{all} cube pixels are considered
 simultaneously, and statistics are collected on individual BCD pixels,
 which can be used to flag them as bad.
 
-@callout{The automatic bad pixel tool must be used with caution.  It can
-flag real data such as spectra lines or sharp spatial features
-(e.g. point sources).  Always check the resulting bad pixels it finds,
-and avoid very low sigma thresholds or fractions.}
+@callout{Auto Bad Pix Warning, The automatic bad pixel tool must be used
+with caution.  It can flag real data such as spectra lines or sharp
+spatial features (e.g. point sources).  Always check the resulting bad
+pixels it finds@comma{} and avoid very low sigma thresholds or
+fractions.}
 
 An example of the auto-badpix parameter dialog is seen in
 @ref{fig:autobadpix}.  The ``Sigma-Trim'' option sets the rough number
@@ -3310,10 +3325,10 @@ exposures (6s) in which cosmic rays are incompletely identified by the
 pipeline.  This results in small 3--4 pixel stripes along rows, which
 can often be identified automatically with record-level auto bad pixels.
 
-@callout{Note that by default the bad pixel list is appended to with
-subsequent runs of auto-badpix.  Clear the bad pixel list first to avoid
-this, and save intermediate results to @file{.bpl} files for added
-flexibility.}
+@callout{Clearing Bad Pixels,Note that by default the bad pixel list is
+appended to with subsequent runs of auto-badpix.  Clear the bad pixel
+list first to avoid this@comma{} and save intermediate results to
+@file{.bpl} files for added flexibility.}
 
 Obviously, the amount of redundancy in a spectral map has a major impact
 on the degree to which outlier pixels can be automatically discovered.
@@ -3395,10 +3410,10 @@ full uncertainty cube in parallel.
 
 @end table  
 
-@callout{Note that pipeline uncertainties are statistical ramp
-uncertainties only, valid only in the low S/N limit.  Above
-S/N~10--20, systematic uncertainties, not accounted for by CUBISM,
-dominate.}
+@callout{Pipeline Uncertainties,Note that pipeline uncertainties are
+statistical ramp uncertainties only@comma{} valid only in the low S/N
+limit.  Above S/N~10--20@comma{} systematic uncertainties@comma{} not
+accounted for by CUBISM@comma{} dominate.}
 
 @node WAVSAMP, Building the Cube, Cube Build Settings, Cube Assembly
 @section WAVSAMP
@@ -3611,11 +3626,11 @@ cube; see @xref{Cube Analysis}.  Except for low-level analysis of
 completely validated cubes, it is preferable to work with full cube
 project files (@pxref{Saving the Project}).
 
-@callout{By default, when opening a cube from @kbd{File->Open...} or
-when calling @file{cubism} directly, only @file{.cpj} files will be
-displayed.  To load a FITS cube, select the filters list to display
-@file{.fits} files, and ensure you select a 3D FITS cube generated by
-CUBISM.}
+@callout{Load FITS Cubes,By default@comma{} when opening a cube from
+@kbd{File->Open...} or when calling @file{cubism} directly@comma{} only
+@file{.cpj} files will be displayed.  To load a FITS cube@comma{} select
+the filters list to display @file{.fits} files@comma{} and ensure you
+select a 3D FITS cube generated by CUBISM.}
 
 @c
 @c Cube Analysis
@@ -3634,7 +3649,7 @@ from a 3D FITS cube (with some limitations).
 @menu
 * Extracting 1D Spectra::       
 * Creating 2D Maps::            
-* Complex Maps and Extractions::  
+* Complex Maps::                
 @end menu
 
 @node Extracting 1D Spectra, Creating 2D Maps, Cube Analysis, Cube Analysis
@@ -3645,32 +3660,32 @@ To generate a 1D spectrum, you must first identify the spatial region
 over which the spectral cube is to be averaged.  This can be done in one
 of two ways: directly defining a rectangular aperture on the cube, or
 from a matched extraction region read in from an existing @file{.tbl}
-spectrum file.
+spectrum file or DS9 region file.
 
 @menu
 * Direct Extraction::           
-* Matched Extraction::          
+* Matched Region Extraction::   
 @end menu
 
-@node Direct Extraction, Matched Extraction, Extracting 1D Spectra, Extracting 1D Spectra
+@node Direct Extraction, Matched Region Extraction, Extracting 1D Spectra, Extracting 1D Spectra
 @subsection Direct Extraction
 
 @xref{Cube Extraction Tool}, for more information on defining a
 rectangular extraction aperture on a cube.  Briefly, choose the
 extraction tool (hit @kbd{x} in the CubeView window displaying the
-cube), drag from top-left to bottom right to define a region, and a
-CubeSpec window opens showing the flux intensity spectrum averaged that
-region, in the units specified in the cube build settings (@pxref{Cube
-Build Settings}).  If the CubeSpec window was already open, the spectrum
-will change to reflect the newly-defined region, and the area of
-extraction (in cube pixels) is displayed at the top of the CubeSpec
-window.
+cube), drag from top-left to bottom right to define a rectangular
+region, and a CubeSpec window opens showing the flux intensity spectrum
+averaged over that region, in the units specified in the cube build
+settings (@pxref{Cube Build Settings}).  If the CubeSpec window was
+already open, the spectrum will change to reflect the newly-defined
+region, and the area of extraction (in cube pixels) is displayed at the
+top of the CubeSpec window.
 
-When you move or resize the region, the spectrum (which is an average
-over that area) will automatically update.  This is an excellent way to
-quickly see how the IRS spectrum of your source changes with position
-over the cube, or extraction size.  Remember that the arrow keys allow
-the selection box to be moved one pixel at a time in CubeView.
+When you move or resize the region, the spectrum will update
+automatically.  This is an excellent way to quickly see how the IRS
+spectrum of your source changes with position over the cube, or
+extraction size.  Remember that the arrow keys allow the selection box
+to be moved one pixel at a time in CubeView.
 
 Any extracted spectra can be saved using @kbd{File->Save Spectrum As...}
 (@pxref{CubeSpec File Menu}).  The save format is an ASCII file with
@@ -3679,43 +3694,63 @@ encoded headers, column delimiters, and units, in the IPAC table format
 read this format).  Any @file{.tbl} file saved in this way can also be
 used to define the region of extraction for another cube --- see below.
 
-@callout{Avoid using extraction apertures smaller than roughly
-@samp{2x2} pixels, since over small regions, pixel aliasing driven by
-the undersampled IRS PSF can lead to anomalous continuum ``sawtooth''
-patterns near high spatial frequency regions within the cube.}
+@callout{Extraction Aperture Size,Avoid using extraction apertures
+smaller than roughly @samp{2x2} pixels@comma{} since over small
+regions@comma{} pixel aliasing driven by the undersampled IRS PSF can
+lead to anomalous continuum ``sawtooth'' patterns near high spatial
+frequency regions within the cube.}
 
 
-@node Matched Extraction,  , Direct Extraction, Extracting 1D Spectra
-@subsection Matched Extraction
+@node Matched Region Extraction,  , Direct Extraction, Extracting 1D Spectra
+@subsection Matched Region Extraction
 @cindex Spectra, fully stitched
+@cindex Extraction Regions
 
 Matched extraction is the extraction of spectra from a cube in an
 aperture defined elsewhere.  All spectra saved by CUBISM include header
-information giving the celestial coordinates of the rectangular region
-of extraction.  This aperture can be reused to recover spectra from
+information giving the celestial coordinates of the region of
+extraction.  This aperture can be reused to recover spectra from
 different cubes built in the same region.  It is most commonly used to
 generate single, fully stitched spectra by matching the physical
 extraction region between different cubes in different IRS modules or
 orders: e.g. matching SL1 and SL2, or SL1 with LL1, SH with LH, etc.,
-though it can also be convenient to recall existing extraction regions
-from the same cube.
+and import non-rectangular extraction regions defined elsewhere.  It can
+also be convenient to recall existing extraction regions from the same
+cube.
 
-@callout{When defining an aperture intended to be matched across
-multiple IRS modules, ensure it is large enough to avoid pixel aliasing
-in all modules being extracted.}
+@callout{Matched Aperture Size, When defining an aperture intended to be
+matched across multiple IRS modules@comma{} ensure it is large enough to
+avoid pixel aliasing in all modules being extracted.}
 
 In the CubeView window displaying your cube, use @kbd{File->Extract
-Region from File...} to load a saved region file.  Once this is done,
-the spatial region will be displayed on your current cube in the
-CubeView window, and a spectrum will automatically appear in a new
-CubeSpec window.  Regions loaded from file in this manner are not
-directly editable.  Note that since cubes are built with position angle
-parallel to the IRS slit at the time of observation (which rotates
-throughout the year), in general extraction apertures recovered from
-other slits, or spectral maps executed at different times, will not
-align with the rows or columns of the cube.  Rotated apertures are
-clipped against the cube to generate the partial-pixel weighted average
-over the region.
+Region from File...} to load a saved region file, either in the form of
+a @file{.tbl} spectrum file created by CUBISM, or a (limited subset of)
+@file{.reg} DS9 region file.  Once this is done, the spatial region will
+be displayed on your current cube in the CubeView window, and a spectrum
+will automatically appear in a new CubeSpec window.  Aperture regions
+loaded from file in this manner are not directly editable.  
+
+Note that since cubes are built with position angle parallel to the IRS
+slit at the time of observation (which rotates throughout the year), in
+general extraction apertures recovered from other slits, or spectral
+maps executed at different times, will not align with the rows or
+columns of the cube.  The aligned apertures are clipped against the cube
+to generate the partial-pixel weighted average over the region.  The
+same is true for polygonal and circular apertures (which are converted
+to polygons).  Regions in DS9 can be defined on any image with valid
+coordinates, which can be useful for extracting areas based on
+additional information (e.g. an X-ray hot-spot, etc.).
+
+@cindex DS9 Regions
+@callout{DS9 Regions,Only a very specific subset of DS9 region files is
+supported: circles@comma{} and polygons of any length.  The output file
+format @emph{must} be set to DS9@comma{} WCS coordinates@comma{} J2000
+(FK5).  In addition@comma{} only @emph{one} polygon or circle per region
+file is read (the first).  All other region information is quietly
+ignored.  Note that self-intersecting polygons create multiple polygons
+in a region file (all but the first of which will be quietly ignored).
+Attempting to read any other type of DS9-generated region file will
+result in an error.  See DS9's @kbd{Region} menu and documentation.}
 
 The name of the file from which the aperture was loaded appears at the
 top of the CubeSpec window.  The new spectrum can now be saved in the
@@ -3732,11 +3767,11 @@ to extract spectra from maps with significantly larger beam sizes.  This
 may result in long-wavelength spectra generated over areas smaller than
 the beam.  Also be aware that diffraction smoothes the angular source
 distribution to greater degrees at longer wavelength, so that a single
-extraction aperture can probe slightly different regions depending on
-wavelength.  This effect is particularly pronounced with sharp spatial
-structures: e.g. an extraction formed inside a small ring of emission at
-the shortest wavelengths will likely be contaminated by ring emission at
-longer wavelengths.
+extraction aperture can probe slightly different physical regions
+depending on wavelength.  This effect is particularly pronounced with
+sharp spatial structures: e.g. an extraction formed inside a small ring
+of emission at the shortest wavelengths will likely be contaminated by
+ring emission at longer wavelengths.
 
 If you read in a region that is larger than your current cube, and
 attempt to extract a spectrum over this region, CUBISM will produce a
@@ -3747,17 +3782,18 @@ disk, but you should probably select a smaller aperture if you are
 attempting to compare or stitch spectra across IRS modules.  Similarly,
 regions entirely outside the cube will generate an error.
 
-@callout{When comparing spectra extracted from the same physical region,
-flux offsets between modules and orders can occur.  To minimize this,
-ensure the background was subtracted in the same manner for all cubes
-being compared, and that the extraction region was large enough.}
+@callout{Spectra Mismatch,When comparing spectra extracted from the same
+physical region@comma{} flux offsets between modules and orders can
+occur.  To minimize this@comma{} ensure the background was subtracted in
+the same manner for all cubes being compared@comma{} and that the
+extraction region was large enough.}
 
 Slight astrometric errors in the final cube astrometry (limited by the
 spacecraft pointing system's precision) will compound offsets between
 matched spectra in very small regions near steep spatial gradients in
 the source.
 
-@node Creating 2D Maps, Complex Maps and Extractions, Extracting 1D Spectra, Cube Analysis
+@node Creating 2D Maps, Complex Maps, Extracting 1D Spectra, Cube Analysis
 @section Creating 2D Maps
 @cindex Maps, creating
 
@@ -3767,8 +3803,9 @@ the cube) averaged or integrated over any specified wavelength interval.
 @xref{CubeSpec} for more detail on defining regions on the displayed
 spectrum.
 
-@callout{Any map produced by CubeSpec can be saved to a FITS file by selecting
-@kbd{File->Save Map as FITS...} from the CubeView menu.}
+@callout{Save Map as FITS,Any spectral map produced by CubeSpec can be
+saved to a FITS file by selecting @kbd{File->Save Map as FITS...} from
+the CubeView menu.}
 
 
 @menu
@@ -3806,9 +3843,10 @@ newly defined map.  This is now the continuum-subtracted map of your
 science target.  The CubeView window will indicate the type of map being
 shown, the range of peak wavelength coverage.
 
-@callout{Though they are called @kbd{Peak} and @kbd{Continuum}, the two
-region types can be used to make arbitrary differential maps averaged
-over different wavelength intervals.}
+@callout{Spectral Region Types,Though they are called @kbd{Peak} and
+@kbd{Continuum}@comma{} the two region types can be used to make
+arbitrary differential maps averaged over different wavelength
+intervals.}
 
 Once regions are defined, they can be selected by middle-clicking,
 @key{Space} cycles selection among them, moved with middle-click-drag,
@@ -3899,7 +3937,7 @@ in only a small difference in the resulting map image.
 If the @kbd{Lam-Weight} button is selected, rather than average all
 continuum planes together, CubeSpec preforms a weighted average for each
 foreground plane, with the weight set to
-@math{1/(1 + abs(\lambda_f-\lambda_c ))} where @math{\lambda_f} is the
+@math{1/(1 + |\lambda_f-\lambda_c|)} where @math{\lambda_f} is the
 wavelength of the given foreground plane, and @math{\lambda_c} is the
 wavelength of a continuum plane.  In this way, each foreground plane
 gets a custom background with more weight given to the closest continuum
@@ -3923,17 +3961,15 @@ informational purposes only, and do not affect the map displayed.
 
 
 
-@node Complex Maps and Extractions,  , Creating 2D Maps, Cube Analysis
-@section Complex Maps and Extractions
+@node Complex Maps,  , Creating 2D Maps, Cube Analysis
+@section Complex Maps
 
-CUBISM offers only a simple set of rectangular extraction apertures with
-matched extraction, and map creation based on averages or
+CUBISM offers only map creation based on simple averages or
 wavelength-offset-weighted averages among planes of the cube.  For
-higher order extraction and map creation, e.g. to extract over
-non-rectangular areas, or create maps by fitting multiple components to
-at each position in a maps, it is convenient to export the full cube to
-the IDL command line or as a separate FITS file.  @xref{Saving the Cube
-as FITS}, for more information.
+higher order map creation, e.g. to create derived maps by fitting
+multiple components to at each position, it is convenient to export the
+full cube to the IDL command line or as a separate FITS file.
+@xref{Saving the Cube as FITS}, for more information.
 
 
 
@@ -4419,7 +4455,7 @@ meant second order, for example, causing target self-subtraction.
 
 CUBISM makes heavy use of polygon clipping to map all the partial BCD
 pixels onto the sky grid, so to speed up this crucial operation, a small
-piece of clipping code in written in C, and automatically compiled as
+piece of clipping code is written in C, and automatically compiled as
 needed.  If your system is not configured with a C compiler (typically
 @code{gcc}), this can fail, generating this message.  An equivalent
 fallback IDL-native version of the clipping algorithm will take over,
