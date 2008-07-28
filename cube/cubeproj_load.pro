@@ -70,7 +70,8 @@ function cubeproj_load,file
   if obj_valid(cube) then begin 
      if ~obj_isa(cube,'CubeProj') then $
         message,'Invalid Cube Project'
-     cube->SetProperty,CHANGED=0b,SAVE_FILE=file_expand_path(file)
+     cube->SetProperty,CHANGED=0b, $
+                       SAVE_FILE=file_expand_path((file_info(file)).name)
      cube->Initialize
   endif      
   
