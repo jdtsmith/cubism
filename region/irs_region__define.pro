@@ -90,7 +90,10 @@ pro IRS_Region::GetProperty,ASTROMETRY=astr,RA=ra,DEC=dec,X=x,Y=y, $
            ra=reform((*self.region)[0,*])
            dec=reform((*self.region)[1,*])
         endelse 
-        if arg_present(x) && n_elements(astr) ne 0 then ad2xy,ra,dec,astr,x,y
+        if arg_present(x) && n_elements(astr) ne 0 then begin 
+           ad2xy,ra,dec,astr,x,y ;; "IDL convention: first pixel center 0.0"
+           x+=0.5 & y+=0.5
+        endif 
         cen=[mean(ra),mean(dec)] ;XXX not true generally!!!
      endif 
   endif 
@@ -194,14 +197,14 @@ pro IRS_Region::SetRegion,reg,RESET=reset,ASTROMETRY=astr
         xy2ad,reg[0]-.5,reg[1]-.5,astr,ra,dec
         getrot,astr,r,cd
         r=reg[2]*mean(abs(cd*3600.D)) ;convert radius in pixels to arcsec
-        reg=[ra,dec,r]
+        region=[ra,dec,r]
      endif else begin 
         xy2ad,reg[0,*]-.5,reg[1,*]-.5,astr,ra,dec ;convert pixels to coords
-        reg[0,*]=ra & reg[1,*]=dec
+        region=[1#ra,1#dec]
      endelse 
   endif 
-  if ptr_valid(self.region) then *self.region=reg else $
-     self.region=ptr_new(reg)
+  if ptr_valid(self.region) then *self.region=region else $
+     self.region=ptr_new(region,/NO_COPY)
 end
 
 ;=============================================================================
