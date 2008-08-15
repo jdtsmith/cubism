@@ -202,7 +202,7 @@ pro IRS_Region::SetRegion,reg,RESET=reset,ASTROMETRY=astr
         xy2ad,reg[0,*]-.5,reg[1,*]-.5,astr,ra,dec ;convert pixels to coords
         region=[1#ra,1#dec]
      endelse 
-  endif 
+  endif else region=reg
   if ptr_valid(self.region) then *self.region=region else $
      self.region=ptr_new(region,/NO_COPY)
 end
