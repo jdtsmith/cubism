@@ -1,4 +1,11 @@
 
+  ;; XXX Possible Time saver: If the cube size was changed, we might
+  ;; need to shift existing accounts by one or more pixels ... only
+  ;; relevant with POSITION-based (not GRID-based) cube layout.
+  ;; E.g. making a cube with overlapping maps taken at different
+  ;; epochs.  A better option is to leave the cube size the same.
+
+==========================
 
 
 - Better treatment of extraction regions: develop a structure or other
