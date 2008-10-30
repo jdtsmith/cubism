@@ -161,13 +161,12 @@ pro CubeAutoBadPix::Defaults
   if self.defaults_set then return
   self.maxvar=[[10.0,5.0],$     ;without/with background
                [10.0,5.0]]      ;record only version
-  self.minfrac=[[0.5,0.1], $
+  self.minfrac=[[0.5,0.4], $
                 [0.75,0.75]]
   self.with_background=1b
   self.with_unc=0b              ; self.record_only?0b:1b
   self.defaults_set=1b
 end
-
 
 pro cubeautobadpix__define
   st={CubeAutoBadPix, $
