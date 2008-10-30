@@ -119,14 +119,9 @@ pro CubeBackTrack::Message, msg
            if (self.cube ne msg.CUBE && obj_valid(msg.CUBE)) || $
               self.bcd_size[0] eq 0 then begin 
               self.cube=msg.CUBE
+              if ~self->CheckAccounts() then return
               self.cube->GetProperty,BCD_SIZE=bcdsz,PROJECT_NAME=pn, $
-                                     WAVELENGTH=wave,ACCOUNTS_VALID=av
-              if n_elements(av) eq 0 || array_equal(av,0b) then begin 
-                 if widget_info(self.wBase,/VALID_ID) then $
-                    widget_control, self.wBase,/DESTROY
-                 self->Reset,/DISABLE
-                 return
-              endif 
+                                     WAVELENGTH=wave
               
               if widget_info(self.wBase,/VALID_ID) then $
                  widget_control,BASE_SET_TITLE= $
@@ -137,16 +132,14 @@ pro CubeBackTrack::Message, msg
            endif 
            self.wavelength=msg.wavelength
            self->Enable 
-        endif else begin 
-           if widget_info(self.wBase,/VALID_ID) then $
-              widget_control, self.wBase,/DESTROY
+        endif else begin        ;non-full mode, no backtracking 
            self->Reset,/DISABLE
            return
         endelse 
      end
      
-     'CUBEREC_FULL': begin 
-        self->Enable
+     'CUBEREC_FULL': begin      ; a change of wavelength
+        void=self->CheckAccounts() 
         self.wavelength=msg.WAVELENGTH
      end
   endcase
@@ -361,18 +354,20 @@ pro CubeBackTrack::UpdateList
   self->EnsureCube
      
   list=self.cube->BackTrackPix(self.point,self.plane,/FOLLOW,ERROR=err)
+  if keyword_set(err) then begin 
+     self->Reset
+     if widget_info(self.wList,/VALID_ID) then $
+        widget_control, self.wList,/UPDATE
+     return
+  endif 
+  
   if n_elements(*self.list) gt 0 then begin 
      cnt=n_elements(tag_names(list))
      good=0
      for i=0,cnt-1 do good+=array_equal(list.(i),(*self.list).(i))
-     if good eq cnt then return
+     if good eq cnt then return ; list did not change!
   endif 
   
-  if keyword_set(err) then begin 
-     self->Reset
-     widget_control, self.wList,/UPDATE
-     return
-  endif 
   oldid=''
   pm=string(177b)
   if size(list,/N_DIMENSIONS) eq 0 then str='' else begin 
@@ -415,10 +410,23 @@ pro CubeBackTrack::EnsureCube
 end
 
 ;=============================================================================
+;  CheckAccounts - Check the cube's accounts and enable/disable accordingly.
+;=============================================================================
+function CubeBackTrack::CheckAccounts
+  disable=0b
+  if ~obj_valid(self.cube) then disable=1b else begin 
+     self.cube->GetProperty,ACCOUNTS_VALID=av
+     if n_elements(av) eq 0 || array_equal(av,0b) then disable=1b
+  endelse 
+  if disable then self->Reset,/DISABLE else self->Enable
+  return, ~disable
+end
+
+;=============================================================================
 ;       wDestroy - Destroy the Widget
 ;=============================================================================
 pro CubeBackTrack::wDestroy
-  if NOT widget_info(self.wBase, /VALID_ID) then return
+  if ~widget_info(self.wBase, /VALID_ID) then return
   widget_control, self.wBase,/DESTROY
 end
 
