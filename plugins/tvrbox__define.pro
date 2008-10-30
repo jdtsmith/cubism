@@ -87,7 +87,7 @@
 ;    2001-08-07 (J.D. Smith): Imported from SCORE-era source.
 ;       
 ;-
-;    $Id$
+;    $Id: tvrbox__define.pro,v 1.24 2008/07/28 18:45:56 jdsmith Exp $
 ;##############################################################################
 ;
 ; LICENSE
@@ -192,6 +192,9 @@ pro tvRBox::Message, msg
         if msg.key lt 5 or msg.key gt 8 then return
         if msg.release then return ; press only
         move=([[-1,0],[1,0],[0,1],[0,-1]])[0:1,msg.key-5]
+        if msg.modifiers AND 1 then begin 
+           if (msg.modifiers AND 2) ne 0 then move*=10 else move*=5
+        endif 
         if self.snap_mode then begin 
            self.oDraw->GetProperty,OFFSET=off, DISPSIZE=ds
            new_coords=[off[0],off[1]+self.size[1]-1] > $
