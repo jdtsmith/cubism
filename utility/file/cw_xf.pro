@@ -877,7 +877,11 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    ;; --- get starting pathname and/or filename
    start_file=''
    
-   cd, curr=curr               ;get current directory
+   catch,err
+   if err ne 0 then begin 
+      catch,/CANCEL
+      cd,'' & cd,curr=curr
+   endif else cd, curr=curr     ;get current directory
    if size(start,/TYPE) eq 7 then begin
       if strmid(start,strlen(start)-1,1) ne sep then begin ;it's a file
          start_file=file_basename(start)
