@@ -22,7 +22,7 @@
 ;    2005-03-24 (J.D. Smith): Initially written.
 ;   
 ;-
-;    $Id$
+;    $Id: irs_region__define.pro,v 1.19 2008/09/04 22:03:02 jdsmith Exp $
 ;##############################################################################
 ; 
 ; LICENSE
@@ -338,18 +338,22 @@ pro IRS_Region::WriteRegion,bhdr,file,IPAC_TBL=ipac_tbl
                     radecstring((*self.region)[1],PRECISION=3),(*self.region)[2])]
      endif else begin 
         self->GetProperty,RA=ra,DEC=dec
-        
+        nra=n_elements(ra) 
         s=[s,string(FORMAT= '("# Poly: ",2(A,",",A,:," ; "),"]")', $
                     radecstring(ra[0],/RA,PRECISION=3), $
                     radecstring(dec[0],PRECISION=3), $
                     radecstring(ra[1],/RA,PRECISION=3), $
                     radecstring(dec[1],PRECISION=3))]
-        for i=1,n_elements(ra)/2-1 do $
+        for i=1,nra/2-1 do $
            s=[s,string(FORMAT='("#       ",2(A,",",A,:," ; "),"]")', $
                        radecstring(ra[2*i],/RA,PRECISION=3), $
                        radecstring(dec[2*i],PRECISION=3), $
                        radecstring(ra[2*i+1],/RA,PRECISION=3), $
                        radecstring(dec[2*i+1],PRECISION=3))]
+        if nra mod 2 ne 0 then $
+           s=[s,string(FORMAT='("#       ",A,",",A)', $
+                      radecstring(ra[nra-1],/RA,PRECISION=3), $
+                      radecstring(dec[nra-1],PRECISION=3))]
      endelse 
      ipac_table_addhist,s,bhdr,/BLANK
   endelse 
@@ -391,9 +395,15 @@ pro IRS_Region::ParseRegion,hdr,file,IPAC_TABLE=ipac_table
            ;; Continuing lines
            ext=stregex(line,match+','+match+' ; '+match+','+match,/EXTRACT, $
                        /SUBEXPR)
-           if ~ext[0] then break ;first non match
-           ra=[ra,ext[1],ext[3]]
-           dec=[dec,ext[2],ext[4]]
+           if ~ext[0] then begin ;; check for a final line on it's own
+              ext=stregex(line,match+','+match,/EXTRACT,/SUBEXPR)
+              if ~ext[0] then break ;first non match
+              ra=[ra,ext[1]] & dec=[dec,ext[2]]
+              break
+           endif else begin 
+              ra=[ra,ext[1],ext[3]]
+              dec=[dec,ext[2],ext[4]]
+           endelse 
         endelse 
      endfor 
      if n_elements(radius) ne 0 then begin 
