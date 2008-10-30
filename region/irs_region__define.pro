@@ -66,9 +66,13 @@ end
 ;  RegionPhotometry -- Compute area averaged photometry of an image
 ;                      over our region
 ;=============================================================================
-function IRS_Region::RegionPhotometry,image,clip_astr,AREAS=areas
+function IRS_Region::RegionPhotometry,image,clip_astr,AREAS=areas, $
+                                      IMAGE_UNCERTAINTY=unc_image, $
+                                      UNCERTAINTY=unc
   pix=self->ClipRegion(image,clip_astr,AREAS=areas)
   if pix[0] eq -1 then return,!VALUES.F_NAN
+  if keyword_set(unc_image) && arg_present(unc) then $
+     unc=sqrt(total(unc_image[pix]^2*areas^2,/NAN))/total(areas,/NAN)
   return,total(image[pix]*areas,/NAN)/total(areas,/NAN)
 end
 
@@ -80,8 +84,8 @@ pro IRS_Region::GetProperty,ASTROMETRY=astr,RA=ra,DEC=dec,X=x,Y=y, $
                             SOLID_ANGLE=sa,CENTROID=cen,OFFSET_ANGLES=oa
   if arg_present(reg) && ptr_valid(self.region) then reg=*self.region
   
-  if arg_present(ra) || arg_present(dec) || arg_present(cen) || arg_present(x) || $
-     arg_present(y) then begin 
+  if arg_present(ra) || arg_present(dec) || arg_present(cen) || $
+     arg_present(x) || arg_present(y) then begin 
      if ptr_valid(self.region) then begin 
         if n_elements(*self.region) eq 3 then begin 
            r=self->CircleRegion(ASTROMETRY=astr)
