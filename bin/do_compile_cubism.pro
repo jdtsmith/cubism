@@ -1,0 +1,2 @@
+compile_cubism
+exit

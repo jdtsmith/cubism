@@ -1,0 +1,9 @@
+\comment Ordfind table for S13.0, version of 2005 Sep 13, D. Shupe
+\comment Sampling of order 3 changed to be like sampling of order 1
+\comment Min and max wavelengths optimized
+\character ChannelID = 0
+| order | wavelength_center |  a5       | a4        | a3        |  a2       |    a1     | a0        |  b5       | b4        | b3        |  b2       |    b1     | b0        | wavelength_min | wavelength_max | width_search |  width_found |
+| int   | real              |  real     | real      | real      |  real     |    real   | real      |  real     | real      | real      |  real     |    real   | real      | real           | real           | real         |  real        |
+ 1                11.3525    0.0000e+00  0.0000e+00  0.0000e+00  -0.402328   -7.79676     18.5532     0.0000e+00  0.0000e+00  0.0000e+00  0.0000e+00    -182.827    64.0000         7.45256          15.3085      3.4000e+01     3.4000e+01
+ 2                6.35829    0.0000e+00  0.0000e+00  0.0000e+00   11.0266    -9.17441     60.0695     0.0000e+00  0.0000e+00  0.0000e+00  0.0000e+00    -205.203    40.5000         5.12652          7.62600      3.4000e+01     3.4000e+01
+ 3                7.98724    0.0000e+00  0.0000e+00  0.0000e+00   45.6554    -8.15365     63.2667     0.0000e+00  0.0000e+00  0.0000e+00  0.0000e+00    -128.887    116.500         7.31226          8.70387      3.4000e+01     3.4000e+01

@@ -1,0 +1,46 @@
+\order flux
+\comment Identifier = b1_fluxcon.tbl
+\comment Flux conversion factors and order tuning coefficients.
+\comment Version 0.0 09/18/02 PM    Defined this file.
+\comment         0.1 01/03/03 PM    Short High key wavelengths and passbands, adjusted to avoid A0V H lines.
+\comment         0.2 03/15/03 PM    Set flux conversions, assuming saturation at 100 Jy corresponding to 2.99 e- in 6 sec, all orders, factor 2 uncertain.
+\comment         1.0 12/19/03 PM    Updated all coefficents based on SV data, in 3rd order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR6688 staring (7836416), averaged between the two nods, and tested against point sources flux calibrator HR7310 (7463424) and representative science cases.
+\comment                             ***** WARNING: Tuning coefficients and flux conversion depend on flatfield version and extraction method.  This version is associated with full SH slit extractions, 
+\comment                             ***** using /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b1_wavsamp.tbl, and flatfield /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b1_flatfield.fits. 
+\comment         2.0 03/06/04 PM    Updated all coefficents based on SV and NomOps data and S9.5 SH flat, in 3rd order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR6688 stare (7836416) at the nods, and map (7462400) at center and near-nod positions, and tested against calibrators HR7310 (7453424), HR2491 (7857408). 
+\comment                             ***** Using /stage/ssc-testdata-irs/pipedrop/cal/S9.0/040109/b1_wavsamp.tbl and flatfield /ssc/testdata/irs/pipedrop/cal/S9.5/040304/b1_flatfield.fits.
+\comment         3.0 02/08/04 PM    Updated all coefficents.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR6688 stare (7836416) at the nods, and map (7462400) at center and near-nod positions, HR6606 (8882176) and tested against calibrators HR7310 (7453424), HR2491 (7857408).
+\comment                             ***** Using /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b1_wavsamp.tbl and flatfield /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b1_flatfield.fits.
+\comment         x.x 11/08/04 PMO   Preliminary S10plus fluxcon using HR6688
+\comment         3.1 12/03/04 PMO   Modified values of fluxcon and a1 in order to obtain proper slope of spectra.
+\comment         3.2 05/05/05 PMO   S12 SH fluxcon all orders, using HR6688 Campaign 18 data (r13195008) with new S12 wavsamp. Background subtracted using sky observation r13196544. Fit with calc_tune using 
+\comment                             2nd order polynomials, except order 16 (3rd order). 
+\comment         4.0 11/02/05 PMO   S13 SH fluxcon all orders, using HR6688 Campaigns 18-24 average, off sky background-subtracted, with new S13 flat and wavsamp. Fit with calc_tune using 2nd order
+\comment                             polynomials and 5% outlier rejection.    
+\comment         4.1 11/18/05 PMO   S13 SH fluxcon redone, using extract v4.2 to replace NaNs.
+\comment         5.0 12/05/06 PMO   S15 SH fluxcon all orders, using HR6688 Campaigns 18-34 median, off sky background-subtracted, with new S15 flat and wavsamp. Fit with calc_tune using 2nd order 
+\comment                             polynomials and 5% outlier rejection. 
+\comment         5.1 01/21/07 PMO   S15 SH fluxcon all orders, using HR6688 Campaigns 18-34 median, off sky background-subtracted, with revised S15 flat (zody spatial correction applied to match nods) and 
+\comment                             revised S15 wavsamp. Fit with calc_tune using 2nd order polynomials and 5% outlier rejection. 
+\comment                             ***** using /stage/ssc-testdata-irs/pipedrop/cal/S15.0/OPS/13Jan2007_SH/b1_wavsamp.tbl, b1_flatfield.fits, b1_flatfield_cmask.fits
+\comment         5.2 01/25/07 PMO  S15 SH fluxcon. Trim long wavelength ends and refit orders 13-15 with p=3 polynomials to remove bumps.
+\comment
+\comment History
+\character channelID = 1
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |              |             |               |           |               |           |               |           |              |
+ 11          18.6000           0.0000           0.0000          0.0000            0.0000          0.0000          341.4401         124.5000    1.000000       0.000000    -0.063471        0.000000      0.013701      0.000000       0.000000      0.000000     0.000000      0.000000     0.000000       0.000000
+ 12          17.1000           0.0000           0.0000          0.0000            0.0000          0.0000          380.5278         124.5000    1.000000       0.000000    -0.063342        0.000000     -0.003917      0.000000       0.000000      0.000000     0.000000      0.000000     0.000000       0.000000
+ 13          15.8000           0.0000           0.0000          0.0000            0.0000          0.0000          415.0448         124.5000    1.000000       0.000000    -0.067852        0.000000      0.033318      0.000000      -0.039585      0.000000     0.000000      0.000000     0.000000       0.000000
+ 14          14.8000           0.0000           0.0000          0.0000            0.0000          0.0000          448.0603         124.5000    1.000000       0.000000    -0.073675        0.000000      0.074966      0.000000       0.005888      0.000000     0.000000      0.000000     0.000000       0.000000
+ 15          13.8000           0.0000           0.0000          0.0000            0.0000          0.0000          484.5939         124.5000    1.000000       0.000000    -0.090153        0.000000      0.040656      0.000000      -0.074862      0.000000     0.000000      0.000000     0.000000       0.000000
+ 16          12.9000           0.0000           0.0000          0.0000            0.0000          0.0000          531.4951         124.5000    1.000000       0.000000    -0.123942        0.000000      0.016632      0.000000       0.000000      0.000000     0.000000      0.000000     0.000000       0.000000
+ 17          12.1000           0.0000           0.0000          0.0000            0.0000          0.0000          571.8894         124.5000    1.000000       0.000000    -0.056865        0.000000      0.124338      0.000000       0.000000      0.000000     0.000000      0.000000     0.000000       0.000000
+ 18          11.5000           0.0000           0.0000          0.0000            0.0000          0.0000          596.9463         124.5000    1.000000       0.000000    -0.113980        0.000000      0.296617      0.000000       0.000000      0.000000     0.000000      0.000000     0.000000       0.000000
+ 19          10.8000           0.0000           0.0000          0.0000            0.0000          0.0000          693.3268         124.5000    1.000000       0.000000    -0.252575        0.000000      0.186012      0.000000       0.000000      0.000000     0.000000      0.000000     0.000000       0.000000
+ 20          10.2000           0.0000           0.0000          0.0000           0.0000           0.0000          812.9346         124.5000    1.000000       0.000000    -0.274600        0.000000      0.204551      0.000000       0.000000      0.000000     0.000000      0.000000     0.000000       0.000000
+

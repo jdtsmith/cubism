@@ -1,0 +1,14 @@
+\ Pixel effective solid angle, per module
+\ Hand-crafted by JD Smith (Thu Mar 31 12:57:03 MST 2005)
+\ 2005-04-01: Update per H.R.: LL, SL changed
+\ 2005-04-04 (JDS) Update to LH/SH using Grillmair slit widths
+\ 2005-04-13 (JDS) Update LH from LL1 comparison.
+\ Low-res from SINGS photometric comparisons (using SLCF)
+\ High-res assuming 1px X 2px slit-width effective
+|mod_name                              |mod_num |pix_solid_angle |
+| char                                 |  int   |  real          |
+|                                      |        |  sr            |
+ Short-Low                               0        1.3653725e-10
+ Short-High                              1        2.6825607e-10
+ Long-Low                                2        1.2620845e-09
+ Long-High                               3        1.30358e-09

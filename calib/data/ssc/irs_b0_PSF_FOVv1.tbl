@@ -1,0 +1,22 @@
+\order flux
+\comment Identifier = b0_psf_fov.tbl
+\comment Slit field of view (frame) and fiducial PSF information.
+\comment Version 0.1 03/18/03 PM, JB  Defined this file.  PSF estimates by HT.
+\comment History 
+\character channelID = 0
+\character platescale = 1.8
+| FOV |  order |               FOVNAME                        |  DFRAC  | lambda_ref |  W_ref  |
+| int |  int   |               char                           |  real   | real       |  real   |
+|     |        |                                              |         | microns    |  pixels |
+  26      1       IRS_Short-Lo_1st_Order_1st_Position            0.333    14.000       4.0000
+  27      1       IRS_Short-Lo_1st_Order_2nd_Position            0.667    14.000       4.0000
+  28      1       IRS_Short-Lo_1st_Order_Center_Position         0.500    14.000       4.0000
+  29      1       IRS_Short-Lo_Module_Center                     0.500    14.000       2.0800
+  29      2       IRS_Short-Lo_Module_Center                     0.500     6.000       0.9600
+  29      3       IRS_Short-Lo_Module_Center                     0.500     8.000       1.1900
+  32      2       IRS_Short-Lo_2nd_Order_1st_Position            0.333     6.000       2.500
+  33      2       IRS_Short-Lo_2nd_Order_2nd_Position            0.667     6.000       2.500
+  34      2       IRS_Short-Lo_2nd_Order_Center_Position         0.500     6.000       2.500
+  32      3       IRS_Short-Lo_2nd_Order_Bonus_1st_Position      0.333     8.000       4.500
+  33      3       IRS_Short-Lo_2nd_Order_Bonus_2nd_Position      0.667     8.000       4.500
+  34      3       IRS_Short-Lo_2nd_Order_Bonus_Center_Position   0.500     8.000       4.500

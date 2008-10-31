@@ -1,0 +1,28 @@
+\order flux
+\comment Identifier = b3_fluxcon.tbl
+\comment Flux conversion factors and order tuning coefficients.
+\comment Version 0.0 09/18/02 PM    Defined this file.
+\comment         0.1 01/03/03 PM    Long High key wavelengths and passbands, adjusted to avoid A0V H lines.
+\comment         0.2 03/15/03 PM    Set flux conversions, assuming saturation at 200 Jy (orders 11,12,19,20), 100 Jy elsewhere, corresponding to 2.99 e- in 6 sec, factor 2 uncertain.
+\comment         1.0 12/15/03 PM    Updated all coefficents based on SV data, in 3rd order polynomials for orders 11-17, 5th order for orders 18-20.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR7310 map (7453424) at center and near-nod positions, and tested against point sources flux calibrators HR6688 (7462400), HR2491 (7857408).
+\comment                             ***** NOTE:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with full LH slit extractions, 
+\comment                             ***** using /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b3_wavsamp.tbl, and flatfield /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b3_flatfield.fits. 
+\comment History
+\HISTORY POLY_ORDER = 4
+\character channelID = 3
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |               |            |               |           |               |           |               |           |              |
+ 11         35.5000           0.40000           0.00000         0.00000        0.00000          0.00000        399.84606930     0.00000000      0.9963713    0.00000000    0.0286950   0.00000000        -0.0030589   0.00000000     -0.0241176   0.00000000     0.00000000   0.00000000   0.00000000   0.00000000
+ 12         33.4000           0.40000           0.00000         0.00000        0.00000          0.00000        384.45083620     0.00000000      1.0087144    0.00000000    0.0389901   0.00000000        -0.0046847   0.00000000     -0.0069286   0.00000000     0.00000000   0.00000000   0.00000000   0.00000000
+ 13         29.8000           0.40000           0.00000         0.00000        0.00000          0.00000        400.68118290     0.00000000      0.9971658    0.00000000    0.0400447   0.00000000         0.0155242   0.00000000     -0.0185927   0.00000000     0.00000000   0.00000000   0.00000000   0.00000000
+ 14         27.6000           0.40000           0.00000         0.00000        0.00000          0.00000        376.67742920     0.00000000      1.0014273    0.00000000    0.0362167   0.00000000        -0.0035073   0.00000000     -0.0024029   0.00000000     0.00000000   0.00000000   0.00000000   0.00000000
+ 15         26.6000           0.35000           0.00000         0.00000        0.00000          0.00000        414.21755980     0.00000000      0.9943302    0.00000000    0.0329733   0.00000000        -0.0533100   0.00000000     -0.0378274   0.00000000     0.00000000   0.00000000   0.00000000   0.00000000 
+ 16         24.7200           0.35000           0.00000         0.00000        0.00000          0.00000        417.10266110     0.00000000      1.0144078    0.00000000   -0.0263269   0.00000000        -0.0269019   0.00000000      0.0273500   0.00000000     0.00000000   0.00000000   0.00000000   0.00000000 
+ 17         23.1000           0.5000            0.00000         0.00000        0.00000          0.00000        456.44366460     0.00000000      1.0049654    0.00000000    0.0035482   0.00000000        -0.0708667   0.00000000     -0.0025937   0.00000000     0.00000000   0.00000000   0.00000000   0.00000000 
+ 18         22.000            0.5000            0.00000         0.00000        0.00000          0.00000        440.63101200     0.00000000      0.9899485    0.00000000   -0.1133637   0.00000000         0.1663493   0.00000000      0.4008892   0.00000000    -0.2195181    0.00000000  -0.3008340    0.00000000 
+ 19         20.2000           0.32500           0.00000         0.00000        0.00000          0.00000        455.05975340     0.00000000      1.0042738    0.00000000   -0.0550915   0.00000000        -0.0583654   0.00000000      0.7243800   0.00000000    -0.8778310    0.00000000   0.2835993    0.00000000 
+ 20         19.4000           0.32500           0.00000         0.00000        0.00000          0.00000        487.36135860     0.00000000      0.9969379    0.00000000    0.0201574   0.00000000        -0.2419276   0.00000000      0.2743739   0.00000000     0.7947998    0.00000000  -0.9808491    0.00000000
+ 
+ 

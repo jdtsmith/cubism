@@ -1,0 +1,15 @@
+
+Version 0.97
+=============
+
+   - Support for time forked calibrations (e.g. LH bias change ->
+     FLUXCON change).
+   - New S13-compatible calibration set.
+   - Improved focus setting and screen redraw in CubeView for a
+     variety of tools.
+   - Don't lose window focus with multiple CubeViews.
+   - Record-level auto bad pixels.
+   - Reverse cycle through bad pixel showing states using Shift
+     mouse-3.
+   - CubeSpec: preserve single wavelength regions.
+   - Visualize: handle deleted records correctly.

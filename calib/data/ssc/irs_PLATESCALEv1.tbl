@@ -1,0 +1,9 @@
+\platescale version 0.1
+\hand-crafted by J.D. Smith (Tue Dec  2 14:14:45 MST 2003)
+|mod_name                              |mod_num |plate_scale |
+| char                                 |  int   |  real      |
+|                                      |        | arcsec/pix |
+Short-Low                               0        1.8
+Short-High                              1        2.4
+Long-Low                                2        4.8
+Long-High                               3        4.8

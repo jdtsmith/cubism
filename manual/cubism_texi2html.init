@@ -1,0 +1,14 @@
+$cell              = \&t2h_default_cell;
+
+# cell in multitable, modified for top alignment, JDS 01/17/2007
+sub t2h_default_cell($$)
+{
+    my $text = shift;
+    my $row_macro = shift;
+
+    if ($row_macro eq 'headitem')
+    {
+        return '<th>' . $text . '</th>';
+    }
+    return '<td valign="top">' . $text . '</td>';
+}

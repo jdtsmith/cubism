@@ -1,0 +1,24 @@
+\ Pixel effective solid angle, per module
+\ Hand-crafted by JD Smith (Mon May  8 17:55:46 MST 2006)
+\ 2005-04-01: Update per H.R.: LL, SL changed
+\ 2005-04-04 (JDS) Update to LH/SH using Grillmair slit widths
+\ 2005-04-13 (JDS) Update LH from LL1 comparison.
+\ 2005-04-14 (JDS) Update SL from LL2 comparison/IRAC4 extended corrections
+\ 2006-05-08 (JDS) Updates SL (/1.186), based on SL1/LL2 comparisons, as well
+\                  as circumstantial evidence from IRAC Ch. 3 & 4 
+\                  (with extended source corrections from T. Jarrett), and 
+\                  ISOCAM 7um.
+\                  Updates SH(*0.819) and LH(*0.792) to account for new 
+\                  high-res SLCF application, based on matched measurements 
+\                  by B. Buckalew of [SIII] 18um, [SIII] 33um, and 
+\                  [SiII] high-res vs. low-res line flux comparisons.
+\ Low-res from SINGS photometric comparisons (using SLCF)
+\ Note this is roughly the solid angle of 2 pixels, due to the 
+\ single-pixel WAVSAMP sampling inherent in the Cubism reconstruction.
+|mod_name                              |mod_num |pix_solid_angle |
+| char                                 |  int   |  real          |
+|                                      |        |  sr            |
+ Short-Low                               0        1.64463e-10
+ Short-High                              1        2.19702e-10
+ Long-Low                                2        1.2620845e-09
+ Long-High                               3        1.03244e-09  

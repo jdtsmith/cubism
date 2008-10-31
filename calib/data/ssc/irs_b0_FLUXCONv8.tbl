@@ -1,0 +1,32 @@
+\order flux
+\comment Identifier = b0_fluxcon.tbl
+\comment Flux conversion factors and order tuning coefficients.
+\comment Version 0.0 09/18/02 PM    Defined this file.
+\comment         0.1 01/03/03 PM    Short Low key wavelengths and passbands, adjusted to avoid A0V H lines.
+\comment         0.2 03/15/03 PM    Set flux conversions, assuming saturation at 20 Jy corresponding to 2.99 e- in 6 sec, all orders, factor 2 uncertain.
+\comment         1.0 12/20/03 PM    Updated all coefficents based on SV data, in 5th order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR7891 map (7868928), optimized for the two nods, and tested against point sources flux calibrator HR8585 (7869440) and representative science cases.
+\comment                             ***** WARNING:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with aperture extraction widths
+\comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S8.9/031213/b0_psf_fov.tbl.  Wavsamp dependence is  /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b0_wavsamp.tbl   
+\comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b0_flatfield.fits.
+\comment         2.0 30/07/04 PM    Updated all coefficients based on SV and nominal operations data.  Tuning coefficients and fluxcon factors derived from HR7891 map (7868928), 
+\comment                            nominal ops staring mode observations of HR6606 (e.g., 8556800 and subsequent), HR2149=HD42525 (9268736, 9268480) and tested against HD105 (7458304),
+\comment                            HR8585 (7869440), and several point source testcases from nominal ops calsfx and science observations.
+\commnet                             ***** WARNING: All coefficients are highly synchronized to flatfield version, PSF/FOV table version, wavsamp version, and extraction method.  This version is valid only for flatfield
+\comment                             ***** delivered to the pipeline at /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b0_flatfield.fits.  Extraction apertures are defined for the pipline
+\comment                             ***** in /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b0_psf_fov.tbl.  Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b0_wavsamp.tbl.
+\comment         3.0 18/11/04 MB    Updated all coefficients
+\comment         3.1 24/11/04 MB    Updated all coefficients, corrected for use of wrong FF in orders 2 and 3
+\comment         3.2  05/Oct/18 KS  Making an aperture loss fluxcon with 28 PIXEL WIDE SLIT using S13 flats and HR 7341 decin model.  
+\comment         3.2  05/Oct/18 KS  Using Poly ord=2 for SL2, and Poly ord=1 for SL1, and SL3
+\comment         3.3  06/Dec/27 KS  Redid fluxcon for S15.  Order 1 and 2 show bumps and wiggles.  No way to get rid of it without higher orders.
+\comment              06/Dec/27 KS  See Readme file at /stage/ssc-testdata-irs/pipedrop/cal/S15.0/OPS/26dec06/README_SL.
+\comment History
+\character channelID = 0
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |               |            |               |           |               |           |               |           |              |
+ 1            11.0000           0.80000           0.0000          0.0000         0.0000           0.0000          7980.8501     124.5000       1.000000      0.000000      0.005152     0.000000      -0.000884      0.000000       0.000068     0.00000         0.000000      0.00000      0.000000      0.00000
+ 2             6.5000           0.40000           0.0000          0.0000         0.0000           0.0000          4312.5181     124.5000       1.000000      0.000000      0.018073     0.000000       0.013642      0.000000       0.009606     0.00000         0.000000      0.00000      0.000000      0.00000
+ 3             8.0000           0.22000           0.0000          0.0000         0.0000           0.0000          4460.5649     124.5000       1.000000      0.000000      0.001824     0.000000       0.000000      0.000000       0.000000     0.000000        0.000000      0.00000      0.000000      0.00000
+

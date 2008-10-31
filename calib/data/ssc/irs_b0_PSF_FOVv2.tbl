@@ -1,0 +1,24 @@
+\order flux
+\comment Identifier = b0_psf_fov.tbl
+\comment Slit field of view (frame) and fiducial PSF information.
+\comment Version 0.1 03/18/03 PM, JB  Defined this file.  PSF estimates by HT.
+\comment Version 1.0 12/20/03 PM Modified pixel aperture widths for extraction. 
+\comment Version 2.0 07/30/04 PM Adjusted aperture widths for 1st order.
+\comment History 
+\character channelID = 0
+\character platescale = 1.8
+| FOV |  order |               FOVNAME                        |  DFRAC  | lambda_ref |  W_ref  |
+| int |  int   |               char                           |  real   | real       |  real   |
+|     |        |                                              |         | microns    |  pixels |
+  26      1       IRS_Short-Lo_1st_Order_1st_Position            0.333    12.000       8.00 
+  27      1       IRS_Short-Lo_1st_Order_2nd_Position            0.667    12.000       8.00 
+  28      1       IRS_Short-Lo_1st_Order_Center_Position         0.500    12.000       8.00 
+  29      1       IRS_Short-Lo_Module_Center                     0.500    12.000       8.00 
+  29      2       IRS_Short-Lo_Module_Center                     0.500     6.000       4.00
+  29      3       IRS_Short-Lo_Module_Center                     0.500     8.000       4.00
+  32      2       IRS_Short-Lo_2nd_Order_1st_Position            0.333     6.000       4.00
+  33      2       IRS_Short-Lo_2nd_Order_2nd_Position            0.667     6.000       4.00
+  34      2       IRS_Short-Lo_2nd_Order_Center_Position         0.500     6.000       4.00
+  32      3       IRS_Short-Lo_2nd_Order_Bonus_1st_Position      0.333     8.000       4.00
+  33      3       IRS_Short-Lo_2nd_Order_Bonus_2nd_Position      0.667     8.000       4.00
+  34      3       IRS_Short-Lo_2nd_Order_Bonus_Center_Position   0.500     8.000       4.00

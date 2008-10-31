@@ -1,0 +1,34 @@
+\order flux
+\comment Identifier = b1_fluxcon.tbl
+\comment Flux conversion factors and order tuning coefficients.
+\comment Version 0.0 09/18/02 PM    Defined this file.
+\comment         0.1 01/03/03 PM    Short High key wavelengths and passbands, adjusted to avoid A0V H lines.
+\comment         0.2 03/15/03 PM    Set flux conversions, assuming saturation at 100 Jy corresponding to 2.99 e- in 6 sec, all orders, factor 2 uncertain.
+\comment         1.0 12/19/03 PM    Updated all coefficents based on SV data, in 3rd order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR6688 staring (7836416), averaged between the two nods, and tested against point sources flux calibrator HR7310 (7463424) and representative science cases.
+\comment                             ***** WARNING:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with full SH slit extractions, 
+\comment                             ***** following /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b1_wavsamp.tbl, and flatfield /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b1_flatfield.fits. 
+\comment         2.0 03/06/04 PM    Updated all coefficents based on SV and NomOps data and S9.5 SH flat, in 3rd order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR6688 stare (7836416) at the nods, and map (7462400) at center and near-nod positions, and tested against calibrators HR7310 (7453424), HR2491 (7857408).
+\comment                             ***** WARNING:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with full SH slit extractions, 
+\comment                             ***** using /stage/ssc-testdata-irs/pipedrop/cal/S9.0/040109/b1_wavsamp.tbl and flatfield /ssc/testdata/irs/pipedrop/cal/S9.5/040304/b1_flatfield.fits.
+\comment         3.0 02/08/04 PM    Updated all coefficents.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR6688 stare (7836416) at the nods, and map (7462400) at center and near-nod positions, HR6606 (8882176) and tested against calibrators HR7310 (7453424), HR2491 (7857408).
+\comment                             ***** WARNING:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with full SH slit extractions, 
+\comment                             ***** using /stage/ssc-testdata-irs/pipedrop/cal/S10.5/040723/b1_wavsamp.tbl and flatfield /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b1_flatfield.fits.
+\comment
+\comment History
+\character channelID = 1
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |               |            |               |           |               |           |               |           |              |
+ 11         18.8000          0.3000           0.00000           0.00000         0.00000         0.00000        454.451           0.00000      0.9954564       0.00000      0.0301931       0.00000       0.0858611       0.00000     0.0111977       0.00000    -0.0202121       0.00000     0.0000000       0.00000
+ 12         17.1500          0.3000           0.00000           0.00000         0.00000         0.00000        457.784           0.00000      1.0027720       0.00000      0.0106638       0.00000      -0.0071962       0.00000     0.0407606       0.00000     0.0630532       0.00000     0.0000000       0.00000
+ 13         15.7500          0.2000           0.00000           0.00000         0.00000         0.00000        455.897           0.00000      0.9928076       0.00000     -0.0259269       0.00000       0.1027881       0.00000     0.0399544       0.00000    -0.0677863       0.00000     0.0000000       0.00000
+ 14         14.6600          0.2000           0.00000           0.00000         0.00000         0.00000        453.412           0.00000      0.9973994       0.00000      0.0332206       0.00000       0.0026079       0.00000    -0.1802379       0.00000     0.0534858       0.00000     0.0000000       0.00000
+ 15         13.7000          0.2000           0.00000           0.00000         0.00000         0.00000        448.241           0.00000      0.9967833       0.00000      0.0011790       0.00000       0.1694253       0.00000    -0.0160667       0.00000    -0.3272411       0.00000     0.0000000       0.00000
+ 16         12.9800          0.2000           0.00000           0.00000         0.00000         0.00000        439.141           0.00000      0.9926670       0.00000     -0.0527585       0.00000      -0.0075833       0.00000    -0.2098806       0.00000    -0.1420414       0.00000     0.0000000       0.00000
+ 17         12.1200          0.2000           0.00000           0.00000         0.00000         0.00000        488.384           0.00000      0.9950258       0.00000     -0.1167138       0.00000      -0.2185322       0.00000     0.3375139       0.00000     1.0239977       0.00000     0.0000000       0.00000
+ 18         11.5800          0.2000           0.00000           0.00000         0.00000         0.00000        405.234           0.00000      0.9986413       0.00000     -0.0452191       0.00000       0.1262733       0.00000     0.2836327       0.00000     0.2146936       0.00000     0.0000000       0.00000
+ 19         11.0600          0.1500           0.00000           0.00000         0.00000         0.00000        427.272           0.00000      0.9939128       0.00000      0.0254763       0.00000       0.4218744       0.00000     0.2135473       0.00000    -0.1971853       0.00000     0.0000000       0.00000
+ 20         10.3200          0.2000           0.00000           0.00000         0.00000         0.00000        460.776           0.00000      0.9994380       0.00000     -0.0487648       0.00000       0.0875113       0.00000    -0.5798981       0.00000    -0.3786150       0.00000     0.0000000       0.00000

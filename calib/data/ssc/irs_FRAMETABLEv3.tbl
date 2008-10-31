@@ -1,0 +1,34 @@
+\frametable version FTU_19a 
+\angle of +w instrument axis clockwise from TPF +Z axis.
+\hand-crafted by J.D. Smith from Excel spreadsheet vFTU_19a 
+\from BodyFrames_FTU_19a.xls spreadsheet forward by Carl Grillmair, 9/16/2004
+\changes as of v3 include: PUR, PUB, and SLcen, LLcen 
+\SLBoth/LLBoth bugs fixed, Frametable uploaded to spacecraft as of 7/13/04
+|fov_name                              |brown_theta_Y |brown_theta_Z |   angle   |
+| char                                 |  real        |  real        |    real   |
+|                                      | arcmin       | arcmin       |  degrees  |
+Telescope_Boresight                       0.0000          0.0000          0.0000
+IRS_Red_Peak-Up_FOV_Center              -11.6492          2.0004          1.7966
+IRS_Red_Peak-Up_FOV_Sweet_Spot          -11.5870          1.9713          1.9779
+IRS_Blue_Peak-Up_FOV_Center             -13.5203          1.8967          1.7044
+IRS_Blue_Peak-Up_FOV_Sweet_Spot         -13.5784          1.8644          1.8172
+IRS_Short-Lo_1st_Order_1st_Position     -12.0475         -2.6312        275.2800
+IRS_Short-Lo_1st_Order_2nd_Position     -12.0176         -2.9540        275.2800
+IRS_Short-Lo_1st_Order_Center_Position  -12.0326         -2.7926        275.2800
+IRS_Short-Lo_Module_Center              -11.9728         -3.4429        275.2800
+IRS_Short-Lo_2nd_Order_1st_Position     -11.9272         -3.9397        275.2800
+IRS_Short-Lo_2nd_Order_2nd_Position     -11.8989         -4.2466        275.2800
+IRS_Short-Lo_2nd_Order_Center_Position  -11.9131         -4.0932        275.2800
+IRS_Long-Lo_1st_Order_1st_Position       -3.9446        -14.0067        358.8000
+IRS_Long-Lo_1st_Order_2nd_Position       -4.8669        -13.9874        358.8000
+IRS_Long-Lo_1st_Order_Center_Position    -4.4057        -13.9970        358.8000
+IRS_Long-Lo_Module_Center                -2.8095        -14.0316        358.8000
+IRS_Long-Lo_2nd_Order_1st_Position       -0.7566        -14.0757        358.8000
+IRS_Long-Lo_2nd_Order_2nd_Position       -1.6701        -14.0566        358.8000
+IRS_Long-Lo_2nd_Order_Center_Position    -1.2134        -14.0662        358.8000
+IRS_Short-Hi_1st_Position               -10.5876         10.0300        318.5300
+IRS_Short-Hi_2nd_Position               -10.5417          9.9894        318.5300
+IRS_Short-Hi_Center_Position            -10.5647         10.0097        318.5300
+IRS_Long-Hi_1st_Position                -10.4614        -10.2731         43.3400
+IRS_Long-Hi_2nd_Position                -10.3740        -10.1906         43.3400
+IRS_Long-Hi_Center_Position             -10.4177        -10.2319         43.3400

@@ -1,0 +1,20 @@
+\ comment=SLCF from STinyTim models for module sl
+\ comment=Region of integration is X:  173.08:236.92 Y: 191.72:218.28
+\ comment ks 17/08/05  -  v1.0 Derived in August by using STinyTim and assuming slit size 
+\ comment ks 17/08/05        for Short High: 11.3 x 4.7 arcseconds
+\ comment  ks 17/08/05  - v1.1 -- will need to derive exact slit size from later data
+|wavelength |  slcf  |
+| real      |  real  |
+| micron    |        |
+         9    0.7156
+        10    0.7021
+        11    0.6923
+        12    0.6785
+        13    0.6591
+        14    0.6364
+        15    0.6132
+        16    0.5912
+        17    0.5713
+        18    0.5542
+        19    0.5389
+        20    0.5259

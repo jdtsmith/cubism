@@ -1,0 +1,5 @@
+\tilt file
+\character channelID = 2
+| order   |  x or y  |    c3     |    c2     |    c1     |    c0     |  arctan(dy/dx)_beg  |  arctan(dy/dx)_end  |
+| int     |  char    |   real    |   real    |   real    |   real    |   real              |   real              |
+ 9999          y       0.00         0.00        0.00       -1.2000          0.00                 0.00
