@@ -1,0 +1,121 @@
+
+Reference Paper
+===============
+
+The CUBISM algorithm and its implementation are described in detail
+in:
+
+ Smith, J.D.T. et al., Spectral Mapping Reconstruction of Extended
+ 	 Sources, 2007 PASP, 119.1133S
+
+Please reference this paper for published use of the tool.
+
+
+Changes for Version 1.6
+=======================
+
+ - Updated Calibration sets for IRS pipeline version S17 (with
+   particular improvment in LH order stitching).
+
+ - CubeView: can now move box regions (histogram, stats, etc.) outside
+   of zoomed area.
+
+ - Prompt before clearing bad pixels.
+
+ - Support reading/writing DS9 polygonal and circular regions (FK5 WCS
+   coordinates only) for extraction apertures.
+
+ - Display saved extraction regions on visualization image.
+
+ - Reversable color tables.
+
+ - Squash many small bugs.
+
+Changes for Version 1.5
+=======================
+
+ - You can now directly load CUBISM-produced FITS cubes into CubeView.
+   When opening a cube project (e.g. on the initial call to 'cubism'),
+   select a FITS cube file instead of '.cpj' CUBISM project file.  Not
+   all operations are possible when viewing FITS cubes, but you can
+   extract, make line maps, etc.
+
+ - Shipped with a calibration set for S15 IRS pipeline data.
+
+ - A completely new clipping architecture speeds up the initial cube
+   build ("colored rectangles" phase) by 4-8x.  This is true only for
+   the auto-compiled C version (so it's even more important now to
+   ensure IDL can find your compiler!).
+
+ - The speed of a full cube rebuild ("marching white boxes" phase) has
+   also been improved by a factor of 5-10.  These two improvements
+   together make it far less important to save clipping accounts with
+   the cube, since they can now be regenerated up to 10x faster.
+
+ - QuickBuild: when toggling or loading bad pixels, CUBISM keeps track
+   of which cube pixels are affected, and only rebuilds these "dirty"
+   pixels.  Even for very large cubes, testing out a small batch of
+   bad pixel changes is now very fast.  Look for the new "Build Cube"
+   button in the CUBISM Project window to change to "QuickBuild".
+
+ - Record-level bad pixels can now be marked on multiple records at
+   once, when a stack of multiple records is being viewed.
+
+ - Correctly handle spaces in path names.
+
+ - Custom cursors in CubeView inform you which mode you are in (zoom,
+   histogram, extraction, etc.).
+
+ - You can now keep cube backtracking enabled while switching to
+   another tool (e.g. zoom, you can now zoom in and then resume
+   backtracking).
+
+ - New option "These records" when right-clicking on a given pixel in
+   the backtrack window, to set a record-level bad pixel in all the
+   listed records with this pixel coordinate.
+
+ - When the assembled cube is updated, automatically re-extract any
+   existing extracted spectrum being displayed.  This is very useful
+   with QuickBuild to check the effect of setting a small number of
+   bad pixels on a (potentially spurious) spike in a spectrum.
+
+ - New CubeView key shortcuts 0-4, to resize the display window to
+   fixed sizes 1-4, with 0 meaning large enough to show the full image
+   at the current zoom level.
+
+ - Multi-extension FITS files can be read in as visualization images;
+   you'll be prompted for which extension to read.
+
+ - CubeSpec can make "integrated" maps, integrating f_nu d_nu, and
+   converting the units (e.g. to W/m^2/sr).  Useful for line
+   integrations.  
+
+ - Weighted maps (e.g. MIPS 24um) are produced correctly, and can also
+   be integrated over (weighted by d_nu, so the flux units are
+   preserved).
+
+ - The CubeSpec window can be resized.
+
+ - On OSX, Cubism.app should correctly start X11 and target the
+   correct X display for any version of IDL >= 6.1
+
+ - Numerous minor bug-fixes and improvements.
+
+Changes for Version 1.02
+========================
+
+ - Problems with the VM version quitting after any error is
+   acknowledged, and incorrect handling of errors.
+
+ - Single record only backgrounds complaining about the need to
+   rebuild the cube.
+
+ - Can now accommodate spaces in the filepath for the Cubism.app
+   MacOSX version, and/or .cpj files (this may have been responsible
+   for some MacOSX users reporting trouble launching Cubism.app).
+
+ - Killing the window with window manager does not remove window until
+   after prompting to save unsaved changes.
+
+ - Simplified panning of zoomed images in CubeView: similar to DS9
+  (middle or control-click to recenter).
