@@ -8,8 +8,8 @@
 @end direntry
 @set EDITION 1.60
 @set VERSION 1.60
-@set IDLVERSIONREQUIRED 6.1
-@set DATE July, 2008
+@set IDLVERSIONREQUIRED 6.2
+@set DATE October, 2008
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jd.smith@@utoledo.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -240,6 +240,7 @@ Menus
 Cube Assembly
 
 * Input Files::                 
+* Build Order::                 
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
@@ -2648,7 +2649,9 @@ Click twice to zoom in on the wavelength or flux scale.
 @table @code
 @item Full Cube
 Clicking on a wavelength plane sends that plane to the viewer.  The
-plane can be moved using the arrow keys.
+plane can be moved using the arrow keys.  Holding @key{Shift} with the
+arrow keys moves 5 wavelength steps; @key{Shift} and @key{Control}
+together moves by 10 steps.
 
 @item Map
 A @kbd{Peak} or @kbd{Continuum} region is formed by clicking twice: once
@@ -2673,6 +2676,7 @@ definition, a line is left at the location of the first click.
 
 @menu
 * Input Files::                 
+* Build Order::                 
 * Calibration Sets::            
 * Backgrounds::                 
 * Bad Pixels::                  
@@ -2732,7 +2736,7 @@ Iterate as necessary.
 Enjoy your newly assembled cube: extract spectra, build maps, etc.
 @end enumerate
 
-@node Input Files, Calibration Sets, Cube Assembly, Cube Assembly
+@node Input Files, Build Order, Cube Assembly, Cube Assembly
 @section Input Files
 @cindex @samp{BCD} files
 @cindex Calibration sets
@@ -2775,7 +2779,55 @@ using the @kbd{Record->Import Data by Module...}.  Simply point at a
 directory containing the data of interest, and select the appropriate
 data sets, grouped by object and IRS module.
 
-@node Calibration Sets, Backgrounds, Input Files, Cube Assembly
+@node Build Order, Calibration Sets, Input Files, Cube Assembly
+@section Build Order
+@cindex Build Order
+
+For low-resolution IRS spectral maps, there is a subtle distinction
+between the @emph{build order} of a given cube produced by CUBISM, and
+the @emph{target order} of the observations from which it was built,
+which is worth discussing in detail.
+
+Each low-resolution IRS slit consists of two sub-slits, separated by a
+blocked region.  When planning low resolution IRS observations, you must
+select where your chosen target position will be placed in the full
+slit.  You can place your chosen target coordinates in the center of the
+full slit (the blocked location), in which case your record type will
+be, e.g. @samp{LL_Cen}.  Alternatively, you might place your target
+coordinates in the center of one of the sub-slits (e.g. @samp{SL1_cen}).
+Staring mode observations further subdivide each sub-slit, placing the
+target at roughly 1/3 and 2/3 along the sub-slit; these positions are
+denoted @samp{a} and @samp{b}, e.g. @samp{SL1_a}.
+
+None of this, however, has any impact on the order information present
+@emph{in the data themselves}.  If you have placed your target in
+@samp{SL1_cen}, the other sub-slit will still image the sky onto the
+detector and record a spectrum.  Each record's data will thus contain
+both orders (as well as the ``bonus'' order).
+
+It is often useful to build a cube from data in the ``other'' sub-slit's
+order, i.e. the one not targeted during the map.  When an object is
+mapped consecutively with both sub-slits, using all the data records to
+build a cube in a given order results in two disjointed regions.  We
+often call the region of cube built from the sub-slit @emph{not} being
+targeted the ``outrigger''.  Data in the outrigger region can be very
+useful for improving the statistics for automatic bad pixel selection
+(@pxref{Automatic Bad Pixels}), and for confirming the data levels in
+low signal regions.  Alternatively, for large source, the outrigger
+field can contain interesting data in its own right.
+
+By default, CUBISM sets the cube build order to the most common target
+order among the loaded records.  Obviously, if the full slit center was
+targeted, no individual order is preferred, so a default is used.  In
+general, you should check the cube build order to ensure you are
+building the cube you want.  In the project window, @kbd{Info->Project
+Parameters...} provides this information, and you can set the cube build
+order with @kbd{Cube->Set Cube Build Order}.  Recall that each
+low-resolution cube is built using data from a single IRS order
+(e.g. @samp{SL1}).  High resolution order wavelengths are much more
+continuous, and are combined directly in the cube.
+
+@node Calibration Sets, Backgrounds, Build Order, Cube Assembly
 @section Calibration Sets
 @cindex Calibration sets
 
@@ -3685,7 +3737,7 @@ When you move or resize the region, the spectrum will update
 automatically.  This is an excellent way to quickly see how the IRS
 spectrum of your source changes with position over the cube, or
 extraction size.  Remember that the arrow keys allow the selection box
-to be moved one pixel at a time in CubeView.
+to be moved one pixel at a time in CubeView (or 5, or 10 with .
 
 Any extracted spectra can be saved using @kbd{File->Save Spectrum As...}
 (@pxref{CubeSpec File Menu}).  The save format is an ASCII file with
@@ -4022,7 +4074,7 @@ are assembled here.
 @item @kbd{Control-shift-click}
 @tab Select additional range of records (from last click).
 @item @key{Return}
-@tab View record (same as double click).
+@tab View record (same as double clicking).
 @end multitable
 
 @node Cube View, Cube Spec, Cube Project, Mouse and Keyboard Shortcuts
@@ -4075,7 +4127,7 @@ Pan image, contrained to horizontal or vertical (if zoomed in).
 Define scaling box. On handle, resize box.
 
 @item Arrows
-Move box.
+Move box 1 pixel (with Shift: 5 pixels, with Control+Shift: 10 pixels)
 @end table
 
 @item @kbd{c}
@@ -4118,7 +4170,7 @@ Update averaging strip width.
 Define statistics box. On handle, resize box.
 
 @item Arrows
-Move box.
+Move box 1 pixel (with Shift: 5 pixels, with Control+Shift: 10 pixels)
 @end table
 
 @item @kbd{p}
@@ -4129,7 +4181,7 @@ Move box.
 Define photometry box. On handle, resize box.
 
 @item Arrows
-Move box.
+Move box 1 pixel (with Shift: 5 pixels, with Control+Shift: 10 pixels)
 @end table
 
 @item @kbd{x}
@@ -4141,7 +4193,7 @@ only).
 Define extraction box. On handle, resize box.
 
 @item Arrows
-Move box.
+Move box 1 pixel (with Shift: 5 pixels, with Control+Shift: 10 pixels)
 @end table
 
 @item @kbd{t}
@@ -4266,7 +4318,8 @@ Select additional range of records.
 @tab Enlarge/reduce peak or continuum region size.
 
 @item @key{Left}/@key{Right} Arrows
-@tab Move selected region or wavelength plane.
+@tab Move selected region or wavelength plane by one step (with Shift: 5
+steps; with Control+Shift: 10 steps).
 
 @item @kbd{f}
 @tab Perform line fit (peak and continuum regions required).
@@ -4354,12 +4407,13 @@ Commonly encountered problems and their solutions:
 @item
 @strong{I get the message ``Couldn't restore data from file...''}.  
 
-By default, CUBISM does not save the BCD and associated data itself in
-the @file{.cpj} project file, instead recording a file reference to the
-files.  If you've since moved or modified the BCD files, or are loading
-the project on another system where they are in a different location,
-you can @kbd{Edit->Select All}, then @kbd{Edit->Replace File
-Substring...}  to correct the base pathname.  Another option is to store
+By default, to save space, CUBISM does not save the BCD and associated
+data itself in the @file{.cpj} project file, instead recording a file
+path @emph{reference} to the files.  If you've since moved or modified
+the BCD files, or are loading the project on another system where they
+are in a different location, you can @kbd{Edit->Select All}, then
+@kbd{Edit->Replace File Substring...}  to correct the base pathname (you
+can use regular expressions in the search).  Another option is to store
 the data inside of the project, or save it with @emph{relative}
 pathnames.  @xref{Saving the Project}.
 
@@ -4446,9 +4500,10 @@ from a clean, new cube project.
 @strong{My source emission disappears when I use outrigger sky data and
 then click @kbd{BGSub} in the viewed stack.}  
 
-Make sure that you are subtracting the correct data order.  You might
-have inadvertently selected first order for your sky when you actually
-meant second order, for example, causing target self-subtraction.
+Make sure that you are subtracting records with background information
+in the the correct order.  You might have inadvertently selected records
+pointed to the first order for your sky when you actually meant second
+order, for example, causing target self-subtraction.
 
 @item
 @strong{I get a message 'Failed compiling DLM clipper...'.}  
@@ -4486,6 +4541,12 @@ setenv IDL_ONLINE_HELP_PDF_CMD xpdf
 
 You have an outdated version of @code{AstroLib}, update it.
 
+
+@item
+@strong{I can't understand the difference between build order and the
+record order shown under the @samp{Type} column in the project viewer.}
+
+You need to read @ref{Build Order}.
 
 @end enumerate
 
