@@ -10,6 +10,10 @@ if [ -z "$IDL_DIR" ]; then
 	export IDL_DIR=/usr/local/rsi/idl
     elif [ -d /Applications/rsi/idl ]; then
 	export IDL_DIR=/Applications/rsi/idl
+    elif [ -d /usr/local/itt/idl ]; then
+	export IDL_DIR=/usr/local/itt/idl
+    elif [ -d /Applications/itt/idl ]; then
+	export IDL_DIR=/Applications/itt/idl
     else 
 	echo "IDL_DIR not set and idl cannot be located, please correct."
 	exit 1
