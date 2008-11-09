@@ -1,12 +1,13 @@
-VPATH = cubism/manual
+VPATH = manual
 CUBISM_VERSION_FILE = cubism/main/cubism_version.pro
 CUBISM-VERSION := $(shell perl -ne 'print $$1 if /cubism_version='"'"'(v[0-9.a-z]+)/;' $(CUBISM_VERSION_FILE))
 
 CUBISM_BIN_FILE = cubism_$(CUBISM-VERSION)_bin.tgz
+CUBISM_TAR_FILE = cubism_$(CUBISM-VERSION)_src.tar
 CUBISM_SRC_FILE = cubism_$(CUBISM-VERSION)_src.tgz
 CUBISM_SAV_FILE = cubism/bin/cubism_vm.sav
 
-IDL = idl_6.3
+IDL = idl
 
 .PHONY: all
 all: manual bindist srcdist
@@ -22,33 +23,27 @@ savefile: $(CUBISM_SAV_FILE)
 
 .PHONY: manual
 manual: cubism.pdf
-	(cd cubism/manual; make pdf)
+	(cd manual; make pdf)
 
-$(CUBISM_BIN_FILE): $(CUBISM_SAV_FILE) 
-	tar czvf $(CUBISM_BIN_FILE) --exclude "CVS" \
+$(CUBISM_BIN_FILE): $(CUBISM_SAV_FILE)
+	tar czvf $(CUBISM_BIN_FILE) --exclude ".git" \
 		--exclude '.??*' --exclude '*~' --exclude '#*#' \
 		README \
 		cubism/bin/cubism_vm* cubism/calib/data cubism/calib/*.c \
-		cubism/bin/irs_info cubism/map_sets cubism/manual/cubism.pdf
+		cubism/bin/irs_info cubism/map_sets manual/cubism.pdf
 
 $(CUBISM_SAV_FILE): $(CUBISM_VERSION_FILE)
 	(cd cubism/bin; $(IDL) do_compile_cubism)
 
-$(CUBISM_SRC_FILE): ChangeLog 
-	rm -rf irs_cubism_$(CUBISM-VERSION)
-	mkdir irs_cubism_$(CUBISM-VERSION)
-	cp README irs_cubism_$(CUBISM-VERSION)
-	(cd irs_cubism_$(CUBISM-VERSION);\
-	 cvs co cubism; \
-	 rm -f cubism/TODO; \
-	 rm -rf cubism/manual/*; \
-	 cp ../cubism/manual/cubism.pdf cubism/manual/; \
-	 cvs co objtools; \
-	 cvs co tvtools)
-	tar czvf $(CUBISM_SRC_FILE) --exclude 'CVS' irs_cubism_$(CUBISM-VERSION)
-	rm -rf irs_cubism_$(CUBISM-VERSION)
+$(CUBISM_SRC_FILE): 
+	git archive --format=tar --prefix=irs_cubism/ HEAD \
+		CHANGES COPYING README cubism/ manual/ \
+		objtools/ tvtools/ utility/ > $(CUBISM_TAR_FILE)
+	(cd ../; tar -rvf irs_cubism/$(CUBISM_TAR_FILE) \
+		irs_cubism/manual/cubism.pdf )
+	gzip -c $(CUBISM_TAR_FILE) > $(CUBISM_SRC_FILE)
+	rm -f $(CUBISM_TAR_FILE)
 
-ChangeLog: $(CUBISM_VERSION_FILE)
-	cvs2cl  --no-wrap -S
+
 
  
