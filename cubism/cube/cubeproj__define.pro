@@ -469,14 +469,14 @@ pro CubeProj::ShowEvent, ev
                     thiscube,                                 $
                     '                                   ', $
                     '    JD Smith and the SINGS Team    ', $
-                    '         (c) 2002-2007             ', $
+                    '         (c) 2002-2008             ', $
                     '   http://sings.stsci.edu/cubism   ', $
                     '***********************************']
      end
      
      'manual': begin 
         @cubism_dir
-        manual=filepath(ROOT=cubism_dir,SUBDIR='manual','cubism.pdf')
+        manual=filepath(ROOT=cubism_dir,SUBDIR=['..','manual'],'cubism.pdf')
         if ~file_test(manual,/READ) then $
            self->Error,'Cannot locate Cubism manual.'
         online_help,BOOK=manual,/FULL_PATH
