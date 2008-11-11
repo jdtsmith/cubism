@@ -6,8 +6,8 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.60
-@set VERSION 1.60
+@set EDITION 1.6
+@set VERSION 1.6
 @set IDLVERSIONREQUIRED 6.2
 @set DATE November, 2008
 @set AUTHOR J.D. Smith
