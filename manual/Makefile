@@ -17,7 +17,7 @@ TEXI2HTML = texi2html --split chapter -number --init-file cubism_texi2html.init
 TEXI2PDF = texi2pdf
 
 # Program to convert image files
-CONVERT = convert
+CONVERT = convert -compress ZIP 
 
 TEXIFILE  = cubism.texi
 INFOFILES = cubism
