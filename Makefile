@@ -27,7 +27,6 @@ savefile: $(CUBISM_SAV_FILE)
 
 .PHONY: manual
 manual: $(CUBISM_MAN_FILE)
-	(cd manual; make pdf)
 
 .PHONY: dmg
 dmg: $(CUBISM_DMG) $(CUBISM_APP_FILE)
@@ -44,6 +43,9 @@ $(CUBISM_BIN_FILE): $(CUBISM_SAV_FILE) $(CUBISM_MAN_FILE)
 
 $(CUBISM_SAV_FILE): $(CUBISM_VERSION_FILE) 
 	(cd cubism/bin; $(IDL) do_compile_cubism)
+
+$(CUBISM_MAN_FILE): manual/cubism.texi
+	(cd manual; make pdf)
 
 $(CUBISM_SRC_FILE): $(CUBISM_MAN_FILE) 
 	git archive --format=tar --prefix=irs_cubism/ HEAD \
