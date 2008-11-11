@@ -9,7 +9,7 @@
 @set EDITION 1.60
 @set VERSION 1.60
 @set IDLVERSIONREQUIRED 6.2
-@set DATE October, 2008
+@set DATE November, 2008
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jd.smith@@utoledo.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -2791,13 +2791,14 @@ which is worth discussing in detail.
 Each low-resolution IRS slit consists of two sub-slits, separated by a
 blocked region.  When planning low resolution IRS observations, you must
 select where your chosen target position will be placed in the full
-slit.  You can place your chosen target coordinates in the center of the
-full slit (the blocked location), in which case your record type will
-be, e.g. @samp{LL_Cen}.  Alternatively, you might place your target
-coordinates in the center of one of the sub-slits (e.g. @samp{SL1_cen}).
-Staring mode observations further subdivide each sub-slit, placing the
-target at roughly 1/3 and 2/3 along the sub-slit; these positions are
-denoted @samp{a} and @samp{b}, e.g. @samp{SL1_a}.
+slit.  You can choose to have the spacecraft place your chosen target
+coordinates in the center of the full slit (the blocked location), in
+which case your record type will be, e.g. @samp{LL_Cen}.  Alternatively,
+you might place your target coordinates in the center of one of the
+sub-slits (e.g. @samp{SL1_cen}).  Staring mode observations further
+subdivide each sub-slit, placing the target at roughly 1/3 and 2/3 along
+the sub-slit; these positions are denoted @samp{a} and @samp{b},
+e.g. @samp{SL1_a}.
 
 None of this, however, has any impact on the order information present
 @emph{in the data themselves}.  If you have placed your target in
@@ -2808,24 +2809,24 @@ both orders (as well as the ``bonus'' order).
 It is often useful to build a cube from data in the ``other'' sub-slit's
 order, i.e. the one not targeted during the map.  When an object is
 mapped consecutively with both sub-slits, using all the data records to
-build a cube in a given order results in two disjointed regions.  We
-often call the region of cube built from the sub-slit @emph{not} being
-targeted the ``outrigger''.  Data in the outrigger region can be very
-useful for improving the statistics for automatic bad pixel selection
-(@pxref{Automatic Bad Pixels}), and for confirming the data levels in
-low signal regions.  Alternatively, for large source, the outrigger
-field can contain interesting data in its own right.
+build a cube in a given order results in two potentially disjointed
+regions.  We often call the region of cube built from the sub-slit
+@emph{not} being targeted the ``outrigger''.  Data in the outrigger
+region can be very useful for improving the statistics for automatic bad
+pixel selection (@pxref{Automatic Bad Pixels}), and for confirming the
+data levels in low signal regions.  Alternatively, for large source, the
+outrigger field can contain interesting data in its own right.
 
 By default, CUBISM sets the cube build order to the most common target
-order among the loaded records.  Obviously, if the full slit center was
-targeted, no individual order is preferred, so a default is used.  In
-general, you should check the cube build order to ensure you are
-building the cube you want.  In the project window, @kbd{Info->Project
-Parameters...} provides this information, and you can set the cube build
-order with @kbd{Cube->Set Cube Build Order}.  Recall that each
-low-resolution cube is built using data from a single IRS order
-(e.g. @samp{SL1}).  High resolution order wavelengths are much more
-continuous, and are combined directly in the cube.
+order among the loaded BCD records.  Obviously, if the full slit center
+was targeted, no individual order is preferred, so an arbitrary default
+is used.  In general, you should check the cube build order to ensure
+you are building the cube you want.  In the project window,
+@kbd{Info->Project Parameters...} provides this information, and you can
+set the cube build order with @kbd{Cube->Set Cube Build Order}.  Recall
+that each low-resolution cube is built using data from a single IRS
+order (e.g. @samp{SL1}).  High resolution order wavelengths are much
+more continuous, and are combined directly in the cube.
 
 @node Calibration Sets, Backgrounds, Build Order, Cube Assembly
 @section Calibration Sets
@@ -4368,23 +4369,38 @@ improperly, especially on maps without much cube-level redundancy.
 
 Unexpected positive or negative spikes in an extracted spectrum often
 indicate remaining bad pixels.  Use backtracking to track them down ---
-see @ref{Backtracking to Discover Bad Pixels}.
+see @ref{Backtracking to Discover Bad Pixels}.  Quick-build, and the
+cube and spectra are instantly updated.
+
+@item
+@strong{Avoid over-zealous bad pixel removal.}
+
+Sources with strong high-frequency spatial structure (e.g. point
+sources) will necessarily have a broad range of data contributing to
+some pixels in the cube (in particular due to the limited PSF sampling).
+Marking all outliers of any sort bad, either by hand or using auto
+bad-pixels, will result in depressed or elevated ``chunks'' in the
+spectra with no obvious cause.  Using backtracking, try un-setting
+related global bad pixels and quick-building.
 
 @item
 @strong{Use keyboard shortcuts to speed up the interface.}  
 
-Keyboard shortcuts are available CubeView (e.g. @kbd{z} to switch to the
-zoom tool, @key{Space} to freeze the scaling range, etc.), in CubeSpec
-(e.g. @kbd{p} to enter peak region define mode, arrows to move or resize
-regions, etc.), and in the CUBISM Project (e.g. arrow keys to change the
-record selection, @key{Return} to view it).  @xref{The Tools}, for more
-information, and @ref{Mouse and Keyboard Shortcuts} for a handy table.
+Keyboard shortcuts are available in CubeView (e.g. @kbd{z} to switch to
+the zoom tool, @key{Space} to freeze the scaling range, etc.), in
+CubeSpec (e.g. @kbd{p} to enter peak region define mode, arrows to move
+or resize regions, etc.), and in the CUBISM Project (e.g. arrow keys to
+change the record selection, @key{Return} to view it).  Arrows move the
+active item and can be accelerated by holding @key{Shift} or
+@key{Control} + @key{Shift}.  @xref{The Tools}, for more information,
+and @ref{Mouse and Keyboard Shortcuts} for a handy table.
 
 @item
 @strong{Use multiple viewers.}  
 
 This allows you to simultaneously scrutinize @samp{BCD} records, the
-built cube, and an AOR visualization image.
+built cube, and an AOR visualization image.  Using color maps to theme
+them allows viewing data from multiple projects without confusion.
 
 @item
 @strong{Use the AOR visualizer to examine in-situ backgrounds.}  
@@ -4468,7 +4484,8 @@ Spectral Map HOWTO} for information on observation planning.
 
 Did you double check the cube build order (@kbd{Cube->Set Cube Build
 Order...})?  Remember that saving the cube with a different name does
-not change the cube build order.
+not change the cube build order, and that the target order of the data
+does not control the build order (@pxref{Build Order}).
 
 @item
 @strong{I have 4 different projects open, and I can't keep track of what
