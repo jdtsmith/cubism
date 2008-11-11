@@ -55,6 +55,7 @@ $(CUBISM_SRC_FILE): $(CUBISM_MAN_FILE)
 	rm -f $(CUBISM_TAR_FILE)
 
 $(CUBISM_APP): $(CUBISM_SAVE_FILE) $(CUBISM_MAN_FILE)
+	rm -rf $(CUBISM_APP)
 	platypus -D -a 'Cubism' -o 'None' -u 'JD Smith' \
 		-p /bin/sh -V $(CUBISM-VERSION) -I org.jdsmith.Cubism \
 		-s Cbsm -X 'cpj' -T Cbsm \
@@ -76,17 +77,17 @@ $(CUBISM_APP): $(CUBISM_SAVE_FILE) $(CUBISM_MAN_FILE)
 "        		<key>CFBundleTypeOSTypes</key>\n" .\
 "        		<array>\n".\
 "        		        <string>Cbsm</string>\n" .\
-"        		</array>\n" . $$_ if $$l && !$$i; \
-$$l=$$i;' $(CUBISM_APP)/Contents/Info.plist 
+"        		</array>\n" . $$_ if $$l && !$$i; $$l=$$i;' \
+		$(CUBISM_APP)/Contents/Info.plist 
 	cp -f cubism/main/CubismFiles.icns $(CUBISM_APP)/Contents/
 
 $(CUBISM_DMG): $(CUBISM_APP) $(CUBISM_SAV_FILE)
-	[ -d "$(CUBISM_DMG_DIR)" ] && rm -rf "$(CUBISM_DMG_DIR)"	
+	rm -rf "$(CUBISM_DMG_DIR)"
 	mkdir "$(CUBISM_DMG_DIR)"
 	cp -rp "$(CUBISM_APP)" "$(CUBISM_DMG_DIR)"
 	cp -rp Applications "$(CUBISM_DMG_DIR)"
 	cp README "$(CUBISM_DMG_DIR)"
-	[ -f "$(CUBISM_DMG)" ] && rm -f "$(CUBISM_DMG)"
-	hdiutil create -fs HFS+ -format UDRO -srcfolder "$(CUBISM_DMG_DIR)" \
+	rm -f "$(CUBISM_DMG)"
+	hdiutil create -fs HFS+ -srcfolder "$(CUBISM_DMG_DIR)" \
 		-volname "Cubism $(CUBISM-VERSION)" "$(CUBISM_DMG)"
 	rm -rf "$(CUBISM_DMG_DIR)"
