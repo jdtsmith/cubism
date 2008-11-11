@@ -5,9 +5,16 @@ if [ -n "`which open-x11`" ]; then
     # Open X11 and find the display, for Tiger only
     TMP=/tmp/$UID/TemporaryItems
     mkdir -p $TMP
-    cp -f "$top/bin/getdisplay.sh" $TMP
     rm -f $TMP/display
-    
+    cat <<EOF > $TMP/getdisplay.sh
+#!/bin/sh
+if [ -z "$DISPLAY" ]; then
+echo :0 > $TMP/display
+else
+echo $DISPLAY > $TMP/display
+fi
+
+EOF
     open-x11 $TMP/getdisplay.sh || \
 	open -a XDarwin $TMP/getdisplay.sh || \
 	echo ":0" > $TMP/display
@@ -19,4 +26,4 @@ if [ -n "`which open-x11`" ]; then
 fi
 
 cd $HOME
-exec "$top/cubism/bin/cubism_vm" "$2"
+exec "$top/cubism/bin/cubism_vm" "$1"
