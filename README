@@ -1,9 +1,26 @@
+INTRODUCTION
+============
 
-This is the README file for the Cubism distribution.  
+This is the README file for the Cubism distribution.  Cubism is the
+CUbe Builder for IRS Spectral Mapping, a tool for use in constructing
+and analyzing spectral maps obtained with the Spitzer Space
+Telescope's IRS spectrograph.  
+
+Cubism was written by J.D. Smith and the SINGS Legacy team.
 
 Cubism is available in two basic distribution types: source, and
 binary.  A binary Cubism.app bundled package for MacOSX is also
 available.
+
+
+REFERENCE
+=========
+
+The Cubism algorithm and its implementation are described in detail
+in:
+
+ Smith, J.D.T. et al., Spectral Mapping Reconstruction of Extended
+         Sources, 2007 PASP, 119.1133S
 
 
 MANIFEST
@@ -18,7 +35,7 @@ MANIFEST
    cubism/map_sets Map sets for creating spectral maps.
    objtools/       Object utility tools.
    tvtools/        Viewer-component tools.
-
+   manual/ 	   A manual (TeXinfo source and PDF).
 
  The IDL binary distribution contains:
  +++++++++++++++++++++++++++++++++++++
@@ -26,6 +43,13 @@ MANIFEST
    bin/		  Pre-compiled IDL runtime Cubism binary.
    calib/	  IRS calibration files and sets.
    map_sets/	  Map sets for creating spectral maps.
+   manual/ 	  A manual (PDF).
+
+ The Cubism.app MacOSX DMG distribution contains:
+ ++++++++++++++++++++++++++++++++++++++++++++++++
+
+   A self-contained Cubism.app application bundle, README, and alias
+   to the Applications folder for convenience of copying.
 
 
 REQUIREMENTS
@@ -45,8 +69,8 @@ REQUIREMENTS
  - GCC or other C compiler.
 
 
- Binary distribution:
- ++++++++++++++++++++
+ Binary distribution (including MacOSX Cubism.app):
+ ++++++++++++++++++++++++++++++++++++++++++++++++++
 
  - IDL, or the free IDLVM, version 6.1 or later.
 
@@ -64,9 +88,10 @@ REQUIREMENT NOTES
  A default system compiler is strongly recommended, for auto-compiling
  a C helper library which speeds up basic cube building operations.
  Most Linux systems have compilers included by default.  OSX users
- should install the Developer Tools.
+ should download and install the free Developer Tools (aka XCode,
+ which includes gcc).
 
- To see what IDL will use to compile, type, at the IDL prompt:
+ To see what IDL will use to compile C code, type, at the IDL prompt:
 
  IDL> help,!MAKE_DLL,/st
  ** Structure !MAKE_DLL, 4 tags, length=48, data length=48:
@@ -76,7 +101,8 @@ REQUIREMENT NOTES
     CC              STRING    'gcc %X -fPIC -I"/usr/local/rsi/idl_6.1/ext'...
     LD              STRING    'ld -shared -o %L %O %X'
 
- IDL on OSX also requires X11; see the installation notes for IDL.
+ IDL on OSX also requires X11 (installed by default starting with OSX
+ v10.5); see the installation notes for IDL.
 
 
 INSTALLATION
@@ -86,18 +112,17 @@ INSTALLATION
  +++++++++++++++++++
 
  If running either the source or binary Cubism distribution from the
- IDL command line, simply relocate the directories into a location on
- the IDL_PATH, and restart IDL, if necessary.  An example IDL_PATH,
+ IDL command line, simply move the source directories into a location
+ on the IDL_PATH, and restart IDL, if necessary.  An example IDL_PATH,
  for locating the directories in ~/idl, is:
 
-  setenv IDL_PATH <IDL_DEFAULT>:+$HOME/idl
+   export IDL_PATH=<IDL_DEFAULT>:+$HOME/idl
 
  Virtual Machine Usage:
  ++++++++++++++++++++++
 
  If running from the IDL Virtual Machine, the directories can be
  located anywhere, and an IDL_PATH environment variable is not needed.
-
 
  OSX Binary Cubism.app package:
  ++++++++++++++++++++++++++++++
@@ -106,12 +131,13 @@ INSTALLATION
  which attempts to run Cubism directly in the IDL VM when the
  application or a Cubism project ('.cpj') file is double-clicked.
  Simply drag the Cubism application to your /Applications folder, or
- anywhere else.  
+ anywhere else.
 
  If IDL is installed somewhere other than /Applications/rsi/idl, or
- /usr/local/rsi/idl, set the global environment variable IDL_DIR to
- the location of the IDL install directory.
- 
+ /usr/local/rsi/idl (or equivalent paths with rsi->itt), set the
+ global environment variable IDL_DIR to the location of the IDL
+ install directory.
+
 
 RUNNING
 =======
@@ -142,15 +168,37 @@ RUNNING
  at the command line.  This will automatically restore and run the
  compiled version of Cubism.
 
+ OSX Binary Cubism.app package:
+ ++++++++++++++++++++++++++++++
 
-ADVANTAGES/DISADVANTAGES
-========================
+ Double-click the application or a ".cpj" project file.
+
+
+DOCUMENTATION
+=============
+
+Full documentation is bundled with each version of Cubism.  Choose
+Help->Cubism Manual from the project window.
+
+
+SUPPORT
+=======
+
+Support for CUBISM is provided by the Spitzer Science Center at
+help@spitzer.caltech.edu.  Please identify the version of Cubism you
+are using (see Help->About Cubism).
+
+
+CHOOSING A DISTRIBUTION
+=======================
 
 Cubism can be run from either the source or binary distribution, at
-the IDL command line, or in the freely available IDL VM.
+the IDL command line, or in the freely available IDL VM (virtual
+machine).
 
  Binary distribution, Command-Line IDL:
-  
+ ++++++++++++++++++++++++++++++++++++++
+ 
    Advantages: All necessary routines pre-compiled, no need to install
      external libraries.  Interaction and Cubism control available
      from the command line.  No risk of routine name collisions.
@@ -158,21 +206,31 @@ the IDL command line, or in the freely available IDL VM.
    Disadvantages: Less useful for debugging Cubism.  IDL license
      required.
 
- Binary distribution, IDL Virtual Machine:
+ Binary distribution, IDL Virtual Machine (including MacOSX Cubism.app):
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
    Advantages: All necessary routines pre-compiled, no need to install
      external libraries.  No risk of routine name collisions.  No IDL
-     license required.
+     license required.  For OSX, ease of interface.
 
    Disadvantages: No interaction available from IDL command line.  Not
-      useful for debugging Cubism.  IDL VM splash screen on startup.
+      useful for debugging Cubism.  Click-through IDL VM splash screen
+      on startup.
 
  Source distribution, Command-Line IDL:
+ ++++++++++++++++++++++++++++++++++++++
 
    Advantages: Interaction and control of Cubism and general analysis
-      from the IDL command line.  Ability to run multiple IDL tools
-      concurrently.  Most useful for debugging Cubism.
+      directly from the IDL command line (e.g. export
+      cubes/maps/spectra to command line).  Ability to run multiple
+      IDL tools concurrently.  Most useful for debugging Cubism.
 
    Disadvantages: IDL license required.  Routine name collisions could
       occur if many external libraries are installed.
   
+
+LICENSE
+=======
+
+Cubism is licensed under the GNU General Public License, Version 2 or
+later.  See the file COPYING.
