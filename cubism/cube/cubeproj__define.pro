@@ -5624,7 +5624,8 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      range_cube=(*self.CUBE)[*,*,foreranges[0,i]:foreranges[1,i]]
      if use_unc then range_cube_unc= $
         (*self.CUBE_UNC)[*,*,foreranges[0,i]:foreranges[1,i]]
-     range_cube_finite=total(finite(range_cube),3)
+     if this_fore_cnt eq 1 then range_cube_finite=finite(range_cube) $
+     else range_cube_finite=total(finite(range_cube),3)
 
      ;; Setup weightings and normalizations
      bottom_norm=1. & top_weight=1.
@@ -5689,14 +5690,20 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
      if integrate || use_weights then begin 
         top_weight=rebin(reform(top_weight,1,1,this_fore_cnt,/OVERWRITE), $
                          ftarg,/SAMPLE)
-        this_stack=total(range_cube*top_weight, 3,/NAN)
+        if this_fore_cnt eq 1 then this_stack=range_cube*top_weight else $
+           this_stack=total(range_cube*top_weight, 3,/NAN)
         if use_unc then $
-           this_stack_var=total(range_cube_unc^2*top_weight^2,3,/NAN)
+           if this_fore_cnt eq 1 then $
+              this_stack_var=range_cube_unc^2*top_weight^2 $
+           else this_stack_var=total(range_cube_unc^2*top_weight^2,3,/NAN)
         this_stack/=bottom_norm
         if use_unc then this_stack_var/=bottom_norm^2
      endif else begin ;; simple average, no weights or normalizations
-        this_stack=total(range_cube,3,/NAN)
-        if use_unc then this_stack_var=total(range_cube_unc^2,3,/NAN)
+        if this_fore_cnt eq 1 then this_stack=range_cube $
+        else this_stack=total(range_cube,3,/NAN)
+        if use_unc then $
+           if this_fore_cnt eq 1 then this_stack_var=range_cube_unc^2 $
+           else this_stack_var=total(range_cube_unc^2,3,/NAN)
         stack_cnt+=range_cube_finite
      endelse 
      
