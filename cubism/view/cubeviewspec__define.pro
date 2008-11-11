@@ -1305,7 +1305,6 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,PARENT_GROUP=grp
   
   colbase=widget_base(controlbase,/COLUMN,/ALIGN_TOP)
   
-
   for i=0,n_elements(self.wGray)-1  do $
      widget_control, self.wGray[i],SENSITIVE=0
 
