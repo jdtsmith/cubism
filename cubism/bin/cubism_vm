@@ -15,7 +15,7 @@ if [ -z "$IDL_DIR" ]; then
     elif [ -d /Applications/itt/idl ]; then
 	export IDL_DIR=/Applications/itt/idl
     else 
-	echo "IDL_DIR not set and idl cannot be located, please correct."
+	echo "IDL_DIR not set and idl cannot be located, please correct." 
 	exit 1
     fi
 fi
