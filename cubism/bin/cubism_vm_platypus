@@ -15,6 +15,7 @@ echo $DISPLAY > $TMP/display
 fi
 
 EOF
+    chmod +x $TMP/getdisplay.sh
     open-x11 $TMP/getdisplay.sh || \
 	open -a XDarwin $TMP/getdisplay.sh || \
 	echo ":0" > $TMP/display
