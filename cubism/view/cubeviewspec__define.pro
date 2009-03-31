@@ -93,7 +93,7 @@ pro CubeViewSpec::Message, msg
      if ptr_valid(msg.spec_unc) then *self.sp_unc=*msg.spec_unc else $
         if n_elements(*self.sp_unc) gt 0 then void=temporary(*self.sp_unc)
      widget_control, self.wToggles,GET_VALUE=ren
-     if ren[0] then begin 
+     if ren[1] then begin 
         med=median(*self.sp)
      endif 
      widget_control, self.wDraw,/DRAW_BUTTON_EVENTS, /DRAW_MOTION_EVENTS
@@ -189,6 +189,13 @@ pro CubeViewSpec::Event,ev
                     widget_control, self.wRType, SET_DROPLIST_SELECT=1, $
                                     /SENSITIVE
                  end
+                 'G': begin 
+                    widget_control, self.wToggles,GET_VALUE=tog
+                    tog[0]=1-tog[0]
+                    self.log_scale=tog[0]
+                    widget_control, self.wToggles,SET_VALUE=tog
+                    self->Plot
+                 end 
                  'R': self->Reset
                  'L': if self.mode eq 0 then widget_control, self.wDo, $
                                                              SET_VALUE=2
@@ -197,7 +204,7 @@ pro CubeViewSpec::Event,ev
                  'F': self->Fit
                  'V': begin     ;value line
                     widget_control, self.wToggles, GET_VALUE=tog
-                    tog[0]=1-tog[0]
+                    tog[1]=1-tog[1]
                     widget_control, self.wToggles, SET_VALUE=tog
                     self->Plot
                  end
@@ -400,7 +407,8 @@ pro CubeViewSpec::Event,ev
      
      self.wToggles: begin 
         widget_control, ev.id,GET_VALUE=tog
-        self.show_error=tog[1]
+        self.log_scale=tog[0]
+        self.show_error=tog[2]
         self->Plot
      end 
      
@@ -798,8 +806,9 @@ end
 pro CubeViewSpec::ShowRegionLine
   if self.got eq -1 then return ; we aren't defining a region
   val=self.pressloc[self.got eq 1]
+  y=self.log_scale?10.^!Y.CRANGE:!Y.CRANGE
   if self.got eq 1 then plots,!X.CRANGE,val,COLOR=self.colors_base,THICK=2 $
-  else plots,val,!Y.CRANGE,COLOR=self.colors_base,THICK=2
+  else plots,val,y,COLOR=self.colors_base,THICK=2
 end
 
 ;=============================================================================
@@ -810,7 +819,7 @@ pro CubeViewSpec::ShowFit
   ;; mark the max and median positions
   if self.medlam ne 0 then begin 
      plots,self.medlam,self.medpeak,PSYM=7,SYMSIZE=2
-     oplot,[self.medlam,self.medlam],!Y.CRANGE
+     oplot,[self.medlam,self.medlam],self.log_scale?10.^!Y.CRANGE:!Y.CRANGE
      plots,self.maxlam,self.max,PSYM=1,SYMSIZE=2
   endif 
   
@@ -834,6 +843,7 @@ pro CubeViewSpec::ShowFit
   ew_left=self.medlam-self.ew/2.  & c_left= poly(ew_left,*self.fit)
   ew_right=self.medlam+self.ew/2. & c_right=poly(ew_right,*self.fit)
   l=!Y.CRANGE[0]
+  if self.log_scale then l=10.^l
   plots,ew_left, [l,c_left], COLOR=self.colors_base+3
   plots,ew_right,[l,c_right],COLOR=self.colors_base+3
   plots,[ew_left,ew_right],[l,l],COLOR=self.colors_base+3
@@ -957,11 +967,13 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   old=!D.WINDOW
   wset,self.pixwin              ;Double buffering
   erase
-  plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=5,YSTYLE=5, $
-       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NODATA
+  sp=*self.sp
+  if self.log_scale then sp>=min(abs(sp)) ; avoid truncation
+  plot,*self.lam,sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=5,YSTYLE=5, $
+       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NODATA,YLOG=self.log_scale
   self->ShowRegions
-  plot,*self.lam,*self.sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,YSTYLE=1, $
-       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NOERASE
+  plot,*self.lam,sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,YSTYLE=1, $
+       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NOERASE,YLOG=self.log_scale
   if self.show_error && n_elements(*self.sp_unc) gt 0 then $
      errplot,*self.lam,*self.sp-*self.sp_unc,*self.sp+*self.sp_unc
 
@@ -995,7 +1007,7 @@ pro CubeViewSpec::ShowValueLine
   if self.press or self.movestart eq -1 then return
   if ~self->ShowingValueLine() then return
   x=(*self.lam)[self.movestart]
-  plots,x,!Y.CRANGE
+  plots,x,self.log_scale?10.^!Y.CRANGE:!Y.CRANGE
 end
 
 ;=============================================================================
@@ -1003,7 +1015,7 @@ end
 ;=============================================================================
 function CubeViewSpec::ShowingValueLine
   widget_control, self.wToggles, GET_VALUE=tog
-  return,tog[0] ne 0 
+  return,tog[1] ne 0 
 end
 
 ;=============================================================================
@@ -1029,7 +1041,7 @@ end
 ;  ShowRegions - Draw the peak and continuum regions with outlines.
 ;=============================================================================
 pro CubeViewSpec::ShowRegions
-  y=!Y.CRANGE
+  y=self.log_scale?10.^!Y.CRANGE:!Y.CRANGE
   ;;full mode, no region -- simply highlight the chosen wavelength
   if self.mode eq 0 AND self.wavelength ne 0.0 then begin 
      plots,self.wavelength,y,COLOR=self.colors_base+3,THICK=2
@@ -1081,7 +1093,7 @@ pro CubeViewSpec::Outline
   l=(*self.lam)[range]
 ;  lout=(*self.lam)[(range+[-1,1])>0<(n_elements(*self.lam)-1)]
 ;  l=(l+lout)/2.
-  y=!Y.CRANGE
+  y=self.log_scale?10.^!Y.CRANGE:!Y.CRANGE
   plots,/DATA,[l[0],l[0],l[1],l[1],l[0]],[y[0],y[1],y[1],y[0],y[0]], $
         COLOR=self.colors_base+3
 end
@@ -1290,17 +1302,17 @@ function CubeViewSpec::Init,XRANGE=xr,YRANGE=yr,PARENT_GROUP=grp
   col1row2base=widget_base(col1base,/ROW,/ALIGN_LEFT, $
                            /BASE_ALIGN_CENTER,SPACE=1) 
   
-  buttons=['ValLine','Errors']
+  buttons=['Log','Val','Err']
   
   self.wToggles=cw_bgroup(col1row2base,buttons,/NONEXCLUSIVE,/ROW,$
-                          SET_VALUE=replicate(1,n_elements(buttons)))
+                          SET_VALUE=[0,replicate(1,n_elements(buttons)-1)])
   self.show_error=1b
-  self.wOrder=widget_droplist(col1row2base,TITLE='Fit Order:', $
+  self.wOrder=widget_droplist(col1row2base,TITLE='Fit: Order', $
                               VALUE=string(FORMAT='(I0)',indgen(5)+1))
   self.wGray[2]=self.wOrder
 
   self.wFit=cw_bgroup(col1row2base,IDS=ids,/ROW, $
-                      ['Fit','Remove Fit','Reset'],/NO_RELEASE)
+                      ['Fit','Remove','Reset'],/NO_RELEASE)
   self.wGray[3:4]=ids[0:1]
   
   colbase=widget_base(controlbase,/COLUMN,/ALIGN_TOP)
@@ -1399,6 +1411,7 @@ pro CubeViewSpec__define
       integrate: 0b, $          ;whether to integrate the foreground
       map_name:'', $            ;the map name, if any
       show_error:0b, $          ;whether to show the errors
+      log_scale: 0b, $          ;whether to use log scaling for the flux
       xsize:0, $                ;xsize of displayed widget
       draw_size_diff:[0,0],$    ;diff beteen window and widget
       ;; Widget/Window/ColorMap ID's
