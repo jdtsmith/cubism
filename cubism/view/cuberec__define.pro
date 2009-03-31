@@ -102,6 +102,7 @@ pro CubeRec::Message, msg
   cal_update=0b
   badpix_update=0b
   free=0b
+
   case type of
      'BOX': begin 
         if self.oFixReg->On() then self.oFixReg->Reset
@@ -535,6 +536,12 @@ end
 
 pro CubeRec_event,ev
   widget_control, ev.handler, get_uvalue=uv
+  catch, err
+  if err ne 0 then begin 
+     call_method,'Error',uv.self,!ERROR_STATE.MSG
+     catch,/CANCEL
+     return
+  endif 
   if uv.event then $
      call_method,uv.method,uv.self,ev $
   else $
