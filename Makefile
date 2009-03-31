@@ -72,7 +72,7 @@ $(CUBISM_APP): $(CUBISM_SAVE_FILE) $(CUBISM_MAN_FILE)
 		mv -f cubism.pdf manual/; mkdir bin; \
 		mv -f cubism_vm cubism_vm.sav bin/; \
 		mkdir calib; mv -f data polyclip.c calib/; \
-		mkdir cubism; mv -f calib bin cubism/)
+		mkdir cubism; mv -f map_sets calib bin cubism/)
 	perl -i -pe '$$i=/cpj/..m|</array>|; $$_= \
 "        		<key>CFBundleTypeIconFile</key>\n" . \
 "        		        <string>CubismFiles.icns</string>\n" .\
