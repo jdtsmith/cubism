@@ -119,13 +119,13 @@ end
 
 ;=============================================================================
 ;  OffsetAngles -- Calculate the angles of offset between consecutive
-;                  points in the region, or the radius of a circle
+;                  points in the region, or the radius of a circle,
+;                  return in decimal degrees.
 ;=============================================================================
 function IRS_Region::OffsetAngles
   if ~ptr_valid(self.region) then return,-1
-  RADEG=180.D/!DPI
-  if n_elements(*self.region) eq 3 then return,(*self.region)[3]/3600.D/RADEG
-  reg=*self.region/RADEG
+  if n_elements(*self.region) eq 3 then return,(*self.region)[3]/3600.D
+  reg=*self.region
   reg2=shift(reg,0,1)
   return,spherical_angle_offset(reg[0,*],reg[1,*],reg2[0,*],reg2[1,*])
 end
