@@ -13,7 +13,7 @@
 ;    An object wrapper for CUBISM spectral mapping projects,
 ;    containing the input BCD and calibration data, along with the
 ;    routines to convert them into spectral cubes and analyze those
-;    cubes.
+;    cubes.  And a whole lot more.  
 ;    
 ; CATEGORY:
 ;
