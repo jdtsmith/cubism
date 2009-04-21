@@ -177,7 +177,8 @@ end
 ;=============================================================================
 ;  SetRegionFromBox -- Set region from simple pixel box coordinates
 ;=============================================================================
-pro IRS_Region::SetRegionFromBox,ll,ur,OUTPUT_POLY=op,ASTROMETRY=astr
+pro IRS_Region::SetRegionFromBox,ll,ur0,OUTPUT_POLY=op,ASTROMETRY=astr
+  ur=ur0+1 ;; bounding region goes up to the next higher pixel
   op=[[ll[0],ll[1]], $
       [ll[0],ur[1]], $
       [ur[0],ur[1]], $
@@ -191,6 +192,12 @@ end
 ;               (it will be converted to RA,DEC).
 ;=============================================================================
 pro IRS_Region::SetRegion,reg,RESET=reset,ASTROMETRY=astr
+  
+  ;; Pixel indexing conventions:
+  ;; FITS HEADERS/FORTRAN :  1st centered on [1.0,1.0]
+  ;; NASALIB WCS PROGRAMS :  1st centered on [0.0,0.0]
+  ;; CUBISM, aka God-Given : 1st centered on [0.5,0.5]
+
   if n_elements(reset) eq 0 then heap_free,self.region
   if (size(reg,/DIMENSIONS))[0] ne 2 && n_elements(reg) ne 3 then $
      message,'Region must be 2xn or 3 elements.'

@@ -5209,7 +5209,7 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      endif 
      
      oReg=obj_new('IRS_Region')
-     oReg->SetRegionFromBox,low,high+1,OUTPUT_POLY=op, $
+     oReg->SetRegionFromBox,low,high,OUTPUT_POLY=op, $
                             ASTROMETRY=self->CubeAstrometryRecord()
   endelse 
   
