@@ -104,7 +104,7 @@ OUTPUTS:
   poly_inds: On output, in contains the reverse index vector for inds
     and areas, such that poly_inds[i]:poly_inds[i+1]-1 contains the
     indices into these vectors corresponding to input polygon i.  The
-    length should be n_poly+1.  Note that the clipped polygons
+    length will be nclip_poly+1.  Note that the clipped polygons
     themselves cannot be output by POLYCLIP_MULTIPLE.  Also serves as
     an input argument (see above).
 
