@@ -71,7 +71,8 @@ pro polyclip,i,j,pol_x,pol_y
   ;;       A polygon edge looks like:
   ;;                 s-------->p
   np=n_elements(pol_x) 
-  py_out=(px_out=fltarr(np+4,/nozero)) ;room for full clipped (convex) polygon
+  nout=np+4L
+  py_out=(px_out=fltarr(nout,/nozero)) ;room for full clipped (convex) polygon
   clip_vals=[i,i+1,j+1,j]
   
   for ctype=0b,3b do begin      ;clip left, right, top, bottom
@@ -89,8 +90,8 @@ pro polyclip,i,j,pol_x,pol_y
      
      ;; does the segment cross the clipping line?
      crosses=shift(in,1) XOR in
-     pind=0                     ;the index into the vectors
-     for k=0,np-1 do begin
+     pind=0L                    ;the index into the vectors
+     for k=0L,np-1L do begin
         px=pol_x[k] & py=pol_y[k]
         if crosses[k] then begin ; in->out or out->in, add intersection
            ;; Put the intersection point on the list
@@ -110,11 +111,16 @@ pro polyclip,i,j,pol_x,pol_y
                  break
               end
            endswitch
-           pind=pind+1
+           pind++
         endif
         if in[k] then begin ; out->in or in->in, add 2nd point
            px_out[pind]=px & py_out[pind]=py
-           pind=pind+1
+           pind++
+        endif 
+        if pind ge nout-2 then begin ;ran out of room, increase size
+           px_out=[px_out,fltarr(nout,/NOZERO)]
+           py_out=[py_out,fltarr(nout,/NOZERO)]
+           nout*=2L
         endif 
      endfor 
      if pind eq 0 then begin   ; polygon is entirely outside this line
