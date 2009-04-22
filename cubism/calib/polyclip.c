@@ -236,8 +236,11 @@ void polyclip_multi(int argc, void* argv[]) {
     nverts=poly_inds[k+1]-poly_inds[k];
     if(nverts>nv_max) nv_max=nverts;
   }
-  px_out=(float *)malloc((nv_max+4)*sizeof(float));
-  py_out=(float *)malloc((nv_max+4)*sizeof(float));
+  nv_max+=24;			/* for a margin of safety, we include
+				   20 more */
+
+  px_out=(float *)malloc((nv_max)*sizeof(float));
+  py_out=(float *)malloc((nv_max)*sizeof(float));
 
   /* Clip each polygon and accumulate results */
   for(indx=0,prev_pind=0,k=0;k<n_poly;k++) {
