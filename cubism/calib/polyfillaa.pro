@@ -106,6 +106,9 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;       2009-04-22 (J.D. Smith): Correctly estimate maximum number of
+;          resulting clipped polygons for multiple input polygons.
+;
 ;       2007-01-11 (J.D. Smith): Major rewrite to accommodate the new
 ;          multi-polygon clipper polyclip.c, greatly improving speed
 ;          when only the clipped areas are needed.  Has two
@@ -218,8 +221,9 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
         bottom[set]=floor(min(py[take],DIMENSION=2,max=maxy))>0L
         top[set]=floor(maxy)<(sy-1L)
      endfor
-     nx=total(right-left+1,/PRESERVE_TYPE) 
-     ny=total(top-bottom+1,/PRESERVE_TYPE)
+     nx=right-left+1L
+     ny=top-bottom+1L
+     npix=total(nx*ny,/PRESERVE_TYPE)
   endif else begin              ; Single polygon
      ;; Clip grid to the enclosing box
      left=floor(min(px,max=maxx))>0L
@@ -228,20 +232,18 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      top=floor(maxy)<(sy-1L)
      nx=right-left+1L & ny=top-bottom+1L
      if nx lt 1 || ny lt 1 then return,-1L
+     npix=nx*ny
   endelse 
-  
-  npix=nx*ny
-  
   if npix le 0L then return,-1L
   
   ;; npix is the maximum possible number of clipped polys
   nverts=n_elements(px)         
   apa=arg_present(areas)
-  if apa then areas=fltarr(npix,/NOZERO) 
   
   if keyword_set(nc) || polyclip_compiled eq 0 then begin 
      ;; --- pure IDL version
      ind=0L
+     if apa then areas=fltarr(npix,/NOZERO) 
      
      ret=lonarr(npix,/NOZERO)
      beg=0
@@ -291,7 +293,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
                                      'INDS',temporary(polys_out_ind))
      if apa then areas=areas[0:ind-1L]
      ret=ret[0:ind-1L]
-  endif else begin        
+  endif else begin     
      ;; --- Compiled version, use call_external and the shared lib
      if size(px,/TYPE) eq 5 then begin ; No double please
         px=float(px) & py=float(py)
@@ -299,7 +301,8 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      
      nclip_poly=0L              ;actual number of clipped polygons
      inds=lonarr(2,npix)        ;Output x,y indices which clipped the poly(s)
-
+     
+     areas=fltarr(npix,/NOZERO) 
      if n_poly gt 1 then begin 
         ;; Multiple polys input: no output polygons; poly_inds is
         ;; input/output for area & inds
@@ -347,7 +350,6 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
                                'INDS',ri_out[0:nclip_poly])
         endif 
      endelse
-     
      areas=areas[0:nclip_poly-1]
      ret=reform(inds[0,0:nclip_poly-1]+sx*inds[1,0:nclip_poly-1],/OVERWRITE)
   endelse 
