@@ -4145,7 +4145,7 @@ pro CubeProj::BuildCube
      cube_dirty_pix=cube_dirty_pix[uniq(cube_dirty_pix,sort(cube_dirty_pix))]
      cube_dirty_cnt=n_elements(cube_dirty_pix) 
      dfrac=100.*cube_dirty_cnt/product(self.CUBE_SIZE)
-     if dfrac gt 15. then begin ; Approximate break-even in quickbuild speedup
+     if dfrac gt 10. then begin ; Approximate break-even in quickbuild speedup
         quickbuild=0b
         dfmsg=': full build forced'
      endif else dfmsg=''
