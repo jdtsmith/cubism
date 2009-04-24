@@ -148,6 +148,8 @@
 function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
                      RECOMPILE=rc, POLY_INDICES=poly_inds
   common polyfillaa_external,polyclip_compiled,polyclip_path
+  
+  ;; Compile the C clipper, if needed
   if n_elements(polyclip_compiled) eq 0 || keyword_set(rc) then begin 
      catch, err
      if err ne 0 then begin   ; any failure in compiling, just use the IDL vers
@@ -174,18 +176,24 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
            tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE, $
                              UNLOAD=keyword_set(rc))
            
-           case tmp[0] of
+           switch tmp[0] of
+              43b:
               42b: begin 
                  message, /CONTINUE,'Outdated clipper detected, recompiling.'
                  reuse=0b       ;old version, recompile it
                  tmp=call_external(polyclip_path,'polyclip_test',/B_VALUE, $
                                    /UNLOAD) ; Unload it for next round compile
+                 break
               end 
            
-              43b: done=1       ;correct version, continue
+              44b: begin 
+                 done=1         ;correct version, continue
+                 break
+              end 
+              
               else: message,'Testing clipper DLM: Incorrect value returned.', $
                             /NONAME
-           endcase
+           endswitch 
            i++
         endwhile 
         if ~done then message,'Clipper version test failed.',/NONAME
@@ -195,13 +203,15 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   endif
   
   app=arg_present(polys)
-    
+  
   ;; See if we have multiple polygons passed
   if n_elements(poly_inds) ne 0 then begin 
      n_poly=n_elements(poly_inds)-1L
      if app then $
         message,'Clipped polygon output not supported for multiple poly inputs.'
   endif else n_poly=1
+  
+  sx=long(sx) & sy=long(sy)
   
   ;; Count up the pixels from the various polygon's bounding boxes
   if n_poly gt 1 then begin 
@@ -298,7 +308,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      if size(px,/TYPE) eq 5 then begin ; No double please
         px=float(px) & py=float(py)
      endif
-     
+
      nclip_poly=0L              ;actual number of clipped polygons
      inds=lonarr(2,npix)        ;Output x,y indices which clipped the poly(s)
      
@@ -306,6 +316,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      if n_poly gt 1 then begin 
         ;; Multiple polys input: no output polygons; poly_inds is
         ;; input/output for area & inds
+        if size(poly_inds,/TYPE) ne 13 then poly_inds=ulong(poly_inds) 
         tmp=call_external(polyclip_path,'polyclip_multi',$
                           VALUE= $
                           [0b,0b,0b,0b,$

@@ -175,7 +175,7 @@ char polyclip_test();
 
 /* Return a unique version number to test compilation success */
 char polyclip_test() {
-  return 43;
+  return 44;
 }
 
 /* Clip a single polygon, with polygon output */
@@ -207,7 +207,7 @@ void polyclip_single(int argc,void * argv[]) {
 	px_out+=nv_clip; py_out+=nv_clip; /* Offset for next output poly */
 	inds[2*indx]=i; inds[2*indx+1]=j;
 	indx++;
-      }
+      } 
     }
   }
 }
@@ -225,7 +225,8 @@ void polyclip_multi(int argc, void* argv[]) {
   /* Input */
   l=(int *)argv[0]; r=(int *)argv[1]; b=(int *)argv[2]; t=(int *)argv[3];
   px=(float *)argv[4]; py=(float *)argv[5]; 
-  n_poly=(int)argv[6]; poly_inds=(int *)argv[7]; /* poly_inds Input/Output */
+  n_poly=(int)argv[6];
+  poly_inds=(unsigned int *)argv[7]; /* poly_inds Input/Output */
 
   /* Output */
   inds=(int *)argv[8]; nclip_poly=(int *)argv[9];
@@ -238,10 +239,8 @@ void polyclip_multi(int argc, void* argv[]) {
   }
   nv_max+=24;			/* for a margin of safety, we include
 				   20 more */
-
   px_out=(float *)malloc((nv_max)*sizeof(float));
   py_out=(float *)malloc((nv_max)*sizeof(float));
-
   /* Clip each polygon and accumulate results */
   for(indx=0,prev_pind=0,k=0;k<n_poly;k++) {
     nverts=poly_inds[k+1]-prev_pind;
