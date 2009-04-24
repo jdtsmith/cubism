@@ -3885,14 +3885,25 @@ pro CubeProj::BuildAccount,_EXTRA=e
                                  WAVECUT=self.wavecut, $
                                  /PIXEL_BASED, /SAVE_POLYGONS, $
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
-        
-        ;; Pre-allocate an account list 
-        nacc=4*n_elements(prs) 
-        account=replicate({CUBE_ACCOUNT_LIST},nacc)
-        acc_ind=0L
-        
-        ;; iterate over all the adjacent PRs in the order 
+                
+        ;; Set up list for accumulating all orders' polygons together
+        n_verts=0L
+        poly_cnt_ord=lonarr(n_elements(prs),/NOZERO) ;how many polys for each PR
         for j=0L,n_elements(prs)-1 do begin 
+           n_verts+=n_elements(*prs[j].POLYGONS)
+           poly_cnt_ord[j]=n_elements(*prs[j].PIXELS)
+        endfor 
+        n_poly_tot=total(poly_cnt_ord,/PRESERVE_TYPE) ;total number of polys
+        polys_ord=fltarr(2,n_verts,/NOZERO)       ;all the polys for this order
+        bcdpixels=lonarr(n_poly_tot,/NOZERO)          
+        cube_plane=lonarr(n_poly_tot,/NOZERO)
+        poly_inds_ord=lonarr(n_poly_tot+1L,/NOZERO) ;accumulated reverse indices
+        accum_cnt=[0L,0L]
+        
+        ;; iterate and accumulate all polygons from  adjacent PRs in the order 
+        for j=0L,n_elements(prs)-1 do begin 
+           ;; +++ Rotate and offset this PR's polys into the sky grid
+           
            ;; Setup the rotation matrix to rotate this PR back to the
            ;; +x direction (which may lie at any angle to the cube grid)
            angle=-prs[j].angle+delta_PA
@@ -3901,20 +3912,26 @@ pro CubeProj::BuildAccount,_EXTRA=e
               rot=transpose([[ ct,-st], $
                              [ st, ct]])
            endif
-           
-           bcdpixels=*prs[j].PIXELS ;corresponding BCD pixel for each polygon
            polys=*prs[j].POLYGONS ; x, y list indexed by reverse indices
            poly_inds=*prs[j].POLY_INDS
            polys=(polys-rebin(prs[j].cen,size(polys,/DIMENSIONS),/SAMPLE)) * $
                  self.OVERSAMPLE_FACTOR
-           
-           ;; Rotate this polygon to the cube sky grid, if necessary
-           if angle ne 0.0 then polys=rot#polys ;XXX check!!!
-           ;; Offset the polygon correctly into the sky grid
+           if angle ne 0.0 then polys=rot#polys 
            polys+=rebin(offset,size(polys,/DIMENSIONS),/SAMPLE)
            
+           ;; Accumulate polygons, indices, and pixels
+           npolys=n_elements(*prs[j].PIXELS)
+           bcdpixels[accum_cnt[1]]=*prs[j].PIXELS 
+           cube_plane[accum_cnt[1]:accum_cnt[1]+npolys-1]=j
+
+           polys_ord[0,accum_cnt[0]]=polys
+           poly_inds_ord[accum_cnt[1]]+=poly_inds ; offset and replace
+           accum_cnt[0]+=(size(polys,/DIMENSIONS))[1]
+           accum_cnt[1]+=npolys
+
+           ;; Display Feedback
            if (j eq 0L) && self.feedback then begin
-              for k=0,n_elements(bcdpixels)-1L do $
+              for k=0,npolys-1L do $
                  plots,[reform(polys[0,poly_inds[k]:poly_inds[k+1]-1]), $
                         polys[0,poly_inds[k]]], $
                        [reform(polys[1,poly_inds[k]:poly_inds[k+1]-1]), $
@@ -3922,40 +3939,34 @@ pro CubeProj::BuildAccount,_EXTRA=e
               plots,offset,PSYM=4,COLOR=color
               wait,0
            endif
-           
-           cube_spatial_pix=polyfillaa(reform(polys[0,*]),reform(polys[1,*]),$
-                                       self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
-                                       AREAS=areas,POLY_INDICES=poly_inds)
-           
-           if cube_spatial_pix[0] eq -1 then continue ;none clipped
-           
-           poly_cnt=poly_inds[1:*]-poly_inds ; per-bcdpix number pixels clipped
-           keep=where(poly_cnt gt 0,kcnt)    ; only those which actually clipped
-           if kcnt eq 0 then continue
-           
-           ;; chunk index the bcdpixel array
-           h=histogram(total(poly_cnt[keep],/CUMULATIVE,/PRESERVE_TYPE)-1L, $
-                       /BINSIZE,MIN=0,REVERSE_INDICES=ri)
-           bcdpixels=bcdpixels[keep[ri[0:n_elements(h)-1]-ri[0]]]
-           
-           ncp=n_elements(cube_spatial_pix) ; Total number of new clipped polys
-           
-           ;; Add space to account list as necessary, large chunks at a time
-           if acc_ind+ncp ge nacc then begin 
-              add=nacc>ncp
-              account=[account,replicate({CUBE_ACCOUNT_LIST},add)]
-              nacc+=add
-           endif
-           
-           account[acc_ind:acc_ind+ncp-1].cube_pix=cube_spatial_pix
-           account[acc_ind:acc_ind+ncp-1].cube_plane=j ;just this pr's
-           account[acc_ind:acc_ind+ncp-1].bcd_pix=bcdpixels
-           account[acc_ind:acc_ind+ncp-1].area=areas
-           acc_ind+=ncp
-        endfor
-        account=account[0:acc_ind-1] ; trim this order's account to size
+        endfor 
         
-        ;; Merge this account into the full cube account
+        ;; Clip all the polygons from this order+record at once!
+        cube_inds=polyfillaa(reform(polys_ord[0,*]),reform(polys_ord[1,*]),$
+                             self.CUBE_SIZE[0],self.CUBE_SIZE[1], $
+                             AREAS=areas,POLY_INDICES=poly_inds_ord)
+           
+        if cube_inds[0] eq -1 then continue ;none clipped
+           
+        sliver_cnt=poly_inds_ord[1:*]-poly_inds_ord 
+        keep=where(sliver_cnt gt 0,kcnt) ; only those which actually clipped
+        if kcnt eq 0 then continue
+           
+        ;; chunk index the bcdpixel and cube_plane arrays
+        ;; (i.e. replicate each index as many times as needed for each
+        ;; poly's sliver set)
+        h=histogram(total(sliver_cnt[keep],/CUMULATIVE,/PRESERVE_TYPE)-1L, $
+                    BINSIZE=1,MIN=0,REVERSE_INDICES=ri)
+        bcdpixels=bcdpixels[keep[ri[0:n_elements(h)-1]-ri[0]]]
+        cube_plane=cube_plane[keep[ri[0:n_elements(h)-1]-ri[0]]]
+        
+        account=replicate({CUBE_ACCOUNT_LIST},n_elements(cube_inds))
+        account.cube_pix=cube_inds
+        account.bcd_pix=bcdpixels
+        account.area=areas
+        account.cube_plane=cube_plane
+        
+        ;; Merge this account into the full cube account for record `i'
         self->MergeAccount,i,ord,account
      endfor
   endfor
