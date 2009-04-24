@@ -3833,7 +3833,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
   
   astr=self->CubeAstrometryRecord()
   exp_off=-1
-  for iwh=0L,good_cnt-1 do begin 
+  for iwh=0L,good_cnt-1 do begin  ;; iterate over all enabled data records
      i=wh[iwh]                  ;enabled record index
      
      ;; if the accounts are fully valid and an account exists for this
@@ -4080,8 +4080,8 @@ pro CubeProj::BuildCube
      ;; See if we can do a "quick build": only quickly re-processing
      ;; certain marked "dirty" pixels, re-using the rest of the cube
      ;; (and unc)
-     dirty=ptr_valid((*self.DR)[enabled].DIRTY_PIX)
-     global_dirty=ptr_valid(self.GLOBAL_DIRTY_PIX)
+     dirty=ptr_valid((*self.DR)[enabled].DIRTY_PIX) ; dirty for specific recs
+     global_dirty=ptr_valid(self.GLOBAL_DIRTY_PIX)  ; dirty for *all* records
      quickbuild=ptr_valid(self.CUBE) && $
         n_elements(*self.CUBE) gt 0 && $
         (~use_unc || ptr_valid(self.CUBE_UNC)) && $
@@ -4123,7 +4123,7 @@ pro CubeProj::BuildCube
               if ind[j] lt 0 or ind[j] ge rec.REV_BCD_CNT then continue
               cnt=ri[ind[j]+1]-ri[ind[j]]
               if cnt eq 0 then continue
-              if (cube_dirty_cnt + cnt) ge ncp then begin 
+              if (cube_dirty_cnt + cnt) ge ncp then begin ;; extend
                  cube_dirty_pix=[cube_dirty_pix,lonarr(ncp)]
                  ncp*=2
               endif 
@@ -4200,7 +4200,8 @@ pro CubeProj::BuildCube
      rev_wh=rev_width*rev_height
      rev_off=rec.REV_OFFSET
      
-     ;; Locate dirty cube pixels in this record's bounding box
+     ;; Locate the dirty cube pixels in *this record*'s bounding box,
+     ;; if any
      if quickbuild then begin 
         inbb=where((cube_dirty_x-rev_off[0]) lt rev_width AND $
                    (cube_dirty_x-rev_off[0]) ge 0 AND $
@@ -4241,9 +4242,10 @@ pro CubeProj::BuildCube
      ;; entering the cube, and add any global bad pixels
      if ptr_valid(rec.BMASK) then $
         mask AND= (*rec.BMASK AND 28928U) eq 0L 
+     ;; And any global bad pixels
      if use_bpmask then mask AND= bpmask
      
-     ;; Add any per-BCD bad pixels
+     ;; Add any per-BCD bad pixels for this record
      if ptr_valid(rec.BAD_PIXEL_LIST) then $
         mask[*rec.BAD_PIXEL_LIST]=0b
      
@@ -4251,7 +4253,7 @@ pro CubeProj::BuildCube
      ;;     pixels binned by bin count
      for i=0L,dual_cnt-1L do begin  
         if dual[i+1] eq dual[i] then continue
-        inds=dual[dual[i]:dual[i+1]-1]
+        inds=dual[dual[i]:dual[i+1]-1] ;indices with this count
         
         ;; Cube pixels and associated "notional" indices for reverse index
         if quickbuild then begin 
@@ -4272,7 +4274,7 @@ pro CubeProj::BuildCube
               rebin(lindgen(d[0]),d,/SAMP)
         accts=(*rec.ACCOUNT)[(*rec.REV_ACCOUNT)[temporary(accts)]]
 
-        bcd_pix=accts.BCD_PIX   ;the various conributing BCD pixels
+        bcd_pix=accts.BCD_PIX   ;the various contributing BCD pixels
            
         ;; Clear out the empties (they're about to get set)
         empty=where(~finite(cube[pix]),cnt)
