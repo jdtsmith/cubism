@@ -398,13 +398,13 @@ void polyclip_intersect(float px, float py,int i, int j, int side) {
   }
 }
 
-/* polyclip_area - Compute area of a given polygon */
+/* polyclip_area - Compute area of a given polygon (peform in double) */
 float polyclip_area(float *px,float *py, int n) {
   int i,k;
-  float area=0.0;
+  double area=0.0;
   for(i=0;i<n;i++) {
     k=(i==n-1?0:i+1);
-    area+=px[i]*py[k]-py[i]*px[k];
+    area+=(double)px[i]*(double)py[k]-(double)py[i]*(double)px[k];
   }
   if(area<0.) area=-area;
   return area/2.0;
