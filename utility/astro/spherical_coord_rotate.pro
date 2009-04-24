@@ -68,9 +68,17 @@
 ;
 ;##############################################################################
 
+function spherical_coord_crossp,a,b
+  return,[a[1,*]*b[2,*]-b[1,*]*a[2,*], $
+          a[2,*]*b[0,*]-b[2,*]*a[0,*], $
+          a[0,*]*b[1,*]-b[0,*]*a[1,*]]
+end
+
 function spherical_coord_rotate_cartesian,ra,dec
   ;; Convert to cartesian coordinates
   cd=cos(dec)
+  if n_elements(ra) gt 1 then $
+     return, [transpose(cd*cos(ra)),transpose(cd*sin(ra)),transpose(sin(dec))]
   return,[cd*cos(ra),cd*sin(ra),sin(dec)]
 end
 
@@ -85,19 +93,33 @@ pro spherical_coord_rotate,ra_ref,dec_ref,ra_new,dec_new,ra,dec
   ;; Construct coordinate frame with x -> ref point & z -> rotation axis
   x=v_ref
   z=crossp(v_new,v_ref)         ; rotate about this axis
-  z/=sqrt(total(z^2))           ; normalize
+  z/=sqrt(total(z^2))                         ; normalize
   y=crossp(z,x)
   y/=sqrt(total(y^2))
   
   ;; Construct new rotated coordinate frame (x along new direction)
   x2=v_new
-  y2=crossp(z,x2)               ; z axis is the same in new frame
+  y2=crossp(z,x2) ; z axis is the same in new frame
   y2/=sqrt(total(y2^2))
   
   ;; Project onto the initial frame, then re-express in the rotated one
-  v=total(v*x)*x2 + total(v*y)*y2 + total(v*z)*z
-  
-  dec=asin(v[2])*RADEG
-  ra=atan(v[1],v[0])*RADEG
-  if ra lt 0.D then ra+=360.D
+  nra=n_elements(ra) 
+  if nra eq 1 then begin 
+     v=total(v*x,1)*x2 + total(v*y,1)*y2 + total(v*z,1)*z
+     
+     dec=asin(v[2])*RADEG
+     ra=atan(v[1],v[0])*RADEG
+     if ra lt 0.D then ra+=360.D
+  endif else begin 
+     targ=[3,nra]
+     v=rebin(transpose(total(v*rebin(x,targ,/SAMPLE),1)),targ,/SAMPLE) * $
+       rebin(x2,targ,/SAMPLE) + $
+       rebin(transpose(total(v*rebin(y,targ,/SAMPLE),1)),targ,/SAMPLE) * $
+       rebin(y2,targ,/SAMPLE) + $
+       rebin(transpose(total(v*rebin(z,targ,/SAMPLE),1)),targ,/SAMPLE) * $
+       rebin(z,targ,/SAMPLE)
+     dec=asin(v[2,*])*RADEG
+     ra=atan(v[1,*],v[0,*])*RADEG
+     ra+= (ra lt 0.D) * 360.D
+  endelse 
 end
