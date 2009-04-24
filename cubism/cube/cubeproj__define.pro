@@ -3876,10 +3876,16 @@ pro CubeProj::BuildAccount,_EXTRA=e
         self->FeedbackWindowSet
      endif 
      
+     ;; Notational convenience: polygons (pre-)clipped between PR's
+     ;; and the BCD grid are called "polys".  The multitude of
+     ;; polygons which result from clipping the (suitably
+     ;; offset/rotate) polys against the sky grid are called
+     ;; "slivers".
+     
      ;; (Probably small) difference between PA of this BCD and the
      ;; mean map PA
      delta_PA=pa-self.PA
-     for ord=0,n_elements(ords)-1 do begin
+     for ord=0,n_elements(ords)-1 do begin ;; iterate over each build order
         aper=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[ord]
         prs=self.cal->GetWAVSAMP(self.MODULE,ords[ord],APERTURE=aper, $
                                  WAVECUT=self.wavecut, $
