@@ -11,6 +11,22 @@ in:
 Please reference this paper for published use of the tool.
 
 
+Changes for Version 1.7
+=======================
+
+ - Updated calibration for IRS pipeline version S18.7.
+
+ - Log scaling in CubeViewSpec.
+
+ - Fixed "off by one pixel" error in DS9 .reg files *written* (not
+   read) by CUBISM.
+
+ - Better memory handling during clipping, resulting in another 20-40%
+   speedup of raw cube build.
+
+ - Higher precision C DLM clipping for identical results to IDL-native
+   version.
+
 Changes for Version 1.6
 =======================
 
