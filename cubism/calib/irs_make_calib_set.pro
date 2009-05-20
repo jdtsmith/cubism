@@ -25,10 +25,10 @@
 ;
 ; INPUT PARAMETERS:
 ;
-;    filename: The file name ('file.cal') to save the set as, into
-;       calib/data/sets/.  To make the file loadable automatically as
-;       by date, name the file like 'irs_YYYY_MM_DD....cal'.
-;       Otherwise, it can be loaded manually.
+;    filename: The file name ('file.cal') to save the set as, into (by
+;      default) calib/data/sets/.  To make the file loadable
+;      automatically as by date, name the file like
+;      'irs_YYYY_MM_DD....cal'.  Otherwise, it can be loaded manually.
 ;
 ; KEYWORD PARAMETERS:
 ;
