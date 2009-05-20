@@ -1,0 +1,57 @@
+\order flux
+\comment Identifier = b2_fluxcon.tbl
+\comment Flux conversion factors and order tuning coefficients.
+\comment Version 0.0 09/18/02 PM    Defined this file.
+\comment         0.1 01/03/03 PM    Long Low key wavelengths and passbands, adjusted to avoid A0V H lines.
+\comment         0.2 03/15/03 PM    Set flux conversions, assuming saturation at 20 Jy (LL2,LL3), 40 Jy (LL1) corresponding to 2.99 e- in 6 sec, factor 2 uncertain.
+\comment         0.9 11/28/03 PM    Derived fluxcon from HR7341 7463680 IRS-O map, 5 positions delta(W) 2.52 arsec, 
+\comment                             Tested against HR6606 7462144 and HR6688 7680768 
+\comment         1.0 12/20/03 PM    Updated all coefficents based on SV data, in 5th order polynomials for all orders.  Tuning coefficients and fluxcon factors derived from
+\comment                             HR7891 map (7868928), optimized for the two nods, and tested against point sources flux calibrator HR8585 (7869440), HR6688 (7836416) and representative science cases.
+\comment                             ***** WARNING:  The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with aperture extraction widths
+\comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S8.9/031213/b2_psf_fov.tbl file. Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_wavsamp.tbl.
+\comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_flatfield.fits.
+\comment         2.0 08/02/04 PM    Updated all coefficients, all orders, derived from HR7891 (7868928), HR6606 (7562144), tested with HR8585 (7869440), HR6688 (7836416), HD105 (7458304) and various staring AORs of 
+\comment                             expected to be point sources.  
+\comment                             ***** WARNING: The tuning coefficients and flux conversion are highly dependent on flatfield version and extraction method.  This version is associated with aperture extraction widths
+\comment                             ***** defined in /ssc/testdata/irs/pipedrop/cdf/S10.5/040723/b2_psf_fov.tbl file. Wavsamp dependence is /ssc/testdata/irs/pipedrop/cal/S8.9/031215/b2_wavsamp.tbl.
+\comment                             ***** Flatfield dependence is /ssc/testdata/irs/pipedrop/cal/S10.5/040723/b2_flatfield.fits.
+\comment         x.x Nov/15/2004    Fluxcon for LL for S11 pipeline using HR 6606 as the calibrator.
+\comment
+\comment         1.0 Jul 22/05 KS   Making a new fluxcon based on the spectrum of KsiDra.  Extracted in a 28-pix aperture, did polynomial fits to Decin model, chose p5 for LL2, and p2 for LL1 and LL3 
+\comment         1.1 Sep 19/05 KS   New aperture loss flat using S13 flatfield and 28 PIX WIDE APERTURE.  Flat made with median averaged HR7341. 1st order poly fitting
+\comment   S13.0 3.0 09/02/05 PMO    LL Fluxcon: Updated all coefficients, all orders, using HR 7341
+\comment                            Decin standard. Used spline-corrected flat to remove LL2 15.5u bump. PMO
+\comment   S13.0 3.1 11/08/05 PMO   LL Fluxcon: Updated all coefficients, all orders, using HR 7341
+\comment                            Decin standard. Corrected problem with median-averaging of cycles. PMO
+\comment         3.2 Apr 20/06 KS   Checking and remaking LL S13 fluxcon because it appeared to be a bit high in LL1 from LL2.  
+\comment         3.3 Apr 24/06 KS   Re-doing it for LL with S13 data for HR 7341.  Used IRS21,22 data to make 28-pix fluxcons.
+\comment   S15.0 4.0 11/22/06 PMO   Data reprocessed with new S15.0 wavsamp, which has been straightened to remove spatial wiggles. 
+\comment                            We also use new S15.0 flatfield that corrects the S13.0 flatfield for low-frequency sinusoidal 
+\comment                            spatial variations that previously caused nod1-nod2 flux offsets. New fluxcon coefficients are 
+\comment                            based on (p=1-2) polynomial fits to the median (with outlier rejection) of 24 calsfx AORs of 
+\comment                            HR 7341 from IRS C21,22,24-27, and 31-33. This version of the fluxcon is coupled to the new
+\comment                            (S14) LL linearity coefficient. 
+\comment         4.1 Dec 26/06 KS   Re-deriving aploss for LL for S15 using HR7341.  Used large number of AORs to make fluxcon.  See Readme file at 
+\comment                            /stage/ssc-testdata-irs/pipedrop/cal/S15.0/OPS/26dec06/README_LL.
+\comment   S18.9 5.0 12/12/08 PMO   ***** Only for use on IRS campaigns 45 and later (post-bias change) *****
+\comment                            Data processed with S15(=S17) flatfield and new S18.X wavsamp. New fluxcon coefficients are 
+\comment                            based on (p=1-3) polynomial fits to the median of calsfx AORs from IRS C45-56.
+\comment                            Extracted spectra were divided by the wavsamp height in each bin to improve order matching.
+\comment         5.1 3/23/09  PMO   Making aploss_fluxcon for LLPOST44 S18.7 using HR7341. Same AORs as for point source fluxcon. Using 20 pixel manual aperture
+\comment                            in SPICE to exclude noisy pixels--still gets the wings of the PSF.
+\comment         5.2 4/27/09 PMO    Remake aploss_fluxcon for LLPOST44 S18.7 using HR7341. Median combine all aors and run IRSCLEAN to reduce noise from rogues.
+\comment                            Go back to using FULL 28 pixel extraction. Extracted spectra were divided by the wavsamp height in each bin to improve order 
+\comment                            matching. Restrict LL1 to p=2 polynomial, and fit to <34 um  to keep noise at >32 um from skewing fit.
+\comment         5.3 5/11/09 PMO    Fixed bug in background subtraction. Remake aploss_fluxcon for LLPOST44 S18.7 using median HR7341 with FULL 28 pixel extraction.
+\comment                            Use p=2 polynomial for LL1 and p=3 for LL2, and restrict fit to <34 um to avoid light leak. Removed extra blank line.
+\comment                            
+\comment History
+\character channelID = 2
+\VALIDFROM="2454403.00000"
+| order  | key_wavelength |    passband    |   signal_irs   |  s_irs_sigma  |   signal_ref   |  s_ref_sigma  |   fluxcon   |  fluxcon_sigma  |    a0     |    a0_sigma   |    a1     |    a1_sigma   |     a2     |    a2_sigma   |    a3     |    a3_sigma   |    a4     |    a4_sigma   |    a5     |   a5_sigma   |
+| int    | real           |    real        |   real         |  real         |   real         |  real         |   real      |  real           |   real    |    real       |   real    |    real       |     real   |    real       |   real    |    real       |    real   |    real       |    real   |   real       |
+|        |  microns       |    microns     |  electrons/sec | electrons/sec |     Jy         |     Jy        | elec/sec/Jy |  elec/sec/Jy    |           |               |           |               |            |               |           |               |           |               |           |              |
+        1          28.0000           0.0000           0.0000          0.0000           0.0000          0.0000   3785.329102          124.5000    1.000000        0.000000    0.011261        0.000000    0.001030        0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
+        2          18.0000           0.0000           0.0000          0.0000           0.0000          0.0000   4084.705078          124.5000    1.000000        0.000000   -0.059650        0.000000    0.012432        0.000000    0.000989        0.000000    0.000000        0.000000    0.000000        0.000000
+        3          20.5000           0.0000           0.0000          0.0000           0.0000          0.0000   3935.269287          124.5000    1.000000        0.000000   -0.008817        0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000    0.000000        0.000000
