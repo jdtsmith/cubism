@@ -3892,7 +3892,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
                                  /PIXEL_BASED, /SAVE_POLYGONS, $
                                  PR_WIDTH=self.PR_SIZE[1],_EXTRA=e)
                 
-        ;; Set up list for accumulating all orders' polygons together
+        ;; Set up list for accumulating all this orders' polygons at once
         n_verts=0L
         poly_cnt_ord=lonarr(n_elements(prs),/NOZERO) ;how many polys for each PR
         for j=0L,n_elements(prs)-1 do begin 
@@ -3929,11 +3929,12 @@ pro CubeProj::BuildAccount,_EXTRA=e
            npolys=n_elements(*prs[j].PIXELS)
            bcdpixels[accum_cnt[1]]=*prs[j].PIXELS 
            cube_plane[accum_cnt[1]:accum_cnt[1]+npolys-1]=j
-
+           
+           ;; Reverse offset accumulation... add to the last one
            polys_ord[0,accum_cnt[0]]=polys
            poly_inds_ord[accum_cnt[1]]+=poly_inds ; offset and replace
            accum_cnt[0]+=(size(polys,/DIMENSIONS))[1]
-           accum_cnt[1]+=npolys
+           accum_cnt[1]+=npolys ; poly_inds is always of length npolys+1
 
            ;; Display Feedback
            if (j eq 0L) && self.feedback then begin
