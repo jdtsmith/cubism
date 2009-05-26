@@ -219,7 +219,8 @@ void polyclip_multi(int argc, void* argv[]) {
   
   int i,j,k,nv_clip,indx,*l,*r,*b,*t;
   float *px,*py,*px_out,*py_out,*areas,area;
-  int n_poly,*poly_inds;
+  int n_poly;
+  unsigned int *poly_inds;
   int *inds,*nclip_poly, nverts, this_nclip_poly, prev_pind, nv_max;
 
   /* Input */
@@ -238,7 +239,7 @@ void polyclip_multi(int argc, void* argv[]) {
     if(nverts>nv_max) nv_max=nverts;
   }
   nv_max+=24;			/* for a margin of safety, we include
-				   20 more */
+				   24 more */
   px_out=(float *)malloc((nv_max)*sizeof(float));
   py_out=(float *)malloc((nv_max)*sizeof(float));
   /* Clip each polygon and accumulate results */

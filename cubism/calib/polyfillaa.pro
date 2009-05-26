@@ -335,7 +335,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      endif else begin 
         ;; Single poly input: ri_out is for output clipped polygons
         ri_out=lonarr(npix+1)      
-        py_out=(px_out=fltarr((nverts+4)*npix,/NOZERO)) ; at most 4 new legs
+        py_out=(px_out=fltarr((nverts+24)*npix,/NOZERO)) ; at most 24 new legs
         
         tmp=call_external(polyclip_path,'polyclip_single',$
                           VALUE= $
