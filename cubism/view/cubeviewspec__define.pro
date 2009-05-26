@@ -975,12 +975,15 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
   wset,self.pixwin              ;Double buffering
   erase
   sp=*self.sp
-  if self.log_scale then sp>=min(abs(sp)) ; avoid truncation
-  plot,*self.lam,sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=5,YSTYLE=5, $
-       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NODATA,YLOG=self.log_scale
-  self->ShowRegions
-  plot,*self.lam,sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=1,YSTYLE=1, $
-       CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],/NOERASE,YLOG=self.log_scale
+  for i=0,1 do begin 
+     s=([5,1])[i]
+     plot,*self.lam,sp,XRANGE=self.xr,YRANGE=self.yr,XSTYLE=s,YSTYLE=s, $
+          CHARSIZE=1.3,POSITION=[.06,.06,.99,.95],NODATA=i eq 0, $
+          YLOG=self.log_scale, MIN_VALUE=self.log_scale?0.0:!VALUES.F_NAN, $
+          NOERASE=i eq 1
+     if i eq 0 then self->ShowRegions
+  endfor 
+  
   if self.show_error && n_elements(*self.sp_unc) gt 0 then $
      errplot,*self.lam,*self.sp-*self.sp_unc,*self.sp+*self.sp_unc
 
