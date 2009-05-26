@@ -166,8 +166,10 @@ pro CubeViewSpec::Event,ev
   
   case ev.id of 
      self.wDraw: begin          ;press and motion events
-        if ev.type lt 5 then $
+        if ev.type lt 5 then begin 
            c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
+           if c[0] lt !X.CRANGE[0] || c[0] gt !X.CRANGE[1] then return
+        endif 
         case ev.type of
            5b: begin ;; ASCII keys
               if ev.release then return ;just press events
