@@ -3904,6 +3904,7 @@ pro CubeProj::BuildAccount,_EXTRA=e
         bcdpixels=lonarr(n_poly_tot,/NOZERO)          
         cube_plane=lonarr(n_poly_tot,/NOZERO)
         poly_inds_ord=lonarr(n_poly_tot+1L,/NOZERO) ;accumulated reverse indices
+        poly_inds_ord[0]=0L
         accum_cnt=[0L,0L]
         
         ;; iterate and accumulate all polygons from  adjacent PRs in the order 
