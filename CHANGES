@@ -18,6 +18,9 @@ Changes for Version 1.7
 
  - Log scaling in CubeViewSpec.
 
+ - Scroll wheel to change selected region size or change wavelength in
+   CubeViewSpec.
+
  - Fixed "off by one pixel" error in DS9 .reg files *written* (not
    read) by CUBISM.
 
