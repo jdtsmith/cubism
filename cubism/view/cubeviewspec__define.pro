@@ -96,7 +96,8 @@ pro CubeViewSpec::Message, msg
      if ren[1] then begin 
         med=median(*self.sp)
      endif 
-     widget_control, self.wDraw,/DRAW_BUTTON_EVENTS, /DRAW_MOTION_EVENTS
+     widget_control, self.wDraw,/DRAW_BUTTON_EVENTS, /DRAW_MOTION_EVENTS, $
+                     /DRAW_WHEEL_EVENTS
      self.movestart=-1
      self->Plot
   endelse
@@ -170,7 +171,7 @@ pro CubeViewSpec::Event,ev
            c=(convert_coord(ev.X,ev.Y,/DEVICE,/TO_DATA))[0:1]
            if c[0] lt !X.CRANGE[0] || c[0] gt !X.CRANGE[1] then return
         endif 
-        case ev.type of
+        switch ev.type of
            5b: begin ;; ASCII keys
               if ev.release then begin 
                  self.last_ch=0b ; reset repeat suppression
@@ -239,11 +240,18 @@ pro CubeViewSpec::Event,ev
                  end
                  else:          ;print,"Got: *"+strupcase(ev.ch[0])+"*"
               endcase 
+              break
            end
            
-           6b: begin ;; Special keys
+           7b: begin            ;scroll
+              ev.press=1b
+              ev.key=ev.clicks eq 1?7:8
+           end 
+           
+           6b: begin                                    ;; Special keys
               if ev.release then return ; Just press events
               if ev.key lt 5 or ev.key gt 8 then return ; Only Arrow Keys
+              ;; C and S accelerate movement
               del=(ev.modifiers AND 1)?((ev.modifiers AND 2) ne 0?10:5):1
               ;; Clear out keyboard events, since they can accumulate
               widget_control, self.wDraw, /CLEAR_EVENTS
@@ -283,89 +291,96 @@ pro CubeViewSpec::Event,ev
               if n_elements(*self.fit) ne 0 then self->ResetFit
               if self.map_name then self->ResetMap
               self->Send
+              break
            end 
               
-           0b: case ev.press of ;press events
-              1b: begin         ;Left button
-                 widget_control, self.wDo, GET_VALUE=doing
-                 if self.got eq -1 then begin ;first in pair
-                    if self.mode eq 0 AND doing eq 2 then begin ;full-WL
-                       ;; just pick the wavelength
-                       new_wav=(*self.lam)[self.movestart]
-                       if self.wavelength ne new_wav then begin 
-                          self.wav_ind=self.movestart
-                          self.wavelength=new_wav
-                          self->Plot ;show the selected WL
-                          self->Send
-                       endif 
-                    endif else begin 
-                       self.pressloc=c
-                       self.got=doing
-                       self->ShowRegionLine
-                    endelse 
-                 endif else begin ;second press in a defining pair
-                    self.got=-1 ;got them both now, yeah
-                    case doing of 
-                       2: begin ;region
-                          sel=widget_info(self.wRtype,/DROPLIST_SELECT) 
-                          m=min(abs(*self.lam-c[0]),ind1)
-                          m=min(abs(*self.lam-self.pressloc[0]),ind2)
-                          if ind1 eq ind2 then return
-                          r=[ind1<ind2,ind1>ind2]
-                          if ~array_equal(r ne -1,1b) then return
-                          ;; append the new region
-                          if ptr_valid(self.reg[sel]) then $
-                             *self.reg[sel]=[[*self.reg[sel]],[r]] $
-                          else $
-                             self.reg[sel]=ptr_new(reform(r,2,1))
+           0b: begin 
+              case ev.press of  ;press events
+                 1b: begin      ;Left button
+                    widget_control, self.wDo, GET_VALUE=doing
+                    if self.got eq -1 then begin                ;first in pair
+                       if self.mode eq 0 AND doing eq 2 then begin ;full-WL
+                          ;; just pick the wavelength
+                          new_wav=(*self.lam)[self.movestart]
+                          if self.wavelength ne new_wav then begin 
+                             self.wav_ind=self.movestart
+                             self.wavelength=new_wav
+                             self->Plot ;show the selected WL
+                             self->Send
+                          endif 
+                       endif else begin 
+                          self.pressloc=c
+                          self.got=doing
+                          self->ShowRegionLine
+                       endelse 
+                    endif else begin ;second press in a defining pair
+                       self.got=-1   ;got them both now, yeah
+                       case doing of 
+                          2: begin ;region
+                             sel=widget_info(self.wRtype,/DROPLIST_SELECT) 
+                             m=min(abs(*self.lam-c[0]),ind1)
+                             m=min(abs(*self.lam-self.pressloc[0]),ind2)
+                             if ind1 eq ind2 then return
+                             r=[ind1<ind2,ind1>ind2]
+                             if ~array_equal(r ne -1,1b) then return
+                             ;; append the new region
+                             if ptr_valid(self.reg[sel]) then $
+                                *self.reg[sel]=[[*self.reg[sel]],[r]] $
+                             else $
+                                self.reg[sel]=ptr_new(reform(r,2,1))
+                             
+                             self.selected=n_elements(*self.reg[sel])/2-1
+                             self.seltype=sel
+                             self->MergeRegs
+                             ;; XXX regs and weights presently incompatible
+                             ptr_free,self.weights 
+                             self.map_name=''
+                             if ptr_valid(self.wMapSets) then $
+                                for i=0,n_elements(*self.wMapSets)-1 do $
+                                   widget_control, (*self.wMapSets)[i], $
+                                                   SET_BUTTON=0
+                             self->UpdateButtons
+                          end
                           
-                          self.selected=n_elements(*self.reg[sel])/2-1
-                          self.seltype=sel
-                          self->MergeRegs
-                          ;; XXX regs and weights presently incompatible
-                          ptr_free,self.weights 
-                          self.map_name=''
-                          if ptr_valid(self.wMapSets) then $
-                             for i=0,n_elements(*self.wMapSets)-1 do $
-                                widget_control, (*self.wMapSets)[i], $
-                                                SET_BUTTON=0
-                          self->UpdateButtons
-                       end
-                       
-                       0:  begin ;XClip
-                          self.xr=[self.pressloc[0]<c[0], $
-                                   self.pressloc[0]>c[0]]
-                       end
-                       
-                       1: begin ;YClip
-                          self.yr=[self.pressloc[1]<c[1], $
-                                   self.pressloc[1]>c[1]]
-                       end
-                    endcase 
-                    self->Plot
-                    if doing eq 2 then self->Send ;new region stack
-                 endelse 
-              end
-              
-              2b: begin         ;Middle Button -- drag/select regions
-                 self->FindReg,value_locate(*self.lam,c[0]),FOUND=f
-                 if self.selected eq -1 or f eq 0 then return
-                 self.press=1b
-                 self.movestart=value_locate(*self.lam,c[0])
-              end
-              
-              
-              4b: begin         ;Right Button - Reset (no nuking regions)
-                 if self.got ge 0 then begin ;if selecting range, cancel
-                    self.got=-1 
-                    self->Plot  
-                    if self.map_name then self->ResetMap
-                 endif else self->Reset,/KEEP
-              end
-              else:
-           endcase 
+                          0:  begin ;XClip
+                             self.xr=[self.pressloc[0]<c[0], $
+                                      self.pressloc[0]>c[0]]
+                          end
+                          
+                          1: begin ;YClip
+                             self.yr=[self.pressloc[1]<c[1], $
+                                      self.pressloc[1]>c[1]]
+                          end
+                       endcase 
+                       self->Plot
+                       if doing eq 2 then self->Send ;new region stack
+                    endelse 
+                 end
+                 
+                 2b: begin      ;Middle Button -- drag/select regions
+                    self->FindReg,value_locate(*self.lam,c[0]),FOUND=f
+                    if self.selected eq -1 or f eq 0 then return
+                    self.press=1b
+                    self.movestart=value_locate(*self.lam,c[0])
+                 end
+                 
+                 
+                 4b: begin      ;Right Button - Reset (no nuking regions)
+                    if self.got ge 0 then begin ;if selecting range, cancel
+                       self.got=-1 
+                       self->Plot  
+                       if self.map_name then self->ResetMap
+                    endif else self->Reset,/KEEP
+                 end
+                 else: 
+              endcase 
+              break
+           end
            
-           1b: self.press=0b    ;release
+           1b: begin 
+              self.press=0b     ;release
+              break
+           end 
            
            2b: begin            ;motion
               m=min(abs(*self.lam-c[0]),ind)
@@ -399,8 +414,9 @@ pro CubeViewSpec::Event,ev
                  self->Plot
                  self->Send
               endif else if self->ShowingValueLine() then self->Plot
+              break
            end 
-        endcase 
+        endswitch 
         return
      end
      
