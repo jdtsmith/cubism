@@ -172,11 +172,16 @@ pro CubeViewSpec::Event,ev
         endif 
         case ev.type of
            5b: begin ;; ASCII keys
-              if ev.release then return ;just press events
+              if ev.release then begin 
+                 self.last_ch=0b ; reset repeat suppression
+                 return          ; just press events
+              endif 
+              if ev.ch eq self.last_ch then return ; suppress fast repeats
               if ev.ch eq 8 then begin ; Delete Key
                  self->Delete 
                  return
               endif 
+              self.last_ch=ev.ch
               case strupcase(ev.ch) of 
                  'C': begin
                     self->SwitchMode,/MAP
@@ -1402,6 +1407,7 @@ pro CubeViewSpec__define
       Info:'',$                 ;a message describing the spectrum to display
       selected: 0, $            ;which region is selected, if any
       seltype:0, $              ;type selected, continuum, or peak
+      last_ch:0b, $             ;last character typed
       press:0b, $               ;whether we've pressed (certain buttons)
       pressloc:[0.0,0.0], $     ;where the press occured
       movestart:0, $            ;where a region move began
