@@ -361,7 +361,8 @@ pro CubeBackTrack::UpdateList
      return
   endif 
   
-  if n_elements(*self.list) gt 0 then begin 
+  if n_elements(*self.list) gt 0 && size(*self.list,/TYPE) eq 8 && $
+     size(list,/TYPE) eq 8 then begin 
      cnt=n_elements(tag_names(list))
      good=0
      for i=0,cnt-1 do good+=array_equal(list.(i),(*self.list).(i))
@@ -370,7 +371,8 @@ pro CubeBackTrack::UpdateList
   
   oldid=''
   pm=string(177b)
-  if size(list,/N_DIMENSIONS) eq 0 then str='' else begin 
+  if size(list,/TYPE) ne 8 || size(list,/N_DIMENSIONS) eq 0 then str='' else $
+     begin 
      str=strarr(n_elements(list))
      for i=0,n_elements(list)-1 do begin 
         str[i]=string(FORMAT='(" (",I3,",",I3,") ",' + $
