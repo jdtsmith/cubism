@@ -5733,7 +5733,6 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   endfor
 
   ;; Normalize
-  stack_cnt>=1L
   if ~integrate && ~use_weights then begin 
      ;; No integration or weighting
      stack/=stack_cnt
