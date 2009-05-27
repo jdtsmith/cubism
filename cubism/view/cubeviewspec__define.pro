@@ -51,7 +51,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002-2006 J.D. Smith
+;  Copyright (C) 2002-2009 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -1000,8 +1000,19 @@ pro CubeViewSpec::Plot,NOOUTLINE=noo
      if i eq 0 then self->ShowRegions
   endfor 
   
-  if self.show_error && n_elements(*self.sp_unc) gt 0 then $
-     errplot,*self.lam,*self.sp-*self.sp_unc,*self.sp+*self.sp_unc
+  if self.show_error && n_elements(*self.sp_unc) gt 0 then begin 
+     if self.log_scale then begin 
+        wh=where(*self.sp gt 0.,cnt)
+        if cnt gt 0 then begin 
+           lam=(*self.lam)[wh]
+           sp=(*self.sp)[wh]
+           sp_unc=(*self.sp_unc)[wh]
+           errplot,lam,sp-sp_unc,sp+sp_unc
+        endif 
+     endif else begin 
+        errplot,*self.lam,*self.sp-*self.sp_unc,*self.sp+*self.sp_unc
+     endelse 
+  endif 
 
   self.x_s=!X.S & self.y_s=!Y.S
   
