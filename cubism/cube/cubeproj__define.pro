@@ -5989,7 +5989,8 @@ pro CubeProj::AddGroup,DIR=dir,MODULE_ONLY=md,COADD=cd,DROOPRES=dr,FLATAP=fl
   endfor 
   
   ch=multchoice('Choose '+type+' Data:',list,TITLE='Load Group', $
-                PARENT_GROUP=self->TopBase(),/MODAL,/NONEXCLUSIVE)
+                PARENT_GROUP=self->TopBase(),/MODAL,/NONEXCLUSIVE, $
+                SCROLL=n_elements(list) ge 10 )
   
   widget_control, /HOURGLASS
   
