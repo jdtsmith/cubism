@@ -159,7 +159,6 @@ end
 ;  FindPR - Find the relevant PR which contains point, if any.
 ;=============================================================================
 function cvLine::FindPR,x,y,ORDER=ord
-  !EXCEPT=2
   ;; Global order min/max cut
   wh=where(x ge (*self.PRs).MIN[0,*] AND $
            y ge (*self.PRs).MIN[1,*] AND $
