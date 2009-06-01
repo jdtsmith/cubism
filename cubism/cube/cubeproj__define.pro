@@ -6294,26 +6294,58 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
         showing_unc=keyword_set(show_unc) 
         stackQ=nrec gt 1
         rec=(*self.DR)[record]
+        
         if stackQ then begin 
-           ;; Stack of BCDs
-           bcd=*rec[0].BCD
            use_bmask=array_equal(ptr_valid(rec.BMASK),1b)
            use_unc=array_equal(ptr_valid(rec.UNC),1b)
-           if use_unc then unc=*rec[0].UNC^2 ;add in quadrature
+           if use_unc then begin 
+              unc=*rec[0].UNC^2 ;add in quadrature
+              stack_cnt_unc=finite(unc)
+           endif 
            if use_bmask then mask=*rec[0].BMASK
-           for i=1,nrec-1 do begin 
-              if ~showing_unc then bcd+=*rec[i].BCD
-              if use_unc then unc+=*rec[i].UNC^2
+           
+           if ~showing_unc then begin 
+              bcd=make_array(size(*rec[0].BCD,/DIMENSIONS), $
+                             TYPE=size(*rec[0].BCD,/TYPE))
+              stack_cnt=ulong(bcd)
+           endif 
+              
+           if use_unc then begin 
+              unc=make_array(size(*rec[0].UNC,/DIMENSIONS), $
+                             TYPE=size(*rec[0].UNC,/TYPE))
+              stack_cnt_unc=ulong(unc)
+           endif 
+           
+           if use_bmask then $
+              mask=make_array(size(*rec[0].BMASK,/DIMENSIONS), $
+                              TYPE=size(*rec[0].BMASK,/TYPE))
+           for i=0,nrec-1 do begin 
+              ;; No need to compute BCD if showing unc
+              if ~showing_unc then begin 
+                 f=finite(*rec[i].BCD)
+                 wh=where(f,cnt)
+                 if cnt gt 0 then bcd[wh]+=(*rec[i].BCD)[wh]
+                 stack_cnt+=f
+              endif 
+              if use_unc then begin 
+                 f=finite(*rec[i].UNC)
+                 wh=where(f,cnt)
+                 if cnt gt 0 then unc[wh]+=(*rec[i].UNC)[wh]^2
+                 stack_cnt_unc+=f
+              endif 
               if use_bmask then mask OR=*rec[i].BMASK
            endfor 
            if ~showing_unc then begin 
-              bcd/=nrec 
+              bcd/=stack_cnt
               bcd_p=ptr_new(bcd,/NO_COPY)
            endif 
            if n_elements(unc) gt 0 then begin 
-              unc=sqrt(unc)/nrec
+              unc=sqrt(unc)/(stack_cnt_unc>1UL)
+              wh=where(stack_cnt_unc eq 0,cnt)
+              if cnt gt 0 then unc[wh]=!VALUES.F_NAN
               unc_p=ptr_new(unc,/NO_COPY)
            endif else unc_p=ptr_new()
+           void=check_math()
            mask_p=n_elements(mask) gt 0?ptr_new(mask,/NO_COPY):ptr_new()
            free=1
            if showing_unc then begin 
