@@ -24,7 +24,8 @@ Changes for Version 1.7
  - Fixed "off by one pixel" error in DS9 .reg files *written* (not
    read) by CUBISM.
 
- - Properly handle backtracking cubes with empty 'NaN' regions.
+ - Properly handle backtracking cubes with empty 'NaN' regions, and
+   better NaN handling in cube creation and record stacks.
 
  - Better memory handling during clipping, resulting in another 20-40%
    speedup of raw cube build.
