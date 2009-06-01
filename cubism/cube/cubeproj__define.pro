@@ -821,7 +821,8 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                 'BPL'], $
                BUTTON_UVALUE=6+indgen(8),UVALUE='sort',/ROW,MAP=0)
   
-  b1=widget_button(headbase,VALUE='>',UVALUE='switchlist')
+  b1=widget_button(headbase,VALUE=(*self.wInfo).which_list?'<':'>', $
+                   UVALUE='switchlist')
   
   width=88
   
