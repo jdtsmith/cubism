@@ -5751,6 +5751,8 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   endif 
   
   if use_unc then stack_unc=sqrt(temporary(stack_var))
+  void=check_math()             ;clear any divide by zero errors
+  
   
   ;; Put post-multiply factors back in (except for weight maps: they
   ;; are weighted by d_nu only)
