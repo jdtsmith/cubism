@@ -803,7 +803,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   headmap=widget_base(headbase)
   (*self.wInfo).wHead[0]= $
      cw_bgroup(/NONEXCLUSIVE,headmap, $
-               ['ID               ', $
+               ['ID                 ', $
                 'Exp   ', $
                 'Observed       ', $
                 'Added      ', $
@@ -811,7 +811,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
                 'Step '],UVALUE='sort',/ROW)
   (*self.wInfo).wHead[1]= $  
      cw_bgroup(/NONEXCLUSIVE,headmap, $
-               ['Target            ', $
+               ['Target              ', $
                 'RA     ', $
                 'Dec   ', $
                 'DATA',$
@@ -823,7 +823,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   
   b1=widget_button(headbase,VALUE='>',UVALUE='switchlist')
   
-  width=86
+  width=88
   
   (*self.wInfo).SList= $
      widget_list(b,/MULTIPLE,/ALIGN_LEFT, $
@@ -1967,7 +1967,7 @@ function CubeProj::List
       if which_list eq 0 then begin ;the standard list
          type=(*self.DR)[i].type>0
          tchar=([" ","d","c","f"])[type]
-         s=string(FORMAT='(" ",A-20,T23,F6.2,T30,A,T49,A,T68,A8,T77,' + $
+         s=string(FORMAT='(" ",A-23,T25,F6.2,T32,A,T51,A,T70,A8,T79,' + $
                   'I3,"[",I0,",",I0,"]")', $
                   (*self.DR)[i].ID, $
                   (*self.DR)[i].TIME, $
@@ -1986,7 +1986,7 @@ function CubeProj::List
          
          pos=self.reconstructed_pos?(*self.DR)[i].REC_POS: $
              (*self.DR)[i].RQST_POS
-         s=string(FORMAT='(" ",A-19,T22,A11,T34,A12,T50,3(A1,6X),A5,2X,I6)', $
+         s=string(FORMAT='(" ",A-22,T24,A11,T36,A12,T52,3(A1,6X),A5,2X,I6)', $
                   (*self.DR)[i].OBJECT, $
                   radecstring(pos[0],/RA),radecstring(pos[1]), $
                   bcd_valid[i]?'Y':'N', $
