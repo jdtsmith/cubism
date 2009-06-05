@@ -6421,6 +6421,7 @@ pro CubeProj::Cleanup
            self.AUTO_BPL.BCD_PIX,self.AUTO_BPL.BCD_VALS, $
            self.AUTO_BPL.DCEID,self.AUTO_BPL.BCD_UNC,self.AUTO_BPL.CNT_VEC
   heap_free,self.BACK_RECS
+  obj_destroy,self.oautobadpix
   ;if self.spawned then obj_destroy,self.cal ;noone else will see it.
   self->OMArray::Cleanup
   self->ObjMsg::Cleanup
