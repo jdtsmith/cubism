@@ -6,10 +6,10 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.6
-@set VERSION 1.6
+@set EDITION 1.7
+@set VERSION 1.7
 @set IDLVERSIONREQUIRED 6.2
-@set DATE November, 2008
+@set DATE July, 2009
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jd.smith@@utoledo.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -4564,6 +4564,15 @@ You have an outdated version of @code{AstroLib}, update it.
 record order shown under the @samp{Type} column in the project viewer.}
 
 You need to read @ref{Build Order}.
+
+@item
+@strong{All my colors come out red in the viewer, cube build visualizer,
+everywhere!}
+
+You are running CUBISM from source and forgot to turn off decomposed
+color, which is usually done in the idl setup.  @xref{Setup}.  Binary
+versions of CUBISM running under the IDL virtual machine do this for
+you.
 
 @end enumerate
 
