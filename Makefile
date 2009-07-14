@@ -11,7 +11,7 @@ CUBISM_APP = Cubism.app
 CUBISM_DMG_DIR =  cubism_$(CUBISM-VERSION)
 CUBISM_DMG = $(CUBISM_DMG_DIR).dmg
 
-IDL = idl -genver
+IDL = idl
 
 .PHONY: all
 all: bindist srcdist dmg
@@ -87,7 +87,6 @@ $(CUBISM_DMG): $(CUBISM_APP) $(CUBISM_SAV_FILE)
 	rm -rf "$(CUBISM_DMG_DIR)"
 	mkdir "$(CUBISM_DMG_DIR)"
 	cp -rp "$(CUBISM_APP)" "$(CUBISM_DMG_DIR)"
-	cp -rp Applications "$(CUBISM_DMG_DIR)"
 	cp README "$(CUBISM_DMG_DIR)"
 	rm -f "$(CUBISM_DMG)"
 	hdiutil create -fs HFS+ -srcfolder "$(CUBISM_DMG_DIR)" \
