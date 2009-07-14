@@ -1,7 +1,7 @@
 INTRODUCTION
 ============
 
-This is the README file for the Cubism distribution, version 1.6.
+This is the README file for the Cubism distribution, version 1.7.
 Cubism is the CUbe Builder for IRS Spectral Mapping, a tool for use in
 constructing and analyzing spectral maps obtained with the Spitzer
 Space Telescope's IRS spectrograph.
@@ -48,8 +48,7 @@ MANIFEST
  The Cubism.app MacOSX DMG distribution contains:
  ++++++++++++++++++++++++++++++++++++++++++++++++
 
-   A self-contained Cubism.app application bundle, README, and alias
-   to the Applications folder for convenience of copying.
+   A self-contained Cubism.app application bundle, and a README.
 
 
 REQUIREMENTS
@@ -157,11 +156,11 @@ RUNNING
  Binary distribution:
  ++++++++++++++++++++
 
- For the virtual machine, run:
+ For running Cubism within the virtual machine:
 
  % idl -vm=/path/to/cubism_vm.sav
 
- To use in a normal command-line IDL session, type:
+ To use in a normal (licensed) command-line IDL session, type:
 
  IDL> cubism_vm
 
