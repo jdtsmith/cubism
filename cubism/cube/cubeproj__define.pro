@@ -5358,6 +5358,8 @@ pro CubeProj::LoadCubeFromFITS,file
   
   if un eq 'MJy/sr' || un eq 'Jy/pix' then self.fluxcon=1b
   if stregex(un,'/sr',/BOOLEAN) then self.pix_omega=1b
+  
+  self->SnapshotParameters
   obj_destroy,oC
 end
 
