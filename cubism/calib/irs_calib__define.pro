@@ -1587,8 +1587,7 @@ pro IRS_Calib::ParseFluxcon,file,module
      endfor
   endfor 
   
-  if self.FLUXCON_FILE[m] then self.FLUXCON_FILE[m]+=string(10b)+file $
-  else self.FLUXCON_FILE[m]=strjoin(file,string(10b))
+  self.FLUXCON_FILE[m]=strjoin(file,string(10b))
 end
 
 ;=============================================================================
