@@ -5265,7 +5265,7 @@ end
 pro CubeProj::AddOutputInfo,out_obj,_EXTRA=e
   calname=self.cal_file
   fullname=irs_fov(MODULE=self.MODULE,ORDER=self.ORDER,POSITION=0,/SLIT_NAME, $
-                   /LOOKUP_MODULE)
+                   /LOOKUP_MODULE,/ON_ARRAY)
   out_obj->SetProperty,SOFTWARE='CUBISM',VERSION=self.version, $
                        FLUX_UNITS=self->FluxUnits(/AS_BUILT,_EXTRA=e), $
                        CAL_SET=calname,APERNAME=fullname
@@ -5340,9 +5340,9 @@ pro CubeProj::LoadCubeFromFITS,file
      self->Error,'Not a CUBISM FITS cube.'
   endif 
   
-  void=irs_fov(strtrim(aper,2)+'_cen',MODULE=md,ORDER=ord,/SHORT_NAME)
-  self.MODULE=md
-  self.ORDER=ord
+  parts=stregex(aper,'([SL][LH])([0-9]+)?',/SUBEXPR,/EXTRACT)
+  self.MODULE=parts[1]
+  self.ORDER=n_elements(parts) gt 2?fix(parts[2]):0
   self.VERSION=soft_ver
   
   self.cal_file=cal
@@ -6232,7 +6232,7 @@ pro CubeProj::Send,RECORD=record,CUBE=cube,BACKGROUND=back,BLEND=comb, $
         astr=ptr_new(astr)
         self->MsgSend, {CUBEPROJ_VISUALIZE, self, $
                         self->ProjectName() + ' '+ $
-                        irs_fov(MODULE=self.module,ORDER=self.order, $
+                        irs_fov(MODULE=self.module,ORDER=self.order,/ON_ARRAY,$
                                 POSITION=0,/SLIT_NAME,/LOOKUP_MODULE) + ': ' +$
                         file_basename(self.visualize_file), $
                         self.MODULE,self.VISUALIZE_IMAGE, $

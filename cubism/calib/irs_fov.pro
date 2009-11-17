@@ -46,6 +46,10 @@
 ;
 ;    SLIT_NAME: Return the abbreviated slit name, without the position
 ;       information.
+;  
+;    ON_ARRAY: If set, SLIT_NAME refers to the order *on the array*,
+;       e.g. SL3 is valid as an array, though it is not a valid
+;       aperture for pointing.
 ;
 ; OUTPUTS:
 ;
@@ -70,7 +74,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002,2003,2004 J.D. Smith
+;  Copyright (C) 2002,2003,2004, 2009 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -92,7 +96,7 @@
 ;##############################################################################
 
 function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
-                  LOOKUP_MODULE=lm, RETURN_NAME=nm, SLIT_NAME=sno
+                  LOOKUP_MODULE=lm, RETURN_NAME=nm, SLIT_NAME=sno,ON_ARRAY=array
   
   void={IRS_FOV,ID:0,NAME:'',SHORT_NAME:'',MODULE:'',ORDER:0,POSITION:0}
   f=[{IRS_FOV,18,'IRS_Red_Peak-Up_FOV_Center',          'PU_R_cen','PUR',0,0},$
@@ -120,13 +124,17 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
      {IRS_FOV,57,'IRS_Long-Hi_2nd_Position',              'LH_b',   'LH',0,2},$
      {IRS_FOV,58,'IRS_Long-Hi_Center_Position',           'LH_cen', 'LH',0,0}]
   
+  bonus=0b
   if keyword_set(lm) then begin 
      if n_elements(md_in) ne 0 then md=irs_module(md_in,/TO_NAME)
      if n_elements(md) eq 0 OR n_elements(ord) eq 0 OR $
         n_elements(pos) eq 0 then $
         message,'Must specify Module,Order and Position'
      
-     if ord eq 3 && (md eq 'SL' || md eq 'LL') then ord=2
+     if ord eq 3 && (md eq 'SL' || md eq 'LL') then begin 
+        ord=2
+        bonus=1b
+     endif 
      wh=where(f.module eq md AND $
               (f.order eq long(ord) OR $
                (strmid(f.module,1) eq 'H' AND f.order eq 0)) AND $
@@ -150,10 +158,14 @@ function irs_fov, fov, SHORT_NAME=sn,MODULE=md_in, ORDER=ord, POSITION=pos, $
   endif 
   
   case 1 of
-     keyword_set(sno): begin 
+     keyword_set(sno): begin    
         short=f[wh].SHORT_NAME
         pos=strpos(short,'_',/REVERSE_SEARCH)
         if pos ne -1 then short=strmid(short,0,pos)
+        if bonus && keyword_set(array) then begin     
+           pos=strpos(short,strtrim(f[wh].ORDER,2))
+           if pos ne -1 then short=strmid(short,0,pos)+'3'
+        endif 
         return,short
      end 
      keyword_set(sn): return,f[wh].SHORT_NAME
