@@ -5222,12 +5222,15 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      max=(size(*self.CUBE,/DIMENSIONS))[0:1]-1
      low=0>low<max
      high=0>high<max
-     sp=total(total((*self.CUBE)[low[0]:high[0],low[1]:high[1],*],1,/NAN), $
-              1,/NAN)/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+     subcube=(*self.CUBE)[low[0]:high[0],low[1]:high[1],*]
+     ;; Don't average in non-finite values
+     good=where(product(finite(subcube),3,/PRESERVE_TYPE),gcnt)
+     if gcnt eq 0 then return,-1
+     sp=total(total(subcube,1,/NAN),1,/NAN)/gcnt
      if use_unc then begin 
         sp_unc=sqrt(total(total((*self.CUBE_UNC)[low[0]:high[0], $
                                                  low[1]:high[1],*]^2,1,/NAN), $
-                          1,/NAN))/(high[1]-low[1]+1.)/(high[0]-low[0]+1.)
+                          1,/NAN))/gcnt
      endif 
      
      oReg=obj_new('IRS_Region')
