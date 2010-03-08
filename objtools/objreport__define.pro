@@ -210,12 +210,14 @@ pro ObjReport::Error,msg,RETURN_ONLY=ro,_REF_EXTRA=e
   on_error,2
   if self->IsWidget() then begin 
      ;; Avoid re-prompting our own thrown message, if caught somewhere
-     if strpos(!ERROR_STATE.MSG,'OBJREPORT-ERROR') eq -1 then $
+     ;; and redirected here
+     if strpos(!ERROR_STATE.MSG,'OBJREPORT-ERROR') eq -1 then begin 
         self->orPopupReport,msg,/Error,PARENT=parent,_EXTRA=e
-     if self->IsBlocking() then begin
-        ;; Send a message to be caught by the established OBJREPORT catch
-        message,'OBJREPORT-ERROR',/NOPRINT,LEVEL=-1
-     endif else if keyword_set(ro) then return else retall 
+        if self->IsBlocking() then begin
+           ;; Send a message to be caught by the established OBJREPORT catch
+           message,'OBJREPORT-ERROR',/NOPRINT,LEVEL=-1
+        endif else if keyword_set(ro) then return else retall 
+     endif 
   endif else self->orCommandLineReport,msg,/ERROR
 end
 
