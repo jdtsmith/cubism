@@ -28,7 +28,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002,2003,2005 J.D. Smith
+;  Copyright (C) 2002,2003,2005,2010 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -90,8 +90,7 @@ pro cubism_vm,pname
      if err ne 0 then begin 
         XManager                ;just silently restart event processing
         catch,/cancel
-        return
-     endif 
-  endif 
-  cubism,pname,NO_BLOCK=command_line
+     endif else cubism,pname,NO_BLOCK=0
+  endif else cubism,pname,/NO_BLOCK
 end
+
