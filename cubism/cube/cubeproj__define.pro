@@ -4456,14 +4456,15 @@ pro CubeProj::NormalizePRSize
      endfor
      self.PR_SIZE[0]=slmax
   endelse
-  len=0.                        ;adjust for a non-full aperture
-  if ptr_valid(self.APERTURE) then begin 
-     for i=0,n_elements(*self.APERTURE)-1 do begin 
-        m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
-        len=m>len
-     endfor 
-     self.PR_SIZE[0]=self.PR_SIZE[0]*len
-  endif   
+  
+  ;len=0.                        ;adjust for a non-full aperture
+  ;if ptr_valid(self.APERTURE) then begin 
+  ;   for i=0,n_elements(*self.APERTURE)-1 do begin 
+  ;      m=max((*self.APERTURE)[i].high-(*self.APERTURE)[i].low)
+  ;      len=m>len
+  ;   endfor 
+  ;   self.PR_SIZE[0]=self.PR_SIZE[0]*len
+  ;endif   
   
   ;; The PR Width
   if self.PR_SIZE[1] eq 0.0 then begin
@@ -4581,9 +4582,9 @@ function CubeProj::BCDBounds,recs,_EXTRA=e
      ap=nap eq 1?(*self.APERTURE)[0]:(*self.APERTURE)[i]
      left=min(ap.low)           ;The bounding aperture for this order
      right=max(ap.high)
-     acen=.5*(left+right)-.5    ;positive acen shifts right
+     ;acen=.5*(left+right)-.5    ;positive acen shifts right
      ;; Celestial (degree) left/right offsets from slit center
-     off=([0.,1.]-.5+acen)*self.PR_SIZE[0]
+     off=([left,right]-.5)*self.PR_SIZE[0] ;([0.,1.]-.5+acen)*self.PR_SIZE[0]
      if n_elements(final_off) eq 0 then final_off=off else begin 
         final_off[0]=final_off[0]<off[0] ;Bounding aperture assumes same 
         final_off[1]=final_off[1]>off[1] ;slit length for all build orders
@@ -4668,21 +4669,20 @@ pro CubeProj::LayoutBCDs
   
   ;; Compute the region bounds
   bounds=self->BCDBounds(good)
-  
   for i=0,goodcnt-1 do begin 
      ;; Compute corner celestial positions in the cube frame
      ad2xy,bounds[0:3,i],bounds[4:7,i],cubeastr,x,y 
                                 ;x,y in 0,0 pixel-centered coords
      x+=0.5 & y+=0.5            ;back to normal pixel convention (0.5-centered)
-
+     
      ;; Accumulate pixel bounding rectangle
      if n_elements(x_min) ne 0 then begin 
-        x_min=x_min<min(x) & y_min=y_min<min(y)
+        x_min<=min(x) & y_min<=min(y)
      endif else begin 
         x_min=min(x) & y_min=min(y)
      endelse 
      if n_elements(x_max) ne 0 then begin 
-        x_max=x_max>max(x) & y_max=y_max>max(y)
+        x_max>=max(x) & y_max>=max(y)
      endif else begin 
         x_max=max(x) & y_max=max(y)
      endelse 
