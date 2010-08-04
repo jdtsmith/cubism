@@ -71,7 +71,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2003-2005 J.D. Smith
+;  Copyright (C) 2003-2010 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
