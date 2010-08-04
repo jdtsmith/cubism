@@ -2452,10 +2452,10 @@ pro CubeProj::SwitchRecordDataType,r,FLATAP=f2ap,BCD=bcd,DROOPRES=dr,_EXTRA=e
   
   (*self.DR)[r].FILE=new_files
   (*self.DR)[r].TYPE=new_type[0]
-  
   ptr_free,(*self.DR)[r].BCD
   self->RestoreData,r
-  if self.BACK_DATE then begin 
+  if self.BACK_DATE && ptr_valid(self.BACK_RECS) && $
+     (where_array(recs.dceid,*self.back_recs))[0] ne -1 then begin 
      self->Info,'Rebuilding background from '+jul2date(self.BACK_DATE)
      self->RebuildBackground,/NO_UPDATE
   endif 
