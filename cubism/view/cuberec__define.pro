@@ -541,11 +541,11 @@ pro CubeRec_event,ev
      call_method,'Error',uv.self,!ERROR_STATE.MSG
      catch,/CANCEL
      return
-  endif 
+  endif
   if uv.event then $
      call_method,uv.method,uv.self,ev $
   else $
-     call_method,uv.method,uv.self     
+     call_method,uv.method,uv.self
 end
 
 ;=============================================================================
@@ -699,6 +699,7 @@ pro CubeRec::Extract,_EXTRA=e
   self.Box->Getlrtb,l,r,t,b
   self.region_file=''           ;no longer extracting by region
   spec=self.cube->Extract([l,b],[r,t],UNCERTAINTY=spec_unc,_EXTRA=e)
+  if n_elements(spec) eq 1 and spec[0] eq -1 then return
   info=string(FORMAT='(%"%s: [%d,%d]->[%d,%d]")', $
               self.cube->ProjectName(),l,b,r,t)
   self->SetupViewSpec
