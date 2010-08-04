@@ -3553,7 +3553,7 @@ pro CubeProj::MergeSetup,ORDS=ords
      
      ;; No overlap case... just concatenate
      if min_wav2 gt max_wav1 then begin 
-        print,FORMAT='(%"No overlap:  %2d->%2d")',ords[ord-1],ords[ord]
+        ;;print,FORMAT='(%"No overlap:  %2d->%2d")',ords[ord-1],ords[ord]
         if n_elements(wave) gt 0 then wave=[wave,wave1] else wave=wave1
         wave_zero[ord]=wave_zero[ord-1]+n_elements(wave1) 
         last_over=0 & wh_clear_sav=-1
