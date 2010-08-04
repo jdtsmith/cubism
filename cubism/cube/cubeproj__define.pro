@@ -463,13 +463,15 @@ pro CubeProj::ShowEvent, ev
         title='CUBISM '+cubism_version
         tlen=strlen(title) & left=(35-tlen)/2
         title=strjoin(replicate(' ',left>0)) + title
+        clip=polyclip_version()
         self->Info,TITLE='About Cubism', $
                    ['***********************************', $
-                    title,                                    $
-                    thiscube,                                 $
+                    title,                                 $
+                    thiscube,                              $
+                    '    Polyclip: '+clip,                 $
                     '                                   ', $
                     '    JD Smith and the SINGS Team    ', $
-                    '         (c) 2002-2008             ', $
+                    '         (c) 2002-2010             ', $
                     '   http://sings.stsci.edu/cubism   ', $
                     '***********************************']
      end

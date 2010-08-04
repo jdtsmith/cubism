@@ -147,7 +147,7 @@
 
 function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
                      RECOMPILE=rc, POLY_INDICES=poly_inds
-  common polyfillaa_external,polyclip_compiled,polyclip_path
+  common polyfillaa_external,polyclip_compiled,polyclip_path,polyclip_version
   
   ;; Compile the C clipper, if needed
   if n_elements(polyclip_compiled) eq 0 || keyword_set(rc) then begin 
@@ -196,8 +196,9 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
            endswitch 
            i++
         endwhile 
-        if ~done then message,'Clipper version test failed.',/NONAME
+        if ~done then message,'Clipper version test failed.',/NONAME 
         polyclip_compiled=1
+        polyclip_version=tmp[0]
      endelse 
      catch,/cancel 
   endif
