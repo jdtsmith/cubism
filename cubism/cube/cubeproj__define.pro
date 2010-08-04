@@ -5743,11 +5743,11 @@ function CubeProj::Stack,foreranges,BACKRANGES=backranges,WEIGHTS=weights, $
   ;; Add in uncertainty from background
   if use_unc && use_bg then begin 
      ;; With the accumulated weights, we can now compute the BG uncertainty
-     if lam_weight then $
+     if integrate then background_unc*=delta_nu_sum $
+     else if lam_weight then $
         background_unc=sqrt(total(back_finite* $
                                   back_weights_accum^2*back_cube_unc^2, $
-                                  3,/NAN))/stack_cnt $
-     else if integrate then background_unc*=delta_nu_sum 
+                                  3,/NAN))/stack_cnt 
      stack_var+=background_unc^2
   endif 
   
