@@ -5428,19 +5428,9 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,UNCERTAINTY=unc, $
      oSP=obj_new('IRS_Spectrum',FILE_BASE=self->FileBaseName()+'_'+ $
                  self.MODULE+(self.ORDER gt 0?strtrim(self.ORDER,2):''), $
                  PARENT_GROUP=self->TopBase())
-     ;; If the region was created by hand in pixel coordinates, create
-     ;; a region object for it
-     if n_elements(op) ne 0 then begin 
-        oReg=obj_new('IRS_Region')
-        oReg->SetRegion,op,ASTROMETRY=self->CubeAstrometryRecord()
-        oSP->SetProperty,REGION=oReg
-     endif 
      destroy=1
      if obj_valid(reg) then oSP->SetProperty,REGION=reg
-  endif else begin 
-     ;; Re-use a given region: it must have been extracted from that.
-     oSP->GetProperty,REGION=oReg
-  endelse 
+  endif  
   
   oSP->SaveInit,file
   if size(file,/TYPE) ne 7 then begin 
