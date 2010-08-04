@@ -4848,8 +4848,7 @@ function CubeProj::BackTrackPix, pix, plane,FOLLOW=follow,COUNT=cnt, ERROR=err
   endfor 
   
   if show then begin 
-     self->SetListSelect,where(show_vec),/NO_PRESERVE_TOP,/NO_UPDATE, $
-                         /NO_STATUS
+     self->SetListSelect,where(show_vec),/NO_PRESERVE_TOP,/NO_STATUS
      self->UpdateButtons
   endif 
   cnt=n_elements(all) 
