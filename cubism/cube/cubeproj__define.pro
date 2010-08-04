@@ -2430,7 +2430,7 @@ pro CubeProj::SwitchRecordDataType,r,FLATAP=f2ap,BCD=bcd,DROOPRES=dr,_EXTRA=e
   if array_equal(recs.type,recs[0].type) then begin 
      all_type=recs[0].type
      types=all_types[where(indgen(4) ne all_type AND all_types ne "Coad2d")]
-  endif 
+  endif else types=all_types[where(all_types ne "Coad2d")]
   
   if keyword_set(f2ap) then new_type=3
   if keyword_set(bcd) then new_type=0
