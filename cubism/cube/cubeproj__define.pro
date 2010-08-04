@@ -5184,11 +5184,13 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
   
   use_unc=ptr_valid(self.CUBE_UNC)
   
+  destroy=0
+
   if keyword_set(rff) then begin
      oReg=obj_new('IRS_Region')
-     oReg->ReadRegion,rff,PARENT_GROUP=self->TopBase(), $
-                      ASTROMETRY=self->CubeAstrometryRecord()
+     oReg->ReadRegion,rff,PARENT_GROUP=self->TopBase()
      if size(rff,/TYPE) ne 7 || ~file_test(rff) then return,-1
+     destroy=1
   endif
   
   if obj_valid(oReg) then begin ;we've got a region object, use it!
@@ -5237,11 +5239,13 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      oReg=obj_new('IRS_Region')
      oReg->SetRegionFromBox,low,high,OUTPUT_POLY=op, $
                             ASTROMETRY=self->CubeAstrometryRecord()
+     destroy=1
   endelse 
   
   if keyword_set(sf) then $
      self->SaveSpectrum,sf,sp,UNCERTAINTY=sp_unc,REGION=oReg,_EXTRA=e
   
+  if destroy then obj_destroy,oReg
   
   if keyword_set(exp) then begin 
      if use_unc then      $
@@ -5461,7 +5465,7 @@ pro CubeProj::SaveSpectrum,file,sp,oSP,UNCERTAINTY=unc, $
 
   oSP->Save,file
   
-  if n_elements(destroy) ne 0 then obj_destroy,oSP
+  if n_elements(destroy) ne 0 then obj_destroy,oSP,/NO_REGION_DESTROY
 end
 
 
