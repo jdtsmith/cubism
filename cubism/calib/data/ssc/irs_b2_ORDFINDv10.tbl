@@ -1,0 +1,11 @@
+\character channelID = 2
+\ S15.0 version for LL, last edited 18 Sept 2006 by D. Shupe
+\ x-coefficients (a0, a1, a2) changed for all orders.  Wavelength_min for order 3 changed.
+\ updated with Ball Code V fit, J. Howell, 2/25/08
+\ mixed solution, S15 orders 2&3, Ball order 1, J. Howell, 6/30/08
+\ x-coefficients for order 1 reverted to S15, J. Howell, 8/13/09
+| order | wavelength_center |  a5       | a4        | a3        |  a2       |    a1     | a0        |  b5       | b4        | b3        |  b2       |    b1     | b0        | wavelength_min | wavelength_max | width_search |  width_found |
+| int   | real              |  real     | real      | real      |  real     |    real   | real      |  real     | real      | real      |  real     |    real   | real      | real           | real           | real         |  real        |
+  1               31.00473    0.0000e+00  0.0000e+00  0.0000e+00   12.4693    -0.685      40.5546    0.0000e+00  0.0000e+00  0.0000e+00  8.405516    -171.0422   62.89905      19.5734          42.4361        3.4000e+01     3.400e+01
+  2               17.6121     0.0000e+00  0.0000e+00  0.0000e+00   20.2361     4.2438     78.2677    0.0000e+00  0.0000e+00  0.0000e+00  0.0000e+00  -192.077    40.0142       13.90            21.268         3.4000e+01     3.400e+01
+  3               20.398000   0.0000e+00  0.0000e+00  0.0000e+00    6.7861    -7.4870     80.1103    0.0000e+00  0.0000e+00  0.0000e+00  0.0000e+00  -111.230    121.5142      19.15            21.74          3.4000e+01     3.400e+01
