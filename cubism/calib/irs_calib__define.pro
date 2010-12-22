@@ -341,7 +341,9 @@ function IRS_Calib::FluxConv,module,order,WAVELENGTH=lam, $
   self->GetProperty,module,order,FLUXCON=fluxcon,TUNE=tune, $
                     KEY_WAV=key_wav,SLCF=slcf, $
                     PIXEL_OMEGA=pix_effective_omega, $
-                    DATE_OBS=dobs
+                    DATE_OBS=dobs,WAV_MIN=wmin,WAV_MAX=wmax
+  
+  if n_elements(lam) eq 0 then lam=findgen(100)/99.*(wmax-wmin)+wmin
   
   tune_func=poly(lam-key_wav,tune)
   
