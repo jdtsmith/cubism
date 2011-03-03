@@ -1278,7 +1278,18 @@ end
 
 
 ;=============================================================================
-;  ToggleBadPixel - Toggle the given bad pixel
+;  ToggleBadPixel - Toggle the given bad pixel.  Pix is the
+;                   one-dimensional pixel index (or an vector of such
+;                   indices) into a single BCD record (0... 128^2-1).
+;                   RECORD_INDEX specifies the index of the record in
+;                   question (0...num_recs-1), which depends on the
+;                   sort order.  Alternatively, RECORD_SET identifies
+;                   records by their unique EXP_ID.  Set SET to either
+;                   0 or 1 to clear or set the bad pixel status.
+;                   Otherwise, the status is toggled.  Set UPDATE to
+;                   update all subscribed tools (e.g. to update the
+;                   display of bad pixels).  AUTO is used to flag this
+;                   set as an auto-constructed bad pixel set.
 ;=============================================================================
 pro CubeProj::ToggleBadPixel,pix,SET=set,RECORD_INDEX=rec,RECORD_SET=rset, $
                              UPDATE=ud,AUTO=auto
@@ -3553,7 +3564,6 @@ pro CubeProj::MergeSetup,ORDS=ords
      
      ;; No overlap case... just concatenate
      if min_wav2 gt max_wav1 then begin 
-        ;;print,FORMAT='(%"No overlap:  %2d->%2d")',ords[ord-1],ords[ord]
         if n_elements(wave) gt 0 then wave=[wave,wave1] else wave=wave1
         wave_zero[ord]=wave_zero[ord-1]+n_elements(wave1) 
         last_over=0 & wh_clear_sav=-1
@@ -3570,14 +3580,10 @@ pro CubeProj::MergeSetup,ORDS=ords
      ;; Use as the primary wavelength set whichever had more samples in
      ;; the overlap region
      if cnt1 ge cnt2 then begin ; merge in the 2nd order's overlap.
-        ;print,FORMAT='(%"Merge 2nd orders overlap: %2d->%2d")',ords[ord-1],$
-        ;      ords[ord]
         use_wav=wave1[wh_over1]
         lose_wav=wave2[wh_over2]
         self->AddMergeRec,ord,wh_over2,lose_wav
      endif else begin           ;merge in the 1st order's overlap
-        ;print,FORMAT='(%"Merge 1st orders overlap: %2d->%2d")',ords[ord-1],$
-        ;      ords[ord]
         use_wav=wave2[wh_over2]
         lose_wav=wave1[wh_over1] ;offset into *current* wave1, may have been
                                 ; (likely ) trimmed 
@@ -3593,9 +3599,6 @@ pro CubeProj::MergeSetup,ORDS=ords
      if wh_clear1[0] ne -1 then wave_zero[ord]+=n_elements(wh_clear1) 
      ;; must correct via overlap count to ensure alignment
      wave_zero[ord]+=(cnt1-cnt2)>0
-     
-;     print,FORMAT='(%"Offsetting %2d to %3d with len1: %3d (%3d/%3d)")', $
-;           ords[ord],wave_zero[ord], n_elements(wh_clear1),cnt1,cnt2
      
      ;; Excise the overlapping chunks from both sides
      if wh_clear1[0] ne -1 then wave1=wave1[wh_clear1]
@@ -3628,7 +3631,6 @@ pro CubeProj::MergeSetup,ORDS=ords
                                      (wave[map_loc+1]-wave[map_loc]))
      (*self.MERGE)[ord].to=ptr_new(map_loc,/NO_COPY)
   endfor 
-;  print,'Total wavelength: ',n_elements(wave) 
   self.WAVELENGTH=ptr_new(wave,/NO_COPY)
 end
 
