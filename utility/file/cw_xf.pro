@@ -138,21 +138,21 @@ pro xf_getrecent ,flim,flist,dlim,dlist,filtlim,filtlist
    if nf ne 0 then begin
       flist=strarr(nf)
       readf, un,FORMAT='('+strtrim(nf,2)+'(A,:,/))',flist
-      if n_elements(flist) gt flim then flist=flist(0:flim-1)
+      if n_elements(flist) gt flim then flist=flist[0:flim-1]
    endif else begin
       flim=0 & flist=['']
    endelse
    if nd ne 0 then begin
       dlist=strarr(nd)
       readf, un,FORMAT='('+strtrim(nd,2)+'(A,:,/))',dlist
-      if n_elements(dlist) gt dlim then dlist=dlist(0:dlim-1)
+      if n_elements(dlist) gt dlim then dlist=dlist[0:dlim-1]
    endif else begin
       dlim=0 & dlist=['']
    endelse
    if nfilt ne 0 then begin
       filtlist=strarr(nfilt)
       readf, un,FORMAT='('+strtrim(nfilt,2)+'(A,:,/))',filtlist
-      if n_elements(filtlist) gt filtlim then filtlist=filtlist(0:filtlim-1)
+      if n_elements(filtlist) gt filtlim then filtlist=filtlist[0:filtlim-1]
    endif else begin
       filtlim=0 & filtlist=['']
    endelse
@@ -198,9 +198,9 @@ pro xf_addrecent, state,addfile,adddir
    widget_control, state.filtmenu_id, get_uvalue=filtlist
    if (state.butval and 1B) eq 0 then begin ;we're using a filter
       widget_control, state.filt_id,get_value=filtcurr
-      wh=where(filtlist ne filtcurr(0) and filtlist ne '',cnt)
+      wh=where(filtlist ne filtcurr[0] and filtlist ne '',cnt)
       if cnt gt 0 then $
-       filtlist=[filtcurr,filtlist(wh)] else filtlist=[filtcurr]
+       filtlist=[filtcurr,filtlist[wh]] else filtlist=[filtcurr]
       widget_control, state.filtmenu_id, set_uvalue=filtlist
    endif
    ;;--- remove and replace recent file if state.nu is non-zero
@@ -214,7 +214,7 @@ pro xf_recent_update,flist,dlist, filtlist
    common cw_xfblock, sep, recfile
    widget_control,/HOURGLASS
    openw, un,/get_lun,recfile
-   if filtlist(0) eq '' then nfilt=0 else nfilt=n_elements(filtlist)
+   if filtlist[0] eq '' then nfilt=0 else nfilt=n_elements(filtlist)
    nf=n_elements(flist) & nd=n_elements(dlist)
    printf,un,FORMAT='(I2,5X,I2,5X,I2)',nf, nd, nfilt
    printf,un,FORMAT='(A)',flist
@@ -281,7 +281,7 @@ function cw_xf_event, ev
       state.path_id: $          ;***path typed in
        begin
          widget_control,ev.id,get_value=dir
-         dir=dir(0)
+         dir=dir[0]
          if strmid(dir,0,1) eq '~' then dir=getenv('HOME')+strmid(dir,1)
          len=strlen(dir)
          if strmid(dir,len-1,1) ne sep then dir=dir+sep
@@ -331,7 +331,7 @@ function cw_xf_event, ev
          ;;--- update path and files
          ;; get old directory -- change things only if dir is different
          widget_control,state.path_id,get_value=olddir
-         if olddir(0) ne dir then begin
+         if olddir[0] ne dir then begin
             widget_control,state.path_id,set_value=dir
             xf_list, state      ;Update Dirs and files -- errors return  here
          endif
@@ -510,7 +510,7 @@ function cw_xf_event, ev
 
          ;; get old directory -- change things only if dir is different
          widget_control,state.path_id,get_value=olddir
-         if olddir(0) ne dir then begin
+         if olddir[0] ne dir then begin
             widget_control,state.path_id,set_value=dir
             xf_list, state ;Update Dirs,files -- errors will return from here
          endif
@@ -742,7 +742,7 @@ pro cw_xf_set_value, id, value
    WIDGET_CONTROL, stash, GET_UVALUE=state, /NO_COPY
 
    s=size(value)
-   case s(1) of
+   case s[1] of
       7: $                      ;It's a string
       begin
          ;; Parse out the directory from the supplied value
@@ -846,11 +846,11 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
       match, fuval, filtlist, sub1,sub2,count=cnt ;test for duplicates
       if cnt ne 0 then begin ; remove replicated ones
          showlist=filtlist
-         showlist(sub2)=''
+         showlist[sub2]=''
       endif else showlist=filtlist
       wh2=where(showlist ne '',cnt)
       if cnt ne 0 then begin
-         showlist=showlist(wh2)
+         showlist=showlist[wh2]
          fltlim=n_elements(showlist)
       endif else fltlim=0
       fuval=[fuval,filtlist]
@@ -861,16 +861,16 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    numfilts=nfl+fltlim          ;passed and recent filters
    filtstruct={flags:0,name:''}
    filtstruct=replicate(filtstruct,numfilts+1)
-   filtstruct(1:nfl).name=fl    ;put in preset filters
-   filtstruct(0).name="Filters"
-   filtstruct(0).flags=1 & filtstruct(numfilts).flags=2
+   filtstruct[1:nfl].name=fl    ;put in preset filters
+   filtstruct[0].name="Filters"
+   filtstruct[0].flags=1 & filtstruct[numfilts].flags=2
    if nrec ne 0 and fltlim ne 0 then begin
       ;;set initial filter list member to show
       if n_elements(sel) eq 0 then sel=nfl
-      if numfilts-1-nfl eq 0 then filtstruct(nfl+1:numfilts).name=showlist(0) $
+      if numfilts-1-nfl eq 0 then filtstruct[nfl+1:numfilts].name=showlist[0] $
       else $
-       filtstruct(nfl+1:numfilts).name=showlist
-      filtstruct(nfl+1).flags=4 ;separator line between set and recent filters
+       filtstruct[nfl+1:numfilts].name=showlist
+      filtstruct[nfl+1].flags=4 ;separator line between set and recent filters
    endif
    if n_elements(sel) eq 0 then sel=0
 
@@ -947,7 +947,7 @@ FUNCTION cw_xf,parent,UVALUE=uval,FILTERLIST=fl,start=start, $
    ;;--- FILTER SELECTION
    filtbase = widget_base(base,/ROW,space=1,/BASE_ALIGN_CENTER)
    nullid = widget_label(filtbase,VALUE='Filter:')
-   state.filt_id=widget_text(filtbase,VALUE=fuval(sel),XS=10,ysize=1,/EDIT)
+   state.filt_id=widget_text(filtbase,VALUE=fuval[sel],XS=10,ysize=1,/EDIT)
    
    state.filtmenu_id=cw_pdmenu(filtbase,filtstruct,/RETURN_NAME, $
                                uvalue=filtlist)
