@@ -4142,7 +4142,8 @@ pro CubeProj::BuildCube
               if ~dirty[k] then continue
               pix=*rec.DIRTY_PIX
            endelse 
-           ind=(pix mod bcd_size[0]) - rec.REV_BCD_XOFF + $
+           ;;indices offset into record's reverse_index space
+           ind=(pix mod bcd_size[0]) - rec.REV_BCD_XOFF + $ 
                pix/bcd_size[0]*rec.REV_BCD_WIDTH - rec.REV_BCD_MIN
            for j=0L,n_elements(ind)-1 do begin 
               if ind[j] lt 0 or ind[j] ge rec.REV_BCD_CNT then continue
@@ -4204,6 +4205,7 @@ pro CubeProj::BuildCube
         cube_unc=make_array(self.CUBE_SIZE,/FLOAT,VALUE=!VALUES.F_NAN)
   endif 
   areas=make_array(self.CUBE_SIZE,/FLOAT,VALUE=0.0)
+  if self.feedback then shown=bytarr(self.CUBE_SIZE[0:1])
   
   ;; Create mask from bad pixels
   if ptr_valid(self.GLOBAL_BAD_PIXEL_LIST) then begin 
@@ -4228,14 +4230,14 @@ pro CubeProj::BuildCube
      ;; Locate the dirty cube pixels in *this record*'s bounding box,
      ;; if any
      if quickbuild then begin 
-        inbb=where((cube_dirty_x-rev_off[0]) lt rev_width AND $
-                   (cube_dirty_x-rev_off[0]) ge 0 AND $
-                   (cube_dirty_y-rev_off[1]) lt rev_height AND $
-                   (cube_dirty_y-rev_off[1]) ge 0,inbb_cnt)
-        if inbb_cnt eq 0 then continue
-        x=cube_dirty_x[inbb]
-        y=cube_dirty_y[inbb]
-        z=cube_dirty_z[inbb]
+        in_rec_bb=where((cube_dirty_x-rev_off[0]) lt rev_width AND $
+                        (cube_dirty_x-rev_off[0]) ge 0 AND $
+                        (cube_dirty_y-rev_off[1]) lt rev_height AND $
+                        (cube_dirty_y-rev_off[1]) ge 0,in_rec_bb_cnt)
+        if in_rec_bb_cnt eq 0 then continue
+        x=cube_dirty_x[in_rec_bb]
+        y=cube_dirty_y[in_rec_bb]
+        z=cube_dirty_z[in_rec_bb]
         
         ;; Index into XY bounding box reverse index vector for cube
         ind=(x-rev_off[0]) + (y-rev_off[1])*rev_width + z*rev_wh - rev_min
@@ -4282,7 +4284,7 @@ pro CubeProj::BuildCube
         
         ;; Cube pixels and associated "notional" indices for reverse index
         if quickbuild then begin 
-           pix=cube_dirty_pix[inbb[inds]]
+           pix=cube_dirty_pix[in_rec_bb[inds]]
            inds=ind[inds]       ;convert to real bb-index
         endif else begin ;; loop in dual histogram bin count 
            ;; Translate bounding-box-cube pixels into the real cube
@@ -4308,16 +4310,12 @@ pro CubeProj::BuildCube
            if use_unc then cube_unc[pix[empty]]=0.0
            if self.feedback then begin 
               ;; Highlight newly filled pixels
-              if quickbuild then begin 
-                 wh=empty    ; Show all quick-builds (maybe none at half plane)
-              endif else begin  ; show only those at halfway-plane
-                 wh=where(z[empty] eq self.cube_size[2]/2,cnt)
-                 if cnt gt 0 then wh=empty[wh]
-              endelse 
+              w=where(~shown[x[empty],y[empty]],cnt)
               for j=0,cnt-1 do begin 
-                 xp=x[wh[j]] & yp=y[wh[j]]
+                 xp=x[empty[w[j]]] & yp=y[empty[w[j]]]
                  plots,[xp,xp,xp+1,xp+1,xp],[yp,yp+1,yp+1,yp,yp],THICK=2
               endfor 
+              if cnt gt 0 then shown[x[empty[w]],y[empty[w]]]=1b
            endif 
         endif 
         
