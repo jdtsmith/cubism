@@ -3353,6 +3353,7 @@ function CubeProj::BCD, which,UNCERTAINTY=unc,BMASK=bmask,ALL=all
   if ~array_equal(which lt 0 or which ge self->N_Records(),0b) then $
      self->Error,"Invalid record number: "+strjoin(strtrim(which,2),",")
   nw=n_elements(which) 
+  self->RestoreData,which
   if nw eq 1 then begin 
      if arg_present(unc) && ptr_valid((*self.DR)[which].UNC) then $
         unc=*(*self.DR)[which].UNC
