@@ -1857,7 +1857,7 @@ An example CubeView showing a stack average of 36 records is shown
 @node Tool Interaction, Box Regions, CubeView Tools, CubeView Tools
 @subsubsection Tool Interaction
 
-Their are two categories of main CubeView tools, @emph{exclusive} tools,
+There are two categories of main CubeView tools, @emph{exclusive} tools,
 which require exclusive control of the mouse input, and
 @emph{non-exclusive} tools, any number of which can be active at any
 time.  These two types are separated in the tool palette, with exclusive
@@ -1974,13 +1974,13 @@ The non-exclusive tools are:
 @tab Display a compass rose
 @end multitable
 
-Not all tools are active at all times --- inactive tools are grayed
-out.  Among the tools, Cube Extraction can only be used when viewing a
-cube, pixel backtracking can only be used when viewing a single cube
-plane, and bad pixels and order masking are enabled only when viewing
-BCD data, Visualization is only possible with a visualization image,
-and the Compass Rose is disabled except with cubes and visualization
-images (i.e. images with WCS information).
+Not all tools are active at all times --- inactive tools are grayed out.
+Among the tools, Cube Extraction can only be used when viewing a cube,
+pixel backtracking can only be used when viewing a single cube plane,
+and bad pixels and order masking are enabled only when viewing BCD data.
+Visualization is only possible with a visualization image, and the
+Compass Rose is disabled except with cubes and visualization images
+(i.e. images with WCS coordinate information).
 
 
 @node Zoom Tool, Histogram Tool, Tool Overview, CubeView Tools
@@ -4595,8 +4595,8 @@ exact code path which led to the error in the IDL shell.  This code path
 might be enough to give you a hint as to the nature of the problem, but
 is also useful for the upstream maintainers for debugging purposes.
 
-Report problems to the SSC, @email{help@@spitzer.caltech.edu},
-including, at minimum:
+Report problems at the Spitzer Science Center helpdesk, including, at
+minimum:
 
 @enumerate
 @item A brief statement of the problem.
@@ -4604,8 +4604,8 @@ including, at minimum:
 isolated to the smallest necessary number.
 @item Example inputs which trigger the problem, if applicable (e.g. a
 FITS file which gives trouble).
-@item The full traceback message reported after you have enabled
-Debugging.
+@item The full traceback message reported in the IDL console window
+after you have enabled Debugging.
 @end enumerate
 
 If CUBISM freezes and you cannot make any progress, try
