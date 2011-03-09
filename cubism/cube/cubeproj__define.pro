@@ -96,7 +96,7 @@
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2002-2010 J.D. Smith
+;  Copyright (C) 2002-2011 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -471,7 +471,7 @@ pro CubeProj::ShowEvent, ev
                     '    Polyclip: '+clip,                 $
                     '                                   ', $
                     '    JD Smith and the SINGS Team    ', $
-                    '         (c) 2002-2010             ', $
+                    '         (c) 2002-2011             ', $
                     '   http://sings.stsci.edu/cubism   ', $
                     '***********************************']
      end
@@ -860,7 +860,7 @@ pro CubeProj::Show,FORCE=force,SET_NEW_PROJECTNAME=spn,_EXTRA=e
   (*self.wInfo).xsize=bgeom.SCR_XSIZE
   
   @cubism_version
-  status=string(164b)+' CUBISM version '+cubism_version+ $
+  status=string(164b)+' CUBISM version ' + cubism_version + $
          ' by JD Smith and the SINGS team'
   self->Status,status
   
