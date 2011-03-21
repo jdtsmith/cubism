@@ -46,7 +46,8 @@
 ;    ObjMsg-->tvPlug-->CubeBackTrack
 ;
 ; MODIFICATION HISTORY:
-;    
+;
+;    2011-03-16 (JDS): Sortable columns
 ;    2003-03-31 (J.D. Smith): Written
 ;-
 ;    $Id$
@@ -182,16 +183,24 @@ pro CubeBackTrack::On
   self.cube->GetProperty,PROJECT_NAME=pn
   self.msg_base=string(FORMAT='(%"Cube: %s")',pn)
   title=string(FORMAT='(%"BackTracking: %s")',pn)
-  self.msg_head= $
-     "BCD                      Pix          Frac       Val                 "+$
-     "Back                (Val-Back)     Flag"
-  msg=self.msg_base+string(10b)+self.msg_head
+  msg=self.msg_base
   
   if ~widget_info(self.wBase,/VALID_ID) then begin 
      self.wBase=widget_base(/COLUMN, SPACE=1,GROUP_LEADER=self.parent, $
                             TITLE=title, /TLB_SIZE_EVENTS,UVALUE=self)
      self.wLabel=widget_label(self.wBase,value=msg,/ALIGN_LEFT, $
                               /DYNAMIC_RESIZE)
+     
+     self.wHead=cw_bgroup(self.wBase,/EXCLUSIVE, /FRAME, $
+                          ['BCD                ', $
+                           'Pix     ', $
+                           'Frac    ', $
+                           'Val           ', $
+                           'Back        ', $
+                           '(Val-Back)   ', $
+                           'Flag    '], $
+                          SET_VALUE=self.sort,UVALUE='sort',/ROW)
+     
      if self.list_size gt 0 then $
         self.wList=widget_list(self.wBase,XSIZE=111,SCR_YSIZE=self.list_size, $
                                /CONTEXT_EVENTS) $
@@ -328,22 +337,27 @@ pro CubeBackTrack::Event,ev
            end
         endcase 
      end 
-     else: ; Flush all other events
+     'WIDGET_LIST':             ;do nothing on the list
+     else: begin                ;; Sort columns
+        widget_control, ev.id,GET_UVALUE=action
+        if n_elements(action) eq 0 || action ne 'sort' || ev.select eq 0 then return
+        self.sort=ev.value
+        self->UpdateList, /PRESERVE
+     end 
   endcase 
 end
 
 ;=============================================================================
 ;  UpdateList - Update the list of backtracked pixels
 ;=============================================================================
-pro CubeBackTrack::UpdateList
+pro CubeBackTrack::UpdateList,PRESERVE=preserve
   if ~widget_info(self.wLabel,/VALID_ID) then return
   widget_control, self.wList,UPDATE=0
   msg=self.msg_base+ $
       (self.point[0] eq -1?$
        string(FORMAT='(%" Pix: [--,--] %6.3f um")',self.wavelength): $
        string(FORMAT='(%" Pix: [%d,%d] %6.3f um")',self.point, $
-              self.wavelength))+ $
-      string(10b)+self.msg_head
+              self.wavelength))
   widget_control, self.wLabel,GET_VALUE=oldmsg
   if oldmsg ne msg then widget_control, self.wLabel,SET_VALUE=msg
   if self.point[0] eq -1 then begin 
@@ -361,18 +375,24 @@ pro CubeBackTrack::UpdateList
      return
   endif 
   
-  if n_elements(*self.list) gt 0 && size(*self.list,/TYPE) eq 8 && $
-     size(list,/TYPE) eq 8 then begin 
-     cnt=n_elements(tag_names(list))
-     good=0
-     for i=0,cnt-1 do good+=array_equal(list.(i),(*self.list).(i))
-     if good eq cnt then return ; list did not change!
-  endif 
-  
   oldid=''
   pm=string(177b)
   if size(list,/TYPE) ne 8 || size(list,/N_DIMENSIONS) eq 0 then str='' else $
      begin 
+     
+
+     
+     
+     case self.sort of 
+        0: s=-1
+        1: s=sort(string(FORMAT='(I5.5)',list.BCD_PIX)+list.ID)
+        2: s=sort(list.AREA)
+        3: s=sort(list.BCD_VAL)
+        4: s=sort(list.BACK_VAL)
+        5: s=sort(list.BCD_VAL-list.BACK_VAL)
+        6: s=sort(list.FLAGS)
+     endcase 
+     if s[0] ge 0 then list=list[s]
      str=strarr(n_elements(list))
      for i=0,n_elements(list)-1 do begin 
         str[i]=string(FORMAT='(" (",I3,",",I3,") ",' + $
@@ -464,7 +484,7 @@ pro CubeBackTrack__define
       lock:0b, $                ;whether to lock onto a single point
       list:ptr_new(), $         ;the backtrack list
       msg_base:'', $            ;the base for the title
-      msg_head:'', $            ;the header message
+      sort:0, $                 ;which column to sort on
       ;; Widget 
       color:0, $                ;the color to draw ourselves with
       list_size:0, $            ;pixel size of the list
@@ -472,6 +492,7 @@ pro CubeBackTrack__define
       parent:0L, $
       wBase:0L, $
       wLabel:0L, $
+      wHead:0L, $               ;header columns
       wList:0L, $               ;list widget
       wMenu:0L, $               ;context menu
       wCBut_global_mark: 0L, $  ;mark button (global)
