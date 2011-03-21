@@ -2739,9 +2739,10 @@ pro CubeProj::Sort,sort
      1:  s=sort((*self.DR).TIME)
      2:  s=sort((*self.DR).DATE_OBS)
      3:  s=sort((*self.DR).DATE)
-     4:  s=sort(long((*self.DR).FOVID)+ishft(long((*self.DR).TYPE),16))
-     5:  s=sort((*self.DR).EXP)
-     6:  s=sort((*self.DR).OBJECT)
+     4:  s=sort(ulong64((*self.DR).FOVID)+ishft(ulong64((*self.DR).TYPE),6)+ $
+               ishft(ulong64((*self.DR).DCEID),8))
+     5:  s=sort(ulong64((*self.DR).EXP)+ishft(ulong64((*self.DR).DCEID),32))
+     6:  s=sort((*self.DR).OBJECT+string(FORMAT='(I12)',(*self.DR).DCEID))
      7:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[0]: $
                 (*self.DR).RQST_POS[0])
      8:  s=sort(self.reconstructed_pos?(*self.DR).REC_POS[1]: $
