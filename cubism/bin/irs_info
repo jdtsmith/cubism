@@ -21,12 +21,18 @@ foreach (@keywords) {$keywords{pack("A8",$_)}++;};
        39=>'LL1_b  ', 40=>'LL1_cen', 41=>'LL_cen ', 44=>'LL2_a  ',
        45=>'LL2_b  ', 46=>'LL2_cen', 50=>'SH_a   ', 51=>'SH_b   ',
        52=>'SH_cen ', 56=>'LH_a   ', 57=>'LH_b   ', 58=>'LH_cen ');
-
-find({wanted =>
-      sub{
-	return unless -f and /(\.bcd_fp|_bcd)\.fits$/;
-	parsefile($File::Find::dir, $_);
-      },  follow => 1 }, '.');
+if(@ARGV) {
+  use File::Basename;
+  foreach (@ARGV) {
+    parsefile(dirname($_),$_)
+  }
+} else {
+  find({wanted =>
+	sub{
+	  return unless -f and /(\.bcd_fp|_bcd)\.fits$/;
+	  parsefile($File::Find::dir, $_);
+	},  follow => 1 }, '.');
+}
 
 sub parsefile {
   my ($dir,$file)=@_;
@@ -98,12 +104,14 @@ foreach $obj (sort keys %bcds) {
 
 	  # Maps: check on steps for this subslit
 	  @steps=@missing=();
-	  foreach $step (@{$rec{steps}}) {
-	    $steps[$step->[0]][$step->[1]]++;
-	  }
-	  for ($i=1; $i<=$rec{STEPSPAR}; $i++) {
-	    for ($j=1; $j<=$rec{STEPSPER}; $j++) {
-	      push @missing,[$i,$j] unless $steps[$i][$j];
+	  unless(@ARGV) {
+	    foreach $step (@{$rec{steps}}) {
+	      $steps[$step->[0]][$step->[1]]++;
+	    }
+	    for ($i=1; $i<=$rec{STEPSPAR}; $i++) {
+	      for ($j=1; $j<=$rec{STEPSPER}; $j++) {
+		push @missing,[$i,$j] unless $steps[$i][$j];
+	      }
 	    }
 	  }
 	  $missing=@missing?("!!! Missing map steps: ".
