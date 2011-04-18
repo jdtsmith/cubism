@@ -384,19 +384,17 @@ end
 pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
                             WAVE_CENTER=wc,WAV_MIN=wmn,WAV_MAX=wmx, $
                             PLATE_SCALE=ps,PIXEL_OMEGA=po,PMASK=pmask, $
-                            FLUXCON=fluxcon,KEY_WAV=fluxcon_kw,TUNE=tune, $
+                            FLUXCON=fluxcon,KEY_WAV=fluxcon_kw,TUNE=tune,$
                             SLCF=slcf,WAVECUT=wavecut,DATE_OBS=dobs
-  if arg_present(pmask) then begin 
+  if n_elements(module) ne 0 then begin 
      m=irs_module(module)
-     pmask=self.PMASK[m]
-  endif
-  if arg_present(slcf) then begin 
-     m=irs_module(module)
-     slcf=self.SLCF[m]
-  endif
+     if n_elements(order) ne 0 then $
+        rec=self->GetRecord(module,order,/MUST_EXIST)
+  endif 
+  if arg_present(pmask) then pmask=self.PMASK[m]
+  if arg_present(slcf) then slcf=self.SLCF[m]
   if arg_present(name) then name=self.name
-  if n_elements(module) ne 0 then $
-     rec=self->GetRecord(module,order,/MUST_EXIST)
+     
   if size(rec,/TYPE) ne 8 then return
   if arg_present(sl) then   sl=rec.SLIT_LENGTH
   if arg_present(wc) then   wc=rec.WAV_CENTER
@@ -406,8 +404,8 @@ pro IRS_Calib::GetProperty, module, order, NAME=name,SLIT_LENGTH=sl, $
   if arg_present(po) then po=rec.PIXEL_OMEGA
   
   ;; Date-specific fluxcons (e.g. LH, bias change).
-  if arg_present(fluxcon) || arg_present(fluxcon_kw) || $
-     arg_present(tune) then begin 
+  if arg_present(fluxcon) || arg_present(fluxcon_kw) || arg_present(tune) $
+  then begin 
      if ptr_valid(rec.FLUXCON_RECS) then begin 
         dates=(*rec.FLUXCON_RECS).VALID_FROM
         if n_elements(dobs) gt 0 then begin 
@@ -1270,7 +1268,7 @@ pro IRS_Calib::ReadCalib,module, WAVSAMP_VERSION=wv,ORDER_VERSION=orv, $
   if n_elements(module) ne 0 then modules=[irs_module(module)] $
   else modules=indgen(4)        ;do them all, by default
   
-  ;; Singles load a single set of data per module
+  ;; Singles: load a single set of data per module
   singles=where(cals.group eq 'single',COMPLEMENT=alls,NCOMPLEMENT=acnt,scnt)
   for i=0,n_elements(modules)-1 do begin 
      md=modules[i]
@@ -1539,6 +1537,7 @@ pro IRS_Calib::ParsePMASK,file,module
   self.PMASK[m]=ptr_new(readfits(file,/SILENT))
   self.PMASK_FILE[m]=file
 end
+
 
 ;=============================================================================
 ;  ParseSLCF
