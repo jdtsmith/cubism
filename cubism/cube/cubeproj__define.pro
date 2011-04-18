@@ -5237,11 +5237,11 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
                                                  low[1]:high[1],*]^2,1,/NAN), $
                           1,/NAN))/gcnt
      endif 
+     destroy=~arg_present(oReg)
      
      oReg=obj_new('IRS_Region')
      oReg->SetRegionFromBox,low,high,OUTPUT_POLY=op, $
                             ASTROMETRY=self->CubeAstrometryRecord()
-     destroy=1
   endelse 
   
   if keyword_set(sf) then $
