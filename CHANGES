@@ -11,6 +11,28 @@ in:
 Please reference this paper for published use of the tool.
 
 
+Changes for Version 1.8
+=======================
+
+ - Updated calibration for IRS pipeline vesion S18.18.
+
+ - Updates for compatibility with IDL version 8.
+
+ - Fix crash which occurred with highly trimmed WAVSAMP boundaries.
+
+ - Backtracking pixels in the cubes updates selected records in a
+   Visualization image (great for seeing where data which contributed
+   to a given cube pixel came from on the sky).
+
+ - Sort by column in the Backtrack window -- useful for quickly
+   identifying outliers.
+
+ - Ensure proper units are saved in FITS cubes.
+
+ - Update IRAC filter curves (normalized and photon-counting) in CubeSpec.
+
+ - Handle NaN's more correctly in simple rectangular extractions.
+
 Changes for Version 1.7
 =======================
 
