@@ -22,7 +22,8 @@
 ;
 ; INPUT PARAMETERS:
 ;
-;    file: The name of a '.cpj' Cubism Project file.
+;    file: The name of a '.cpj' Cubism Project file, or a FITS cube
+;    (.fits) file written by CUBISM.
 ;
 ; OUTPUTS:
 ;
@@ -34,14 +35,15 @@
 ;    
 ; MODIFICATION HISTORY:
 ;
-;    2006-11-20 (J.D. Smith): Written.
+;   2011-04-15 (J.D. Smith): Load FITS cubes as well.
+;   2006-11-20 (J.D. Smith): Written.
 ;-
 ;    $Id$
 ;##############################################################################
 ; 
 ; LICENSE
 ;
-;  Copyright (C) 2006 J.D. Smith
+;  Copyright (C) 2006, 2011 J.D. Smith
 ;
 ;  This file is part of CUBISM.
 ;
@@ -63,10 +65,16 @@
 ;##############################################################################
 
 function cubeproj_load,file
-  cube=restore_object(file,'CubeProj', $
-                      OTHER_CLASSES=['irs_aperture','irs_file_io', $
-                                     'irs_spectrum','irs_map','irs_cube', $
-                                     'cubeautobadpix'])
+  if stregex(file,'.fits$',/BOOLEAN) then begin 
+     cube=obj_new('CubeProj')
+     cube->LoadCubeFromFITS,file
+  endif else begin 
+     cube=restore_object(file,'CubeProj', $
+                         OTHER_CLASSES=['irs_aperture','irs_file_io', $
+                                        'irs_spectrum','irs_map','irs_cube', $
+                                        'cubeautobadpix'])
+  endelse 
+  
   if obj_valid(cube) then begin 
      if ~obj_isa(cube,'CubeProj') then $
         message,'Invalid Cube Project'
