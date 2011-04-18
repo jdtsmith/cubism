@@ -151,7 +151,7 @@ pro IRS_Cube::Save,sf
   
   ;; Recursively save uncertainty cube
   if ptr_valid(self.cube_unc) then begin 
-     sf=file_basename(sf,'.fits')+'_unc.fits'
+     sf=filepath(ROOT=file_dirname(sf),file_basename(sf,'.fits')+'_unc.fits')
      cube=self.cube
      self.cube=self.cube_unc & self.cube_unc=ptr_new()
      self->Save,sf
