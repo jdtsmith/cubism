@@ -3174,7 +3174,6 @@ pro CubeProj::GetProperty, $
      self.cal->GetProperty,self.module,PMASK=pmask
      if ~ptr && ptr_valid(pmask) then pmask=*pmask
   endif
- 
   
   ;;--- AS_BUILT or current global settings
   this=keyword_set(as_built)?self.AS_BUILT:self
@@ -5298,7 +5297,7 @@ pro CubeProj::ParseCubeHeaderInfo,in_obj
 end
 
 ;=============================================================================
-;  SaveCube - Save the cube using a cube object
+;  SaveCube - Save the cube as a 3D FITS cube
 ;=============================================================================
 pro CubeProj::SaveCube,file,COMMENTS=comm
   if ~ptr_valid(self.cube) || ~ptr_valid(self.WAVELENGTH) then return
