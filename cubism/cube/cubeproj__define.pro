@@ -4624,6 +4624,7 @@ function CubeProj::BCDBounds,recs,_EXTRA=e
      ;; data targeted at another order.
      if (*self.DR)[recs[i]].TARGET_ORDER ne self.ORDER && $
         self.ORDER ne 0 then begin
+        self->LoadCalib
         self.cal->TransformCoords,self.MODULE,[1.#a_rect,1.#d_rect],pa, $
                                   ORDER1=(*self.DR)[recs[i]].TARGET_ORDER, $
                                   self.MODULE,ORDER2=self.ORDER, $
