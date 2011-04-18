@@ -6,10 +6,10 @@
 @direntry
 * CUBISM: (cubism).	IDL-based tool for Spitzer IRS Spectral Map Reduction
 @end direntry
-@set EDITION 1.7
-@set VERSION 1.7
+@set EDITION 1.8
+@set VERSION 1.8
 @set IDLVERSIONREQUIRED 6.2
-@set DATE July, 2009
+@set DATE April, 2011
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jd.smith@@utoledo.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
@@ -41,7 +41,7 @@ IRS Spectral Maps.
 This is edition @value{EDITION} of the @cite{CUBISM User Manual} for
 CUBISM @value{VERSION}
 
-Copyright @copyright{} 2006, 2007, 2008 J.D. Smith
+Copyright @copyright{} 2006, 2007, 2008, 2009, 2010, 2011 J.D. Smith
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.2 or
@@ -652,7 +652,7 @@ MacOSX users can accomplish the same thing by optionally using the
 precompiled wrapper @file{Cubism.app} application: simply double-click
 (or double-click a @file{.cpj} CUBISM project file).  Note that even
 under OSX, CUBISM runs as an X11 application, and that @file{Cubism.app}
-is simply a wrapper to start IDL in the VM and load CUBISM.
+is simply a wrapper to start IDL in the IDL Virtual Machine and load CUBISM.
 
 @node Upgrading,  , Running, Installation
 @section Upgrading
