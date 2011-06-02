@@ -80,6 +80,7 @@ end
 ;**************************OverRiding methods********************************
 ;; Motion and button messages expected
 pro tvSlice::Message,msg
+  compile_opt idl2
   self->tvPlug::Message,msg,TYPE=type
   case type of 
      'DRAW_MOTION': begin 
