@@ -11,7 +11,7 @@ CUBISM_APP = Cubism.app
 CUBISM_DMG_DIR =  cubism_$(CUBISM-VERSION)
 CUBISM_DMG = $(CUBISM_DMG_DIR).dmg
 
-IDL = idl
+IDL = idl71
 
 .PHONY: all
 all: bindist srcdist dmg
