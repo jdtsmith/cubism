@@ -8,8 +8,8 @@
 @end direntry
 @set EDITION 1.8
 @set VERSION 1.8
-@set IDLVERSIONREQUIRED 6.2
-@set DATE April, 2011
+@set IDLVERSIONREQUIRED 7.1
+@set DATE June, 2011
 @set AUTHOR J.D. Smith
 @set AUTHOREMAIL jd.smith@@utoledo.edu
 @set CUBISMHOMEPAGE http://sings.stsci.edu/cubism
