@@ -61,8 +61,7 @@ Invariant Sections.
 @sp 4
 @center @image{images/logo2,,,Cubism Logo}
 
-@author{by J.D. Smith, Lee Armus, Brent Buckalew, Danny Dale,}
-@author{@w{ } @w{ } @w{ }George Helou, Helene Roussel & Kartik Sheth}
+@author by J.D. Smith, Lee Armus, Brent Buckalew, Danny Dale, George Helou, Helene Roussel & Kartik Sheth
 
 @page
 
@@ -2161,15 +2160,15 @@ as a bad pixel.}
 @end float
 
 The pixel backtracking tool is an advanced cube analysis and
-verification tool.  It is enabled only when viewing a single plane of a
-spectral cube.  For the pixel under the cursor, it displays a list of
-all the input BCD pixel fragments which contributed to that cube pixel,
-and simultaneously highlights the contributing records in the associated
-CUBISM Project window.  The more pixel redundancy built into your map,
-the greater the number of records and record pixels which contributed to
-a given cube pixel (also, cubes from the high-resolution modules
-typically have more, since there is also overlap among the multiple
-high-res orders).
+verification tool.  It is enabled only when viewing a @emph{single
+plane} of a spectral cube.  For the pixel under the cursor, it displays
+a list of all the input BCD pixel fragments which contributed to that
+cube pixel, and simultaneously highlights the contributing records in
+the associated CUBISM Project window.  The more pixel redundancy built
+into your map, the greater the number of records and record pixels which
+contributed to a given cube pixel (also, cubes from the high-resolution
+modules typically have more, since there is also overlap among the
+multiple high-res orders).
 
 The information displayed includes the record ID, the pixel within that
 record, and the fractional contribution to the cube pixel being
@@ -2193,7 +2192,10 @@ or cleared as a global or record-level bad pixel (@pxref{Global and
 Record Level Bad Pixels}).  In addition, you can simultaneously set a
 given BCD pixel as a record level bad pixel in @emph{all} the listed
 records contributing that pixel using the @kbd{Bad Pixel (These
-records)} context menu option.
+records)} context menu option.  By default, the list of contributing
+pixels is sorted by BCD identifier; clicking on the column head buttons
+toggles sorting by any of the columns, which can be useful for example
+to quickly identify major outliers in the distribution for long lists.
 
 You can
 continue to navigate through the cube while backtracking is active.
