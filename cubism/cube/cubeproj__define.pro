@@ -5192,7 +5192,7 @@ function CubeProj::Extract,low,high, SAVE=sf, EXPORT=exp, FROM_FILE=rff, $
      oReg=obj_new('IRS_Region')
      oReg->ReadRegion,rff,PARENT_GROUP=self->TopBase()
      if size(rff,/TYPE) ne 7 || ~file_test(rff) then return,-1
-     destroy=1
+     destroy=~arg_present(oReg)
   endif
   
   if obj_valid(oReg) then begin ;we've got a region object, use it!
