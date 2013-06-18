@@ -140,7 +140,7 @@ EXAMPLE:
 		    areas, $            ; OUT: output areas
 		    px_out,py_out,ri_out) x_out
 		    
-/*#############################################################################
+#############################################################################
  LICENSE
 
   Copyright (C) 2001,2002,2003,2006, 2007 J.D. Smith
@@ -166,7 +166,7 @@ EXAMPLE:
 #include <stdio.h>
 
 int  polyclip(float *,float *, int, int, int, float *, float *);
-int  polyclip_shclip(float, float, int, int, int);
+void  polyclip_shclip(float, float, int, int, int);
 void polyclip_shclose(int, int, int);
 int  polyclip_inside(float, float, int, int, int);
 void polyclip_intersect(float, float, int, int, int);
@@ -198,7 +198,7 @@ void polyclip_single(int argc,void * argv[]) {
   ri_out[0]=0;
   for(indx=0,i=l;i<=r;i++) {
     for(j=b;j<=t;j++) {
-      if(nv_clip=polyclip(px,py,nverts,i,j,px_out,py_out)) {
+      if((nv_clip=polyclip(px,py,nverts,i,j,px_out,py_out))) {
 	area=polyclip_area(px_out,py_out,nv_clip);
 	if (area==0.0) continue;
 	areas[indx]=area;	/* Discard degenerates */
@@ -248,7 +248,7 @@ void polyclip_multi(int argc, void* argv[]) {
     this_nclip_poly=0;
     for(i=l[k];i<=r[k];i++) {
       for(j=b[k];j<=t[k];j++) {
-	if(nv_clip=polyclip(px,py,nverts,i,j,px_out,py_out)) {
+	if((nv_clip=polyclip(px,py,nverts,i,j,px_out,py_out))) {
 	  area=polyclip_area(px_out,py_out,nv_clip);
 	  if (area==0.0) continue; /* Discard degenerates */
 	  areas[indx]=area;	
@@ -299,7 +299,7 @@ int polyclip(float *px, float *py, int n, int i, int j,
 
 /* Reentrant Sutherland-Hodgman Clipper */
 /* Recursively clip a polygon with all 4 boundaries of pixel (i,j) */
-int polyclip_shclip(float px, float py, int i, int j, int side) {
+void polyclip_shclip(float px, float py, int i, int j, int side) {
   int in_p;
 
 #ifdef DEBUG
@@ -375,6 +375,7 @@ int polyclip_inside(float px, float py, int i, int j, int side) {
   case BOTTOM: 
     return (py>=j);
   }
+  return -1;
 }
 
 void polyclip_intersect(float px, float py,int i, int j, int side) { 
