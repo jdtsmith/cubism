@@ -208,6 +208,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   ;; See if we have multiple polygons passed
   if n_elements(poly_inds) ne 0 then begin 
      n_poly=n_elements(poly_inds)-1L
+     multi=1b
      if app then $
         message,'Clipped polygon output not supported for multiple poly inputs.'
   endif else n_poly=1
@@ -215,7 +216,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
   sx=long(sx) & sy=long(sy)
   
   ;; Count up the pixels from the various polygon's bounding boxes
-  if n_poly gt 1 then begin 
+  if keyword_set(multi) then begin 
      npix=0L                   ;use histogram over poly length
      h=histogram(poly_inds[1:*]-poly_inds,OMIN=om,REVERSE_INDICES=ri)
      bottom=lonarr(n_poly,/NOZERO) & top=lonarr(n_poly,/NOZERO)
@@ -260,7 +261,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      beg=0
      for p=0L,n_poly-1 do begin 
         nclip_poly=0L
-        if n_poly gt 1 then begin 
+        if keyword_set(multi) then begin 
            px1=px[beg:poly_inds[p+1]-1]
            py1=py[beg:poly_inds[p+1]-1]
         endif else begin 
@@ -295,7 +296,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
               nclip_poly++
            endfor
         endfor
-        if n_poly gt 1 then begin
+        if keyword_set(multi) then begin
            beg=poly_inds[p+1]
            poly_inds[p+1]=poly_inds[p] + nclip_poly
         endif
@@ -314,7 +315,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
      inds=lonarr(2,npix)        ;Output x,y indices which clipped the poly(s)
      
      areas=fltarr(npix,/NOZERO) 
-     if n_poly gt 1 then begin 
+     if keyword_set(multi) then begin 
         ;; Multiple polys input: no output polygons; poly_inds is
         ;; input/output for area & inds
         if size(poly_inds,/TYPE) ne 13 then poly_inds=ulong(poly_inds) 
