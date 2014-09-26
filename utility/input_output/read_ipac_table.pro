@@ -47,15 +47,18 @@
 ;
 ;      |  column1 |  column2 | column3 | column4  |    column5       |   
 ;      |  double  |  double  |   int   |   double |     char         | 
+;      |  unit1   |  unit2   |  unit3  |   unit4  |     unit5        | 
 ;      111111111111222222222223333333333444444444445555555555555555555  
 ;
 ; EXAMPLE:
 ;
-;    foo=read_ipac_table
+;    foo=read_ipac_table(file)
 ;    print,foo
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2014-09-02 (J.D. Smith): Correctly read tables with large number
+;                             of columns.
 ;    2007-02-12 (J.D. Smith): Null value check, using explicit field
 ;                             widths, and handling tabs.
 ;    2006-08-04 (J.D. Smith): Improved header reading speed for long
@@ -95,6 +98,24 @@
 ;
 ;##############################################################################
 
+function read_ipac_table_readline,line,data_fmt
+  ;; data_fmt is an array of structures ala:
+  ;;   {format: fmt, data_elem:de}
+  ;; where fmt is a complete and valid format string, and de is a
+  ;; pointer to a structure with matching types/names.  
+  ;; reads can then account for long lines with too many format codes.
+  ;; returns a single concatenated structure of all the resulting
+  ;; data_elem structures.
+  
+  foreach fmt,data_fmt do begin 
+     de=*fmt.data_elem
+     reads,line,de,FORMAT=fmt.format
+     if n_elements(data_elems) eq 0 then data_elems=de else $
+        data_elems=create_struct(data_elems,de) ; concatenate
+  endforeach 
+  return,data_elems
+end
+
 function read_ipac_table,file, hdr,UNITS=units
   openr,un,file,/get_lun
   line=''
@@ -102,6 +123,7 @@ function read_ipac_table,file, hdr,UNITS=units
   nlines=file_lines(file)
   at_data=(chead=0)
   hcnt=0L
+  max_tok=50                    ;maximum number of tokens to read in one go
   while ~eof(un) do begin 
      readf,un,line
      if ~strtrim(line,2) then continue ; Skip blank lines
@@ -126,7 +148,7 @@ function read_ipac_table,file, hdr,UNITS=units
               nt=n_elements(tok) 
               width=[sep_pos[1:*],strlen(line)]-sep_pos
               width[0]+=1       ;first gets an extra column
-              toff=sep_pos+1    ; T format code is 1-based
+              toff=sep_pos+1L   ;T format code is 1-based
               toff[0]--         ;first column starts on the separator
               
               case chead++ of 
@@ -142,47 +164,68 @@ function read_ipac_table,file, hdr,UNITS=units
                     got=bytarr(nt)
                     format=strarr(nt)
                     tok=strlowcase(tok)
-                    for i=0,n_elements(tok)-1 do begin 
-                       case 1 of 
-                          strmatch(tok[i],'r*'): begin 
-                             val=0.0
-                             got[i]=2b
-                             format[i]='F'
-                          end 
-                          strmatch(tok[i],'i*'): begin 
-                             val=0L
-                             got[i]=1b ;indicate integer
-                             format[i]='I'
-                          end 
-                          strmatch(tok[i],'d*'): begin 
-                             val=0.0D
-                             got[i]=3b
-                             format[i]='D'
-                          end
-                          strmatch(tok[i],'c*'): begin 
-                             got[i]=0b ;indicate string
-                             val=''
-                             format[i]='A'
-                          end
-                          1: message,'Unknown format code '+tok[i]
-                       endcase 
+                    
+                    full_data_elem=!NULL
+                    ngrps=1L+long((nt-1L)/max_tok) 
+                    data_fmt=replicate({format:'',data_elem:ptr_new()},ngrps)
+                    for grp=0L,ngrps-1L do begin 
+                       ;; bundle in groups of length  max_tok
+                       beg=grp*max_tok
+                       en=((grp+1L)*max_tok-1L)<(nt-1L)
+                       data_elem=!NULL
+                       for i=beg,en do begin 
+                          case 1 of 
+                             strmatch(tok[i],'r*') || $
+                                strmatch(tok[i],'f*'): begin 
+                                val=0.0
+                                got[i]=2b
+                                format[i]='F'
+                             end 
+                             
+                             strmatch(tok[i],'i*'): begin 
+                                val=0L
+                                got[i]=1b ;indicate integer
+                                format[i]='I'
+                             end 
+                             
+                             strmatch(tok[i],'d*'): begin 
+                                val=0.0D
+                                got[i]=3b
+                                format[i]='D'
+                             end
+                             
+                             strmatch(tok[i],'c*'): begin 
+                                got[i]=0b ;indicate string
+                                val=''
+                                format[i]='A'
+                             end
+                             1: message,'Unknown format code '+tok[i]
+                          endcase 
                        
-                       ;; Create/extend the input data structure
-                       if n_elements(data_elem) eq 0 then $
-                          data_elem=create_struct(tags[i],val) $
-                       else data_elem=create_struct(data_elem,tags[i],val) 
+                          ;; Create/extend the input data structure
+                          if n_elements(data_elem) eq 0 then $
+                             data_elem=create_struct(tags[i],val) $
+                          else data_elem=create_struct(data_elem,tags[i],val) 
+                       endfor
+                       if n_elements(full_data_elem) eq 0 then $
+                          full_data_elem=data_elem $
+                       else full_data_elem=create_struct(full_data_elem, $
+                                                           data_elem)
+                       subfmt=reform(['T'+ $
+                                        transpose(strtrim(toff[beg:en],2)), $
+                                        transpose(format[beg:en]+$
+                                                    strtrim(width[beg:en],2))],$
+                                       2*(en-beg+1L))
+                       data_fmt[grp].format='('+strjoin(subfmt,",")+')'
+                       data_fmt[grp].data_elem=ptr_new(data_elem,/NO_COPY)
                     endfor
-                    format=reform(['T'+transpose(strtrim(toff,2)), $
-                                   transpose(format+strtrim(width,2))], $
-                                  2*n_elements(format))
-                    format='('+strjoin(format,",")+')'
                  end
                  2: begin       ;units
                     units=tok
                  end 
                  3: begin       ;null value
                     nullvalue=strtrim(tok,2)
-                    null_elem=data_elem
+                    null_elem=full_data_elem
                     for i=0,n_elements(got)-1 do begin 
                        case got[i] of $
                           0b: val=nullvalue[i] ; string
@@ -200,7 +243,8 @@ function read_ipac_table,file, hdr,UNITS=units
            else: begin 
               at_data=1
               nlines=nlines-line_cnt+1
-              ret=replicate(data_elem,nlines)
+              
+              ret=replicate(full_data_elem,nlines)
               line_cnt=0
            end 
         endcase
@@ -213,8 +257,8 @@ function read_ipac_table,file, hdr,UNITS=units
         null=where(strtrim(parts,2) eq nullvalue,nullcnt,COMPLEMENT=keep, $
                    NCOMPLEMENT=keepcnt)
         
-        if nullcnt gt 0 then begin 
-           if keepcnt gt 0 then begin 
+        if nullcnt gt 0 then begin    ; some null values
+           if keepcnt gt 0 then begin ; but not all null values
               p=parts[null]
               ;; Set to 00000 so it will always parse
               mx=max(width[null])
@@ -222,14 +266,14 @@ function read_ipac_table,file, hdr,UNITS=units
               parts[null]=p
               line=strjoin(parts)
               ;; read data
-              reads,line,data_elem,FORMAT=format
+              data_elems=read_ipac_table_readline(line,data_fmt)
               ;; set nulls in
-              for i=0,nullcnt-1 do data_elem.(null[i])=null_elem.(null[i])
-           endif else data_elem=null_elem ;no reading required
-        endif else reads,line,data_elem,FORMAT=format
-     endif else reads,line,data_elem,FORMAT=format
-              
-     ret[line_cnt++]=data_elem
+              for i=0,nullcnt-1 do data_elems.(null[i])=null_elem.(null[i])
+           endif else data_elems=null_elem ;no reading required
+        endif else data_elems=read_ipac_table_readline(line,data_fmt)
+     endif else data_elems=read_ipac_table_readline(line,data_fmt)
+     
+     ret[line_cnt++]=data_elems
   endwhile
   
   if hcnt gt 0 then hdr=hdr[0:hcnt-1]
@@ -242,5 +286,6 @@ function read_ipac_table,file, hdr,UNITS=units
   for i=0,stringcnt-1 do ret.(wh[i])=strtrim(ret.(wh[i]),2)
   if arg_present(units) && chead lt 2 then units=replicate('',n_tags(ret))
   free_lun,un
+  ptr_free,data_fmt.data_elem
   return,ret
 end
