@@ -302,6 +302,7 @@ pro IRS_Region::ReadRegion,file,_EXTRA=e
      st=read_ipac_table(file,hdr)
      self->ParseRegion,hdr,file,/IPAC_TABLE
   endelse 
+  self.source=file
 end
 
 ;=============================================================================
@@ -443,7 +444,7 @@ end
 ;  Init
 ;=============================================================================
 function IRS_Region::Init,source
-  if n_elements(source) ne 0 then self.source=source
+  if n_elements(source) ne 0 then self->ReadRegion,source
   return,1
 end
 
