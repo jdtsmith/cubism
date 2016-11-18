@@ -4554,7 +4554,7 @@ function CubeProj::CubeAstrometryRecord,ZERO_OFFSET=zo
      crpix=self.CUBE_SIZE[0:1]/2.+.5 ;[1,1] => pixel center FITS silliness
   cdelt=self.PLATE_SCALE/self.OVERSAMPLE_FACTOR
   make_astr,astr,CD=cd,DELTA=[-cdelt,cdelt],CRPIX=crpix,CRVAL=self.POSITION, $
-            CTYPE=['RA---TAN','DEC--TAN']
+            CTYPE=['RA---TAN','DEC--TAN'],RADECSYS='FK5'
   return,astr
 end
 
