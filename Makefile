@@ -58,9 +58,9 @@ $(CUBISM_SRC_FILE): $(CUBISM_MAN_FILE)
 
 $(CUBISM_APP): $(CUBISM_SAVE_FILE) $(CUBISM_MAN_FILE)
 	rm -rf $(CUBISM_APP)
-	platypus -D -a 'Cubism' -o 'None' -u 'JD Smith' \
-		-p /bin/sh -V $(CUBISM-VERSION) -I org.jdsmith.Cubism \
-		-s Cbsm -X 'cpj' -T Cbsm \
+	platypus -a 'Cubism' -o 'None' -u 'JD Smith' \
+		-p /bin/bash -V $(CUBISM-VERSION) -I org.jdsmith.Cubism \
+		-s Cbsm -X 'cpj' -T Cbsm  \
 		-i cubism/main/cubism.icns \
 		-f $(CUBISM_SAV_FILE) -f cubism/calib/data \
 		-f cubism/calib/polyclip.c -f cubism/map_sets \

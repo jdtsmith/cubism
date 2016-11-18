@@ -1,6 +1,5 @@
 #!/bin/sh
 top=$(dirname "$0")
-
 if [ `which open-x11` ]; then
     # Open X11 and find the display, for Tiger only
     TMP=/tmp/$UID/TemporaryItems
