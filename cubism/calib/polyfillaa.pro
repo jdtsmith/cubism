@@ -159,8 +159,7 @@ function polyfillaa, px,py,sx,sy, AREAS=areas, POLYGONS=polys,NO_COMPILED=nc, $
            'Error: '+!ERROR_STATE.MSG
         polyclip_compiled=0
      endif else begin 
-        @cubism_dir
-        path=filepath(ROOT=cubism_dir,'calib')
+        path=file_dirname((scope_traceback(/STRUCTURE))[-1].FILENAME)
         reuse=~keyword_set(rc)  ; Don't reuse if re-compiling
         done=0
         i=1
