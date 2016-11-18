@@ -19,6 +19,7 @@
 ;
 ; MODIFICATION HISTORY:
 ;
+;    2012-03-21 (J.D. Smith): Fixed 1/2 pixel offset from double-conversion.
 ;    2005-03-24 (J.D. Smith): Initially written.
 ;   
 ;-
@@ -59,7 +60,7 @@ function IRS_Region::ClipRegion,image,clip_astr,_REF_EXTRA=ref
   if ~ptr_valid(self.region) then return,-1
   self->GetProperty,X=x,Y=y,ASTROMETRY=clip_astr
   s=size(image,/DIMENSIONS)
-  return,polyfillaa(x+0.5,y+0.5,s[0],s[1],_EXTRA=ref)
+  return,polyfillaa(x,y,s[0],s[1],_EXTRA=ref)
 end
 
 ;=============================================================================
