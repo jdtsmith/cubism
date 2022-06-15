@@ -2979,8 +2979,8 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
                           APERTURE=aper,SAVE_FILE=sf, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
                           GLOBAL_BAD_PIXEL_LIST=gbpl, WAVECUT=wavecut, $
-                          RECONSTRUCTED_POSITIONS=rcp, USE_BACKGROUND=ubg,$
-                          BACKGROUND_FRAME = back, BACKGROUND_UNC = back_unc, 
+                          RECONSTRUCTED_POSITIONS=rcp, USE_BACKGROUND=ubg, $
+                          BACKGROUND_FRAME = back, BACKGROUND_UNC = back_unc, $
                           USE_UNCERTAINTY=uunc, LOAD_MASKS=lm, $
                           LOAD_UNCERTAINTY=lu,FLUXCON=fc,SLCF=slcf, $
                           PIXEL_OMEGA=po, SAVE_ACCOUNTS=sa,SAVE_DATA=sd, $
