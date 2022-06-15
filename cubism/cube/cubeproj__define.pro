@@ -3832,7 +3832,7 @@ end
 ;                 corresponding cube pixel.
 ;=============================================================================
 pro CubeProj::BuildAccount,_EXTRA=e
-  widget_control, /HOURGLASS
+  if self.feedback then widget_control, /HOURGLASS
   self->MergeSetup
   self.CUBE_SIZE[2]=n_elements(*self.WAVELENGTH) 
 
@@ -4018,7 +4018,7 @@ end
 ;                 histogram method).
 ;=============================================================================
 pro CubeProj::BuildRevAcct
-  widget_control, /HOURGLASS
+  if self.feedback then widget_control, /HOURGLASS
   accs_changed=0b
   if self->Dirty(/ACCOUNTS,/LAYOUT) then $
      ptr_free,(*self.DR).REV_ACCOUNT,(*self.DR).REV_DUAL, $
@@ -4088,7 +4088,7 @@ end
 ;              fluxing information if appropriate)
 ;=============================================================================
 pro CubeProj::BuildCube
-  widget_control, /HOURGLASS
+  if self.feedback then widget_control, /HOURGLASS
   if ~ptr_valid(self.DR) then return
   self->RestoreAll              ;get all of the data, if necessary
   
@@ -5004,7 +5004,7 @@ pro CubeProj::AutoBadPixels,NO_PROMPT=np,RECORD_BAD_PIX=rbp,_EXTRA=e
                               (~ptr_valid(self.DR) || $
                                array_equal(ptr_valid((*self.DR).UNC),0b)), $
                               RECORD_ONLY=rbp
-     widget_control, /HOURGLASS
+     if self.feedback then widget_control, /HOURGLASS
      if maxvar eq -1 then return
   endif 
   
@@ -5976,7 +5976,7 @@ pro CubeProj::AddGroup,DIR=dir,MODULE_ONLY=md,COADD=cd,DROOPRES=dr,FLATAP=fl
      type='BCD' & filt='*bcd{,_fp}.fits'
   endelse
   
-  widget_control, /HOURGLASS
+  if self.feedback then widget_control, /HOURGLASS
   files=file_search(dir,filt,/TEST_REGULAR,COUNT=cnt)
   if cnt eq 0 then $
      self->Error,['No data found in:',dir],TITLE='Data Import Error'
@@ -6009,7 +6009,7 @@ pro CubeProj::AddGroup,DIR=dir,MODULE_ONLY=md,COADD=cd,DROOPRES=dr,FLATAP=fl
                 PARENT_GROUP=self->TopBase(),/MODAL,/NONEXCLUSIVE, $
                 SCROLL=n_elements(list) ge 10 )
   
-  widget_control, /HOURGLASS
+  if self.feedback then widget_control, /HOURGLASS
   
   if ch[0] ne -1 then $
      for i=0,n_elements(ch)-1 do self->AddData,*choices[ch[i]].FILES
