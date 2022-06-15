@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/local/bin/perl
 #
 # irs_info -- Summarize info for IRS data in directories at and
 # beneath the current one..
