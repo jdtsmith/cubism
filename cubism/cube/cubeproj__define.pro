@@ -2980,7 +2980,7 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
                           PROJECTNAME=pn,SPAWNED=spn,FEEDBACK=fb, $
                           GLOBAL_BAD_PIXEL_LIST=gbpl, WAVECUT=wavecut, $
                           RECONSTRUCTED_POSITIONS=rcp, USE_BACKGROUND=ubg,$
-                          BACKGROUND = back, BACKGROUND_UNC = back_unc, 
+                          BACKGROUND_FRAME = back, BACKGROUND_UNC = back_unc, 
                           USE_UNCERTAINTY=uunc, LOAD_MASKS=lm, $
                           LOAD_UNCERTAINTY=lu,FLUXCON=fc,SLCF=slcf, $
                           PIXEL_OMEGA=po, SAVE_ACCOUNTS=sa,SAVE_DATA=sd, $
