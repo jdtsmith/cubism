@@ -3088,12 +3088,12 @@ pro CubeProj::SetProperty,OVERSAMPLE_FACTOR=osf,NSTEP=nstep, $
   if n_elements(debug) ne 0 then self.debug=keyword_set(debug) 
   
   if n_elements(back) eq 0 then begin 
-     self.BACKGROUND = ptr_new(back, /NO_COPY)
+     self.BACKGROUND = ptr_new(back)
      self->ResetAccounts,/NO_UPDATE & self->SetDirty
   endif 
      
   if n_elements(back_unc) eq 0 then begin 
-     self.BACKGROUND_UNC = ptr_new(back_unc, /NO_COPY)
+     self.BACKGROUND_UNC = ptr_new(back_unc)
      self->ResetAccounts,/NO_UPDATE & self->SetDirty
   endif 
   
