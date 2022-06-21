@@ -5289,9 +5289,9 @@ pro CubeProj::AddOutputInfo,out_obj,_EXTRA=e
   fullname=irs_fov(MODULE=self.MODULE,ORDER=self.ORDER,POSITION=0,/SLIT_NAME, $
                    /LOOKUP_MODULE,/ON_ARRAY)
   out_obj->SetProperty,SOFTWARE='CUBISM',VERSION=self.version, $
-                       FLUX_UNITS=self->FluxUnits(/AS_BUILT,_EXTRA=e), $
-                       CAL_SET=calname,APERNAME=fullname
-  widget_control,/HOURGLASS  
+                                FLUX_UNITS=self->FluxUnits(/AS_BUILT,_EXTRA=e), $
+                                CAL_SET=calname,APERNAME=fullname
+  if self->isWidget() then widget_control,/HOURGLASS  
 end
 
 
